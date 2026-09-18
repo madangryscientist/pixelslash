@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "pixelslash",
+  "root": "apps/pixelslash",
+  "sourceRoot": "apps/pixelslash/src",
+  "projectType": "application",
+  "tags": ["scope:pixelslash", "type:app", "runtime:bun"],
+  "targets": {
+    "run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bun src/index.ts",
+        "cwd": "apps/pixelslash"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bunx tsc --noEmit",
+        "cwd": "apps/pixelslash"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bun test",
+        "cwd": "apps/pixelslash"
+      }
+    }
+  }
+}
