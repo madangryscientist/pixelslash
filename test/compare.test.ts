@@ -4,7 +4,7 @@ import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { run } from "../src/compare.ts";
-import type { ProcLike, SpawnProc } from "../src/compare.ts";
+import type { CapturePage, ProcLike, SpawnProc } from "../src/compare.ts";
 
 const FIXTURES = join(import.meta.dir, "../fixtures");
 const PAGES = join(FIXTURES, "pages");
@@ -841,5 +841,107 @@ describe("pixel run", () => {
       },
     ]);
     expect(cap.stdout).toContain("http://192.168.0.30:5050/pixelslash/run1");
+  });
+});
+
+function fakeCapture(shots: { url: string; width: number }[]): CapturePage {
+  return async (url, dest, width) => {
+    shots.push({ url, width });
+    const src = url.includes("branch") ? join(DS, "card.png") : join(DS, "button.png");
+    await Bun.write(dest, Bun.file(src));
+  };
+}
+
+describe("url pair without a design system", () => {
+  test("--live --local with neither --ds nor --file stores overlay + manifest and exits 0", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const shots: { url: string; width: number }[] = [];
+    let spawned = false;
+    const code = await run(
+      ["--live", "http://main.example/", "--local", "http://branch.example/", "--out", out],
+      cap.io,
+      {
+        capture: fakeCapture(shots),
+        which: () => null,
+        spawn: () => {
+          spawned = true;
+          return fakeProc("OK");
+        },
+      },
+    );
+    expect(code).toBe(0);
+    expect(spawned).toBe(false);
+    expect(shots).toEqual([
+      { url: "http://main.example/", width: 1280 },
+      { url: "http://branch.example/", width: 1280 },
+    ]);
+    expect(cap.stdout).toMatch(/changed pixels/);
+    expect(cap.stdout).not.toMatch(/skip: no judge/);
+    expect(existsSync(join(out, "main.png"))).toBe(true);
+    expect(existsSync(join(out, "branch.png"))).toBe(true);
+    expect(existsSync(join(out, "diff.png"))).toBe(true);
+    const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as {
+      changedPixels: number;
+      createdAt: string;
+    };
+    expect(manifest.changedPixels).toBeGreaterThan(0);
+    expect(manifest.createdAt).toMatch(/^\d{4}-/);
+  });
+
+  test("--push of a URL pair prints the dashboard url", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const posts: { url: string; auth: string | null; files: string[] }[] = [];
+    const fetch = async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      const form = init?.body as FormData;
+      posts.push({
+        url,
+        auth: new Headers(init?.headers).get("authorization"),
+        files: ["main", "branch", "diff", "manifest"].filter((k) => form.get(k) != null),
+      });
+      return Response.json({ id: "run1" }, { status: 200 });
+    };
+    const code = await run(
+      ["--live", "http://main.example/", "--local", "http://branch.example/", "--out", out, "--push"],
+      cap.io,
+      {
+        capture: fakeCapture([]),
+        fetch,
+        env: { OMNIBUS_API: "http://192.168.0.30:5050", OMNIBUS_API_TOKEN: "tok" },
+      },
+    );
+    expect(code).toBe(0);
+    expect(posts).toEqual([
+      {
+        url: "http://192.168.0.30:5050/api/pixelslash/runs",
+        auth: "Bearer tok",
+        files: ["main", "branch", "diff", "manifest"],
+      },
+    ]);
+    expect(cap.stdout).toContain("http://192.168.0.30:5050/pixelslash/run1");
+  });
+
+  test("--routes without --ds or --file is out", async () => {
+    const cap = capture();
+    const code = await run(
+      [
+        "--live",
+        "http://main.example/",
+        "--local",
+        "http://branch.example/",
+        "--routes",
+        join(tmpdir(), "pixelslash-no-routes.txt"),
+      ],
+      cap.io,
+      { capture: fakeCapture([]) },
+    );
+    expect(code).toBe(2);
+    expect(cap.stderr).toMatch(/need --ds DIR or --file FILE_KEY/);
+    expect(cap.stderr).toMatch(/A URL pair may omit --ds and --file/);
+    expect(cap.stderr).not.toMatch(/routes file not found/);
   });
 });

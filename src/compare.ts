@@ -7,7 +7,7 @@ import { pushRun, PushError, resolveOrigin, resolveToken as resolvePushToken } f
 import { writeRunFiles, type RunManifest } from "./run.ts";
 
 const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT]";
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT]\nA URL pair may omit --ds and --file. --routes still needs --ds or --file.";
 const FIGMA_API = "https://api.figma.com/v1";
 const DEFAULT_WIDTH = 1280;
 const MLX_BIN = "mlx_vlm.generate";
@@ -30,11 +30,14 @@ export type SpawnProc = (cmd: string[], opts?: Record<string, unknown>) => ProcL
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export type CapturePage = (url: string, dest: string, width: number) => Promise<void>;
+
 export type Deps = {
   spawn?: SpawnProc;
   fetch?: FetchLike;
   env?: NodeJS.ProcessEnv;
   which?: (bin: string) => string | null;
+  capture?: CapturePage;
 };
 
 type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
@@ -103,7 +106,8 @@ function parseArgs(argv: string[]): Cli {
     );
   }
   if (dsRaw && file) throw new UsageError("need --ds DIR or --file FILE_KEY, not both");
-  if (!dsRaw && !file && !pngMode) {
+  const urlPair = urlMode && !routesFile;
+  if (!dsRaw && !file && !pngMode && !urlPair) {
     throw new UsageError("need --ds DIR or --file FILE_KEY");
   }
   if (flags.has("push") && routesFile) throw new UsageError("--push is for a single pair, not --routes");
@@ -369,7 +373,7 @@ async function compare(cli: Cli, deps: Deps = {}, browser?: Browser): Promise<Co
     await shot(browser, cli.live!, liveShot, cli.width);
     await shot(browser, cli.local!, localShot, cli.width);
   } else {
-    await capturePair(cli.live!, cli.local!, liveShot, localShot, cli.width);
+    await capturePair(cli.live!, cli.local!, liveShot, localShot, cli.width, deps.capture);
   }
 
   const main = Buffer.from(await Bun.file(liveShot).arrayBuffer());
@@ -406,7 +410,13 @@ async function capturePair(
   liveDest: string,
   localDest: string,
   width: number,
+  capture?: CapturePage,
 ): Promise<void> {
+  if (capture) {
+    await capture(liveUrl, liveDest, width);
+    await capture(localUrl, localDest, width);
+    return;
+  }
   const browser = await chromium.launch({ headless: true });
   try {
     await shot(browser, liveUrl, liveDest, width);
