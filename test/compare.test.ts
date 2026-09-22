@@ -925,23 +925,91 @@ describe("url pair without a design system", () => {
     expect(cap.stdout).toContain("http://192.168.0.30:5050/pixelslash/run1");
   });
 
-  test("--routes without --ds or --file is out", async () => {
+  test("--routes with URL origins pixel-diffs each path without a design system", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const routes = join(dir, "routes.txt");
+    await Bun.write(routes, "/\n\n/pricing/\n");
     const cap = capture();
+    const shots: { url: string; width: number }[] = [];
+    let spawned = false;
+    let fetched = false;
     const code = await run(
       [
         "--live",
-        "http://main.example/",
+        "http://main.example",
         "--local",
-        "http://branch.example/",
+        "http://branch.example",
         "--routes",
-        join(tmpdir(), "pixelslash-no-routes.txt"),
+        routes,
+        "--out",
+        out,
+        "--width",
+        "800",
       ],
       cap.io,
-      { capture: fakeCapture([]) },
+      {
+        capture: fakeCapture(shots),
+        which: () => null,
+        spawn: () => {
+          spawned = true;
+          return fakeProc("VIOLATION nope");
+        },
+        fetch: async () => {
+          fetched = true;
+          throw new Error("figma must not be called");
+        },
+      },
+    );
+    expect(code).toBe(0);
+    expect(spawned).toBe(false);
+    expect(fetched).toBe(false);
+    expect(shots).toEqual([
+      { url: "http://main.example/", width: 800 },
+      { url: "http://branch.example/", width: 800 },
+      { url: "http://main.example/pricing", width: 800 },
+      { url: "http://branch.example/pricing", width: 800 },
+    ]);
+    for (const slug of ["index", "pricing"]) {
+      const routeOut = join(out, slug);
+      expect(existsSync(join(routeOut, "live.png"))).toBe(true);
+      expect(existsSync(join(routeOut, "local.png"))).toBe(true);
+      expect(existsSync(join(routeOut, "diff.png"))).toBe(true);
+      const manifest = JSON.parse(await Bun.file(join(routeOut, "manifest.json")).text()) as {
+        changedPixels: number;
+      };
+      expect(manifest.changedPixels).toBeGreaterThan(0);
+      const report = await Bun.file(join(routeOut, "report.html")).text();
+      expect(report).toContain(slug === "index" ? "/" : "/pricing");
+      expect(report).toContain("changed pixels");
+      expect(report).toContain("main.png");
+      expect(report).toContain("branch.png");
+      expect(report).toContain("diff.png");
+    }
+    const index = await Bun.file(join(out, "index.html")).text();
+    expect(index).toContain('href="index/report.html"');
+    expect(index).toContain('href="pricing/report.html"');
+    expect(index).toContain("/pricing");
+    expect(cap.stdout).toMatch(/\d+ changed pixels/);
+    expect(cap.stdout).toContain("file://");
+    expect(cap.stdout).toContain("index.html");
+    expect(cap.stdout).not.toMatch(/skip: no judge/);
+    expect(cap.stdout).not.toMatch(/new on branch/);
+  });
+
+  test("--push with --routes stays a single pair", async () => {
+    const dir = await tmp();
+    const routes = join(dir, "routes.txt");
+    await Bun.write(routes, "/\n");
+    const cap = capture();
+    const shots: { url: string; width: number }[] = [];
+    const code = await run(
+      ["--live", "http://main.example/", "--local", "http://branch.example/", "--routes", routes, "--push"],
+      cap.io,
+      { capture: fakeCapture(shots) },
     );
     expect(code).toBe(2);
-    expect(cap.stderr).toMatch(/need --ds DIR or --file FILE_KEY/);
-    expect(cap.stderr).toMatch(/A URL pair may omit --ds and --file/);
-    expect(cap.stderr).not.toMatch(/routes file not found/);
+    expect(cap.stderr).toMatch(/--push is for a single pair/);
+    expect(shots).toEqual([]);
   });
 });

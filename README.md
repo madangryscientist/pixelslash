@@ -12,7 +12,7 @@ A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-d
 
 `--live-png` / `--local-png` skip Playwright and use existing shots (GTK / Omnishell). `--ds` / `--file` may be omitted in this mode too: same pixel-diff store.
 
-`--routes FILE` is one path per line (`/` `/pricing` …). `--live` and `--local` are then origins: each path is two captures + the DS judge. `--live-png-dir` / `--local-png-dir` is the GTK form (`index.png` for `/`, `pricing.png` for `/pricing`). Writes `--out/index.html` linking each route's `report.html`. `--routes` still needs `--ds` or `--file`.
+`--routes FILE` is one path per line (`/` `/pricing` …). `--live` and `--local` are origins. Without `--ds` or `--file`, each path is two captures, a pixel diff (`main.png`, `branch.png`, `diff.png`, manifest), and `report.html`. `--out/index.html` links those reports. Exit 0. Do not pass `--push` — that stays a single pair. With `--ds` or `--file`, each path is still two captures plus the DS judge. `--live-png-dir` / `--local-png-dir` is the GTK form (`index.png` for `/`, `pricing.png` for `/pricing`) and still needs `--ds` or `--file`.
 
 With `--ds` or `--file`, one URL run captures both at the page width, then checks each shot against every DS component raster. Prefers `mlx_vlm.generate` when present (Mac). Else `ollama run qwen2.5vl` with the page shot, the DS raster, then the prompt (`ollama` on PATH; 100% local). PNG mode with `--ds` copies the given files into `--out` as `live.png` / `local.png` and runs the same judge. Reports violations already on Main vs NEW violations on Branch. Exit 1 if any NEW violations, else 0.
 
@@ -48,7 +48,13 @@ Main vs a branch preview, with a design system:
 bunx nx run pixelslash:run -- --live https://example.com --local http://127.0.0.1:4173 --ds apps/pixelslash/fixtures/ds --out .pixelslash
 ```
 
-Several routes (origins already up):
+Several routes, no design system (origins already up):
+
+```
+bunx nx run pixelslash:run -- --live https://example.com --local http://127.0.0.1:4173 --routes routes.txt --out .pixelslash
+```
+
+Several routes, with a design system:
 
 ```
 bunx nx run pixelslash:run -- --live https://example.com --local http://127.0.0.1:4173 --routes routes.txt --ds apps/pixelslash/fixtures/ds --out .pixelslash

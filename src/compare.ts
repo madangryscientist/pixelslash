@@ -7,7 +7,7 @@ import { pushRun, PushError, resolveOrigin, resolveToken as resolvePushToken } f
 import { writeRunFiles, type RunManifest } from "./run.ts";
 
 const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT]\nA URL pair may omit --ds and --file. --routes still needs --ds or --file.";
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT]\nURL origins may omit --ds and --file, including --routes. --push is a single pair. PNG route dirs still need --ds or --file.";
 const FIGMA_API = "https://api.figma.com/v1";
 const DEFAULT_WIDTH = 1280;
 const MLX_BIN = "mlx_vlm.generate";
@@ -106,8 +106,7 @@ function parseArgs(argv: string[]): Cli {
     );
   }
   if (dsRaw && file) throw new UsageError("need --ds DIR or --file FILE_KEY, not both");
-  const urlPair = urlMode && !routesFile;
-  if (!dsRaw && !file && !pngMode && !urlPair) {
+  if (!dsRaw && !file && !pngMode && !urlMode) {
     throw new UsageError("need --ds DIR or --file FILE_KEY");
   }
   if (flags.has("push") && routesFile) throw new UsageError("--push is for a single pair, not --routes");
@@ -153,7 +152,9 @@ export async function run(argv: string[], io: Io = process, deps: Deps = {}): Pr
     const result = cli.routes ? await compareRoutes(cli, deps) : await compare(cli, deps);
     let code = 0;
     if (!cli.ds) {
-      io.stdout.write(`pixelslash: ${result.manifest?.changedPixels ?? 0} changed pixels\nout: ${fileUrl(result.out)}\n`);
+      const px = result.changedPixels ?? result.manifest?.changedPixels ?? 0;
+      const where = cli.routes ? `report: ${fileUrl(result.reportPath)}` : `out: ${fileUrl(result.out)}`;
+      io.stdout.write(`pixelslash: ${px} changed pixels\n${where}\n`);
     } else if (result.skipped) {
       io.stdout.write(`skip: no judge\nreport: ${fileUrl(result.reportPath)}\n`);
     } else {
@@ -310,16 +311,27 @@ type CompareResult = {
   skipped: boolean;
   manifest?: RunManifest;
   out: string;
+  changedPixels?: number;
+};
+
+type RouteRow = {
+  path: string;
+  slug: string;
+  already: number;
+  fresh: number;
+  skipped: boolean;
+  changedPixels: number;
 };
 
 async function compareRoutes(cli: Cli, deps: Deps = {}): Promise<CompareResult> {
   const routes = cli.routes ?? [];
+  const pixel = !cli.ds;
   await mkdir(cli.out, { recursive: true });
   let browser: Browser | undefined;
-  if (cli.live && cli.local) {
+  if (cli.live && cli.local && !deps.capture) {
     browser = await chromium.launch({ headless: true });
   }
-  const rows: { path: string; slug: string; already: number; fresh: number; skipped: boolean }[] = [];
+  const rows: RouteRow[] = [];
   const already: Violation[] = [];
   const fresh: Violation[] = [];
   let skipped = false;
@@ -339,7 +351,18 @@ async function compareRoutes(cli: Cli, deps: Deps = {}): Promise<CompareResult> 
         deps,
         browser,
       );
-      rows.push({ path, slug, already: one.already.length, fresh: one.fresh.length, skipped: one.skipped });
+      const changedPixels = one.manifest?.changedPixels ?? 0;
+      if (pixel) {
+        await Bun.write(join(cli.out, slug, "report.html"), renderPixelReport({ path, changedPixels }));
+      }
+      rows.push({
+        path,
+        slug,
+        already: one.already.length,
+        fresh: one.fresh.length,
+        skipped: one.skipped,
+        changedPixels,
+      });
       already.push(...one.already);
       fresh.push(...one.fresh);
       skipped = one.skipped;
@@ -348,8 +371,16 @@ async function compareRoutes(cli: Cli, deps: Deps = {}): Promise<CompareResult> 
     await browser?.close();
   }
   const reportPath = join(cli.out, "index.html");
-  await Bun.write(reportPath, renderIndex(rows));
-  return { already, fresh, reportPath, skipped, out: cli.out };
+  await Bun.write(reportPath, renderIndex(rows, pixel));
+  const changedPixels = rows.reduce((n, r) => n + r.changedPixels, 0);
+  return {
+    already,
+    fresh,
+    reportPath,
+    skipped,
+    out: cli.out,
+    changedPixels: pixel ? changedPixels : undefined,
+  };
 }
 
 async function compare(cli: Cli, deps: Deps = {}, browser?: Browser): Promise<CompareResult> {
@@ -555,19 +586,59 @@ function renderViolations(title: string, items: Violation[], empty: string, cls:
   return `<section class="${cls}"><h2>${esc(title)}</h2>${body}</section>`;
 }
 
-function renderIndex(
-  rows: { path: string; slug: string; already: number; fresh: number; skipped: boolean }[],
-): string {
+function renderPixelReport(input: { path: string; changedPixels: number }): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PixelSlash ${esc(input.path)}</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; background: #111; color: #eee; }
+    header { padding: 16px 24px; border-bottom: 1px solid #333; }
+    h1 { font-size: 16px; font-weight: 600; margin: 0; }
+    p { margin: 8px 0 0; color: #aaa; }
+    section { padding: 24px; }
+    .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    figure { margin: 0; background: #1a1a1a; padding: 8px; }
+    figcaption { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #aaa; margin-bottom: 6px; }
+    img { display: block; width: 100%; height: auto; background: #000; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PixelSlash</h1>
+    <p>${esc(input.path)} · ${input.changedPixels} changed pixels</p>
+  </header>
+  <section>
+    <div class="row">
+      <figure><figcaption>Main</figcaption><img src="main.png" alt="Main"></figure>
+      <figure><figcaption>Branch</figcaption><img src="branch.png" alt="Branch"></figure>
+      <figure><figcaption>Diff</figcaption><img src="diff.png" alt="Diff"></figure>
+    </div>
+  </section>
+</body>
+</html>
+`;
+}
+
+function renderIndex(rows: RouteRow[], pixel: boolean): string {
   const items = rows
     .map((r) => {
-      const status = r.skipped
-        ? "skip: no judge"
-        : `${r.already} already on Main · ${r.fresh} new on Branch`;
+      const status = pixel
+        ? `${r.changedPixels} changed pixels`
+        : r.skipped
+          ? "skip: no judge"
+          : `${r.already} already on Main · ${r.fresh} new on Branch`;
       return `<li><a href="${esc(r.slug)}/report.html">${esc(r.path)}</a> — ${esc(status)}</li>`;
     })
     .join("\n");
   const already = rows.reduce((n, r) => n + r.already, 0);
   const fresh = rows.reduce((n, r) => n + r.fresh, 0);
+  const total = rows.reduce((n, r) => n + r.changedPixels, 0);
+  const summary = pixel
+    ? `${rows.length} routes · ${total} changed pixels`
+    : `${rows.length} routes · ${already} already on Main · ${fresh} new on Branch`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -588,7 +659,7 @@ function renderIndex(
 <body>
   <header>
     <h1>PixelSlash</h1>
-    <p>${rows.length} routes · ${already} already on Main · ${fresh} new on Branch</p>
+    <p>${summary}</p>
   </header>
   <section>
     <ul>
