@@ -32,12 +32,34 @@ describe("diffPngs", () => {
     expect(d.changedPixels).toBe(1);
   });
 
-  test("size mismatch → whole frame is a change", () => {
+  test("size mismatch diffs the overlap and does not paint the gutter", () => {
+    const a = solid(2, 2, [1, 2, 3, 255]);
+    const taller = PNG.sync.read(solid(3, 4, [1, 2, 3, 255]));
+    taller.data[0] = 9;
+    const b = PNG.sync.write(taller);
+    const d = diffPngs(a, b);
+    expect(d.changedPixels).toBe(1);
+    expect(d.mainWidth).toBe(2);
+    expect(d.mainHeight).toBe(2);
+    expect(d.branchWidth).toBe(3);
+    expect(d.branchHeight).toBe(4);
+    const overlay = PNG.sync.read(d.overlay);
+    expect(overlay.width).toBe(3);
+    expect(overlay.height).toBe(4);
+    expect(overlay.data[0]).toBe(255);
+    expect(overlay.data[3]).toBe(255);
+    const gutter = (3 * overlay.width + 2) << 2;
+    expect(overlay.data[gutter + 3]).toBe(0);
+  });
+
+  test("identical overlap of different sizes → changedPixels 0", () => {
     const a = solid(2, 2, [0, 0, 0, 255]);
     const b = solid(3, 2, [0, 0, 0, 255]);
     const d = diffPngs(a, b);
-    expect(d.changedPixels).toBe(3 * 2);
-    expect(d.width).toBe(3);
-    expect(d.height).toBe(2);
+    expect(d.changedPixels).toBe(0);
+    const overlay = PNG.sync.read(d.overlay);
+    for (let i = 0; i < overlay.width * overlay.height; i++) {
+      expect(overlay.data[(i << 2) + 3]).toBe(0);
+    }
   });
 });

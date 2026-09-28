@@ -8,9 +8,9 @@ bunx nx run pixelslash:run -- (--live URL --local URL | --live-png PATH --local-
 
 `--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up — the command does not start a dev server.
 
-A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-diffs them, stores `main.png`, `branch.png`, `diff.png`, and a manifest (`changedPixels`, `createdAt`, optional `--label`), and exits 0. Same store as PNG mode. Identical shots still store a run (`changedPixels` 0). Size mismatch counts the whole frame as a change. Default `--out` is `.pixelslash`.
+A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-diffs them, stores `main.png`, `branch.png`, `diff.png`, a manifest (`changedPixels`, `createdAt`, optional `--label`), and `report.html`, and exits 0. stdout points at `report.html`. Same store as PNG mode. Identical shots still store a run (`changedPixels` 0). If width or height differs, only the overlapping rectangle is diffed: `changedPixels` is that overlap count, the report states both sizes, and the non-overlap is not painted as changed. Default `--out` is `.pixelslash`.
 
-`--live-png` / `--local-png` skip Playwright and use existing shots (GTK / Omnishell). `--ds` / `--file` may be omitted in this mode too: same pixel-diff store.
+`--live-png` / `--local-png` skip Playwright and use existing shots (GTK / Omnishell). `--ds` / `--file` may be omitted in this mode too: same pixel-diff store and `report.html`.
 
 `--routes FILE` is one path per line (`/` `/pricing` …). `--live` and `--local` are origins. Without `--ds` or `--file`, each path is two captures, a pixel diff (`main.png`, `branch.png`, `diff.png`, manifest), and `report.html`. `--out/index.html` links those reports. Exit 0. Do not pass `--push` — that stays a single pair. With `--ds` or `--file`, each path is still two captures plus the DS judge. `--live-png-dir` / `--local-png-dir` is the GTK form (`index.png` for `/`, `pricing.png` for `/pricing`) and still needs `--ds` or `--file`.
 
@@ -20,7 +20,7 @@ Install ollama and `ollama pull qwen2.5vl` (7b latest). Fallback if that does no
 
 If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still writes (shots + DS, no fake violations), stdout prints `skip: no judge`, and the process exits 0. DS-match judge is optional and is not required for Omnishell pixel runs.
 
-HTML at `--out/report.html` (open as `file://`): header counts, side-by-side Main/Branch shots, DS rasters, violation list. With `--routes`, open `--out/index.html`.
+A one-pair run without a design system writes `--out/report.html` (open as `file://`): Main, Branch, Diff, the changed-pixel count, and both sizes. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 
 `--push` POSTs the run to the dashboard origin in `~/.omnibus_api_url` (or `OMNIBUS_API`) with bearer `~/.ob_api_token` (or `OMNIBUS_API_TOKEN`). Auth is the existing ob API token, not a new secret. Without `--push`, write local only. The dashboard lists runs at `/pixelslash` (Personal nav) and shows Main | Branch | Diff at `/pixelslash/<id>`.
 

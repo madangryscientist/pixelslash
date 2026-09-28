@@ -11,6 +11,14 @@ export type RunManifest = {
 
 export const RUN_FILES = ["main.png", "branch.png", "diff.png"] as const;
 
+export type FrameSize = { width: number; height: number };
+
+export type WrittenRun = {
+  manifest: RunManifest;
+  main: FrameSize;
+  branch: FrameSize;
+};
+
 export function newRunId(): string {
   return `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
 }
@@ -22,7 +30,7 @@ export function isSafeRunId(id: string): boolean {
 export async function writeRunFiles(
   dest: string,
   input: { main: Buffer; branch: Buffer; label?: string; id?: string; createdAt?: string },
-): Promise<RunManifest> {
+): Promise<WrittenRun> {
   const diff = diffPngs(input.main, input.branch);
   const manifest: RunManifest = {
     id: input.id && isSafeRunId(input.id) ? input.id : newRunId(),
@@ -35,5 +43,9 @@ export async function writeRunFiles(
   await Bun.write(join(dest, "branch.png"), input.branch);
   await Bun.write(join(dest, "diff.png"), diff.overlay);
   await Bun.write(join(dest, "manifest.json"), JSON.stringify(manifest));
-  return manifest;
+  return {
+    manifest,
+    main: { width: diff.mainWidth, height: diff.mainHeight },
+    branch: { width: diff.branchWidth, height: diff.branchHeight },
+  };
 }

@@ -153,8 +153,7 @@ export async function run(argv: string[], io: Io = process, deps: Deps = {}): Pr
     let code = 0;
     if (!cli.ds) {
       const px = result.changedPixels ?? result.manifest?.changedPixels ?? 0;
-      const where = cli.routes ? `report: ${fileUrl(result.reportPath)}` : `out: ${fileUrl(result.out)}`;
-      io.stdout.write(`pixelslash: ${px} changed pixels\n${where}\n`);
+      io.stdout.write(`pixelslash: ${px} changed pixels\nreport: ${fileUrl(result.reportPath)}\n`);
     } else if (result.skipped) {
       io.stdout.write(`skip: no judge\nreport: ${fileUrl(result.reportPath)}\n`);
     } else {
@@ -350,11 +349,9 @@ async function compareRoutes(cli: Cli, deps: Deps = {}): Promise<CompareResult> 
         },
         deps,
         browser,
+        path,
       );
       const changedPixels = one.manifest?.changedPixels ?? 0;
-      if (pixel) {
-        await Bun.write(join(cli.out, slug, "report.html"), renderPixelReport({ path, changedPixels }));
-      }
       rows.push({
         path,
         slug,
@@ -383,7 +380,7 @@ async function compareRoutes(cli: Cli, deps: Deps = {}): Promise<CompareResult> 
   };
 }
 
-async function compare(cli: Cli, deps: Deps = {}, browser?: Browser): Promise<CompareResult> {
+async function compare(cli: Cli, deps: Deps = {}, browser?: Browser, routePath?: string): Promise<CompareResult> {
   const hasDs = Boolean(cli.ds);
   let components: string[] = [];
   if (hasDs) {
@@ -409,7 +406,8 @@ async function compare(cli: Cli, deps: Deps = {}, browser?: Browser): Promise<Co
 
   const main = Buffer.from(await Bun.file(liveShot).arrayBuffer());
   const branch = Buffer.from(await Bun.file(localShot).arrayBuffer());
-  const manifest = await writeRunFiles(cli.out, { main, branch, label: cli.label });
+  const written = await writeRunFiles(cli.out, { main, branch, label: cli.label });
+  const manifest = written.manifest;
 
   const judge = hasDs ? resolveJudge(deps) : null;
   const skipped = hasDs && judge == null;
@@ -423,7 +421,7 @@ async function compare(cli: Cli, deps: Deps = {}, browser?: Browser): Promise<Co
     fresh = localHits.filter((v) => !liveNames.has(v.component));
   }
 
-  const reportPath = join(cli.out, hasDs ? "report.html" : "manifest.json");
+  const reportPath = join(cli.out, "report.html");
   if (hasDs && cli.ds) {
     const dsOut = join(cli.out, "ds");
     await mkdir(dsOut, { recursive: true });
@@ -431,6 +429,16 @@ async function compare(cli: Cli, deps: Deps = {}, browser?: Browser): Promise<Co
       await copyFile(join(cli.ds, name), join(dsOut, name));
     }
     await Bun.write(reportPath, renderReport({ already, fresh, components }));
+  } else {
+    await Bun.write(
+      reportPath,
+      renderPixelReport({
+        path: routePath,
+        changedPixels: manifest.changedPixels,
+        main: written.main,
+        branch: written.branch,
+      }),
+    );
   }
   return { already, fresh, reportPath, skipped, manifest, out: cli.out };
 }
@@ -586,12 +594,22 @@ function renderViolations(title: string, items: Violation[], empty: string, cls:
   return `<section class="${cls}"><h2>${esc(title)}</h2>${body}</section>`;
 }
 
-function renderPixelReport(input: { path: string; changedPixels: number }): string {
+function renderPixelReport(input: {
+  path?: string;
+  changedPixels: number;
+  main: { width: number; height: number };
+  branch: { width: number; height: number };
+}): string {
+  const title = input.path ? `PixelSlash ${esc(input.path)}` : "PixelSlash";
+  const count = input.path
+    ? `${esc(input.path)} · ${input.changedPixels} changed pixels`
+    : `${input.changedPixels} changed pixels`;
+  const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>PixelSlash ${esc(input.path)}</title>
+  <title>${title}</title>
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; background: #111; color: #eee; }
@@ -608,7 +626,8 @@ function renderPixelReport(input: { path: string; changedPixels: number }): stri
 <body>
   <header>
     <h1>PixelSlash</h1>
-    <p>${esc(input.path)} · ${input.changedPixels} changed pixels</p>
+    <p>${count}</p>
+    <p>${sizes}</p>
   </header>
   <section>
     <div class="row">

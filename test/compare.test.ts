@@ -3,6 +3,7 @@ import { existsSync, rmSync } from "node:fs";
 import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { PNG } from "pngjs";
 import { run } from "../src/compare.ts";
 import type { CapturePage, ProcLike, SpawnProc } from "../src/compare.ts";
 
@@ -788,8 +789,21 @@ describe("pixel run", () => {
       label?: string;
     };
     expect(manifest.changedPixels).toBeGreaterThan(0);
+    expect(manifest.changedPixels).toBeLessThanOrEqual(120 * 40);
     expect(manifest.createdAt).toMatch(/^\d{4}-/);
     expect(manifest.label).toBe("omnishell");
+    expect(cap.stdout).toContain("report.html");
+    expect(cap.stdout).not.toContain("manifest.json");
+    const html = await Bun.file(join(out, "report.html")).text();
+    expect(html).toContain("Main");
+    expect(html).toContain("Branch");
+    expect(html).toContain("Diff");
+    expect(html).toContain(`${manifest.changedPixels} changed pixels`);
+    expect(html).toContain("Main 120x40");
+    expect(html).toContain("Branch 160x80");
+    const overlay = PNG.sync.read(Buffer.from(await Bun.file(join(out, "diff.png")).arrayBuffer()));
+    const gutter = (79 * overlay.width + 159) << 2;
+    expect(overlay.data[gutter + 3]).toBe(0);
   });
 
   test("identical pngs → changedPixels 0, still stores the run", async () => {
@@ -806,6 +820,39 @@ describe("pixel run", () => {
     const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as { changedPixels: number };
     expect(manifest.changedPixels).toBe(0);
     expect(existsSync(join(out, "diff.png"))).toBe(true);
+    expect(cap.stdout).toContain("report.html");
+    const html = await Bun.file(join(out, "report.html")).text();
+    expect(html).toContain("0 changed pixels");
+    expect(html).toContain("Main 120x40");
+    expect(html).toContain("Branch 120x40");
+  });
+
+  test("size mismatch states both sizes and does not count the gutter", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const live = join(dir, "live.png");
+    const local = join(dir, "local.png");
+    await Bun.write(live, solidPng(2, 2, [0, 0, 0, 255]));
+    await Bun.write(local, solidPng(4, 3, [0, 0, 0, 255]));
+    const cap = capture();
+    const code = await run(["--live-png", live, "--local-png", local, "--out", out], cap.io, { which: () => null });
+    expect(code).toBe(0);
+    const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as { changedPixels: number };
+    expect(manifest.changedPixels).toBe(0);
+    expect(cap.stdout).toContain(`file://${join(out, "report.html")}`);
+    expect(cap.stdout).not.toContain("manifest.json");
+    const html = await Bun.file(join(out, "report.html")).text();
+    expect(html).toContain("0 changed pixels");
+    expect(html).toContain("Main 2x2");
+    expect(html).toContain("Branch 4x3");
+    expect(html).toContain('alt="Main"');
+    expect(html).toContain('alt="Branch"');
+    expect(html).toContain('alt="Diff"');
+    const overlay = PNG.sync.read(Buffer.from(await Bun.file(join(out, "diff.png")).arrayBuffer()));
+    expect(overlay.width).toBe(4);
+    expect(overlay.height).toBe(3);
+    const gutter = (2 * overlay.width + 3) << 2;
+    expect(overlay.data[gutter + 3]).toBe(0);
   });
 
   test("--push POSTs multipart with bearer and prints dashboard url", async () => {
@@ -843,6 +890,18 @@ describe("pixel run", () => {
     expect(cap.stdout).toContain("http://192.168.0.30:5050/pixelslash/run1");
   });
 });
+
+function solidPng(width: number, height: number, rgba: [number, number, number, number]): Buffer {
+  const img = new PNG({ width, height });
+  for (let i = 0; i < width * height; i++) {
+    const o = i << 2;
+    img.data[o] = rgba[0];
+    img.data[o + 1] = rgba[1];
+    img.data[o + 2] = rgba[2];
+    img.data[o + 3] = rgba[3];
+  }
+  return PNG.sync.write(img);
+}
 
 function fakeCapture(shots: { url: string; width: number }[]): CapturePage {
   return async (url, dest, width) => {
@@ -888,6 +947,13 @@ describe("url pair without a design system", () => {
     };
     expect(manifest.changedPixels).toBeGreaterThan(0);
     expect(manifest.createdAt).toMatch(/^\d{4}-/);
+    expect(cap.stdout).toContain("report.html");
+    const html = await Bun.file(join(out, "report.html")).text();
+    expect(html).toContain("Main");
+    expect(html).toContain("Branch");
+    expect(html).toContain("Diff");
+    expect(html).toContain("Main 120x40");
+    expect(html).toContain("Branch 160x80");
   });
 
   test("--push of a URL pair prints the dashboard url", async () => {
