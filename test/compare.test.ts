@@ -4,8 +4,8 @@ import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { PNG } from "pngjs";
-import { run } from "../src/compare.ts";
-import type { CapturePage, ProcLike, SpawnProc } from "../src/compare.ts";
+import { run, settleCapture } from "../src/compare.ts";
+import type { CapturePage, ProcLike, SettlePage, SpawnProc } from "../src/compare.ts";
 
 const FIXTURES = join(import.meta.dir, "../fixtures");
 const PAGES = join(FIXTURES, "pages");
@@ -102,6 +102,11 @@ async function servePages(): Promise<{ url(file: string): string; stop(): void }
     port: 0,
     async fetch(req) {
       const name = new URL(req.url).pathname.replace(/^\//, "");
+      if (name === "late.png") {
+        // Delayed on purpose: proves the capture settle waits for a late image.
+        await Bun.sleep(150);
+        return new Response(solidPng(40, 20, [34, 197, 94, 255]), { headers: { "content-type": "image/png" } });
+      }
       const file = Bun.file(join(PAGES, name));
       if (await file.exists()) return new Response(file, { headers: { "content-type": "text/html" } });
       return new Response("not found", { status: 404 });
@@ -220,6 +225,80 @@ describe("capture", () => {
     const live = new Uint8Array(await Bun.file(join(out, "live.png")).arrayBuffer());
     expect(pngWidth(live)).toBe(800);
   }, 30_000);
+});
+
+describe("capture settle", () => {
+  test("end-to-end: content that arrives after domcontentloaded is in the shot", async () => {
+    const pages = await servePages();
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const code = await run(
+      ["--live", pages.url("late.html"), "--local", pages.url("late.html"), "--out", out],
+      cap.io,
+      { which: () => null },
+    );
+    expect(code).toBe(0);
+    const live = PNG.sync.read(Buffer.from(await Bun.file(join(out, "live.png")).arrayBuffer()));
+    const o = (3 * live.width + 3) << 2;
+    expect([live.data[o], live.data[o + 1], live.data[o + 2]]).toEqual([34, 197, 94]);
+  }, 30_000);
+
+  test("two captures of the unchanged page are identical (changedPixels 0)", async () => {
+    const pages = await servePages();
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const url = pages.url("late.html");
+    const code = await run(["--live", url, "--local", url, "--out", out], cap.io, { which: () => null });
+    expect(code).toBe(0);
+    expect(cap.stdout).toMatch(/0 changed pixels/);
+    const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as { changedPixels: number };
+    expect(manifest.changedPixels).toBe(0);
+  }, 30_000);
+});
+
+describe("settleCapture", () => {
+  test("waits fonts, images, network idle, then two frames — in order", async () => {
+    const calls: string[] = [];
+    const pending: Array<() => void> = [];
+    const gated = (label: string) => {
+      calls.push(label);
+      return new Promise<void>((resolve) => pending.push(resolve));
+    };
+    const page: SettlePage = {
+      evaluate: <T>() => gated("evaluate") as unknown as Promise<T>,
+      waitForFunction: () => gated("waitForFunction"),
+      waitForLoadState: (state) => gated(`loadState:${state}`),
+    };
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const release = () => pending.shift()!();
+    const done = settleCapture(page, 5_000);
+    await tick();
+    expect(calls).toEqual(["evaluate"]);
+    release();
+    await tick();
+    expect(calls).toEqual(["evaluate", "waitForFunction"]);
+    release();
+    await tick();
+    expect(calls).toEqual(["evaluate", "waitForFunction", "loadState:networkidle"]);
+    release();
+    await tick();
+    expect(calls).toEqual(["evaluate", "waitForFunction", "loadState:networkidle", "evaluate"]);
+    release();
+    await done;
+  });
+
+  test("is bounded: a page that never settles rejects at the timeout", async () => {
+    const page: SettlePage = {
+      evaluate: () => new Promise<never>(() => {}),
+      waitForFunction: () => new Promise<never>(() => {}),
+      waitForLoadState: () => new Promise<never>(() => {}),
+    };
+    const started = Date.now();
+    await expect(settleCapture(page, 40)).rejects.toThrow(/capture settle exceeded 40ms/);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
 });
 
 describe("png shots", () => {

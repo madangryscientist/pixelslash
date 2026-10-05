@@ -32,6 +32,30 @@ type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export type CapturePage = (url: string, dest: string, width: number) => Promise<void>;
 
+/**
+ * The slice of a browser page the capture settle drives. Playwright's `Page`
+ * satisfies it structurally; tests pass a fake so the settle runs without a
+ * browser or the DOM lib.
+ */
+export type SettlePage = {
+  evaluate<T>(callback: () => T | Promise<T>): Promise<T>;
+  waitForFunction(callback: () => unknown): Promise<unknown>;
+  waitForLoadState(state: "networkidle"): Promise<void>;
+};
+
+/**
+ * Browser globals the settle touches, declared locally because the app tsconfig
+ * has no DOM lib. Only the type is module-scoped — the callbacks reference
+ * `globalThis` at runtime, since Playwright serializes the source into the page.
+ */
+type SettleGlobals = {
+  document: {
+    fonts: { ready: Promise<unknown> };
+    images: ArrayLike<{ complete: boolean; naturalWidth: number }>;
+  };
+  requestAnimationFrame: (callback: () => void) => number;
+};
+
 export type Deps = {
   spawn?: SpawnProc;
   fetch?: FetchLike;
@@ -465,6 +489,46 @@ async function capturePair(
   }
 }
 
+/**
+ * Wait for a page to settle before screenshotting: web fonts, every image, a
+ * short network-idle window, then two animation frames. Bounded by `timeoutMs`
+ * (default CAPTURE_TIMEOUT_MS) so a page whose fonts never load does not hang
+ * the capture past it.
+ */
+export function settleCapture(page: SettlePage, timeoutMs = CAPTURE_TIMEOUT_MS): Promise<void> {
+  const steps = (async () => {
+    await page.evaluate(() => (globalThis as unknown as SettleGlobals).document.fonts.ready);
+    await page.waitForFunction(() =>
+      Array.from((globalThis as unknown as SettleGlobals).document.images).every(
+        (img) => img.complete && img.naturalWidth > 0,
+      ),
+    );
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const g = globalThis as unknown as SettleGlobals;
+          g.requestAnimationFrame(() => g.requestAnimationFrame(() => resolve()));
+        }),
+    );
+  })();
+  return withTimeout(steps, timeoutMs, `capture settle exceeded ${timeoutMs}ms`);
+}
+
+async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new CaptureError(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 async function shot(browser: Browser, url: string, dest: string, width: number): Promise<void> {
   const page = await browser.newPage({ viewport: { width, height: 720 } });
   page.setDefaultNavigationTimeout(CAPTURE_TIMEOUT_MS);
@@ -472,6 +536,7 @@ async function shot(browser: Browser, url: string, dest: string, width: number):
     const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
     if (!resp) throw new CaptureError(`capture failed for ${url}: no response`);
     if (resp.status() >= 400) throw new CaptureError(`capture failed for ${url}: HTTP ${resp.status()}`);
+    await settleCapture(page);
     await page.screenshot({ path: dest, fullPage: true });
   } catch (e) {
     if (e instanceof CaptureError) throw e;
