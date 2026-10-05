@@ -3,7 +3,7 @@
 Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch. Local mlx, else ollama. Not an `ob` command.
 
 ```
-bunx nx run pixelslash:run -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT]
+bunx nx run pixelslash:run -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT] [--ticket ID]
 ```
 
 `--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up — the command does not start a dev server. Each capture waits for the page to settle before shooting: web fonts, every image, a short network-idle window, then two animation frames — all bounded by the capture timeout, so a page that never settles fails rather than hangs.
@@ -23,6 +23,8 @@ If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still write
 A one-pair run without a design system writes `--out/report.html` (open as `file://`): Main, Branch, Diff, the changed-pixel count, and both sizes. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 
 `--push` POSTs the run to the dashboard origin in `~/.omnibus_api_url` (or `OMNIBUS_API`) with bearer `~/.ob_api_token` (or `OMNIBUS_API_TOKEN`). Auth is the existing ob API token, not a new secret. Without `--push`, write local only. The dashboard lists runs at `/pixelslash` (Personal nav) and shows Main | Branch | Diff at `/pixelslash/<id>`.
+
+`--ticket ID` appends one paragraph to that ob ticket after a successful single-pair run: changed pixel count, the dashboard URL when `--push`ed, and `--label` when set. Not structured findings. No `--ticket`: the run still succeeds and writes no note. Do not combine `--ticket` with `--routes`.
 
 ## Omnishell (GTK) dogfood
 

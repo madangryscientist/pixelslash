@@ -968,6 +968,99 @@ describe("pixel run", () => {
     ]);
     expect(cap.stdout).toContain("http://192.168.0.30:5050/pixelslash/run1");
   });
+
+  test("--ticket appends one paragraph with changed pixels and the label", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const notes: { ticket: string; text: string }[] = [];
+    const code = await run(
+      [
+        "--live-png",
+        join(DS, "button.png"),
+        "--local-png",
+        join(DS, "card.png"),
+        "--out",
+        out,
+        "--label",
+        "omnishell",
+        "--ticket",
+        "917",
+      ],
+      cap.io,
+      {
+        which: () => null,
+        note: async (ticket, text) => {
+          notes.push({ ticket, text });
+        },
+      },
+    );
+    expect(code).toBe(0);
+    const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as { changedPixels: number };
+    expect(notes).toEqual([
+      { ticket: "917", text: `PixelSlash: ${manifest.changedPixels} changed pixels. omnishell.` },
+    ]);
+  });
+
+  test("--ticket with --push includes the dashboard url", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const notes: { ticket: string; text: string }[] = [];
+    const fetch = async () => Response.json({ id: "run1" }, { status: 200 });
+    const code = await run(
+      [
+        "--live-png",
+        join(DS, "button.png"),
+        "--local-png",
+        join(DS, "card.png"),
+        "--out",
+        out,
+        "--label",
+        "omnishell",
+        "--ticket",
+        "917",
+        "--push",
+      ],
+      cap.io,
+      {
+        which: () => null,
+        fetch,
+        env: { OMNIBUS_API: "http://192.168.0.30:5050", OMNIBUS_API_TOKEN: "tok" },
+        note: async (ticket, text) => {
+          notes.push({ ticket, text });
+        },
+      },
+    );
+    expect(code).toBe(0);
+    const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as { changedPixels: number };
+    expect(notes).toEqual([
+      {
+        ticket: "917",
+        text: `PixelSlash: ${manifest.changedPixels} changed pixels. http://192.168.0.30:5050/pixelslash/run1. omnishell.`,
+      },
+    ]);
+  });
+
+  test("no --ticket writes no note", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const cap = capture();
+    const notes: string[] = [];
+    const code = await run(
+      ["--live-png", join(DS, "button.png"), "--local-png", join(DS, "card.png"), "--out", out],
+      cap.io,
+      {
+        which: () => null,
+        note: async () => {
+          notes.push("called");
+        },
+      },
+    );
+    expect(code).toBe(0);
+    expect(notes).toEqual([]);
+    expect(existsSync(join(out, "manifest.json"))).toBe(true);
+  });
 });
 
 function solidPng(width: number, height: number, rgba: [number, number, number, number]): Buffer {
@@ -1156,5 +1249,28 @@ describe("url pair without a design system", () => {
     expect(code).toBe(2);
     expect(cap.stderr).toMatch(/--push is for a single pair/);
     expect(shots).toEqual([]);
+  });
+
+  test("--ticket with --routes stays a single pair and writes no note", async () => {
+    const dir = await tmp();
+    const routes = join(dir, "routes.txt");
+    await Bun.write(routes, "/\n");
+    const cap = capture();
+    const notes: string[] = [];
+    const shots: { url: string; width: number }[] = [];
+    const code = await run(
+      ["--live", "http://main.example/", "--local", "http://branch.example/", "--routes", routes, "--ticket", "917"],
+      cap.io,
+      {
+        capture: fakeCapture(shots),
+        note: async () => {
+          notes.push("called");
+        },
+      },
+    );
+    expect(code).toBe(2);
+    expect(cap.stderr).toMatch(/--ticket is for a single pair/);
+    expect(shots).toEqual([]);
+    expect(notes).toEqual([]);
   });
 });
