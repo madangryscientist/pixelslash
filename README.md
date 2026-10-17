@@ -10,7 +10,7 @@ bunx nx run pixelslash:run -- (--live URL --local URL | --live-png PATH --local-
 
 A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-diffs them, stores `main.png`, `branch.png`, `diff.png`, a manifest (`changedPixels`, `createdAt`, optional `--label`), and `report.html`, and exits 0. stdout points at `report.html`. Same store as PNG mode. Identical shots still store a run (`changedPixels` 0). If width or height differs, only the overlapping rectangle is diffed: `changedPixels` is that overlap count, the report states both sizes, and the non-overlap is not painted as changed. Default `--out` is `.pixelslash`.
 
-`--live-png` / `--local-png` skip Playwright and use existing shots (GTK / Omnishell). `--ds` / `--file` may be omitted in this mode too: same pixel-diff store and `report.html`.
+`--live-png` / `--local-png` skip Playwright and use existing screenshots. `--ds` / `--file` may be omitted in this mode too: same pixel-diff store and `report.html`.
 
 `--routes FILE` is one path per line (`/` `/pricing` …). `--live` and `--local` are origins. Without `--ds` or `--file`, each path is two captures, a pixel diff (`main.png`, `branch.png`, `diff.png`, manifest), and `report.html`. `--out/index.html` links those reports. Exit 0. Do not pass `--push` — that stays a single pair. With `--ds` or `--file`, each path is still two captures plus the DS judge. `--live-png-dir` / `--local-png-dir` is the GTK form (`index.png` for `/`, `pricing.png` for `/pricing`) and still needs `--ds` or `--file`.
 
@@ -18,7 +18,7 @@ With `--ds` or `--file`, one URL run captures both at the page width, then check
 
 Install ollama and `ollama pull qwen2.5vl` (7b latest). Fallback if that does not fit: `ollama pull qwen2.5vl:3b && ollama cp qwen2.5vl:3b qwen2.5vl`. The CLI still spawns `qwen2.5vl`.
 
-If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still writes (shots + DS, no fake violations), stdout prints `skip: no judge`, and the process exits 0. DS-match judge is optional and is not required for Omnishell pixel runs.
+If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still writes (shots + DS, no fake violations), stdout prints `skip: no judge`, and the process exits 0. DS-match judge is optional and is not required for screenshot pixel runs.
 
 A one-pair run without a design system writes `--out/report.html` (open as `file://`): Main, Branch, Diff, the changed-pixel count, and both sizes. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 
@@ -26,14 +26,14 @@ A one-pair run without a design system writes `--out/report.html` (open as `file
 
 `--ticket ID` appends one paragraph to that ob ticket after a successful single-pair run: changed pixel count, the dashboard URL when `--push`ed, and `--label` when set. Not structured findings. No `--ticket`: the run still succeeds and writes no note. Do not combine `--ticket` with `--routes`.
 
-## Omnishell (GTK) dogfood
+## Local-screenshot dogfood (GTK windows)
 
 Capture two windows with grim (automation is later), then compare and push:
 
 ```
-grim -g "$(slurp)" /tmp/omnishell-main.png
-grim -g "$(slurp)" /tmp/omnishell-branch.png
-bunx nx run pixelslash:run -- --live-png /tmp/omnishell-main.png --local-png /tmp/omnishell-branch.png --label omnishell --push
+grim -g "$(slurp)" /tmp/widget-main.png
+grim -g "$(slurp)" /tmp/widget-branch.png
+bunx nx run pixelslash:run -- --live-png /tmp/widget-main.png --local-png /tmp/widget-branch.png --label widget --push
 ```
 
 Open the printed URL (`https://…/pixelslash/<id>` or LAN `http://192.168.0.30:5050/pixelslash/<id>`).
@@ -62,7 +62,7 @@ Several routes, with a design system:
 bunx nx run pixelslash:run -- --live https://example.com --local http://127.0.0.1:4173 --routes routes.txt --ds apps/pixelslash/fixtures/ds --out .pixelslash
 ```
 
-GTK / Omnishell shots (no URL, no Playwright, no DS):
+Local screenshot shots (no URL, no Playwright, no DS):
 
 ```
 bunx nx run pixelslash:run -- --live-png main.png --local-png branch.png --out .pixelslash

@@ -852,7 +852,7 @@ describe("pixel run", () => {
     const out = join(dir, "out");
     const cap = capture();
     const code = await run(
-      ["--live-png", join(DS, "button.png"), "--local-png", join(DS, "card.png"), "--out", out, "--label", "omnishell"],
+      ["--live-png", join(DS, "button.png"), "--local-png", join(DS, "card.png"), "--out", out, "--label", "widget"],
       cap.io,
       { which: () => null },
     );
@@ -870,7 +870,7 @@ describe("pixel run", () => {
     expect(manifest.changedPixels).toBeGreaterThan(0);
     expect(manifest.changedPixels).toBeLessThanOrEqual(120 * 40);
     expect(manifest.createdAt).toMatch(/^\d{4}-/);
-    expect(manifest.label).toBe("omnishell");
+    expect(manifest.label).toBe("widget");
     expect(cap.stdout).toContain("report.html");
     expect(cap.stdout).not.toContain("manifest.json");
     const html = await Bun.file(join(out, "report.html")).text();
@@ -983,7 +983,7 @@ describe("pixel run", () => {
         "--out",
         out,
         "--label",
-        "omnishell",
+        "widget",
         "--ticket",
         "917",
       ],
@@ -998,7 +998,7 @@ describe("pixel run", () => {
     expect(code).toBe(0);
     const manifest = JSON.parse(await Bun.file(join(out, "manifest.json")).text()) as { changedPixels: number };
     expect(notes).toEqual([
-      { ticket: "917", text: `PixelSlash: ${manifest.changedPixels} changed pixels. omnishell.` },
+      { ticket: "917", text: `PixelSlash: ${manifest.changedPixels} changed pixels. widget.` },
     ]);
   });
 
@@ -1017,7 +1017,7 @@ describe("pixel run", () => {
         "--out",
         out,
         "--label",
-        "omnishell",
+        "widget",
         "--ticket",
         "917",
         "--push",
@@ -1037,7 +1037,7 @@ describe("pixel run", () => {
     expect(notes).toEqual([
       {
         ticket: "917",
-        text: `PixelSlash: ${manifest.changedPixels} changed pixels. http://192.168.0.30:5050/pixelslash/run1. omnishell.`,
+        text: `PixelSlash: ${manifest.changedPixels} changed pixels. http://192.168.0.30:5050/pixelslash/run1. widget.`,
       },
     ]);
   });
