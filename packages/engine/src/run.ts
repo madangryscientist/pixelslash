@@ -29,7 +29,13 @@ export function isSafeRunId(id: string): boolean {
 
 export async function writeRunFiles(
   dest: string,
-  input: { main: Buffer; branch: Buffer; label?: string; id?: string; createdAt?: string },
+  input: {
+    main: Buffer;
+    branch: Buffer;
+    label?: string | undefined;
+    id?: string;
+    createdAt?: string;
+  },
 ): Promise<WrittenRun> {
   const diff = diffPngs(input.main, input.branch);
   const manifest: RunManifest = {

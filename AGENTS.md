@@ -45,17 +45,33 @@ be refactored, "do not add a dependency for this".
 
 ## The gate
 
+The repo is a small Nx workspace on Bun workspaces:
+
+| Project | Path | What it is |
+| --- | --- | --- |
+| `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
+| `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@pixelslash/engine` |
+| `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
+
 A change is green when all of these pass **from the worktree**:
 
 ```bash
 bun install                       # a fresh worktree has no node_modules
-bunx tsc --noEmit                 # or: bun run typecheck
-bun test                          # or: bun run test
+bun run typecheck                 # nx run-many -t typecheck  (tsc, strict)
+bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop)
+bun run format:check              # oxfmt --check  (`bun run format` fixes)
+bun run test                      # nx run-many -t test  (Vitest under the Bun runtime)
 ```
 
-There is no lint step yet. Anything that changes capture, the diff or the
-report also gets a real run, and the `report.html` it prints is opened and
-looked at — a green `bun test` does not render a report:
+One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
+`.nx/`; add `--skip-nx-cache` to force a rerun. There is no Nx Cloud and no
+remote cache. Lint rules are all errors; fix the code, do not disable a rule.
+Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
+code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
+
+Anything that changes capture, the diff or the report also gets a real run,
+and the `report.html` it prints is opened and looked at — a green test run
+does not render a report:
 
 ```bash
 bunx playwright install chromium-headless-shell   # once per machine

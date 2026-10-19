@@ -1,0 +1,15 @@
+{
+  "name": "@pixelslash/cli",
+  "private": true,
+  "bin": {
+    "pixelslash": "src/index.ts"
+  },
+  "type": "module",
+  "dependencies": {
+    "@pixelslash/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0"
+  }
+}

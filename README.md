@@ -5,8 +5,10 @@ Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch
 ```
 bun install
 bunx playwright install chromium-headless-shell   # once, for URL capture
-bun run test        # bun test
-bun run typecheck   # tsc --noEmit
+bun run typecheck   # nx: tsc on every project
+bun run lint        # nx: oxlint (type-aware) + check-slop
+bun run format:check
+bun run test        # nx: vitest on every project
 bun run pixelslash -- <args below>
 ```
 
