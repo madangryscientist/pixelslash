@@ -144,9 +144,13 @@ so `ob-cli`, `ob-spinoff`, `ob-land`, `ob-skeptical-review` and the rest resolve
    not hang and it does not shoot early.
 3. **Exit codes are a contract.** Exit 1 only on NEW violations on Branch;
    pixel-only runs exit 0. CI will read this.
-4. **Local only.** Page shots never leave the machine. The Figma token comes
-   from `FIGMA_TOKEN` or `--token-path`, never git.
-5. **The CLI does not start a dev server.** Both URLs must already be up; a
-   down URL fails.
+4. **Local unless told to upload.** Without `--upload`, page shots never leave
+   the machine. With it, they go only to the server the project is configured
+   for (ours or self-hosted) and nowhere else. Tokens (Figma, CI upload, model
+   keys) come from env or a token file, never git. *Amended 2026-10-19: was
+   "Local only"; the hosted review app needs uploads.*
+5. **The local pair mode does not start a dev server.** `--live` / `--local`
+   URLs must already be up; a down URL fails. *Amended 2026-10-19: the pinned
+   capture image may start the app from a command named in its config.*
 6. **Figma dogfood is out of scope** (decision #62). Do not reopen 770, 771,
    772, 773, 781, 782 or 783.
