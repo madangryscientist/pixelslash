@@ -1,0 +1,7 @@
+{
+  "label": "noise",
+  "kind": "dither",
+  "page": "form",
+  "width": 640,
+  "height": 460
+}

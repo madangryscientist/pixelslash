@@ -53,6 +53,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@pixelslash/engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
+| `bench` | `bench` | the Argos benchmark: labelled corpus, runner, scoring (`bun run bench`; see `bench/README.md`). Needs the Argos VM up |
 
 A change is green when all of these pass **from the worktree**:
 

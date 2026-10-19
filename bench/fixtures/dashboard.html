@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>dashboard</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: #f4f4f5;
+        color: #18181b;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        height: 48px;
+        padding: 0 20px;
+        background: #fff;
+        border-bottom: 1px solid #d4d4d8;
+      }
+      #logo {
+        display: block;
+      }
+      nav {
+        display: flex;
+        gap: 16px;
+        flex: 1;
+      }
+      nav a {
+        color: #52525b;
+        text-decoration: none;
+        font-weight: 500;
+      }
+      nav a.active {
+        color: #2563eb;
+      }
+      #avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #a78bfa;
+      }
+      main {
+        padding: 20px;
+      }
+      #banner {
+        height: 56px;
+        border-radius: 8px;
+        background: linear-gradient(90deg, #2563eb, #7c3aed);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        font-weight: 600;
+        font-size: 16px;
+      }
+      .stats {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .stat {
+        flex: 1;
+        background: #fff;
+        border: 1px solid #d4d4d8;
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .stat .label {
+        color: #71717a;
+        font-size: 12px;
+      }
+      .stat .value {
+        font-size: 24px;
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .stat .trend {
+        font-size: 12px;
+        color: #16a34a;
+      }
+      #activity {
+        margin-top: 16px;
+        background: #fff;
+        border: 1px solid #d4d4d8;
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      #activity h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      #activity ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #activity li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #activity li .time {
+        margin-left: auto;
+        color: #71717a;
+        font-size: 12px;
+      }
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+      }
+      #primary {
+        background: #2563eb;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font: inherit;
+        font-weight: 500;
+      }
+      #spinner {
+        width: 18px;
+        height: 18px;
+        border: 3px solid #d4d4d8;
+        border-top-color: #2563eb;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        animation-play-state: paused;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg id="logo" width="24" height="24" viewBox="0 0 24 24">
+        <rect width="24" height="24" rx="6" fill="#2563eb" />
+        <path d="M6 12l4 4 8-8" stroke="#fff" stroke-width="2.5" fill="none" />
+      </svg>
+      <nav>
+        <a class="active" href="#">Overview</a><a href="#">Reports</a><a href="#">Settings</a>
+      </nav>
+      <div id="avatar"></div>
+    </header>
+    <main>
+      <div id="banner">Quarterly review is ready</div>
+      <section class="stats">
+        <div class="stat" id="stat-revenue">
+          <div class="label">Revenue</div>
+          <div class="value">$48,210</div>
+          <div class="trend">+4.2%</div>
+        </div>
+        <div class="stat" id="stat-users">
+          <div class="label">Active users</div>
+          <div class="value">1,204</div>
+          <div class="trend">+1.8%</div>
+        </div>
+        <div class="stat" id="stat-errors">
+          <div class="label">Error rate</div>
+          <div class="value">0.31%</div>
+          <div class="trend">-0.1%</div>
+        </div>
+      </section>
+      <section id="activity">
+        <h2>Recent activity</h2>
+        <ul>
+          <li id="row-1">
+            <svg class="icon" id="icon-1" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="7" fill="#16a34a" />
+              <path d="M4.5 8.5l2.5 2.5 4.5-5" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+            ><span>Deploy finished for web</span><span class="time">2m ago</span>
+          </li>
+          <li id="row-2">
+            <svg class="icon" id="icon-2" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="7" fill="#2563eb" />
+              <path d="M8 4v5M8 11v1" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+            ><span>New teammate invited</span><span class="time">18m ago</span>
+          </li>
+          <li id="row-3">
+            <svg class="icon" id="icon-3" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="7" fill="#dc2626" />
+              <path d="M5 5l6 6M11 5l-6 6" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+            ><span>Nightly build failed</span><span class="time">1h ago</span>
+          </li>
+        </ul>
+      </section>
+      <div class="actions">
+        <button id="primary">Export report</button>
+        <div id="spinner"></div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "bench"
   ],
   "type": "module",
   "scripts": {
@@ -12,7 +13,8 @@
     "lint": "nx run-many -t lint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test": "nx run-many -t test"
+    "test": "nx run-many -t test",
+    "bench": "nx run bench:bench --output-style=stream"
   },
   "devDependencies": {
     "@types/bun": "1.4.3",

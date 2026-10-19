@@ -19,3 +19,4 @@ export {
   type SnapshotEntry,
   type SnapshotManifest,
 } from "./snapshot.ts";
+export { diffPngs, type PixelDiff } from "./diff.ts";

@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "icon",
+  "page": "dashboard",
+  "width": 640,
+  "height": 480,
+  "box": {
+    "x": 35,
+    "y": 297,
+    "w": 16,
+    "h": 17
+  }
+}

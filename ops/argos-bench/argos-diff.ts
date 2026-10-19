@@ -7,7 +7,7 @@
 //   argos-diff <base.png> <head.png> <out-dir> [--threshold 0.5]
 //   argos-diff --pairs <dir> <out-dir> [--threshold 0.5]   # <dir>/<name>/{base,head}.png
 //
-// Prints one JSON object per pair on stdout (JSON Lines) and copies Argos's diff image, when it
+// Prints one JSON object per pair on stdout (JSON Lines), with the time diffImages took in `ms`, and copies Argos's diff image, when it
 // makes one, to <out-dir>/<name>.diff.png.
 import { copyFile, mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -22,7 +22,9 @@ function image(filepath: string) {
 }
 
 async function run(pair: Pair, outDir: string, threshold: number) {
+  const started = performance.now();
   const result = await diffImages(image(pair.base), image(pair.head), { threshold });
+  const ms = performance.now() - started;
   let diff: string | null = null;
   if (result.file) {
     diff = join(outDir, `${pair.name}.diff.png`);
@@ -37,6 +39,8 @@ async function run(pair: Pair, outDir: string, threshold: number) {
     width: result.file?.width ?? null,
     height: result.file?.height ?? null,
     diff,
+    // Wall time of diffImages alone (ob 1477): excludes ssh, tar and container start.
+    ms: Math.round(ms * 10) / 10,
   };
 }
 

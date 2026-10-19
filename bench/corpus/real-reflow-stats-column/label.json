@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "reflow",
+  "page": "dashboard",
+  "width": 640,
+  "height": 480,
+  "box": {
+    "x": 20,
+    "y": 140,
+    "w": 600,
+    "h": 340
+  }
+}

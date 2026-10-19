@@ -1,6 +1,8 @@
 {
   "ignorePatterns": [
     "fixtures/**",
+    "bench/fixtures/**",
+    "bench/results/**",
     "**/*.md",
     "**/routeTree.gen.ts",
     "**/worker-configuration.d.ts",

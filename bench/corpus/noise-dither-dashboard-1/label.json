@@ -1,0 +1,7 @@
+{
+  "label": "noise",
+  "kind": "dither",
+  "page": "dashboard",
+  "width": 640,
+  "height": 480
+}

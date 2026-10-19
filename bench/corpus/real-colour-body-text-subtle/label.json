@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "colour",
+  "page": "article",
+  "width": 640,
+  "height": 640,
+  "box": {
+    "x": 70,
+    "y": 178,
+    "w": 496,
+    "h": 337
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "name": "bench",
+  "sourceRoot": "bench/src",
+  "projectType": "application",
+  "targets": {
+    "typecheck": { "command": "tsc -p bench/tsconfig.json" },
+    "lint": {
+      "command": "oxlint --type-aware --deny-warnings bench && bun scripts/check-slop.ts bench"
+    },
+    "test": { "command": "bun --bun vitest run", "options": { "cwd": "bench" } },
+    "corpus": { "command": "bun bench/src/generate.ts", "cache": false },
+    "bench": { "command": "bun bench/src/run.ts", "cache": false }
+  }
+}

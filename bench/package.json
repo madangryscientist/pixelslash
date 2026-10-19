@@ -1,0 +1,13 @@
+{
+  "name": "@pixelslash/bench",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pixelslash/engine": "workspace:*",
+    "playwright": "1.60.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
+}
