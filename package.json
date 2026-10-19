@@ -2,11 +2,21 @@
   "name": "pixelslash",
   "private": true,
   "type": "module",
+  "bin": {
+    "pixelslash": "src/index.ts"
+  },
+  "scripts": {
+    "pixelslash": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "playwright": "1.60.0",
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
-    "@types/pngjs": "^6.0.5"
+    "bun-types": "^1.3.14",
+    "@types/pngjs": "^6.0.5",
+    "typescript": "^5"
   }
 }

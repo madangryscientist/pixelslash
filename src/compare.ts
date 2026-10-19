@@ -3,11 +3,10 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, type Browser } from "playwright";
-import { pushRun, PushError, resolveOrigin, resolveToken as resolvePushToken } from "./push.ts";
 import { writeRunFiles, type RunManifest } from "./run.ts";
 
 const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--push] [--label TEXT] [--ticket ID]\nURL origins may omit --ds and --file, including --routes. --push and --ticket are a single pair. PNG route dirs still need --ds or --file.";
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT]\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
 const FIGMA_API = "https://api.figma.com/v1";
 const DEFAULT_WIDTH = 1280;
 const MLX_BIN = "mlx_vlm.generate";
@@ -62,7 +61,6 @@ export type Deps = {
   env?: NodeJS.ProcessEnv;
   which?: (bin: string) => string | null;
   capture?: CapturePage;
-  note?: (ticket: string, text: string) => Promise<void>;
 };
 
 type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
@@ -70,7 +68,6 @@ type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void
 class UsageError extends Error {}
 class CaptureError extends Error {}
 class FigmaError extends Error {}
-class NoteError extends Error {}
 
 type Cli = {
   live: string | undefined;
@@ -86,24 +83,17 @@ type Cli = {
   tokenPath: string | undefined;
   out: string;
   width: number;
-  push: boolean;
   label: string | undefined;
-  ticket: string | undefined;
 };
 
 type Violation = { component: string; reason: string };
 
 function parseArgs(argv: string[]): Cli {
   const flags = new Map<string, string>();
-  const boolFlags = new Set(["push"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (!a.startsWith("--")) throw new UsageError(`unexpected argument: ${a}`);
     const key = a.slice(2);
-    if (boolFlags.has(key)) {
-      flags.set(key, "1");
-      continue;
-    }
     const val = argv[i + 1];
     if (!val || val.startsWith("--")) throw new UsageError(`missing value for --${key}`);
     flags.set(key, val);
@@ -136,8 +126,6 @@ function parseArgs(argv: string[]): Cli {
   if (!dsRaw && !file && !pngMode && !urlMode) {
     throw new UsageError("need --ds DIR or --file FILE_KEY");
   }
-  if (flags.has("push") && routesFile) throw new UsageError("--push is for a single pair, not --routes");
-  if (flags.has("ticket") && routesFile) throw new UsageError("--ticket is for a single pair, not --routes");
   const widthRaw = flags.get("width");
   const width = widthRaw === undefined ? DEFAULT_WIDTH : Number(widthRaw);
   if (!Number.isInteger(width) || width <= 0) throw new UsageError("--width must be a positive integer");
@@ -158,27 +146,8 @@ function parseArgs(argv: string[]): Cli {
     tokenPath: tokenPathRaw ? resolve(tokenPathRaw) : undefined,
     out,
     width,
-    push: flags.has("push"),
     label: flags.get("label"),
-    ticket: flags.get("ticket"),
   };
-}
-
-function ticketParagraph(changedPixels: number, url: string | undefined, label: string | undefined): string {
-  const parts = [`PixelSlash: ${changedPixels} changed pixels`];
-  if (url) parts.push(url);
-  if (label) parts.push(label);
-  return `${parts.join(". ")}.`;
-}
-
-async function appendTicketNote(ticket: string, text: string): Promise<void> {
-  const proc = Bun.spawn(["ob", "note", ticket, text], { stdout: "pipe", stderr: "pipe" });
-  const err = await new Response(proc.stderr).text();
-  const code = await proc.exited;
-  if (code !== 0) {
-    const detail = err.trim();
-    throw new NoteError(`ob note ${ticket} failed${detail ? `: ${detail.slice(0, 300)}` : ""}`);
-  }
 }
 
 export async function run(argv: string[], io: Io = process, deps: Deps = {}): Promise<number> {
@@ -210,38 +179,13 @@ export async function run(argv: string[], io: Io = process, deps: Deps = {}): Pr
       io.stdout.write(`pixelslash: ${already} already on main, ${newBit}\nreport: ${fileUrl(result.reportPath)}\n`);
       code = n === 0 ? 0 : 1;
     }
-    let dashboardUrl: string | undefined;
-    if (cli.push) {
-      if (!result.manifest) throw new UsageError("--push is for a single pair, not --routes");
-      const env = deps.env ?? process.env;
-      const origin = resolveOrigin(env);
-      const token = resolvePushToken(env);
-      const main = Buffer.from(await Bun.file(join(result.out, "main.png")).arrayBuffer());
-      const branch = Buffer.from(await Bun.file(join(result.out, "branch.png")).arrayBuffer());
-      const diff = Buffer.from(await Bun.file(join(result.out, "diff.png")).arrayBuffer());
-      const pushed = await pushRun({
-        origin,
-        token,
-        main,
-        branch,
-        diff,
-        manifest: result.manifest,
-        fetch: deps.fetch ?? globalThis.fetch.bind(globalThis),
-      });
-      dashboardUrl = pushed.url;
-      io.stdout.write(`${pushed.url}\n`);
-    }
-    if (cli.ticket && code === 0 && result.manifest) {
-      const text = ticketParagraph(result.manifest.changedPixels, dashboardUrl, cli.label);
-      await (deps.note ?? appendTicketNote)(cli.ticket, text);
-    }
     return code;
   } catch (e) {
     if (e instanceof UsageError) {
       io.stderr.write(`${e.message}\n${USAGE}\n`);
       return 2;
     }
-    if (e instanceof CaptureError || e instanceof FigmaError || e instanceof PushError || e instanceof NoteError) {
+    if (e instanceof CaptureError || e instanceof FigmaError) {
       io.stderr.write(`${e.message}\n`);
       return 1;
     }
