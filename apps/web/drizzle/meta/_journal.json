@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792443173763,
+      "tag": "0000_milky_justice",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@pixelslash/web",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsr generate && tsc --noEmit",
+    "test": "bun --bun vitest run",
+    "test:e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "deploy": "bun run build && wrangler deploy",
+    "cf-typegen": "wrangler types --strict-vars=false"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-router": "1.170.45",
+    "@tanstack/react-start": "1.169.3",
+    "drizzle-orm": "^0.45.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.26.0",
+    "@playwright/test": "1.60.0",
+    "@tanstack/router-cli": "^1.132.0",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "drizzle-kit": "^0.31.11",
+    "vite": "^8.0.0",
+    "wrangler": "^4.151.2"
+  }
+}

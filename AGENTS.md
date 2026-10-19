@@ -51,6 +51,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | --- | --- | --- |
 | `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@pixelslash/engine` |
+| `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
 
 A change is green when all of these pass **from the worktree**:
@@ -68,6 +69,19 @@ One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
 remote cache. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
+
+A change to `apps/web` also runs the standard's web gate (from the worktree root):
+
+```bash
+bunx nx build web
+bunx nx test:e2e web              # Playwright: a local build on a fresh local D1, GitHub stubbed
+(cd apps/web && bunx wrangler deploy --dry-run --outdir /tmp/ps-web-dry)
+```
+
+`apps/web` keeps its schema in `src/db/schema.ts`; `bun run db:generate` (in
+`apps/web`) writes the next additive migration to `apps/web/drizzle/`. All
+queries go through `src/db/*` (they take a `Db`, never D1), and blobs through
+`orgBlobs` in `src/storage/blobs.ts`, so a Docker self-host can swap both.
 
 Anything that changes capture, the diff or the report also gets a real run,
 and the `report.html` it prints is opened and looked at — a green test run

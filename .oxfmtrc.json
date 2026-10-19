@@ -1,3 +1,9 @@
 {
-  "ignorePatterns": ["fixtures/**", "**/*.md"]
+  "ignorePatterns": [
+    "fixtures/**",
+    "**/*.md",
+    "**/routeTree.gen.ts",
+    "**/worker-configuration.d.ts",
+    "apps/web/drizzle/**"
+  ]
 }

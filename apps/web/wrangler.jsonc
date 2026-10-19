@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pixelslash-web",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  // The ids are placeholders: creating the real D1 database and R2 bucket is the first
+  // deploy's job (a human step), not this scaffold's. Local dev and tests use local state.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pixelslash",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle",
+    },
+  ],
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "pixelslash-blobs" }],
+  // GITHUB_CLIENT_SECRET is a secret (`wrangler secret put`, or `.dev.vars` locally).
+  "vars": {
+    "GITHUB_CLIENT_ID": "",
+    "GITHUB_OAUTH_BASE": "https://github.com",
+    "GITHUB_API_BASE": "https://api.github.com",
+  },
+  // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
+  // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
+  "env": {
+    "e2e": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pixelslash",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "drizzle",
+        },
+      ],
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "pixelslash-blobs" }],
+      "vars": {
+        "GITHUB_CLIENT_ID": "e2e-client",
+        "GITHUB_CLIENT_SECRET": "e2e-secret",
+        "GITHUB_OAUTH_BASE": "http://localhost:4174",
+        "GITHUB_API_BASE": "http://localhost:4174",
+      },
+    },
+  },
+}
