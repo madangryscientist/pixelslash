@@ -1,0 +1,14 @@
+{
+  "baseUrl": "http://127.0.0.1:4791",
+  "start": { "command": "bun scripts/serve-capture-fixture.ts 4791" },
+  "routes": [
+    "/",
+    "/motion",
+    { "path": "/masks", "masks": [".ad", { "x": 0, "y": 200, "width": 320, "height": 40 }], "tags": ["masks"] }
+  ],
+  "variants": [
+    { "name": "desktop-light", "viewport": { "width": 1024, "height": 640 } },
+    { "name": "mobile-dark", "viewport": { "width": 390, "height": 844 }, "theme": "dark" }
+  ],
+  "tags": ["fixture"]
+}

@@ -12,8 +12,10 @@ import {
   resolveToken,
   type CompareResult,
   type Deps,
+  type SnapshotDeps,
 } from "@pixelslash/engine";
 import { USAGE, parseArgs, type Cli } from "./args.ts";
+import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 
 export type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
 
@@ -53,16 +55,33 @@ function report(cli: Cli, result: CompareResult, io: Io): number {
   return n === 0 ? 0 : 1;
 }
 
-export async function run(argv: string[], io: Io = process, deps: Deps = {}): Promise<number> {
+export async function run(
+  argv: string[],
+  io: Io = process,
+  deps: Deps & SnapshotDeps = {},
+): Promise<number> {
+  if (argv[0] === "capture")
+    return guarded(() => runCapture(argv.slice(1), io, deps), io, CAPTURE_USAGE);
+  return guarded(
+    async () => {
+      const cli = parseArgs(argv);
+      if (cli.routesFile) cli.routes = await loadRoutes(cli.routesFile);
+      if (cli.file) cli.ds = await figmaDs(cli, cli.file, deps);
+      const result = cli.routes ? await compareRoutes(cli, deps) : await compare(cli, deps);
+      return report(cli, result, io);
+    },
+    io,
+    USAGE,
+  );
+}
+
+/** Map the known errors to exit codes: usage 2, capture or Figma 1. Anything else is a bug and throws. */
+async function guarded(work: () => Promise<number>, io: Io, usage: string): Promise<number> {
   try {
-    const cli = parseArgs(argv);
-    if (cli.routesFile) cli.routes = await loadRoutes(cli.routesFile);
-    if (cli.file) cli.ds = await figmaDs(cli, cli.file, deps);
-    const result = cli.routes ? await compareRoutes(cli, deps) : await compare(cli, deps);
-    return report(cli, result, io);
+    return await work();
   } catch (e) {
     if (e instanceof UsageError) {
-      io.stderr.write(`${e.message}\n${USAGE}\n`);
+      io.stderr.write(`${e.message}\n${usage}\n`);
       return 2;
     }
     if (e instanceof CaptureError || e instanceof FigmaError) {

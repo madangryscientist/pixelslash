@@ -11,3 +11,11 @@ export { fetchFigmaRasters, resolveToken } from "./figma.ts";
 export type { ProcLike, SpawnProc } from "./judge.ts";
 export { loadRoutes } from "./routes.ts";
 export type { RunManifest } from "./run.ts";
+export { findConfig, loadConfig, type CaptureConfig } from "./config.ts";
+export type { Fingerprint } from "./fingerprint.ts";
+export {
+  captureSnapshots,
+  type SnapshotDeps,
+  type SnapshotEntry,
+  type SnapshotManifest,
+} from "./snapshot.ts";

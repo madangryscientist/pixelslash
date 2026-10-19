@@ -32,6 +32,60 @@ If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still write
 
 A one-pair run without a design system writes `--out/report.html` (open as `file://`): Main, Branch, Diff, the changed-pixel count, and both sizes. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 
+## Snapshot capture (the pinned image)
+
+`pixelslash capture` shoots every route × variant in a config into a snapshot dir plus `manifest.json`, for upload to a PixelSlash server. Run it inside the pinned capture image: it fixes Bun, Playwright, Chromium and the font set, so the same commit renders the same pixels on any CI runner.
+
+```
+docker build -f docker/capture/Dockerfile -t pixelslash-capture:dev .
+docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [--config FILE] [--out DIR]
+```
+
+`--config` defaults to the first `pixelslash.config.{ts,js,mjs,json}` in the working dir (JS/TS: the default export). `--out` defaults to `pixelslash-snapshots`. Exit 0 on success, 1 when a page cannot be captured or the start command fails, 2 on a bad flag or config.
+
+```json
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "start": { "command": "bun run preview", "readyUrl": "http://127.0.0.1:4173", "timeoutMs": 60000 },
+  "routes": ["/", { "path": "/pricing", "name": "pricing", "masks": [".clock", { "x": 0, "y": 0, "width": 200, "height": 40 }], "tags": ["billing"] }],
+  "variants": [
+    { "name": "desktop", "viewport": { "width": 1280, "height": 720 } },
+    { "name": "mobile-dark", "viewport": { "width": 390, "height": 844 }, "theme": "dark", "browser": "chromium" }
+  ],
+  "masks": ["[data-pixelslash-mask]"],
+  "tags": ["web"],
+  "stabilise": { "animations": true, "caret": true, "clock": "2026-01-01T00:00:00.000Z", "deviceScaleFactor": 1, "timeoutMs": 8000 }
+}
+```
+
+- `baseUrl` must already be up, unless `start` is given: then the command runs first (in the container, from the working dir), its `readyUrl` (default `baseUrl`) must answer below 400 within `timeoutMs`, and the command's whole process group is stopped after the run. Its output goes to stderr.
+- `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`). Top-level `masks` and `tags` apply to every route.
+- `variants` default to one: Chromium, 1280×720, light. `theme` sets `prefers-color-scheme`. `browser` must be one the image ships — today only `chromium`.
+- `masks` are CSS selectors (every match) or rectangles in full-page CSS px (scaled by the device scale factor); both are painted `#FF00FF`. A selector that matches nothing prints a warning.
+- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off.
+
+`manifest.json` (version 1) lists one entry per PNG; it has no timestamps, so two captures of the same build write the same bytes:
+
+```json
+{
+  "version": 1,
+  "snapshots": [
+    {
+      "name": "pricing",
+      "path": "/pricing",
+      "variant": { "name": "desktop", "browser": "chromium", "viewport": { "width": 1280, "height": 720 }, "theme": "light" },
+      "tags": ["web", "billing"],
+      "file": "pricing/desktop.png",
+      "fingerprint": { "image": "version:0.1.0-dev", "browser": "chromium 148.0.7778.96", "fonts": "sha256:…" }
+    }
+  ]
+}
+```
+
+The fingerprint says what rendered the snapshot; only snapshots with equal fingerprints are compared. `image` is `PIXELSLASH_IMAGE_DIGEST` when the run is given it (`-e PIXELSLASH_IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' …)`), else `version:<image version>`. `fonts` hashes every font file fontconfig can see.
+
+Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
+
 ## Local-screenshot dogfood (GTK windows)
 
 Capture two windows with grim (automation is later), then compare:
