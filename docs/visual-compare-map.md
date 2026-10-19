@@ -5,7 +5,7 @@ title: Visual Compare — sellable DS reviewer
 
 ## Destination
 
-**PixelSlash** — a product you can sell that reviews Main vs Branch (pixel dashboard) and a web page against a Figma design system: **local CLI**, then a **CI Action** wrapping that CLI, then **SaaS** hosting the same engine. One engine, three skins. Not Chromatic. Not `ob`. Not Cue. Not a new dashboard unit.
+**PixelSlash** — a Chromatic competitor that is NOT tied to Storybook: visual review (builds, per-branch baselines, accept/reject, PR checks) across web, desktop and mobile. Independent of omnibus. Today's engine: Playwright capture + PNG-dir ingest + pixel diff + optional local vision design-system judge.
 
 First dogfood: **Omnishell GTK shots** on `/pixelslash` (ob 763). A URL or PNG pair may omit a design system (ob 888, landed; dogfood run `mucuyo6a` on `/pixelslash`). **Figma dogfood is out of scope** (decision #62, 2026-09-22). Do not reopen 770, 771, 772, 781, 782, 773, or 783 to draw or drive Figma.
 
@@ -19,6 +19,7 @@ First dogfood: **Omnishell GTK shots** on `/pixelslash` (ob 763). A URL or PNG p
 
 ## Decisions so far
 
+- 2026-10-19: reversed — it IS a Chromatic competitor (was 'Not Chromatic / not a land gate'). Open decisions are ob 1422–1426 (project pixelslash).
 - **Job:** CodeRabbit-shaped DS reviewer (findings + confidence). Not a Chromatic land gate. Human still lands.
 - **Customer zero:** a site in this repo. Cue is out (decision #54).
 - **Packaging:** all three (local, CI, SaaS). **v1 = local CLI.** CI wraps it later. SaaS hosts it last.
