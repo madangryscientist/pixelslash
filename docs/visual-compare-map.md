@@ -12,7 +12,7 @@ First dogfood: **Omnishell GTK shots** on `/pixelslash` (ob 763). A URL or PNG p
 ## Notes
 
 - Parent ticket: [Visual Compare: Figma + live site + new version, plus AI/tracker confidence](ob://649). Grilled 2026-09-13; readback confirmed.
-- Domain: Nx app `apps/pixelslash` in omnibus until extract (renamed from `apps/visual-compare`, ob 763). Skills: this map, `planner`, `skeptical-review`.
+- Domain: this repo (extracted from omnibus 2026-10-19, ob 1418). Dashboard: its own review app (ob 1421); the omnibus /pixelslash pages are retired by ob 1419.
 - Seed DS: `@omnibus/ui` + Catppuccin Mocha (`platform/ui`). hack-cove already consumes it. After [HITL: create the Figma DS file from @omnibus/ui](ob://651), **Figma is the spec**.
 - `ob vision compare` (ob 468) stays a two-screenshot layout tool. This product does not reuse that CLI as the product; it may reuse the local mlx spawn pattern.
 - `apps/visual-gate` was the leftover Chromatic app. Removed (ob 915). PixelSlash is the capture-and-judge engine.
