@@ -2,7 +2,7 @@ import { and, count, eq } from "drizzle-orm";
 import { sha256Hex } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
-import { type DiffOptions, builds, snapshots } from "./schema";
+import { type DiffOptions, type IgnoreRect, builds, snapshots } from "./schema";
 
 export type Build = typeof builds.$inferSelect;
 
@@ -23,6 +23,7 @@ export type SnapshotInput = {
   theme: string;
   tags: string[];
   diff: DiffOptions;
+  ignore: IgnoreRect[];
   fingerprint: { image: string; browser: string; fonts: string };
 };
 
@@ -77,6 +78,7 @@ export async function putSnapshot(
   const fields = {
     tags: input.tags,
     diffOptions: input.diff,
+    ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
     imageKey,
   };
@@ -139,4 +141,14 @@ export async function snapshotDiffOptions(db: Db, snapshotId: string): Promise<D
     .where(eq(snapshots.id, snapshotId));
   if (!row) throw new NotFoundError("snapshot");
   return row.diffOptions;
+}
+
+/** The areas a snapshot's diff skips, as sent at upload: image px, `[]` when none. */
+export async function snapshotIgnore(db: Db, snapshotId: string): Promise<IgnoreRect[]> {
+  const [row] = await db
+    .select({ ignore: snapshots.ignore })
+    .from(snapshots)
+    .where(eq(snapshots.id, snapshotId));
+  if (!row) throw new NotFoundError("snapshot");
+  return row.ignore;
 }

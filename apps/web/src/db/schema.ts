@@ -141,6 +141,9 @@ export type DiffOptions = {
   maxShift?: number;
 };
 
+/** A rectangle in image px that the diff skips; the same shape as the engine's `IgnoreRect`. */
+export type IgnoreRect = { x: number; y: number; width: number; height: number };
+
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
 
@@ -166,6 +169,11 @@ export const snapshots = sqliteTable(
       .$type<DiffOptions>()
       .notNull()
       .default(sql`'{}'`),
+    /** Areas the diff skips (kept visible in the PNG); `[]` means everything is measured. */
+    ignore: text("ignore", { mode: "json" })
+      .$type<IgnoreRect[]>()
+      .notNull()
+      .default(sql`'[]'`),
     envFingerprint: text("env_fingerprint").notNull(),
     imageKey: text("image_key").notNull(),
     baselineKey: text("baseline_key"),

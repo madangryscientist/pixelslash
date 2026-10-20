@@ -158,3 +158,97 @@ describe("diffPngs", () => {
     expect(d.branchHeight).toBe(3);
   });
 });
+
+describe("diffPngs ignore areas", () => {
+  /** 20x20 white, with a black `size` square at (x, y). */
+  function square(x: number, y: number, size: number): Buffer {
+    const img = PNG.sync.read(solid(20, 20, [255, 255, 255, 255]));
+    for (let j = y; j < y + size; j++) {
+      for (let i = x; i < x + size; i++) {
+        const o = (j * 20 + i) << 2;
+        img.data[o] = img.data[o + 1] = img.data[o + 2] = 0;
+      }
+    }
+    return PNG.sync.write(img);
+  }
+  const blank = solid(20, 20, [255, 255, 255, 255]);
+  const opts = { minRegionArea: 1 };
+
+  test("no ignore areas: ignoredPixels 0", () => {
+    const d = diffPngs(blank, square(4, 4, 4), opts);
+    expect(d.ignoredPixels).toBe(0);
+    expect(d.ignored).toEqual([]);
+    expect(d.changed).toBe(true);
+  });
+
+  test("a change fully inside an ignore box → unchanged, with ignoredPixels counted", () => {
+    const box = { x: 2, y: 2, width: 10, height: 10 };
+    const d = diffPngs(blank, square(4, 4, 4), opts, { branch: [box] });
+    expect(d.changed).toBe(false);
+    expect(d.changedPixels).toBe(0);
+    expect(d.regions).toEqual([]);
+    expect(d.specks).toEqual({ count: 0, pixels: 0 });
+    expect(d.ignoredPixels).toBe(100);
+    expect(d.ignored).toEqual([box]);
+  });
+
+  test("a change half outside the box → changed, the region clipped to the outside part", () => {
+    // 4x4 square at x 4..7; the box covers x 0..5, so columns 6 and 7 remain.
+    const d = diffPngs(blank, square(4, 4, 4), opts, {
+      main: [{ x: 0, y: 0, width: 6, height: 20 }],
+    });
+    expect(d.changed).toBe(true);
+    expect(d.changedPixels).toBe(8);
+    expect(d.regions).toHaveLength(1);
+    expect(d.regions[0]).toMatchObject({ x: 6, y: 4, w: 2, h: 4, changedPixels: 8 });
+    expect(d.ignoredPixels).toBe(120);
+  });
+
+  test("the union of the baseline and the branch boxes: an element that moved", () => {
+    // Black square at (2,2) in main, (12,12) in branch; each box covers one place.
+    const d = diffPngs(square(2, 2, 4), square(12, 12, 4), opts, {
+      main: [{ x: 2, y: 2, width: 4, height: 4 }],
+      branch: [{ x: 12, y: 12, width: 4, height: 4 }],
+    });
+    expect(d.changed).toBe(false);
+    expect(d.changedPixels).toBe(0);
+    expect(d.ignoredPixels).toBe(32);
+    // Only one box: the other place is still measured and still changed.
+    const half = diffPngs(square(2, 2, 4), square(12, 12, 4), opts, {
+      main: [{ x: 2, y: 2, width: 4, height: 4 }],
+    });
+    expect(half.changed).toBe(true);
+    expect(half.changedPixels).toBe(16);
+  });
+
+  test("overlapping boxes are counted once; boxes past the overlap are clipped away", () => {
+    const d = diffPngs(blank, blank, opts, {
+      main: [{ x: 0, y: 0, width: 10, height: 10 }],
+      branch: [
+        { x: 5, y: 5, width: 10, height: 10 },
+        { x: 40, y: 40, width: 5, height: 5 },
+        { x: 15, y: 15, width: 100, height: 100 },
+      ],
+    });
+    expect(d.ignoredPixels).toBe(100 + 100 - 25 + 25);
+    expect(d.ignored).toContainEqual({ x: 15, y: 15, width: 5, height: 5 });
+    expect(d.ignored).toHaveLength(3);
+  });
+
+  test("the same box on both shots is listed once", () => {
+    const box = { x: 2, y: 2, width: 10, height: 10 };
+    const d = diffPngs(blank, blank, opts, { main: [box], branch: [box] });
+    expect(d.ignored).toEqual([box]);
+    expect(d.ignoredPixels).toBe(100);
+  });
+
+  test("the ratio floor counts only measured pixels", () => {
+    // 16 changed of 400 px is 4%; with 200 ignored it is 8% of the 200 measured.
+    const left = { x: 0, y: 0, width: 10, height: 20 };
+    const sq = square(14, 4, 4);
+    expect(diffPngs(blank, sq, { ...opts, minChangedRatio: 0.06 }).changed).toBe(false);
+    expect(diffPngs(blank, sq, { ...opts, minChangedRatio: 0.06 }, { main: [left] }).changed).toBe(
+      true,
+    );
+  });
+});

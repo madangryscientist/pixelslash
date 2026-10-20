@@ -20,6 +20,13 @@ export {
   type SnapshotEntry,
   type SnapshotManifest,
 } from "./snapshot.ts";
-export { DEFAULT_THRESHOLD, diffPngs, type DiffOptions, type PixelDiff } from "./diff.ts";
+export {
+  DEFAULT_THRESHOLD,
+  diffPngs,
+  type DiffIgnore,
+  type DiffOptions,
+  type IgnoreRect,
+  type PixelDiff,
+} from "./diff.ts";
 export { uploadSnapshots, type UploadDeps } from "./upload.ts";
 export type { Region, RegionKind, Specks } from "./regions.ts";

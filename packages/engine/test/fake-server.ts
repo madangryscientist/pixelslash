@@ -20,7 +20,7 @@ export function fakeServer(failOn?: (call: Call) => Response | undefined) {
   return { calls, fetch };
 }
 
-export function metaOf(body: unknown): { name: string } {
+export function metaOf(body: unknown): { name: string; ignore?: unknown } {
   const meta = body instanceof FormData ? body.get("meta") : null;
   if (typeof meta !== "string") throw new Error("request has no meta field");
   return JSON.parse(meta);

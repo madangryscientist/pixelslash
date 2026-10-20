@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { diffPngs, type DiffOptions } from "./diff.ts";
+import { diffPngs, type DiffIgnore, type DiffOptions, type IgnoreRect } from "./diff.ts";
 import type { Region, Specks } from "./regions.ts";
 
 export type RunManifest = {
@@ -12,6 +12,10 @@ export type RunManifest = {
   regions: Region[];
   /** Boxes dropped for being too small to be anything but a speck. */
   specks: Specks;
+  /** Pixels inside an ignore area: not measured, so neither changed nor unchanged. */
+  ignoredPixels: number;
+  /** The ignore areas the diff skipped, clipped to the overlap. */
+  ignored: IgnoreRect[];
   createdAt: string;
   label?: string;
   /** The diff options the run was compared with; absent when none were set. */
@@ -43,17 +47,20 @@ export async function writeRunFiles(
     branch: Buffer;
     label?: string | undefined;
     diff?: DiffOptions | undefined;
+    ignore?: DiffIgnore | undefined;
     id?: string;
     createdAt?: string;
   },
 ): Promise<WrittenRun> {
-  const diff = diffPngs(input.main, input.branch, input.diff);
+  const diff = diffPngs(input.main, input.branch, input.diff, input.ignore);
   const manifest: RunManifest = {
     id: input.id && isSafeRunId(input.id) ? input.id : newRunId(),
     changedPixels: diff.changedPixels,
     changed: diff.changed,
     regions: diff.regions,
     specks: diff.specks,
+    ignoredPixels: diff.ignoredPixels,
+    ignored: diff.ignored,
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
   if (input.label) manifest.label = input.label;

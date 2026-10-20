@@ -56,3 +56,26 @@ describe("manifest diff options", () => {
     await expect(readManifest(dir)).rejects.toThrow(message);
   });
 });
+
+describe("manifest ignore areas", () => {
+  const box = { x: 4, y: 8, width: 100, height: 50 };
+
+  test("round-trip; a manifest from before the field reads as []", async () => {
+    const dir = await manifestDir([entry("home", { ignore: [box] }), entry("pricing")]);
+    const [home, pricing] = (await readManifest(dir)).snapshots;
+    expect(home?.ignore).toEqual([box]);
+    expect(pricing?.ignore).toEqual([]);
+  });
+
+  test.each([
+    ["video", /snapshots\[0\]\.ignore must be an array of \{ x, y, width, height \}/],
+    [[3], /snapshots\[0\]\.ignore\[0\] must be an object/],
+    [[{ ...box, x: -1 }], /snapshots\[0\]\.ignore\[0\]\.x must be a non-negative integer/],
+    [[{ ...box, y: 1.5 }], /snapshots\[0\]\.ignore\[0\]\.y must be a non-negative integer/],
+    [[{ ...box, width: 0 }], /snapshots\[0\]\.ignore\[0\]\.width must be a positive integer/],
+    [[{ ...box, height: "9" }], /snapshots\[0\]\.ignore\[0\]\.height must be a positive integer/],
+  ])("refuses ignore %j", async (ignore, message) => {
+    const dir = await manifestDir([entry("x", { ignore })]);
+    await expect(readManifest(dir)).rejects.toThrow(message);
+  });
+});

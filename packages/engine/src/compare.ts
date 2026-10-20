@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser } from "playwright";
 import { capturePair, launchBrowser, shotPair, type CapturePage } from "./capture.ts";
-import type { DiffOptions } from "./diff.ts";
+import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import {
@@ -41,6 +41,8 @@ export type CompareOptions = {
   label: string | undefined;
   /** Diff options for this run; keys left out take the engine default. */
   diff: DiffOptions;
+  /** Areas (image px) skipped by the diff in both shots and hatched in the report. */
+  ignore: IgnoreRect[];
 };
 
 export type CompareResult = {
@@ -166,6 +168,7 @@ export async function compare(
     branch,
     label: opts.label,
     diff: opts.diff,
+    ignore: { main: opts.ignore, branch: opts.ignore },
   });
   const manifest = written.manifest;
 
@@ -178,6 +181,8 @@ export async function compare(
       diff: opts.diff,
       regions: manifest.regions,
       specks: manifest.specks,
+      ignoredPixels: manifest.ignoredPixels,
+      ignored: manifest.ignored,
       main: written.main,
       branch: written.branch,
     });

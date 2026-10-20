@@ -5,13 +5,15 @@ import { PNG } from "pngjs";
 import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
 import {
   resolveDiff,
+  resolveIgnore,
   type CaptureConfig,
+  type Ignore,
   type MaskRect,
   type Route,
   type Stabilise,
   type Variant,
 } from "./config.ts";
-import type { DiffOptions } from "./diff.ts";
+import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { CaptureError } from "./errors.ts";
 import {
   BARE,
@@ -40,6 +42,12 @@ export type SnapshotEntry = {
    * written before this field existed have none, read as `{}`.
    */
   diff: DiffOptions;
+  /**
+   * Areas the diff skips, in image px (full page, already scaled by the device scale factor and
+   * clipped to the image). Selectors in the config are resolved to these boxes at capture time.
+   * Real pixels stay in the PNG. Manifests written before this field existed have none, read as `[]`.
+   */
+  ignore: IgnoreRect[];
   /** Relative to the manifest's directory. */
   file: string;
   fingerprint: Fingerprint;
@@ -58,6 +66,82 @@ export type SnapshotResult = { manifest: SnapshotManifest; manifestPath: string 
 
 /** Launch flags that take host-specific rendering choices out of the picture. */
 const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];
+
+/** The attribute that marks an element as an ignore area without a config entry. */
+const IGNORE_ATTRIBUTE = "data-pixelslash-ignore";
+
+/**
+ * Browser globals the box measure touches (the tsconfig has no DOM lib). Type-only: the callback in
+ * `boxesOf` is serialized and runs in the page, where these are the real globals.
+ */
+declare const window: { scrollX: number; scrollY: number };
+type Measured = {
+  getBoundingClientRect(): { left: number; top: number; width: number; height: number };
+};
+
+/** Each element's box in full-page CSS px (viewport box plus the scroll offset). Runs in the page. */
+function boxesOf(elements: Measured[]): MaskRect[] {
+  return elements.map((el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + window.scrollX,
+      y: r.top + window.scrollY,
+      width: r.width,
+      height: r.height,
+    };
+  });
+}
+
+/** PNG dimensions from the IHDR chunk, without decoding the image. */
+function pngSize(png: Buffer): { width: number; height: number } {
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
+/**
+ * CSS-px boxes to image px: scaled by `scale`, grown outward to whole pixels, clipped to the image.
+ * Boxes that end up empty (zero-size elements, boxes wholly off the image) are dropped.
+ */
+export function toImageRects(
+  boxes: { x: number; y: number; width: number; height: number }[],
+  scale: number,
+  image: { width: number; height: number },
+): IgnoreRect[] {
+  const out: IgnoreRect[] = [];
+  for (const b of boxes) {
+    const x0 = Math.max(0, Math.floor(b.x * scale));
+    const y0 = Math.max(0, Math.floor(b.y * scale));
+    const x1 = Math.min(image.width, Math.ceil((b.x + b.width) * scale));
+    const y1 = Math.min(image.height, Math.ceil((b.y + b.height) * scale));
+    if (x1 > x0 && y1 > y0) out.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
+  }
+  return out;
+}
+
+/**
+ * Resolve ignore areas on the live page to image-px boxes: every match of every selector, every
+ * `[data-pixelslash-ignore]` element, and the fixed rectangles. Nothing is painted. A selector that
+ * matches nothing warns, like a mask does.
+ */
+async function resolveIgnoreBoxes(
+  page: Page,
+  areas: Ignore[],
+  shot: Pick<Shot, "route" | "stabilise" | "warn">,
+  image: { width: number; height: number },
+): Promise<IgnoreRect[]> {
+  const boxes: MaskRect[] = [];
+  const selectors = [...areas.filter((a) => typeof a === "string"), `[${IGNORE_ATTRIBUTE}]`];
+  for (const selector of selectors) {
+    const loc = page.locator(selector);
+    if ((await loc.count()) === 0) {
+      if (!selector.startsWith(`[${IGNORE_ATTRIBUTE}`))
+        shot.warn(`warning: ignore "${selector}" matched nothing on ${shot.route.path}`);
+      continue;
+    }
+    boxes.push(...(await loc.evaluateAll(boxesOf)));
+  }
+  boxes.push(...areas.filter((a) => typeof a !== "string"));
+  return toImageRects(boxes, shot.stabilise.deviceScaleFactor, image);
+}
 
 /** Paint each rectangle (CSS px, scaled by `scale` to image px, clipped to the image) in MASK_COLOR. */
 export function paintRects(png: Buffer, rects: MaskRect[], scale: number): Buffer {
@@ -87,8 +171,12 @@ type Shot = {
   route: Route;
   variant: Variant;
   stabilise: Stabilise;
+  /** Ignore areas to resolve at screenshot time; the pixels are left as they are. */
+  ignore: Ignore[];
   warn: (m: string) => void;
 };
+
+type Shoot = { png: Buffer; ignore: IgnoreRect[] };
 
 /**
  * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
@@ -104,7 +192,7 @@ async function pinClock(context: BrowserContext, { clock, timers }: Stabilise): 
   await context.clock.pauseAt(clock);
 }
 
-async function shoot(browser: Browser, shot: Shot): Promise<Buffer> {
+async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   const { variant, stabilise, route, url } = shot;
   const context = await browser.newContext({
     viewport: variant.viewport,
@@ -128,11 +216,15 @@ async function shoot(browser: Browser, shot: Shot): Promise<Buffer> {
       mask: locators,
       maskColor: MASK_COLOR,
     });
-    return paintRects(
-      png,
-      route.masks.filter((m) => typeof m !== "string"),
-      stabilise.deviceScaleFactor,
-    );
+    const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, pngSize(png));
+    return {
+      png: paintRects(
+        png,
+        route.masks.filter((m) => typeof m !== "string"),
+        stabilise.deviceScaleFactor,
+      ),
+      ignore,
+    };
   } catch (e) {
     if (e instanceof CaptureError) throw e;
     throw new CaptureError(
@@ -154,11 +246,12 @@ async function shootAll(
     for (const route of config.routes) {
       const file = `${route.name}/${variant.name}.png`;
       const url = joinOrigin(config.baseUrl, route.path);
-      const png = await shoot(ctx.browser, {
+      const { png, ignore } = await shoot(ctx.browser, {
         url,
         route,
         variant,
         stabilise: config.stabilise,
+        ignore: resolveIgnore(config, route, variant),
         warn: ctx.warn,
       });
       await mkdir(join(out, route.name), { recursive: true });
@@ -169,6 +262,7 @@ async function shootAll(
         variant,
         tags: route.tags,
         diff: resolveDiff(config, route, variant),
+        ignore,
         file,
         fingerprint: ctx.fingerprint,
       });

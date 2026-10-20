@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { parseConfig } from "../src/config.ts";
-import { captureSnapshots, paintRects, type SnapshotManifest } from "../src/snapshot.ts";
+import {
+  captureSnapshots,
+  paintRects,
+  toImageRects,
+  type SnapshotManifest,
+} from "../src/snapshot.ts";
 
 const SITE = fileURLToPath(new URL("../../../fixtures/capture/site", import.meta.url));
 const dirs: string[] = [];
@@ -51,7 +56,18 @@ function pixel(img: PNG, x: number, y: number): number[] {
 
 /** One route captured alone, with page timers frozen or running; the PNG bytes. */
 async function shootPage(path: string, timers: boolean): Promise<Buffer> {
-  const routes = [{ path, name: "page", masks: [], tags: [], diff: {}, variantDiff: {} }];
+  const routes = [
+    {
+      path,
+      name: "page",
+      masks: [],
+      tags: [],
+      ignore: [],
+      diff: {},
+      variantDiff: {},
+      variantIgnore: {},
+    },
+  ];
   const out = await tmp();
   await captureSnapshots(
     { ...config, routes, stabilise: { ...config.stabilise, timers } },
@@ -130,7 +146,16 @@ describe("captureSnapshots", () => {
   test("outside the image: warns, records a bare fingerprint; a mask matching nothing warns", async () => {
     const warnings: string[] = [];
     const routes = [
-      { path: "/", name: "index", masks: [".nope"], tags: [], diff: {}, variantDiff: {} },
+      {
+        path: "/",
+        name: "index",
+        masks: [".nope"],
+        tags: [],
+        ignore: [],
+        diff: {},
+        variantDiff: {},
+        variantIgnore: {},
+      },
     ];
     const result = await captureSnapshots({ ...config, routes }, await tmp(), {
       env: {},
@@ -142,6 +167,82 @@ describe("captureSnapshots", () => {
     expect(warnings[0]).toMatch(/outside the pinned PixelSlash image/);
     expect(warnings[1]).toBe('warning: mask ".nope" matched nothing on /');
   }, 60_000);
+});
+
+const ignoreConfig = (scale: number, ignore: unknown[], masks: unknown[] = []) =>
+  parseConfig({
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    routes: [{ path: "/ignore", name: "page", ignore, masks }],
+    variants: [{ name: "desktop", viewport: { width: 800, height: 400 } }],
+    stabilise: { deviceScaleFactor: scale },
+  });
+
+describe("ignore areas", () => {
+  test.each([1, 2])(
+    "a selector and the data attribute resolve to image-px boxes at device scale %i, and nothing is painted",
+    async (scale) => {
+      const out = await tmp();
+      const warnings: string[] = [];
+      const result = await captureSnapshots(ignoreConfig(scale, [".video", ".nope"]), out, {
+        ...pinned,
+        warn: (m) => warnings.push(m),
+      });
+      expect(result.manifest.snapshots[0]?.ignore).toEqual([
+        { x: 40 * scale, y: 40 * scale, width: 200 * scale, height: 100 * scale },
+        { x: 300 * scale, y: 40 * scale, width: 100 * scale, height: 60 * scale },
+      ]);
+      expect(warnings).toEqual(['warning: ignore ".nope" matched nothing on /ignore']);
+      const img = PNG.sync.read(Buffer.from(await Bun.file(join(out, "page/desktop.png")).bytes()));
+      expect(img.width).toBe(800 * scale);
+      // The real pixels are still there: green video, amber marked box.
+      expect(pixel(img, 50 * scale, 50 * scale)).toEqual([22, 163, 74, 255]);
+      expect(pixel(img, 310 * scale, 50 * scale)).toEqual([245, 158, 11, 255]);
+    },
+    60_000,
+  );
+
+  test("rectangles are CSS px scaled and clipped; a redact mask next to an ignore is still painted", async () => {
+    const out = await tmp();
+    const result = await captureSnapshots(
+      ignoreConfig(
+        2,
+        [{ x: 700, y: 380, width: 500, height: 500 }],
+        [{ x: 0, y: 300, width: 320, height: 40 }],
+      ),
+      out,
+      pinned,
+    );
+    expect(result.manifest.snapshots[0]?.ignore).toEqual([
+      { x: 600, y: 80, width: 200, height: 120 },
+      { x: 1400, y: 760, width: 200, height: 40 },
+    ]);
+    const img = PNG.sync.read(Buffer.from(await Bun.file(join(out, "page/desktop.png")).bytes()));
+    expect(pixel(img, 10, 610)).toEqual([255, 0, 255, 255]);
+  }, 60_000);
+
+  test("a snapshot with no ignore areas records []", async () => {
+    const result = await captureSnapshots(config, await tmp(), pinned);
+    expect(result.manifest.snapshots.map((s) => s.ignore)).toEqual([[], [], []]);
+  }, 60_000);
+
+  test("toImageRects grows to whole pixels, clips, and drops what is empty", () => {
+    const image = { width: 100, height: 50 };
+    expect(
+      toImageRects(
+        [
+          { x: 0.4, y: 0.4, width: 1, height: 1 },
+          { x: 90, y: 40, width: 50, height: 50 },
+          { x: 10, y: 10, width: 0, height: 5 },
+          { x: 200, y: 0, width: 5, height: 5 },
+        ],
+        1,
+        image,
+      ),
+    ).toEqual([
+      { x: 0, y: 0, width: 2, height: 2 },
+      { x: 90, y: 40, width: 10, height: 10 },
+    ]);
+  });
 });
 
 describe("paintRects", () => {

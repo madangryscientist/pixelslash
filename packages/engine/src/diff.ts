@@ -24,9 +24,22 @@ export type DiffOptions = {
 } & RegionOptions &
   ShiftOptions;
 
+/** A rectangle in image pixels (the top-left origin of the PNG). */
+export type IgnoreRect = { x: number; y: number; width: number; height: number };
+
+/**
+ * Areas the diff does not measure: the real pixels stay in the shots. The diff skips the union of
+ * both lists, so an element that moved is covered at its old and its new place.
+ */
+export type DiffIgnore = { main?: IgnoreRect[]; branch?: IgnoreRect[] };
+
 export type PixelDiff = {
   /** The verdict: sizes differ, or a `change` region survives and the changed pixels clear the floors. */
   changed: boolean;
+  /** Pixels of the overlap inside an ignore area: skipped, neither changed nor unchanged. */
+  ignoredPixels: number;
+  /** The ignore areas, clipped to the overlap; what the report hatches. */
+  ignored: IgnoreRect[];
   /** Pixels in the overlap that differ and are not anti-aliased edges. */
   changedPixels: number;
   /** Differing pixels that are anti-aliased edges in either shot; not counted as changed. */
@@ -139,34 +152,108 @@ function isAntialiased(img: Raster, x: number, y: number, other: Raster): boolea
   return flatBoth(min) || flatBoth(max);
 }
 
-type Counts = { changedPixels: number; antialiased: number; field: DiffField };
+type Counts = {
+  changedPixels: number;
+  antialiased: number;
+  ignoredPixels: number;
+  ignored: IgnoreRect[];
+  field: DiffField;
+};
 
-/** Diff the overlapping rectangle, painting changed pixels magenta onto `overlay`. */
-function diffOverlap(a: PNG, b: PNG, threshold: number, overlay: PNG): Counts {
-  const maxDelta = MAX_YIQ_DELTA * threshold * threshold;
+/** The ignore rects clipped to a `width` x `height` overlap; empty ones and repeats are dropped. */
+function clipRects(rects: IgnoreRect[], width: number, height: number): IgnoreRect[] {
+  const out: IgnoreRect[] = [];
+  for (const r of rects) {
+    const x = Math.max(0, Math.floor(r.x));
+    const y = Math.max(0, Math.floor(r.y));
+    const right = Math.min(width, Math.ceil(r.x + r.width));
+    const bottom = Math.min(height, Math.ceil(r.y + r.height));
+    if (right <= x || bottom <= y) continue;
+    const clipped = { x, y, width: right - x, height: bottom - y };
+    const seen = out.some(
+      (o) => o.x === x && o.y === y && o.width === clipped.width && o.height === clipped.height,
+    );
+    if (!seen) out.push(clipped);
+  }
+  return out;
+}
+
+/** A per-pixel flag over the overlap, set inside any rect, and how many pixels that is. */
+function ignoreMask(rects: IgnoreRect[], width: number, height: number) {
+  const mask = new Uint8Array(width * height);
+  let count = 0;
+  for (const r of rects) {
+    for (let y = r.y; y < r.y + r.height; y++) {
+      const row = mask.subarray(y * width + r.x, y * width + r.x + r.width);
+      count += row.length - row.reduce((n, flag) => n + flag, 0);
+      row.fill(1);
+    }
+  }
+  return { mask, count };
+}
+
+type Overlap = {
+  width: number;
+  height: number;
+  maxDelta: number;
+  skip: Uint8Array;
+  field: DiffField;
+};
+
+/** Classify the pixel at overlap index `at` into `o.field`; ignored pixels never get here. */
+function classify(a: PNG, b: PNG, at: number, o: Overlap) {
+  const x = at % o.width;
+  const y = (at - x) / o.width;
+  const delta = colourDelta(a.data, (y * a.width + x) << 2, b.data, (y * b.width + x) << 2);
+  const field = o.field;
+  if (Math.abs(delta) <= o.maxDelta) return "same";
+  if (isAntialiased(a, x, y, b) || isAntialiased(b, x, y, a)) {
+    field.kind[at] = PIXEL_ANTIALIASED;
+    return "antialiased";
+  }
+  field.kind[at] = PIXEL_CHANGED;
+  field.amplitude[at] = Math.min(255, Math.round(Math.sqrt(Math.abs(delta) / MAX_YIQ_DELTA) * 255));
+  field.lighter[at] = delta < 0 ? 1 : 0;
+  return "changed";
+}
+
+/**
+ * Diff the overlapping rectangle, painting changed pixels magenta onto `overlay`. Pixels inside
+ * an ignore area are dropped before classification, so no region or speck can start in one.
+ */
+function diffOverlap(
+  a: PNG,
+  b: PNG,
+  overlay: PNG,
+  { threshold, ignore }: { threshold: number; ignore: DiffIgnore },
+): Counts {
   const width = Math.min(a.width, b.width);
   const height = Math.min(a.height, b.height);
   const field = newField(width, height);
-  const counts: Counts = { changedPixels: 0, antialiased: 0, field };
+  const ignored = clipRects([...(ignore.main ?? []), ...(ignore.branch ?? [])], width, height);
+  const skip = ignoreMask(ignored, width, height);
+  const o: Overlap = {
+    width,
+    height,
+    maxDelta: MAX_YIQ_DELTA * threshold * threshold,
+    skip: skip.mask,
+    field,
+  };
+  const counts: Counts = {
+    changedPixels: 0,
+    antialiased: 0,
+    ignoredPixels: skip.count,
+    ignored,
+    field,
+  };
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const delta = colourDelta(a.data, (y * a.width + x) << 2, b.data, (y * b.width + x) << 2);
-      if (Math.abs(delta) <= maxDelta) continue;
-      const at = y * width + x;
-      if (isAntialiased(a, x, y, b) || isAntialiased(b, x, y, a)) {
-        counts.antialiased++;
-        field.kind[at] = PIXEL_ANTIALIASED;
-        continue;
-      }
+      if (o.skip[y * width + x]) continue;
+      const kind = classify(a, b, y * width + x, o);
+      if (kind === "antialiased") counts.antialiased++;
+      if (kind !== "changed") continue;
       counts.changedPixels++;
-      field.kind[at] = PIXEL_CHANGED;
-      field.amplitude[at] = Math.min(
-        255,
-        Math.round(Math.sqrt(Math.abs(delta) / MAX_YIQ_DELTA) * 255),
-      );
-      field.lighter[at] = delta < 0 ? 1 : 0;
-      const io = (y * overlay.width + x) << 2;
-      overlay.data.set([255, 0, 255, 255], io);
+      overlay.data.set([255, 0, 255, 255], (y * overlay.width + x) << 2);
     }
   }
   return counts;
@@ -189,22 +276,26 @@ function labelRegions(regions: Region[], a: PNG, b: PNG, options: DiffOptions): 
   );
 }
 
-export function diffPngs(main: Buffer, branch: Buffer, options: DiffOptions = {}): PixelDiff {
+export function diffPngs(
+  main: Buffer,
+  branch: Buffer,
+  options: DiffOptions = {},
+  ignore: DiffIgnore = {},
+): PixelDiff {
   const a = PNG.sync.read(main);
   const b = PNG.sync.read(branch);
   const overlay = new PNG({
     width: Math.max(a.width, b.width),
     height: Math.max(a.height, b.height),
   });
-  const { changedPixels, antialiased, field } = diffOverlap(
-    a,
-    b,
-    options.threshold ?? DEFAULT_THRESHOLD,
-    overlay,
-  );
+  const { changedPixels, antialiased, ignoredPixels, ignored, field } = diffOverlap(a, b, overlay, {
+    threshold: options.threshold ?? DEFAULT_THRESHOLD,
+    ignore,
+  });
   const found = findRegions(field, options);
   const { specks } = found;
-  const overlap = field.width * field.height;
+  // The ratio floor is a share of what was measured: ignored pixels are not part of the denominator.
+  const measured = field.width * field.height - ignoredPixels;
   const sizeChanged = a.width !== b.width || a.height !== b.height;
   const regions = labelRegions(found.regions, a, b, options);
   const surviving = regions
@@ -213,9 +304,11 @@ export function diffPngs(main: Buffer, branch: Buffer, options: DiffOptions = {}
   const clearsFloors =
     surviving > 0 &&
     surviving >= (options.minChangedPixels ?? 0) &&
-    surviving / overlap >= (options.minChangedRatio ?? 0);
+    surviving / measured >= (options.minChangedRatio ?? 0);
   return {
     changed: sizeChanged || clearsFloors,
+    ignoredPixels,
+    ignored,
     changedPixels,
     antialiased,
     regions,

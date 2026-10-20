@@ -297,5 +297,18 @@ describe("regions", () => {
       const d = diffPngs(png(shiftedText(0)), png(shiftedText(0.5)), { maxShift: 0.3 });
       expect(d.regions.every((r) => r.kind === "change")).toBe(true);
     });
+
+    test("an ignore box drops the pixels before any shift is fitted: no region, not labelled", () => {
+      const box = { x: 10, y: 10, width: 160, height: 90 };
+      const over = { main: [box], branch: [box] };
+      const half = diffPngs(png(shiftedText(0)), png(shiftedText(0.5)), {}, over);
+      expect(half.regions).toEqual([]);
+      expect(half.changed).toBe(false);
+      expect(half.ignoredPixels).toBe(box.width * box.height);
+      // A whole-pixel move would be a `change`; inside the box it is not measured either.
+      const whole = diffPngs(png(shiftedText(0)), png(shiftedText(1)), {}, over);
+      expect(whole.regions).toEqual([]);
+      expect(whole.changed).toBe(false);
+    });
   });
 });

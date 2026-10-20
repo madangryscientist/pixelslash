@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
+import { parseArea, type Ignore, type Mask } from "./config-areas.ts";
 import type { DiffOptions } from "./diff.ts";
 import { mergeDiffOptions, parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
@@ -10,10 +11,7 @@ export const IMAGE_BROWSERS = ["chromium"] as const;
 export type BrowserName = (typeof IMAGE_BROWSERS)[number];
 export type Theme = "light" | "dark";
 
-/** A rectangle in full-page CSS px; scaled by the device scale factor when painted. */
-export type MaskRect = { x: number; y: number; width: number; height: number };
-/** A CSS selector (every match is blanked) or a fixed rectangle. */
-export type Mask = string | MaskRect;
+export type { Ignore, Mask, MaskRect } from "./config-areas.ts";
 
 export type Variant = {
   name: string;
@@ -25,12 +23,17 @@ export type Variant = {
 export type Route = {
   path: string;
   name: string;
+  /** Redact: painted into the PNG at capture time. */
   masks: Mask[];
+  /** This route's own ignore areas (a layer, not the resolved set; see `resolveIgnore`). */
+  ignore: Ignore[];
   tags: string[];
   /** This route's own diff options (a layer, not the resolved set; see `resolveDiff`). */
   diff: DiffOptions;
   /** Per-variant diff options for this route, keyed by variant name. */
   variantDiff: Record<string, DiffOptions>;
+  /** Per-variant ignore areas for this route, keyed by variant name. */
+  variantIgnore: Record<string, Ignore[]>;
 };
 
 export type Stabilise = {
@@ -61,6 +64,8 @@ export type CaptureConfig = {
   upload: UploadConfig;
   /** The project-wide diff options; routes and their variants layer over it. */
   diff: DiffOptions;
+  /** The project-wide ignore areas; routes and their variants add to them. */
+  ignore: Ignore[];
   routes: Route[];
   variants: Variant[];
   stabilise: Stabilise;
@@ -116,20 +121,7 @@ function list(v: unknown, where: string): unknown[] {
 }
 
 function mask(v: unknown, where: string): Mask {
-  if (typeof v === "string") return str(v, where);
-  if (!isObj(v)) bad(where, "must be a CSS selector or { x, y, width, height }");
-  const coord = (k: string) => {
-    const n = v[k];
-    if (typeof n !== "number" || !Number.isInteger(n) || n < 0)
-      bad(`${where}.${k}`, "must be a non-negative integer");
-    return n;
-  };
-  return {
-    x: coord("x"),
-    y: coord("y"),
-    width: posInt(v.width, `${where}.width`),
-    height: posInt(v.height, `${where}.height`),
-  };
+  return parseArea(v, where, bad);
 }
 
 /** A route or variant name: it becomes a path segment in the snapshot dir. */
@@ -160,16 +152,27 @@ function diff(v: unknown, where: string): DiffOptions {
   return v === undefined ? {} : parseDiffOptions(v, where, bad);
 }
 
-function variantDiff(v: unknown, where: string): Record<string, DiffOptions> {
+function ignoreAreas(v: unknown, where: string): Ignore[] {
+  return list(v, where).map((a, i) => mask(a, `${where}[${i}]`));
+}
+
+/** One option layer per variant name, read from `variants.<name>.<key>`. */
+function variantLayer<T>(
+  v: unknown,
+  where: string,
+  key: "diff" | "ignore",
+  parse: (v: unknown, where: string) => T,
+): Record<string, T> {
   if (v === undefined) return {};
   if (!isObj(v)) bad(where, "must be an object keyed by variant name");
-  const out: Record<string, DiffOptions> = {};
+  const out: Record<string, T> = {};
   for (const [name, entry] of Object.entries(v)) {
-    if (!isObj(entry)) bad(`${where}.${name}`, "must be { diff }");
-    for (const key of Object.keys(entry)) {
-      if (key !== "diff") bad(`${where}.${name}.${key}`, "is not a variant option (diff)");
+    if (!isObj(entry)) bad(`${where}.${name}`, "must be { diff?, ignore? }");
+    for (const k of Object.keys(entry)) {
+      if (k !== "diff" && k !== "ignore")
+        bad(`${where}.${name}.${k}`, "is not a variant option (diff, ignore)");
     }
-    out[name] = diff(entry.diff, `${where}.${name}.diff`);
+    out[name] = parse(entry[key], `${where}.${name}.${key}`);
   }
   return out;
 }
@@ -177,7 +180,8 @@ function variantDiff(v: unknown, where: string): Record<string, DiffOptions> {
 function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] }): Route {
   const where = `routes[${i}]`;
   const r = typeof v === "string" ? { path: v } : v;
-  if (!isObj(r)) bad(where, "must be a path or { path, name?, masks?, tags?, diff?, variants? }");
+  if (!isObj(r))
+    bad(where, "must be a path or { path, name?, masks?, ignore?, tags?, diff?, variants? }");
   const path = str(r.path, `${where}.path`);
   if (!path.startsWith("/")) bad(`${where}.path`, "must start with /");
   const name = fileName(r.name, `${where}.name`, routeSlug(path));
@@ -188,9 +192,11 @@ function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] })
       ...global.masks,
       ...list(r.masks, `${where}.masks`).map((m, j) => mask(m, `${where}.masks[${j}]`)),
     ],
+    ignore: ignoreAreas(r.ignore, `${where}.ignore`),
     tags: [...new Set([...global.tags, ...strings(r.tags, `${where}.tags`)])],
     diff: diff(r.diff, `${where}.diff`),
-    variantDiff: variantDiff(r.variants, `${where}.variants`),
+    variantDiff: variantLayer(r.variants, `${where}.variants`, "diff", diff),
+    variantIgnore: variantLayer(r.variants, `${where}.variants`, "ignore", ignoreAreas),
   };
 }
 
@@ -298,6 +304,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
     start: start(raw.start, baseUrl),
     upload: upload(raw.upload),
     diff: diff(raw.diff, "diff"),
+    ignore: ignoreAreas(raw.ignore, "ignore"),
     routes,
     variants,
     stabilise: stabilise(raw.stabilise),
@@ -311,6 +318,15 @@ export function parseConfig(raw: unknown): CaptureConfig {
  */
 export function resolveDiff(config: CaptureConfig, shot: Route, as: Variant): DiffOptions {
   return mergeDiffOptions(config.diff, shot.diff, shot.variantDiff[as.name] ?? {});
+}
+
+/**
+ * The ignore areas a snapshot is captured with: project, then route, then variant, all added
+ * together (an ignore area is something to skip, so a layer can only add). Selectors are resolved
+ * to boxes in the page at capture time; rectangles are CSS px.
+ */
+export function resolveIgnore(config: CaptureConfig, shot: Route, as: Variant): Ignore[] {
+  return [...config.ignore, ...shot.ignore, ...(shot.variantIgnore[as.name] ?? [])];
 }
 
 /** `findConfig`, but no config at all is `undefined`: `upload` runs fine without one. */

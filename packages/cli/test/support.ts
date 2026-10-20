@@ -272,3 +272,11 @@ export async function readManifest(path: string): Promise<RunManifest> {
   if (!isManifest(value)) throw new Error(`not a run manifest: ${path}`);
   return value;
 }
+
+/** Two solid shots one grey step apart: a faint change the default threshold flags. */
+export async function faintPair(dir: string) {
+  const [live, local] = [join(dir, "live.png"), join(dir, "local.png")];
+  await Bun.write(live, solidPng(20, 20, [100, 100, 100, 255]));
+  await Bun.write(local, solidPng(20, 20, [110, 110, 110, 255]));
+  return { live, local };
+}

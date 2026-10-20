@@ -1,0 +1,1 @@
+ALTER TABLE `snapshots` ADD `ignore` text DEFAULT '[]' NOT NULL;

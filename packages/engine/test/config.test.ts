@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseConfig, resolveDiff } from "../src/config.ts";
+import { parseConfig, resolveDiff, resolveIgnore } from "../src/config.ts";
 
 const base = { baseUrl: "http://127.0.0.1:3000", routes: ["/"] };
 
@@ -23,7 +23,16 @@ describe("parseConfig", () => {
       },
     ]);
     expect(config.routes).toEqual([
-      { path: "/", name: "index", masks: [], tags: [], diff: {}, variantDiff: {} },
+      {
+        path: "/",
+        name: "index",
+        masks: [],
+        tags: [],
+        ignore: [],
+        diff: {},
+        variantDiff: {},
+        variantIgnore: {},
+      },
     ]);
     expect(config.start).toBeUndefined();
   });
@@ -73,9 +82,11 @@ describe("parseConfig", () => {
       path: "/pricing/",
       name: "pricing",
       masks: [".clock", { x: 0, y: 0, width: 10, height: 5 }],
+      ignore: [],
       tags: ["web", "billing"],
       diff: {},
       variantDiff: {},
+      variantIgnore: {},
     });
   });
 
@@ -140,7 +151,24 @@ describe("parseConfig", () => {
         ...base,
         routes: [{ path: "/", variants: { "chromium-1280x720-light": { tolerance: {} } } }],
       },
-      /\.tolerance is not a variant option \(diff\)/,
+      /\.tolerance is not a variant option \(diff, ignore\)/,
+    ],
+    [{ ...base, ignore: ".video" }, /ignore must be an array/],
+    [{ ...base, ignore: [""] }, /ignore\[0\] must be a non-empty string/],
+    [
+      { ...base, ignore: [{ x: 0, y: 0, width: 0, height: 4 }] },
+      /ignore\[0\]\.width must be a positive integer/,
+    ],
+    [
+      { ...base, routes: [{ path: "/", ignore: [{ x: -1, y: 0, width: 1, height: 1 }] }] },
+      /routes\[0\]\.ignore\[0\]\.x must be a non-negative integer/,
+    ],
+    [
+      {
+        ...base,
+        routes: [{ path: "/", variants: { "chromium-1280x720-light": { ignore: [3] } } }],
+      },
+      /routes\[0\]\.variants\.chromium-1280x720-light\.ignore\[0\] must be a CSS selector or/,
     ],
     [{ ...base, baseUrl: "nope" }, /baseUrl must be a URL/],
     [{ ...base, routes: [] }, /routes must list at least one path/],
@@ -204,5 +232,39 @@ describe("resolveDiff", () => {
       routes: [{ path: "/", diff: { threshold: 0 } }],
     });
     expect(resolveDiff(strict, strict.routes[0]!, strict.variants[0]!)).toEqual({ threshold: 0 });
+  });
+});
+
+describe("resolveIgnore", () => {
+  const box = { x: 4, y: 8, width: 100, height: 50 };
+  const config = parseConfig({
+    baseUrl: "http://127.0.0.1:3000",
+    ignore: [".video"],
+    masks: [".secret"],
+    variants: [{ name: "desktop" }, { name: "mobile", viewport: { width: 390, height: 844 } }],
+    routes: [
+      "/",
+      { path: "/map", ignore: [".map"], masks: [".token"] },
+      { path: "/feed", ignore: [box], variants: { mobile: { ignore: [".ticker"] } } },
+    ],
+  });
+  const resolve = (route: number, variant: number) =>
+    resolveIgnore(config, config.routes[route]!, config.variants[variant]!);
+
+  test("project, route and variant areas add together; selectors and rectangles both", () => {
+    expect(resolve(0, 0)).toEqual([".video"]);
+    expect(resolve(1, 0)).toEqual([".video", ".map"]);
+    expect(resolve(2, 0)).toEqual([".video", box]);
+    expect(resolve(2, 1)).toEqual([".video", box, ".ticker"]);
+  });
+
+  test("ignore and masks are separate lists: an ignore area is never a redact mask", () => {
+    expect(config.routes[1]?.masks).toEqual([".secret", ".token"]);
+    expect(config.routes[1]?.ignore).toEqual([".map"]);
+  });
+
+  test("none anywhere resolves to []", () => {
+    const plain = parseConfig(base);
+    expect(resolveIgnore(plain, plain.routes[0]!, plain.variants[0]!)).toEqual([]);
   });
 });

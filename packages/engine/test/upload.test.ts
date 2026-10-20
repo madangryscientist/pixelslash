@@ -237,6 +237,20 @@ describe("uploadSnapshots", () => {
     });
   });
 
+  test("sends each snapshot's ignore rects, [] when it has none", async () => {
+    const { dir: cwd } = await repo(1, 1);
+    const box = { x: 4, y: 8, width: 100, height: 50 };
+    const dir = await snapshotDir([entry("home", "desktop", { ignore: [box] }), entry("pricing")]);
+    const server = fakeServer();
+    await uploadSnapshots(
+      { dir, server: "https://ps.example", token: "psci_t", git: gitOpts(cwd) },
+      { fetch: server.fetch },
+    );
+    const metas = server.calls.filter((c) => c.method === "PUT").map((c) => metaOf(c.body));
+    expect(metas.find((m) => m.name === "home")?.ignore).toEqual([box]);
+    expect(metas.find((m) => m.name === "pricing")?.ignore).toEqual([]);
+  });
+
   test("a refused PNG throws and the build is never finalised", async () => {
     const { dir: cwd } = await repo(1, 1);
     const dir = await snapshotDir([entry("home"), entry("pricing")]);

@@ -1,4 +1,4 @@
-import type { DiffOptions } from "./diff.ts";
+import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { describeDiffOptions } from "./diff-options.ts";
 import { stem, type Violation } from "./judge.ts";
 import type { Region, Specks } from "./regions.ts";
@@ -41,6 +41,19 @@ function regionBoxes(regions: Region[], width: number, height: number): string {
     .join("");
 }
 
+/**
+ * The ignore areas, hatched over a figure of `width` x `height` pixels. They were not measured,
+ * so they are drawn as neither changed nor unchanged: a pattern over the real pixels.
+ */
+function ignoreBoxes(ignored: IgnoreRect[], width: number, height: number): string {
+  return ignored
+    .map((r) => {
+      const style = `left:${pct(r.x, width)};top:${pct(r.y, height)};width:${pct(r.width, width)};height:${pct(r.height, height)}`;
+      return `<span class="ignore" style="${style}" title="ignored ${r.x},${r.y} ${r.width}x${r.height}"></span>`;
+    })
+    .join("");
+}
+
 function regionLabel(r: Region, i: number): string {
   const what = {
     noise: `noise (${r.why ?? "scattered"})`,
@@ -70,6 +83,36 @@ function regionList(regions: Region[]): string {
   return `<ol class="regions">${items}</ol>`;
 }
 
+type Notes = { options: string; floored: string; ignoredLine: string };
+
+/** The one line that says an area was not measured; empty when nothing was skipped. */
+function ignoredNote(pixels: number, areas: number): string {
+  if (pixels === 0) return "";
+  const px = `${pixels} ignored ${pixels === 1 ? "pixel" : "pixels"}`;
+  const where = `${areas} ${areas === 1 ? "area" : "areas"}`;
+  return `<p>${px} in ${where} (hatched): not measured, neither changed nor unchanged.</p>\n    `;
+}
+
+/** The optional header paragraphs: diff options, the floors note and the ignored-pixel count. */
+function headerNotes(input: {
+  changedPixels: number;
+  changed?: boolean | undefined;
+  diff?: DiffOptions | undefined;
+  regions: Region[];
+  ignoredPixels?: number | undefined;
+  ignored?: IgnoreRect[] | undefined;
+}): Notes {
+  const used = describeDiffOptions(input.diff ?? {});
+  const held = input.changed === false && input.regions.some((r) => r.kind === "change");
+  return {
+    options: used ? `<p>Diff options: ${esc(used)}</p>\n    ` : "",
+    floored: held
+      ? `<p>Not changed: ${input.changedPixels} changed pixels are under the floors above.</p>\n    `
+      : "",
+    ignoredLine: ignoredNote(input.ignoredPixels ?? 0, input.ignored?.length ?? 0),
+  };
+}
+
 export function renderPixelReport(input: {
   path?: string | undefined;
   changedPixels: number;
@@ -78,6 +121,10 @@ export function renderPixelReport(input: {
   diff?: DiffOptions;
   regions: Region[];
   specks: Specks;
+  /** Pixels inside an ignore area; left out of every count above. */
+  ignoredPixels?: number;
+  /** The ignore areas, clipped to the overlap, in image px. */
+  ignored?: IgnoreRect[];
   main: { width: number; height: number };
   branch: { width: number; height: number };
 }): string {
@@ -85,12 +132,8 @@ export function renderPixelReport(input: {
   const count = input.path
     ? `${esc(input.path)} · ${input.changedPixels} changed pixels`
     : `${input.changedPixels} changed pixels`;
-  const used = describeDiffOptions(input.diff ?? {});
-  const options = used ? `<p>Diff options: ${esc(used)}</p>\n    ` : "";
-  const floored =
-    input.changed === false && input.regions.some((r) => r.kind === "change")
-      ? `<p>Not changed: ${input.changedPixels} changed pixels are under the floors above.</p>\n    `
-      : "";
+  const ignored = input.ignored ?? [];
+  const notes = headerNotes(input);
   const diffWidth = Math.max(input.main.width, input.branch.width);
   const diffHeight = Math.max(input.main.height, input.branch.height);
   const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
@@ -111,6 +154,7 @@ export function renderPixelReport(input: {
     figcaption { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #aaa; margin-bottom: 6px; }
     img { display: block; width: 100%; height: auto; background: #000; }
     .frame { position: relative; }
+    .ignore { position: absolute; box-sizing: border-box; pointer-events: auto; border: 1px solid #5ec8ff; background: repeating-linear-gradient(45deg, rgba(94,200,255,.55) 0 3px, rgba(0,0,0,.35) 3px 7px); }
     .box { position: absolute; box-sizing: border-box; min-width: 6px; min-height: 6px; pointer-events: auto; }
     .box.change { border: 2px solid #ffd400; }
     .box.noise { border: 1px dashed #8a8a8a; }
@@ -124,15 +168,16 @@ export function renderPixelReport(input: {
   <header>
     <h1>PixelSlash</h1>
     <p>${count}</p>
-    ${options}${floored}
+    ${notes.options}${notes.floored}
     <p>${esc(regionSummary(input.regions, input.specks))}</p>
     <p>${sizes}</p>
+    ${notes.ignoredLine}
   </header>
   <section>
     <div class="row">
-      <figure><figcaption>Main</figcaption><img src="main.png" alt="Main"></figure>
-      <figure><figcaption>Branch</figcaption><img src="branch.png" alt="Branch"></figure>
-      <figure><figcaption>Diff</figcaption><div class="frame"><img src="diff.png" alt="Diff">${regionBoxes(input.regions, diffWidth, diffHeight)}</div></figure>
+      <figure><figcaption>Main</figcaption><div class="frame"><img src="main.png" alt="Main">${ignoreBoxes(ignored, input.main.width, input.main.height)}</div></figure>
+      <figure><figcaption>Branch</figcaption><div class="frame"><img src="branch.png" alt="Branch">${ignoreBoxes(ignored, input.branch.width, input.branch.height)}</div></figure>
+      <figure><figcaption>Diff</figcaption><div class="frame"><img src="diff.png" alt="Diff">${ignoreBoxes(ignored, diffWidth, diffHeight)}${regionBoxes(input.regions, diffWidth, diffHeight)}</div></figure>
     </div>
     ${regionList(input.regions)}
   </section>

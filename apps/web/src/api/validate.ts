@@ -1,5 +1,5 @@
 import type { NewBuild, SnapshotInput } from "#/db/builds";
-import type { DiffOptions } from "#/db/schema";
+import type { DiffOptions, IgnoreRect } from "#/db/schema";
 
 /** A request the client got wrong: surfaces as a 400 with this message. */
 export class BadRequest extends Error {}
@@ -26,6 +26,7 @@ const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const TOKEN = /^[\w.-]+$/;
 export const MAX_ANCESTORS = 20;
 const MAX_TAGS = 50;
+const MAX_IGNORE = 200;
 
 function sha(v: unknown, where: string): string {
   if (typeof v !== "string" || !SHA.test(v)) bad(where, "must be a lowercase hex git SHA");
@@ -89,6 +90,29 @@ function parseDiff(v: unknown): DiffOptions {
   return out;
 }
 
+function coord(v: unknown, where: string, min: 0 | 1): number {
+  if (typeof v !== "number" || !Number.isSafeInteger(v) || v < min)
+    bad(where, `must be ${min === 0 ? "a non-negative" : "a positive"} integer`);
+  return v;
+}
+
+/** Image-px rectangles the diff skips. Absent is `[]`: older clients send no `ignore`. */
+function parseIgnore(v: unknown): IgnoreRect[] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || v.length > MAX_IGNORE)
+    bad("ignore", `must be an array of at most ${MAX_IGNORE} { x, y, width, height }`);
+  return v.map((r, i) => {
+    const where = `ignore[${i}]`;
+    const rect = object(r, where);
+    return {
+      x: coord(rect.x, `${where}.x`, 0),
+      y: coord(rect.y, `${where}.y`, 0),
+      width: coord(rect.width, `${where}.width`, 1),
+      height: coord(rect.height, `${where}.height`, 1),
+    };
+  });
+}
+
 export function parseSnapshotInput(raw: unknown): SnapshotInput {
   const m = object(raw, "meta");
   const tags = m.tags ?? [];
@@ -105,6 +129,7 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
     theme,
     tags: tags.map((t, i) => text(t, `tags[${i}]`, 100)),
     diff: parseDiff(m.diff),
+    ignore: parseIgnore(m.ignore),
     fingerprint: {
       image: text(fp.image, "fingerprint.image", 300),
       browser: text(fp.browser, "fingerprint.browser", 300),

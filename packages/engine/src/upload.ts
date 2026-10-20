@@ -4,6 +4,7 @@ import { parseDiffOptions } from "./diff-options.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
+import type { IgnoreRect } from "./diff.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
 
 /** The pinned capture image is Linux; the manifest carries no platform of its own. */
@@ -32,6 +33,27 @@ function posInt(v: unknown, where: string): number {
   return v;
 }
 
+function nonNegInt(v: unknown, where: string): number {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < 0)
+    bad(where, "must be a non-negative integer");
+  return v;
+}
+
+/** Ignore rects in image px; a manifest from before ignore areas has none. */
+function ignoreRects(v: unknown, where: string): IgnoreRect[] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) bad(where, "must be an array of { x, y, width, height }");
+  return v.map((r, i) => {
+    if (!isObj(r)) bad(`${where}[${i}]`, "must be an object");
+    return {
+      x: nonNegInt(r.x, `${where}[${i}].x`),
+      y: nonNegInt(r.y, `${where}[${i}].y`),
+      width: posInt(r.width, `${where}[${i}].width`),
+      height: posInt(r.height, `${where}[${i}].height`),
+    };
+  });
+}
+
 function entry(v: unknown, i: number): SnapshotEntry {
   const where = `snapshots[${i}]`;
   if (!isObj(v)) bad(where, "must be an object");
@@ -56,6 +78,7 @@ function entry(v: unknown, i: number): SnapshotEntry {
     },
     tags: tags.map((t, j) => str(t, `${where}.tags[${j}]`)),
     diff: v.diff === undefined ? {} : parseDiffOptions(v.diff, `${where}.diff`, bad),
+    ignore: ignoreRects(v.ignore, `${where}.ignore`),
     file: str(v.file, `${where}.file`),
     fingerprint: {
       image: str(fingerprint.image, `${where}.fingerprint.image`),
@@ -231,6 +254,7 @@ function snapshotMeta(e: SnapshotEntry) {
     theme: e.variant.theme,
     tags: e.tags,
     diff: e.diff,
+    ignore: e.ignore,
     fingerprint: e.fingerprint,
   };
 }

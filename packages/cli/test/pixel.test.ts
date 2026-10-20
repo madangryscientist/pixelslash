@@ -12,17 +12,10 @@ import {
   solidPng,
   tmp,
   readManifest,
+  faintPair,
 } from "./support.ts";
 
 afterAll(cleanup);
-
-/** Two solid shots one grey step apart: a faint change the default threshold flags. */
-async function faintPair(dir: string) {
-  const [live, local] = [join(dir, "live.png"), join(dir, "local.png")];
-  await Bun.write(live, solidPng(20, 20, [100, 100, 100, 255]));
-  await Bun.write(local, solidPng(20, 20, [110, 110, 110, 255]));
-  return { live, local };
-}
 
 describe("diff options", () => {
   test("--threshold 0.2 flips a faint change to unchanged, and the report says so", async () => {

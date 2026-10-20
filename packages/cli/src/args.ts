@@ -4,10 +4,11 @@ import {
   parseDiffOption,
   type CompareOptions,
   type DiffOptions,
+  type IgnoreRect,
 } from "@pixelslash/engine";
 
 export const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1]\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
 const DEFAULT_WIDTH = 1280;
 
 export type Cli = CompareOptions & {
@@ -28,6 +29,47 @@ export function readFlags(argv: string[]): Map<string, string> {
     flags.set(key, val);
   }
   return flags;
+}
+
+/** `--ignore x,y,w,h` may repeat, which a flag map cannot hold: pull the pairs out first. */
+function takeIgnore(argv: string[]): { rects: IgnoreRect[]; rest: string[] } {
+  const rects: IgnoreRect[] = [];
+  const rest: string[] = [];
+  for (let i = 0; i < argv.length; i += 2) {
+    if (argv[i] !== "--ignore") {
+      rest.push(argv[i] ?? "");
+      if (i + 1 < argv.length) rest.push(argv[i + 1] ?? "");
+      continue;
+    }
+    rects.push(parseIgnore(argv[i + 1]));
+  }
+  return { rects, rest };
+}
+
+const WHOLE = /^\d+$/;
+/** The smallest legal value for x, y, width, height. */
+const FLOOR = [0, 0, 1, 1];
+
+const inRange = (value: number, i: number) =>
+  Number.isSafeInteger(value) && value >= (FLOOR[i] ?? 0);
+
+/** `x,y,w,h` as whole numbers, or null when any part is missing or out of range. */
+function parseRect(parts: string[]): IgnoreRect | null {
+  if (parts.length !== 4) return null;
+  const nums = parts.map((p) => (WHOLE.test(p) ? Number(p) : Number.NaN));
+  if (!nums.every(inRange)) return null;
+  const [x = Number.NaN, y = Number.NaN, width = Number.NaN, height = Number.NaN] = nums;
+  return { x, y, width, height };
+}
+
+/** `x,y,w,h` in image px: x and y are 0 or more, width and height at least 1. */
+function parseIgnore(raw: string | undefined): IgnoreRect {
+  if (!raw || raw.startsWith("--")) throw new UsageError("missing value for --ignore");
+  const rect = parseRect(raw.split(",").map((p) => p.trim()));
+  if (rect) return rect;
+  throw new UsageError(
+    `--ignore must be x,y,w,h in pixels: whole numbers, width and height at least 1 (got "${raw}")`,
+  );
 }
 
 function count(flags: Map<string, string>, a: string, b: string): number {
@@ -89,8 +131,11 @@ function resolved(flags: Map<string, string>, key: string): string | undefined {
 }
 
 export function parseArgs(argv: string[]): Cli {
-  const flags = readFlags(argv);
+  const { rects: ignore, rest } = takeIgnore(argv);
+  const flags = readFlags(rest);
   const mode = inputMode(flags);
+  if (ignore.length > 0 && (mode === "png-dir" || flags.has("routes")))
+    throw new UsageError("--ignore applies to a single pair, not --routes");
   const hasDs = flags.has("ds");
   const hasFile = flags.has("file");
   if (hasDs && hasFile) throw new UsageError("need --ds DIR or --file FILE_KEY, not both");
@@ -113,5 +158,6 @@ export function parseArgs(argv: string[]): Cli {
     width,
     label: flags.get("label"),
     diff: parseDiff(flags),
+    ignore,
   };
 }
