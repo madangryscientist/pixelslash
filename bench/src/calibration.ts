@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argosHost, argosKey, runArgos } from "./argos.ts";
 import { runPixelslash } from "./pixelslash.ts";
-import type { CorpusCase } from "./corpus.ts";
+import { caseKey, type CorpusCase } from "./corpus.ts";
 import type { ToolResult } from "./types.ts";
 
 const FIXTURES = "/argos/apps/backend/src/screenshot-diff/diff/image/__fixtures__";
@@ -62,6 +62,8 @@ function stage(group: ArgosCase[], raw: string, pairs: string): CorpusCase[] {
   return group.map((c) => ({
     name: c.name,
     dir: join(pairs, c.name),
+    // Neither corpus owns these; the field only keys the result map of runPixelslash.
+    corpus: "main",
     label: c.expectChanged ? "real" : "noise",
     kind: "argos",
     page: "argos",
@@ -78,7 +80,7 @@ async function runGroup(group: ArgosCase[], raw: string, work: string): Promise<
   const ps = runPixelslash(cases);
   return group.map((c) => {
     const a = argos.results.get(c.name);
-    const p = ps.get(c.name);
+    const p = ps.get(caseKey({ corpus: "main", name: c.name }));
     if (!a || !p) throw new Error(`no result for calibration case ${c.name}`);
     return { ...c, argos: a, pixelslash: { ...p, diffPng: null } };
   });

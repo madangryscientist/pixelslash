@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "icon",
+  "page": "inbox",
+  "width": 680,
+  "height": 400,
+  "box": {
+    "x": 71,
+    "y": 180,
+    "w": 16,
+    "h": 17
+  }
+}

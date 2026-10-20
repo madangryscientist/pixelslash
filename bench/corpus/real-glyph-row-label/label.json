@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "glyph",
+  "page": "dashboard",
+  "width": 640,
+  "height": 480,
+  "box": {
+    "x": 61,
+    "y": 296,
+    "w": 146,
+    "h": 17
+  }
+}

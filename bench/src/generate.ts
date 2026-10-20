@@ -1,28 +1,59 @@
 #!/usr/bin/env bun
 /**
- * Render the corpus (ob 1477): `bun bench/src/generate.ts`. Each case in cases.ts is rendered from
- * the fixture pages in bench/fixtures/ with Playwright's Chromium, and written to bench/corpus/.
- * The PNGs are committed, so the benchmark itself does not need a browser; re-run this only to
- * change the corpus. It fails if an `identical` pair differs or a `noise`/`real` pair does not.
+ * Render a corpus (ob 1477): `bun bench/src/generate.ts [--set main|holdout] [case-name-part...]`.
+ * Each case is rendered from the fixture pages of its set with Playwright's Chromium, and written
+ * to the set's directory: `main` is cases.ts over bench/fixtures/ into bench/corpus/, `holdout` is
+ * holdout-cases.ts over bench/fixtures-holdout/ into bench/corpus-holdout/. The PNGs are
+ * committed, so the benchmark itself does not need a browser; re-run this only to change a corpus
+ * (name the new cases, so the committed ones are not re-rendered). It fails if an `identical` pair
+ * differs or a `noise`/`real` pair does not.
  */
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
 import { PNG } from "pngjs";
-import { CASES, type CaseDef, type Dither, type Variant } from "./cases.ts";
-import { BENCH_DIR, CORPUS_DIR, type CaseLabel } from "./corpus.ts";
+import type { CaseDef, Dither, Variant } from "./case-kit.ts";
+import { CASES } from "./cases.ts";
+import { roundTripJpeg, roundTripWebp } from "./lossy.ts";
+import { BENCH_DIR, CORPORA, type CaseLabel, type CorpusId } from "./corpus.ts";
+import { HOLDOUT_CASES } from "./holdout-cases.ts";
 import type { Rect } from "./regions.ts";
+import type { Size } from "./lossy.ts";
 import { say, warn } from "./say.ts";
 
-/** Tall enough that the whole page is in view, short enough that an appended section makes it grow. */
-const VIEWPORTS = {
-  dashboard: { width: 640, height: 480 },
-  form: { width: 640, height: 460 },
-  article: { width: 640, height: 640 },
-  pages: { width: 1280, height: 720 },
+type GenSet = {
+  id: CorpusId;
+  cases: CaseDef[];
+  /** `<page>.html` lives here. */
+  pages: string;
+  /** Tall enough that the whole page is in view, short enough that an appended section makes it grow. */
+  viewports: Record<string, Size>;
 };
+
+const SETS: GenSet[] = [
+  {
+    id: "main",
+    cases: CASES,
+    pages: join(BENCH_DIR, "fixtures"),
+    viewports: {
+      dashboard: { width: 640, height: 480 },
+      form: { width: 640, height: 460 },
+      article: { width: 640, height: 640 },
+      pages: { width: 1280, height: 720 },
+    },
+  },
+  {
+    id: "holdout",
+    cases: HOLDOUT_CASES,
+    pages: join(BENCH_DIR, "fixtures-holdout"),
+    viewports: {
+      settings: { width: 680, height: 480 },
+      pricing: { width: 680, height: 520 },
+      inbox: { width: 680, height: 400 },
+    },
+  },
+];
 const FONTCONFIGS = join(BENCH_DIR, "fixtures", "fontconfig");
-const PAGES = join(BENCH_DIR, "fixtures");
 const REPO = join(BENCH_DIR, "..");
 
 declare const document: {
@@ -58,31 +89,6 @@ function applyDither(png: Buffer, d: Dither): Buffer {
     }
   }
   return PNG.sync.write(img);
-}
-
-type Size = { width: number; height: number };
-
-async function roundTripJpeg(
-  browser: Browser,
-  page: Page,
-  jpeg: { quality: number; fullPage: boolean; viewport: Size },
-) {
-  const bytes = await page.screenshot({
-    type: "jpeg",
-    quality: jpeg.quality,
-    fullPage: jpeg.fullPage,
-  });
-  const helper = await browser.newPage({ viewport: jpeg.viewport });
-  try {
-    await helper.setContent(
-      `<body style="margin:0"><img id="i" src="data:image/jpeg;base64,${bytes.toString("base64")}"></body>`,
-    );
-    await helper.waitForFunction(() => document.fonts.ready);
-    await helper.waitForTimeout(100);
-    return await helper.screenshot({ type: "png", fullPage: true });
-  } finally {
-    await helper.close();
-  }
 }
 
 type Render = { png: Buffer; rects: Rect[] };
@@ -131,22 +137,36 @@ function measure(page: Page, entries: string[]): Promise<Rect[]> {
   }, entries);
 }
 
-async function render(browsers: Map<string, Browser>, def: CaseDef, v: Variant): Promise<Render> {
+async function shoot(
+  browser: Browser,
+  page: Page,
+  v: Variant,
+  shot: { fullPage: boolean; viewport: Size },
+): Promise<Buffer> {
+  if (v.jpeg !== undefined) return await roundTripJpeg(browser, page, { quality: v.jpeg, ...shot });
+  if (v.webp !== undefined) return await roundTripWebp(browser, page, { quality: v.webp, ...shot });
+  return await page.screenshot({ type: "png", fullPage: shot.fullPage });
+}
+
+async function render(
+  browsers: Map<string, Browser>,
+  set: GenSet,
+  def: CaseDef,
+  v: Variant,
+): Promise<Render> {
   const browser = await launch(browsers, v);
-  const viewport = VIEWPORTS[def.page];
+  const viewport = set.viewports[def.page];
+  if (!viewport) throw new Error(`${def.name}: no viewport for page ${def.page}`);
   const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
   try {
-    const file = v.source ? join(REPO, v.source) : join(PAGES, `${def.page}.html`);
+    const file = v.source ? join(REPO, v.source) : join(set.pages, `${def.page}.html`);
     await page.goto(`file://${file}`);
     if (v.css) await page.addStyleTag({ content: v.css });
     if (v.js) await page.evaluate(v.js);
     await settle(page);
     const rects = await measure(page, def.box ?? []);
     const fullPage = def.fullPage === true;
-    const png =
-      v.jpeg === undefined
-        ? await page.screenshot({ type: "png", fullPage })
-        : await roundTripJpeg(browser, page, { quality: v.jpeg, fullPage, viewport });
+    const png = await shoot(browser, page, v, { fullPage, viewport });
     return { png: v.dither ? applyDither(png, v.dither) : png, rects };
   } finally {
     await page.close();
@@ -193,35 +213,52 @@ function check(def: CaseDef, base: Render, head: Render): string | null {
   return null;
 }
 
-function writeCase(def: CaseDef, base: Render, head: Render): void {
-  const dir = join(CORPUS_DIR, def.name);
+function writeCase(corpusDir: string, def: CaseDef, base: Render, head: Render): void {
+  const dir = join(corpusDir, def.name);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "base.png"), base.png);
   writeFileSync(join(dir, "head.png"), head.png);
   writeFileSync(join(dir, "label.json"), `${JSON.stringify(labelFor(def, base, head), null, 2)}\n`);
 }
 
-function pruneStale(): void {
-  const keep = new Set(CASES.map((c) => c.name));
-  for (const dir of readdirSync(CORPUS_DIR)) {
-    if (!keep.has(dir)) rmSync(join(CORPUS_DIR, dir), { recursive: true, force: true });
+function pruneStale(set: GenSet, corpusDir: string): void {
+  const keep = new Set(set.cases.map((c) => c.name));
+  for (const dir of readdirSync(corpusDir)) {
+    if (!keep.has(dir)) rmSync(join(corpusDir, dir), { recursive: true, force: true });
   }
 }
 
+function parseArgs(argv: string[]): { set: GenSet; only: string[] } {
+  const only = [...argv];
+  let id: CorpusId = "main";
+  const at = only.indexOf("--set");
+  if (at !== -1) {
+    const value = only[at + 1];
+    if (value !== "main" && value !== "holdout") throw new Error("--set takes main or holdout");
+    id = value;
+    only.splice(at, 2);
+  }
+  const set = SETS.find((s) => s.id === id);
+  if (!set) throw new Error(`no such set: ${id}`);
+  return { set, only };
+}
+
 async function main() {
-  const only = process.argv.slice(2);
-  const defs = only.length > 0 ? CASES.filter((c) => only.some((o) => c.name.includes(o))) : CASES;
+  const { set, only } = parseArgs(process.argv.slice(2));
+  const corpusDir = CORPORA[set.id];
+  const defs =
+    only.length > 0 ? set.cases.filter((c) => only.some((o) => c.name.includes(o))) : set.cases;
   const browsers = new Map<string, Browser>();
   const problems: string[] = [];
-  mkdirSync(CORPUS_DIR, { recursive: true });
-  if (only.length === 0) pruneStale();
+  mkdirSync(corpusDir, { recursive: true });
+  if (only.length === 0) pruneStale(set, corpusDir);
   try {
     for (const def of defs) {
-      const base = await render(browsers, def, def.base);
-      const head = await render(browsers, def, def.head);
+      const base = await render(browsers, set, def, def.base);
+      const head = await render(browsers, set, def, def.head);
       const problem = check(def, base, head);
       if (problem) problems.push(problem);
-      writeCase(def, base, head);
+      writeCase(corpusDir, def, base, head);
       say(`${def.label.padEnd(9)} ${def.name}`);
     }
   } finally {

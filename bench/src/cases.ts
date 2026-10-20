@@ -1,82 +1,22 @@
 /**
- * The corpus, as data (ob 1477). Each case renders one fixture page twice, `base` and `head`, and
- * is labelled by what a reviewer should conclude: `identical`, `noise` (a change nobody would want
- * flagged) or `real` (a change somebody should see, with the elements it touches in `box`).
+ * The main corpus (ob 1477): cases rendered from the three pages in bench/fixtures/. Tuning work
+ * looks at this corpus; bench/corpus-holdout/ (holdout-cases.ts) is the one it must not tune to.
  */
-export type Dither = { seed: number; amp: number; density: number };
-
-export type Variant = {
-  /** Render this file (path from the repo root) instead of the case's fixture page. */
-  source?: string;
-  /** Extra CSS injected after load. */
-  css?: string;
-  /** A JS expression-statement run in the page after load, before the shot. */
-  js?: string;
-  /** Extra Chromium flags; a different flag set means a different browser launch. */
-  args?: string[];
-  /** A fontconfig file from fixtures/fontconfig/ (hinting and anti-aliasing), by name without `.conf`. */
-  fontconfig?: string;
-  /** Post-process the PNG: seeded +-amp noise on `density` of the pixels (GPU rasterisation drift). */
-  dither?: Dither;
-  /** Round-trip the shot through JPEG at this quality (lossy compression artefacts). */
-  jpeg?: number;
-};
-
-export type Label = "identical" | "noise" | "real";
-
-export type CaseDef = {
-  name: string;
-  label: Label;
-  /** Category inside the label, for the per-category table. */
-  kind: string;
-  page: "dashboard" | "form" | "article" | "pages";
-  fullPage?: boolean;
-  base: Variant;
-  head: Variant;
-  /**
-   * Real cases: selectors whose rects (in either render) make the ground-truth box. A `text:`
-   * prefix takes the rect of the text itself, not of the (often full-width) element holding it.
-   */
-  box?: string[];
-};
-
-const same = (name: string, page: CaseDef["page"], extra: Partial<CaseDef> = {}): CaseDef => ({
-  name,
-  label: "identical",
-  kind: "identical",
-  page,
-  base: {},
-  head: {},
-  ...extra,
-});
-
-const noise = (
-  kind: string,
-  name: string,
-  page: CaseDef["page"],
-  ...pair: [base: Variant, head: Variant]
-): CaseDef => ({ name: `noise-${name}`, label: "noise", kind, page, base: pair[0], head: pair[1] });
-
-const real = (
-  kind: string,
-  name: string,
-  page: CaseDef["page"],
-  ...spec: [head: Variant, box: string[], extra?: Partial<CaseDef>]
-): CaseDef => ({
-  name: `real-${name}`,
-  label: "real",
-  kind,
-  page,
-  base: {},
-  head: spec[0],
-  box: spec[1],
-  ...spec[2],
-});
-
-const HINT_NONE: Variant = { fontconfig: "hint-none" };
-const HINT_FULL: Variant = { fontconfig: "hint-full" };
-const HINT_LCD: Variant = { fontconfig: "hint-slight-lcd" };
-const NO_SUBPIXEL = ["--disable-font-subpixel-positioning"];
+import {
+  caretBar,
+  HINT_FULL,
+  HINT_LCD,
+  HINT_NONE,
+  NO_SUBPIXEL,
+  noise,
+  real,
+  same,
+  seek,
+  setSvg,
+  setText,
+  type CaseDef,
+} from "./case-kit.ts";
+import { HARD_CASES } from "./cases-hard.ts";
 
 const ICON_CROSS = `<circle cx="8" cy="8" r="7" fill="#dc2626"/><path d="M5 5l6 6M11 5l-6 6" stroke="#fff" stroke-width="1.8" fill="none"/>`;
 const LOGO_PLUS = `<rect width="24" height="24" rx="6" fill="#2563eb"/><path d="M12 6v12M6 12h12" stroke="#fff" stroke-width="2.5" fill="none"/>`;
@@ -85,16 +25,7 @@ const ICON_I = `<circle cx="8" cy="8" r="7" fill="#2563eb"/><path d="M8 7v5M8 4v
 const PULSE = "@keyframes pulse{50%{opacity:.55}}#badge{animation:pulse 2s infinite}";
 const SHIMMER =
   "@keyframes sh{to{background-position:100% 0}}#hero{background-size:200% 100%;animation:sh 3s linear infinite}";
-const seek = (ms: number) =>
-  `document.getAnimations().forEach((a) => { a.pause(); a.currentTime = ${ms}; });`;
-const caretBar = (sel: string, x: number) =>
-  `${sel}{background:linear-gradient(#18181b,#18181b) no-repeat ${x}px center / 1px 16px,#fff}`;
-const setText = (sel: string, text: string) =>
-  `document.querySelector(${JSON.stringify(sel)}).textContent = ${JSON.stringify(text)};`;
-const setSvg = (sel: string, inner: string) =>
-  `document.querySelector(${JSON.stringify(sel)}).innerHTML = ${JSON.stringify(inner)};`;
-
-export const CASES: CaseDef[] = [
+const BASE_CASES: CaseDef[] = [
   // identical: the same page rendered twice
   same("identical-dashboard", "dashboard"),
   same("identical-form", "form"),
@@ -320,3 +251,5 @@ export const CASES: CaseDef[] = [
     { fullPage: true },
   ),
 ];
+
+export const CASES: CaseDef[] = [...BASE_CASES, ...HARD_CASES];

@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "icon",
+  "page": "pricing",
+  "width": 680,
+  "height": 520,
+  "box": {
+    "x": 39,
+    "y": 290,
+    "w": 14,
+    "h": 14
+  }
+}

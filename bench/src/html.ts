@@ -1,5 +1,6 @@
 /** The side-by-side page of the cases where the two tools differ (ob 1477). */
-import type { CorpusCase } from "./corpus.ts";
+import { basename } from "node:path";
+import { CORPORA, type CorpusCase } from "./corpus.ts";
 import { caseIou, locationDisagreements, verdictDisagreements } from "./score.ts";
 import type { CaseResult, ToolResult } from "./types.ts";
 
@@ -7,7 +8,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 function figure(title: string, src: string | null, extra = ""): string {
   const body = src
-    ? `<div class="shot"><img src="${esc(src)}" alt="${esc(title)}">${extra}</div>`
+    ? `<div class="shot"><img loading="lazy" src="${esc(src)}" alt="${esc(title)}">${extra}</div>`
     : `<div class="none">no diff image<br>(unchanged)</div>`;
   return `<figure><figcaption>${esc(title)}</figcaption>${body}</figure>`;
 }
@@ -17,11 +18,13 @@ function pngSize(png: Buffer): { w: number; h: number } {
 }
 
 /** A tool's diff (changed pixels on transparency) laid over a faded Branch shot, so it can be read. */
+const corpusDir = (c: CorpusCase) => basename(CORPORA[c.corpus]);
+
 function diffFigure(title: string, c: CorpusCase, diffPng: Buffer | null, file: string): string {
   if (!diffPng) return figure(title, null);
   const { w, h } = pngSize(diffPng);
   const headWidth = (100 * c.width) / w;
-  return `<figure><figcaption>${esc(title)}</figcaption><div class="shot over" style="aspect-ratio:${w}/${h}"><img class="under" src="../../corpus/${esc(c.name)}/head.png" style="width:${headWidth}%" alt=""><img src="${esc(file)}" alt="${esc(title)}"></div></figure>`;
+  return `<figure><figcaption>${esc(title)}</figcaption><div class="shot over" style="aspect-ratio:${w}/${h}"><img class="under" loading="lazy" src="../../${corpusDir(c)}/${esc(c.name)}/head.png" style="width:${headWidth}%" alt=""><img loading="lazy" src="${esc(file)}" alt="${esc(title)}"></div></figure>`;
 }
 
 function verdictWord(t: ToolResult | null): string {
@@ -42,13 +45,13 @@ function card(r: CaseResult): string {
     ? `<div class="gt" style="left:${(100 * box.x) / c.width}%;top:${(100 * box.y) / c.height}%;width:${(100 * box.w) / c.width}%;height:${(100 * box.h) / c.height}%"></div>`
     : "";
   return `<section class="case">
-  <h3>${esc(c.name)} <span class="label ${c.label}">${c.label}</span></h3>
+  <h3>${esc(c.corpus)}/${esc(c.name)} <span class="label ${c.label}">${c.label}</span></h3>
   <p>${chip("PixelSlash", r.pixelslash, caseIou(r, "pixelslash"))} &nbsp; ${chip("Argos", r.argos, caseIou(r, "argos"))}</p>
   <div class="row">
-    ${figure("Main (base)", `../../corpus/${c.name}/base.png`)}
-    ${figure("Branch (head)" + (box ? ", green = ground truth" : ""), `../../corpus/${c.name}/head.png`, gt)}
-    ${diffFigure("PixelSlash diff", c, r.pixelslash.diffPng, `diffs/${c.name}.pixelslash.png`)}
-    ${diffFigure("Argos diff", c, r.argos?.diffPng ?? null, `diffs/${c.name}.argos.png`)}
+    ${figure("Main (base)", `../../${corpusDir(c)}/${c.name}/base.png`)}
+    ${figure("Branch (head)" + (box ? ", green = ground truth" : ""), `../../${corpusDir(c)}/${c.name}/head.png`, gt)}
+    ${diffFigure("PixelSlash diff", c, r.pixelslash.diffPng, `diffs/${c.corpus}/${c.name}.pixelslash.png`)}
+    ${diffFigure("Argos diff", c, r.argos?.diffPng ?? null, `diffs/${c.corpus}/${c.name}.argos.png`)}
   </div>
 </section>`;
 }

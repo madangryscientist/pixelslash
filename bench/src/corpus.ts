@@ -1,11 +1,23 @@
 /** The corpus on disk (ob 1477): `bench/corpus/<case>/{base.png,head.png,label.json}`. */
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Rect } from "./regions.ts";
-import type { Label } from "./cases.ts";
+import type { Label } from "./case-kit.ts";
 
-export const BENCH_DIR = join(import.meta.dir, "..");
-export const CORPUS_DIR = join(BENCH_DIR, "corpus");
+export const BENCH_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/** The two corpora: `main` is what tuning looks at, `holdout` is what it must not tune to (ob 1488). */
+export type CorpusId = "main" | "holdout";
+export const CORPUS_IDS: CorpusId[] = ["main", "holdout"];
+
+export function byCorpus<T>(f: (id: CorpusId) => T): Record<CorpusId, T> {
+  return { main: f("main"), holdout: f("holdout") };
+}
+export const CORPORA: Record<CorpusId, string> = {
+  main: join(BENCH_DIR, "corpus"),
+  holdout: join(BENCH_DIR, "corpus-holdout"),
+};
 
 export type CaseLabel = {
   label: Label;
@@ -17,7 +29,7 @@ export type CaseLabel = {
   box?: Rect;
 };
 
-export type CorpusCase = CaseLabel & { name: string; dir: string };
+export type CorpusCase = CaseLabel & { name: string; dir: string; corpus: CorpusId };
 
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -53,13 +65,21 @@ function parseRect(raw: unknown): Rect {
   return { x, y, w, h };
 }
 
-export function loadCorpus(root = CORPUS_DIR): CorpusCase[] {
+export function loadCorpus(corpus: CorpusId): CorpusCase[] {
+  const root = CORPORA[corpus];
   return readdirSync(root, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
     .toSorted()
     .map((name) => {
       const dir = join(root, name);
-      return { name, dir, ...parseLabel(readFileSync(join(dir, "label.json"), "utf8")) };
+      return { name, dir, corpus, ...parseLabel(readFileSync(join(dir, "label.json"), "utf8")) };
     });
+}
+
+/** A case's identity across both corpora: names are unique inside one corpus only. */
+export const caseKey = (c: Pick<CorpusCase, "corpus" | "name">): string => `${c.corpus}/${c.name}`;
+
+export function loadCorpora(): CorpusCase[] {
+  return CORPUS_IDS.flatMap((id) => loadCorpus(id));
 }

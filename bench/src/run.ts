@@ -1,42 +1,47 @@
 #!/usr/bin/env bun
 /**
- * `bun run bench` (ob 1477): feed every labelled pair in bench/corpus/ to PixelSlash's diff and to
- * Argos, score both, and write bench/results/<date>.md plus the side-by-side disagreement page.
+ * `bun run bench` (ob 1477, ob 1488): feed every labelled pair in bench/corpus/ and
+ * bench/corpus-holdout/ to PixelSlash's diff and to Argos, score both, and write
+ * bench/results/<date>.{md,json} plus the side-by-side disagreement page.
  *
- *   bun bench/src/run.ts [--no-argos] [--calibration]
+ *   bun bench/src/run.ts [--no-argos] [--refresh-argos] [--calibration]
  *
- * Argos is reached through ops/argos-bench/run-pairs.sh (ARGOS_BENCH_HOST / ARGOS_BENCH_KEY), so VM
- * 101 must be up. --no-argos scores PixelSlash alone. --calibration adds Argos's own 19 cases.
+ * Argos's verdicts come from bench/argos-cache.json, so no VM is needed. --refresh-argos asks
+ * VM 101 (ops/argos-bench/run-pairs.sh, ARGOS_BENCH_HOST / ARGOS_BENCH_KEY) about the pairs the
+ * cache does not know and rewrites the cache. --no-argos scores PixelSlash alone and writes no
+ * files. --calibration adds Argos's own 19 cases, which are streamed from the VM.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { argosHost, argosKey, runArgos } from "./argos.ts";
+import { ARGOS_THRESHOLD, argosVerdicts } from "./argos-cache.ts";
 import { runCalibration, type CalibrationRow } from "./calibration.ts";
-import { BENCH_DIR, CORPUS_DIR, loadCorpus, type CorpusCase } from "./corpus.ts";
+import { BENCH_DIR, caseKey, loadCorpora, type CorpusCase } from "./corpus.ts";
 import { disagreementCases, disagreementsHtml } from "./html.ts";
 import { runPixelslash } from "./pixelslash.ts";
 import { resultsMarkdown, summaryMarkdown, type RunInfo } from "./render.ts";
+import { CORPUS_IDS } from "./corpus.ts";
+import { RESULTS_DIR, summarise, type ResultsFile } from "./results-json.ts";
 import { say, warn } from "./say.ts";
 import type { CaseResult, ToolResult } from "./types.ts";
 
-const USAGE = "usage: bun bench/src/run.ts [--no-argos] [--calibration]";
+const USAGE = "usage: bun bench/src/run.ts [--no-argos] [--refresh-argos] [--calibration]";
 
-type Flags = { argos: boolean; calibration: boolean; date: string };
-type ArgosRun = Awaited<ReturnType<typeof runArgos>>;
+type Flags = { argos: boolean; refresh: boolean; calibration: boolean; date: string };
 
 function parseFlags(argv: string[]): Flags {
   const flags: Flags = {
     argos: true,
+    refresh: false,
     calibration: false,
     date: new Date().toISOString().slice(0, 10),
   };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+  for (const a of argv) {
     if (a === "--no-argos") flags.argos = false;
+    else if (a === "--refresh-argos") flags.refresh = true;
     else if (a === "--calibration") flags.calibration = true;
     else throw new Error(`unknown argument: ${a}\n${USAGE}`);
   }
+  if (flags.refresh && !flags.argos) throw new Error("--refresh-argos needs Argos");
   if (flags.calibration && !flags.argos) throw new Error("--calibration needs Argos");
   return flags;
 }
@@ -54,86 +59,88 @@ async function pixelslashCommit(): Promise<string> {
   return dirty ? `${sha}+dirty` : sha;
 }
 
-function argosCommit(): Promise<string | null> {
-  return capture([
-    "ssh",
-    "-o",
-    "BatchMode=yes",
-    "-i",
-    argosKey(),
-    argosHost(),
-    "docker run --rm --network none --entrypoint git argos-bench -C /argos rev-parse HEAD",
-  ]);
-}
-
 function pair(
   corpus: CorpusCase[],
   ps: Map<string, ToolResult>,
-  argos: ArgosRun | null,
+  argos: Map<string, ToolResult> | null,
 ): CaseResult[] {
   return corpus.map((c) => {
-    const pixelslash = ps.get(c.name);
-    if (!pixelslash) throw new Error(`no PixelSlash result for ${c.name}`);
-    const theirs = argos?.results.get(c.name) ?? null;
-    if (argos && !theirs) throw new Error(`Argos returned no verdict for ${c.name}`);
+    const pixelslash = ps.get(caseKey(c));
+    if (!pixelslash) throw new Error(`no PixelSlash result for ${caseKey(c)}`);
+    const theirs = argos?.get(caseKey(c)) ?? null;
+    if (argos && !theirs) throw new Error(`no Argos verdict for ${caseKey(c)}`);
     return { case: c, pixelslash, argos: theirs };
   });
 }
 
-/** The markdown, and (with Argos) the disagreement page and the diff images it shows. */
-async function writeResults(
+function resultsJson(rows: CaseResult[], info: RunInfo): ResultsFile {
+  const own = (id: (typeof CORPUS_IDS)[number]) => rows.filter((r) => r.case.corpus === id);
+  const withArgos = info.argosCommit !== null;
+  return {
+    version: 1,
+    date: info.date,
+    pixelslashCommit: info.pixelslashCommit,
+    argos: info.argosCommit ? { commit: info.argosCommit, threshold: ARGOS_THRESHOLD } : null,
+    corpora: {
+      main: summarise(own("main"), withArgos),
+      holdout: summarise(own("holdout"), withArgos),
+    },
+  };
+}
+
+/** The markdown, the json beside it, the disagreement page and the diff images it shows. */
+function writeResults(
   rows: CaseResult[],
   flags: Flags,
-  argos: ArgosRun | null,
+  info: RunInfo,
   cal: CalibrationRow[] | null,
-): Promise<void> {
-  const resultsDir = join(BENCH_DIR, "results");
-  const dayDir = join(resultsDir, flags.date);
+): void {
+  const dayDir = join(RESULTS_DIR, flags.date);
   rmSync(dayDir, { recursive: true, force: true });
-  mkdirSync(join(dayDir, "diffs"), { recursive: true });
-  const info: RunInfo = {
-    date: flags.date,
-    pixelslashCommit: await pixelslashCommit(),
-    argosCommit: flags.argos ? await argosCommit() : null,
-    argosWallMs: argos?.wallMs ?? null,
-  };
-  writeFileSync(join(resultsDir, `${flags.date}.md`), resultsMarkdown(rows, info, cal));
-  if (!argos) return;
+  for (const id of CORPUS_IDS) mkdirSync(join(dayDir, "diffs", id), { recursive: true });
+  writeFileSync(join(RESULTS_DIR, `${flags.date}.md`), resultsMarkdown(rows, info, cal));
+  writeFileSync(
+    join(RESULTS_DIR, `${flags.date}.json`),
+    `${JSON.stringify(resultsJson(rows, info), null, 2)}\n`,
+  );
   const { verdict, location } = disagreementCases(rows);
   for (const r of verdict.concat(location)) {
-    const { name } = r.case;
+    const { name, corpus } = r.case;
     if (r.pixelslash.diffPng)
-      writeFileSync(join(dayDir, "diffs", `${name}.pixelslash.png`), r.pixelslash.diffPng);
+      writeFileSync(join(dayDir, "diffs", corpus, `${name}.pixelslash.png`), r.pixelslash.diffPng);
     if (r.argos?.diffPng)
-      writeFileSync(join(dayDir, "diffs", `${name}.argos.png`), r.argos.diffPng);
+      writeFileSync(join(dayDir, "diffs", corpus, `${name}.argos.png`), r.argos.diffPng);
   }
   writeFileSync(join(dayDir, "disagreements.html"), disagreementsHtml(rows, flags.date));
 }
 
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
-  const corpus = loadCorpus(CORPUS_DIR);
-  say(`corpus: ${corpus.length} pairs`);
+  const corpus = loadCorpora();
+  say(
+    `corpora: ${corpus.length} pairs (${CORPUS_IDS.map((id) => `${corpus.filter((c) => c.corpus === id).length} ${id}`).join(", ")})`,
+  );
   const ps = runPixelslash(corpus);
-  const scratch = mkdtempSync(join(tmpdir(), "pixelslash-bench-"));
-  try {
-    let argos: ArgosRun | null = null;
-    if (flags.argos) {
-      say(`argos: sending ${corpus.length} pairs to ${argosHost()}`);
-      argos = await runArgos(CORPUS_DIR, join(scratch, "argos"));
-    }
-    const rows = pair(corpus, ps, argos);
-    let cal: CalibrationRow[] | null = null;
-    if (flags.calibration) {
-      say("calibration: Argos's own cases");
-      cal = await runCalibration();
-    }
-    await writeResults(rows, flags, argos, cal);
-    say(`\n${summaryMarkdown(rows)}\n`);
-    say(`wrote bench/results/${flags.date}.md${argos ? " and its disagreements.html" : ""}`);
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
+  const argos = flags.argos ? await argosVerdicts(corpus, flags.refresh) : null;
+  if (argos?.refreshed) say(`argos: ${argos.refreshed} pair(s) added to bench/argos-cache.json`);
+  const rows = pair(corpus, ps, argos?.results ?? null);
+  say(`\n${summaryMarkdown(rows)}\n`);
+  if (!flags.argos) {
+    say("--no-argos: nothing written");
+    return;
   }
+  let cal: CalibrationRow[] | null = null;
+  if (flags.calibration) {
+    say("calibration: Argos's own cases");
+    cal = await runCalibration();
+  }
+  const info: RunInfo = {
+    date: flags.date,
+    pixelslashCommit: await pixelslashCommit(),
+    argosCommit: argos?.commit ?? null,
+  };
+  writeResults(rows, flags, info, cal);
+  say(`wrote bench/results/${flags.date}.md, .json and ${flags.date}/disagreements.html`);
 }
 
 try {

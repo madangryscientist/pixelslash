@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import { diffPngs } from "@pixelslash/engine";
-import type { CorpusCase } from "./corpus.ts";
+import { caseKey, type CorpusCase } from "./corpus.ts";
 import { extractRegions, maskFromRgba } from "./regions.ts";
 import type { ToolResult } from "./types.ts";
 
@@ -23,13 +23,13 @@ export function pixelslashDiff(base: Buffer, head: Buffer): ToolResult {
   };
 }
 
-/** Cases are keyed by name; `base.png` is Main and `head.png` is Branch. */
+/** Cases are keyed by `caseKey`; `base.png` is Main and `head.png` is Branch. */
 export function runPixelslash(cases: CorpusCase[]): Map<string, ToolResult> {
   const results = new Map<string, ToolResult>();
   for (const c of cases) {
     const base = readFileSync(join(c.dir, "base.png"));
     const head = readFileSync(join(c.dir, "head.png"));
-    results.set(c.name, pixelslashDiff(base, head));
+    results.set(caseKey(c), pixelslashDiff(base, head));
   }
   return results;
 }

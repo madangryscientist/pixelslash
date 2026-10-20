@@ -22,7 +22,16 @@ function row(
   kind: string,
   ...tools: [pixelslash: ToolResult, argos: ToolResult | null]
 ): CaseResult {
-  const c: CorpusCase = { name, dir: "", label, kind, page: "p", width: 20, height: 20 };
+  const c: CorpusCase = {
+    name,
+    dir: "",
+    corpus: "main",
+    label,
+    kind,
+    page: "p",
+    width: 20,
+    height: 20,
+  };
   if (label === "real") c.box = box;
   return { case: c, pixelslash: tools[0], argos: tools[1] };
 }

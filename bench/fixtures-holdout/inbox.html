@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>inbox</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          13px/1.4 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: #f6f7f9;
+        color: #20242b;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 16px 20px;
+      }
+      #bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      #logo {
+        display: block;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        flex: none;
+      }
+      #search {
+        flex: 1;
+        height: 30px;
+        border: 1px solid #b8bec9;
+        border-radius: 15px;
+        padding: 0 12px;
+        font: inherit;
+        background: #fff;
+      }
+      #compose {
+        background: #0b6bcb;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font: inherit;
+        font-weight: 600;
+      }
+      #avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #14b8a6;
+      }
+      #mails {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+        border: 1px solid #dfe3ea;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      #mails li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-bottom: 1px solid #eceff4;
+      }
+      #mails li:last-child {
+        border-bottom: 0;
+      }
+      #mails .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: transparent;
+        flex: none;
+      }
+      #mails .unread .dot {
+        background: #0b6bcb;
+      }
+      #mails .from {
+        width: 110px;
+        flex: none;
+        font-weight: 600;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      #mails .subject {
+        flex: 1;
+        color: #4a5260;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      #mails .time {
+        color: #8a93a3;
+        font-size: 12px;
+      }
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      #foot {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+        color: #5b6372;
+      }
+      #range b {
+        color: #20242b;
+      }
+      #next {
+        margin-left: auto;
+        background: #fff;
+        border: 1px solid #b8bec9;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font: inherit;
+      }
+      #sync {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid #dfe3ea;
+        border-right-color: #0b6bcb;
+        animation: spin 0.9s linear infinite;
+        animation-play-state: paused;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="bar">
+        <svg id="logo" width="22" height="22" viewBox="0 0 22 22">
+          <rect width="22" height="22" rx="4" fill="#0b6bcb" />
+          <path d="M4 7l7 5 7-5" stroke="#fff" stroke-width="1.8" fill="none" />
+        </svg>
+        <h1 id="title">Inbox</h1>
+        <input id="search" type="text" value="invoice" />
+        <button id="compose" type="button">Compose</button>
+        <div id="avatar"></div>
+      </div>
+      <ul id="mails">
+        <li id="m1" class="unread">
+          <span class="dot"></span>
+          <svg class="icon" id="icon-m1" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="7" fill="#16a34a" />
+            <path d="M4.5 8.5l2.5 2.5 4.5-5" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+          ><span class="from">Priya Nair</span
+          ><span class="subject" id="subject-1"
+            >🎉 Launch went out, thank you everyone for the late nights</span
+          ><span class="time">09:12</span>
+        </li>
+        <li id="m2" class="unread">
+          <span class="dot"></span>
+          <svg class="icon" id="icon-m2" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="7" fill="#d97706" />
+            <path d="M8 4v5M8 11v1" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+          ><span class="from">Billing</span
+          ><span class="subject">Invoice 4821 is due on Friday</span><span class="time">08:40</span>
+        </li>
+        <li id="m3">
+          <span class="dot"></span>
+          <svg class="icon" id="icon-m3" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="7" fill="#2563eb" />
+            <path d="M5 8h6M8 5v6" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+          ><span class="from">Tom Reyes</span
+          ><span class="subject">Re: roadmap review, notes attached</span
+          ><span class="time">Yesterday</span>
+        </li>
+        <li id="m4">
+          <span class="dot"></span>
+          <svg class="icon" id="icon-m4" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="7" fill="#7c3aed" />
+            <path d="M5 8l3 3 3-3" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+          ><span class="from">Design team</span
+          ><span class="subject">New icons are in the shared library</span
+          ><span class="time">Mon</span>
+        </li>
+        <li id="m5">
+          <span class="dot"></span>
+          <svg class="icon" id="icon-m5" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="7" fill="#dc2626" />
+            <path d="M5 5l6 6M11 5l-6 6" stroke="#fff" stroke-width="1.8" fill="none" /></svg
+          ><span class="from">Alerts</span><span class="subject">Backup job failed on db-2</span
+          ><span class="time">Sun</span>
+        </li>
+      </ul>
+      <div id="foot">
+        <span id="range">Showing <b id="range-count">1–5</b> of 248</span>
+        <div id="sync"></div>
+        <button id="next" type="button">Next page</button>
+      </div>
+    </main>
+  </body>
+</html>

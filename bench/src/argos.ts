@@ -39,12 +39,18 @@ function parseVerdict(line: string): Verdict {
   };
 }
 
+/** What the wrapper's `score` prints as, to three significant digits. */
+export const argosNote = (score: number): string => `score ${Number(score.toPrecision(3))}`;
+
+/** Argos's verdict plus its raw score, which the cache keeps and the note rounds. */
+export type ArgosResult = ToolResult & { score: number };
+
 /** Run every `<name>/{base,head}.png` under `pairsDir` through Argos; `outDir` receives its diff images. */
 export async function runArgos(
   pairsDir: string,
   outDir: string,
   threshold?: number,
-): Promise<{ results: Map<string, ToolResult>; wallMs: number }> {
+): Promise<{ results: Map<string, ArgosResult>; wallMs: number }> {
   const args = ["bash", RUN_PAIRS, pairsDir, outDir];
   if (threshold !== undefined) args.push("--threshold", String(threshold));
   const started = performance.now();
@@ -61,7 +67,7 @@ export async function runArgos(
         "Is VM 101 up? `ssh root@192.168.0.20 'qm start 101'`; set ARGOS_BENCH_HOST if its address changed. See ops/argos-bench/runbook.md.",
     );
   }
-  const results = new Map<string, ToolResult>();
+  const results = new Map<string, ArgosResult>();
   for (const line of stdout.split("\n").filter((l) => l.trim() !== "")) {
     const v = parseVerdict(line);
     let regions: ToolResult["regions"] = [];
@@ -75,10 +81,30 @@ export async function runArgos(
       changed: v.changed,
       regions,
       ms: v.ms,
-      note: `score ${Number(v.score.toPrecision(3))}`,
+      note: argosNote(v.score),
       diffPng,
       sizeMismatch: false,
+      score: v.score,
     });
   }
   return { results, wallMs };
+}
+
+async function capture(cmd: string[]): Promise<string | null> {
+  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "ignore" });
+  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  return code === 0 ? out.trim() : null;
+}
+
+/** The Argos commit the VM's image was actually built from; null when the VM does not answer. */
+export function liveArgosCommit(): Promise<string | null> {
+  return capture([
+    "ssh",
+    "-o",
+    "BatchMode=yes",
+    "-i",
+    argosKey(),
+    argosHost(),
+    "docker run --rm --network none --entrypoint git argos-bench -C /argos rev-parse HEAD",
+  ]);
 }
