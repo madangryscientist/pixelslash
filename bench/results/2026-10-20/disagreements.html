@@ -17,7 +17,7 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
 </style></head><body>
 <h1>PixelSlash vs Argos, 2026-10-20</h1>
 <p class="note">Red chip = the tool flagged the pair. Right answer: real flagged, noise and identical left alone. PixelSlash's diff is magenta and Argos's is red, each laid over a faded Branch shot.</p>
-<h2>Verdicts disagree (17)</h2><p class="note">One tool flagged the pair and the other did not.</p><section class="case">
+<h2>Verdicts disagree (29)</h2><p class="note">One tool flagged the pair and the other did not.</p><section class="case">
   <h3>main/noise-caret-email <span class="label noise">noise</span></h3>
   <p><span class="chip changed">PixelSlash: changed</span> <small>10 px, 5 anti-aliased</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
   <div class="row">
@@ -38,28 +38,68 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
   </div>
 </section>
 <section class="case">
-  <h3>main/noise-webp75-form <span class="label noise">noise</span></h3>
-  <p><span class="chip changed">PixelSlash: changed</span> <small>12327 px, 2525 anti-aliased</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <h3>main/noise-jpeg50-article <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>35653 px, 12639 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0613</small></p>
   <div class="row">
-    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-webp75-form/base.png" alt="Main (base)"></div></figure>
-    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-webp75-form/head.png" alt="Branch (head)"></div></figure>
-    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" loading="lazy" src="../../corpus/noise-webp75-form/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-webp75-form.pixelslash.png" alt="PixelSlash diff"></div></figure>
-    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg50-article/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg50-article/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/640"><img class="under" loading="lazy" src="../../corpus/noise-jpeg50-article/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-jpeg50-article.argos.png" alt="Argos diff"></div></figure>
   </div>
 </section>
 <section class="case">
-  <h3>main/noise-webp90-dashboard <span class="label noise">noise</span></h3>
-  <p><span class="chip changed">PixelSlash: changed</span> <small>12161 px, 1930 anti-aliased</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <h3>main/noise-jpeg70-form <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>19275 px, 3219 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0001</small></p>
   <div class="row">
-    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-webp90-dashboard/base.png" alt="Main (base)"></div></figure>
-    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-webp90-dashboard/head.png" alt="Branch (head)"></div></figure>
-    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" loading="lazy" src="../../corpus/noise-webp90-dashboard/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-webp90-dashboard.pixelslash.png" alt="PixelSlash diff"></div></figure>
-    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg70-form/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg70-form/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" loading="lazy" src="../../corpus/noise-jpeg70-form/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-jpeg70-form.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>main/noise-jpeg85-article <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>23665 px, 9068 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0327</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg85-article/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg85-article/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/640"><img class="under" loading="lazy" src="../../corpus/noise-jpeg85-article/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-jpeg85-article.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>main/noise-jpeg95-dashboard <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>12871 px, 1126 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0001</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg95-dashboard/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-jpeg95-dashboard/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" loading="lazy" src="../../corpus/noise-jpeg95-dashboard/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-jpeg95-dashboard.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>main/noise-shift-article-main <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>8415 px, 12738 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.009</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-shift-article-main/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-shift-article-main/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/640"><img class="under" loading="lazy" src="../../corpus/noise-shift-article-main/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-shift-article-main.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>main/noise-shift-dashboard-main <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>6325 px, 9399 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.004</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-shift-dashboard-main/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/noise-shift-dashboard-main/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" loading="lazy" src="../../corpus/noise-shift-dashboard-main/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/noise-shift-dashboard-main.argos.png" alt="Argos diff"></div></figure>
   </div>
 </section>
 <section class="case">
   <h3>main/real-colour-body-text-subtle <span class="label real">real</span></h3>
-  <p><span class="chip changed">PixelSlash: changed</span> <small>7877 px, 8981 anti-aliased, IoU 0.52</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>7877 px, 8981 anti-aliased, IoU 0.73</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
   <div class="row">
     <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-colour-body-text-subtle/base.png" alt="Main (base)"></div></figure>
     <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-colour-body-text-subtle/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:10.9375%;top:27.8125%;width:77.5%;height:52.65625%"></div></div></figure>
@@ -128,13 +168,93 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
   </div>
 </section>
 <section class="case">
-  <h3>holdout/noise-webp85-inbox <span class="label noise">noise</span></h3>
-  <p><span class="chip changed">PixelSlash: changed</span> <small>15549 px, 2535 anti-aliased</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <h3>holdout/noise-jpeg80-inbox <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>26090 px, 3650 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0436</small></p>
   <div class="row">
-    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-webp85-inbox/base.png" alt="Main (base)"></div></figure>
-    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-webp85-inbox/head.png" alt="Branch (head)"></div></figure>
-    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:680/400"><img class="under" loading="lazy" src="../../corpus-holdout/noise-webp85-inbox/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-webp85-inbox.pixelslash.png" alt="PixelSlash diff"></div></figure>
-    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-jpeg80-inbox/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-jpeg80-inbox/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/400"><img class="under" loading="lazy" src="../../corpus-holdout/noise-jpeg80-inbox/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-jpeg80-inbox.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-jpeg80-pricing <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>57242 px, 3690 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0882</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-jpeg80-pricing/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-jpeg80-pricing/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/520"><img class="under" loading="lazy" src="../../corpus-holdout/noise-jpeg80-pricing/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-jpeg80-pricing.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-jpeg80-settings <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>30214 px, 2825 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0464</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-jpeg80-settings/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-jpeg80-settings/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/480"><img class="under" loading="lazy" src="../../corpus-holdout/noise-jpeg80-settings/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-jpeg80-settings.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-shift-container-inbox <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>9017 px, 10835 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0062</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-shift-container-inbox/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-shift-container-inbox/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/400"><img class="under" loading="lazy" src="../../corpus-holdout/noise-shift-container-inbox/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-shift-container-inbox.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-shift-container-pricing <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>10214 px, 11999 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.006</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-shift-container-pricing/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-shift-container-pricing/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/520"><img class="under" loading="lazy" src="../../corpus-holdout/noise-shift-container-pricing/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-shift-container-pricing.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-shift-container-settings <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>8125 px, 9717 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0044</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-shift-container-settings/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-shift-container-settings/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/480"><img class="under" loading="lazy" src="../../corpus-holdout/noise-shift-container-settings/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-shift-container-settings.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-subpixel-glyphs-inbox <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>640 px, 701 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0011</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-subpixel-glyphs-inbox/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-subpixel-glyphs-inbox/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/400"><img class="under" loading="lazy" src="../../corpus-holdout/noise-subpixel-glyphs-inbox/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-subpixel-glyphs-inbox.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-webp85-pricing <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>38116 px, 3149 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0571</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-webp85-pricing/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-webp85-pricing/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/520"><img class="under" loading="lazy" src="../../corpus-holdout/noise-webp85-pricing/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-webp85-pricing.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>holdout/noise-webp85-settings <span class="label noise">noise</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>19734 px, 2131 anti-aliased</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0006</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-webp85-settings/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/noise-webp85-settings/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/480"><img class="under" loading="lazy" src="../../corpus-holdout/noise-webp85-settings/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/noise-webp85-settings.argos.png" alt="Argos diff"></div></figure>
   </div>
 </section>
 <section class="case">
@@ -187,7 +307,7 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
     <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
   </div>
 </section>
-<h2>Same verdict, different place (7)</h2><p class="note">Real changes both tools flagged, but whose changed region differs by at least 0.30 IoU against the ground-truth box.</p><section class="case">
+<h2>Same verdict, different place (10)</h2><p class="note">Real changes both tools flagged, but whose changed region differs by at least 0.30 IoU against the ground-truth box.</p><section class="case">
   <h3>main/real-colour-badge <span class="label real">real</span></h3>
   <p><span class="chip changed">PixelSlash: changed</span> <small>1051 px, 159 anti-aliased, IoU 0.89</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0004, IoU 0.41</small></p>
   <div class="row">
@@ -198,6 +318,16 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
   </div>
 </section>
 <section class="case">
+  <h3>main/real-colour-input-border <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>1500 px, 180 anti-aliased, IoU 1.00</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0051, IoU 0.66</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-colour-input-border/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-colour-input-border/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:21.40625%;top:29.782608695652176%;width:57.1875%;height:22.391304347826086%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" loading="lazy" src="../../corpus/real-colour-input-border/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/real-colour-input-border.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" loading="lazy" src="../../corpus/real-colour-input-border/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/real-colour-input-border.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
   <h3>main/real-fixture-pages-card-to-yellow <span class="label real">real</span></h3>
   <p><span class="chip changed">PixelSlash: changed</span> <small>19103 px, 673 anti-aliased, IoU 0.98</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0074, IoU 0.57</small></p>
   <div class="row">
@@ -205,6 +335,16 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
     <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-fixture-pages-card-to-yellow/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:1.875%;top:16.805555555555557%;width:27.65625%;height:7.916666666666667%"></div></div></figure>
     <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:1280/720"><img class="under" loading="lazy" src="../../corpus/real-fixture-pages-card-to-yellow/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/real-fixture-pages-card-to-yellow.pixelslash.png" alt="PixelSlash diff"></div></figure>
     <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:1280/720"><img class="under" loading="lazy" src="../../corpus/real-fixture-pages-card-to-yellow/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/real-fixture-pages-card-to-yellow.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>main/real-reflow-form-row-stack <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>18963 px, 3078 anti-aliased, IoU 0.94</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.034, IoU 0.43</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-reflow-form-row-stack/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img loading="lazy" src="../../corpus/real-reflow-form-row-stack/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:18.75%;top:21.08695652173913%;width:62.5%;height:78.91304347826087%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" loading="lazy" src="../../corpus/real-reflow-form-row-stack/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/real-reflow-form-row-stack.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" loading="lazy" src="../../corpus/real-reflow-form-row-stack/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/main/real-reflow-form-row-stack.argos.png" alt="Argos diff"></div></figure>
   </div>
 </section>
 <section class="case">
@@ -248,8 +388,18 @@ figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
   </div>
 </section>
 <section class="case">
+  <h3>holdout/real-spacing-gap-1px-inbox <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>6467 px, 3039 anti-aliased, IoU 0.70</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0152, IoU 0.16</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/real-spacing-gap-1px-inbox/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/real-spacing-gap-1px-inbox/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:5.882352941176471%;top:14.5%;width:88.23529411764706%;height:47%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:680/400"><img class="under" loading="lazy" src="../../corpus-holdout/real-spacing-gap-1px-inbox/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/real-spacing-gap-1px-inbox.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:680/400"><img class="under" loading="lazy" src="../../corpus-holdout/real-spacing-gap-1px-inbox/head.png" style="width:100%" alt=""><img loading="lazy" src="diffs/holdout/real-spacing-gap-1px-inbox.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
   <h3>holdout/real-spacing-gap-1px-settings <span class="label real">real</span></h3>
-  <p><span class="chip changed">PixelSlash: changed</span> <small>4828 px, 1721 anti-aliased, IoU 0.43</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0057, IoU 0.12</small></p>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>4828 px, 1721 anti-aliased, IoU 0.67</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0057, IoU 0.12</small></p>
   <div class="row">
     <figure><figcaption>Main (base)</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/real-spacing-gap-1px-settings/base.png" alt="Main (base)"></div></figure>
     <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img loading="lazy" src="../../corpus-holdout/real-spacing-gap-1px-settings/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:27.647058823529413%;top:43.541666666666664%;width:69.41176470588235%;height:45.625%"></div></div></figure>

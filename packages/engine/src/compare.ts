@@ -174,8 +174,10 @@ export async function compare(
     const html = renderPixelReport({
       path: routePath,
       changedPixels: manifest.changedPixels,
-      changed: written.changed,
+      changed: manifest.changed,
       diff: opts.diff,
+      regions: manifest.regions,
+      specks: manifest.specks,
       main: written.main,
       branch: written.branch,
     });

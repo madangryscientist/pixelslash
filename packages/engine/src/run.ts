@@ -1,10 +1,17 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { diffPngs, type DiffOptions } from "./diff.ts";
+import type { Region, Specks } from "./regions.ts";
 
 export type RunManifest = {
   id: string;
   changedPixels: number;
+  /** The one verdict: sizes differ, or a `change` region survives and clears the `diff` floors. */
+  changed: boolean;
+  /** Boxes of the changed pixels, largest first; `noise` ones do not make a run changed. */
+  regions: Region[];
+  /** Boxes dropped for being too small to be anything but a speck. */
+  specks: Specks;
   createdAt: string;
   label?: string;
   /** The diff options the run was compared with; absent when none were set. */
@@ -17,8 +24,6 @@ export type FrameSize = { width: number; height: number };
 
 export type WrittenRun = {
   manifest: RunManifest;
-  /** The diff's verdict: false when the changed pixels sit under the `diff` floors. */
-  changed: boolean;
   main: FrameSize;
   branch: FrameSize;
 };
@@ -46,6 +51,9 @@ export async function writeRunFiles(
   const manifest: RunManifest = {
     id: input.id && isSafeRunId(input.id) ? input.id : newRunId(),
     changedPixels: diff.changedPixels,
+    changed: diff.changed,
+    regions: diff.regions,
+    specks: diff.specks,
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
   if (input.label) manifest.label = input.label;
@@ -57,7 +65,6 @@ export async function writeRunFiles(
   await Bun.write(join(dest, "manifest.json"), JSON.stringify(manifest));
   return {
     manifest,
-    changed: diff.changed,
     main: { width: diff.mainWidth, height: diff.mainHeight },
     branch: { width: diff.branchWidth, height: diff.branchHeight },
   };

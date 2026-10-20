@@ -19,7 +19,7 @@ const META = {
   viewport: "1280x720",
   theme: "light",
   tags: ["web"],
-  diff: { threshold: 0.2, minChangedPixels: 50 },
+  diff: { threshold: 0.2, minChangedPixels: 50, mergeDistance: 40, minRegionArea: 9 },
   fingerprint: { image: "version:0", browser: "chromium 148", fonts: "sha256:f" },
 };
 
@@ -125,11 +125,8 @@ describe("upload API", () => {
     });
     const [snap] = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
     expect(snap).toMatchObject({ name: "pricing", viewport: "1280x720", tags: ["web"] });
-    expect(snap?.diffOptions).toEqual({ threshold: 0.2, minChangedPixels: 50 });
-    expect(await snapshotDiffOptions(db, snap?.id ?? "")).toEqual({
-      threshold: 0.2,
-      minChangedPixels: 50,
-    });
+    expect(snap?.diffOptions).toEqual(META.diff);
+    expect(await snapshotDiffOptions(db, snap?.id ?? "")).toEqual(META.diff);
     expect(JSON.parse(snap?.envFingerprint ?? "")).toEqual(META.fingerprint);
     expect([...blobs.data.keys()]).toEqual([`orgs/${acme.org.id}/${snap?.imageKey}`]);
     expect(await usageCounts(db)).toEqual({ builds: 1, snapshots: 1 });
@@ -269,7 +266,7 @@ describe("upload API", () => {
     expect(await bad(snapshotForm({ ...META, theme: "sepia" }))).toBe(400);
     expect(await bad(snapshotForm({ ...META, viewport: "wide" }))).toBe(400);
     expect(await bad(snapshotForm({ ...META, name: "" }))).toBe(400);
-    for (const diff of [{ threshold: 2 }, { minChangedPixels: 1.5 }, { fuzz: 1 }, 0.2]) {
+    for (const diff of [{ threshold: 2 }, { mergeDistance: 2.5 }, { noiseAmplitude: 2 }, 0.2]) {
       expect(await bad(snapshotForm({ ...META, diff }))).toBe(400);
     }
     expect(await bad("not multipart")).toBe(400);

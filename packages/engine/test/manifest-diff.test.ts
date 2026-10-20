@@ -39,11 +39,11 @@ async function manifestDir(snapshots: object[]): Promise<string> {
 describe("manifest diff options", () => {
   test("round-trip; a manifest from before the field reads as {}", async () => {
     const dir = await manifestDir([
-      entry("home", { diff: { threshold: 0.2, minChangedPixels: 5 } }),
+      entry("home", { diff: { threshold: 0.2, minChangedPixels: 5, minRegionArea: 9 } }),
       entry("pricing"),
     ]);
     const [home, pricing] = (await readManifest(dir)).snapshots;
-    expect(home?.diff).toEqual({ threshold: 0.2, minChangedPixels: 5 });
+    expect(home?.diff).toEqual({ threshold: 0.2, minChangedPixels: 5, minRegionArea: 9 });
     expect(pricing?.diff).toEqual({});
   });
 

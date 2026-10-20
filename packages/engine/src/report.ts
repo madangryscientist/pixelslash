@@ -1,6 +1,7 @@
 import type { DiffOptions } from "./diff.ts";
 import { describeDiffOptions } from "./diff-options.ts";
 import { stem, type Violation } from "./judge.ts";
+import type { Region, Specks } from "./regions.ts";
 
 export type RouteRow = {
   path: string;
@@ -28,12 +29,49 @@ function renderViolations(title: string, items: Violation[], empty: string, cls:
   return `<section class="${cls}"><h2>${esc(title)}</h2>${body}</section>`;
 }
 
+const pct = (n: number, of: number) => `${((n / of) * 100).toFixed(3)}%`;
+
+/** The region boxes, as outlines positioned over a figure of `width` x `height` pixels. */
+function regionBoxes(regions: Region[], width: number, height: number): string {
+  return regions
+    .map((r, i) => {
+      const style = `left:${pct(r.x, width)};top:${pct(r.y, height)};width:${pct(r.w, width)};height:${pct(r.h, height)}`;
+      return `<span class="box ${r.kind}" style="${style}" title="${esc(regionLabel(r, i))}"></span>`;
+    })
+    .join("");
+}
+
+function regionLabel(r: Region, i: number): string {
+  const what = r.kind === "noise" ? `noise (${r.why ?? "scattered"})` : "changed";
+  return `#${i + 1} ${r.x},${r.y} ${r.w}x${r.h} · ${r.changedPixels} changed px · ${what}`;
+}
+
+function regionSummary(regions: Region[], specks: Specks): string {
+  const changed = regions.filter((r) => r.kind === "change").length;
+  const noise = regions.length - changed;
+  const parts = [`${changed} changed ${changed === 1 ? "region" : "regions"}`];
+  if (noise > 0) parts.push(`${noise} noise`);
+  if (specks.count > 0)
+    parts.push(`${specks.count} ${specks.count === 1 ? "speck" : "specks"} dropped`);
+  return parts.join(" · ");
+}
+
+function regionList(regions: Region[]): string {
+  if (regions.length === 0) return "";
+  const items = regions
+    .map((r, i) => `<li class="${r.kind}">${esc(regionLabel(r, i))}</li>`)
+    .join("");
+  return `<ol class="regions">${items}</ol>`;
+}
+
 export function renderPixelReport(input: {
   path?: string | undefined;
   changedPixels: number;
-  /** False when the changed pixels sit under the diff floors. */
+  /** The engine's verdict; false with a `change` region left means the diff floors held it back. */
   changed?: boolean;
   diff?: DiffOptions;
+  regions: Region[];
+  specks: Specks;
   main: { width: number; height: number };
   branch: { width: number; height: number };
 }): string {
@@ -44,9 +82,11 @@ export function renderPixelReport(input: {
   const used = describeDiffOptions(input.diff ?? {});
   const options = used ? `<p>Diff options: ${esc(used)}</p>\n    ` : "";
   const floored =
-    input.changed === false && input.changedPixels > 0
+    input.changed === false && input.regions.some((r) => r.kind === "change")
       ? `<p>Not changed: ${input.changedPixels} changed pixels are under the floors above.</p>\n    `
       : "";
+  const diffWidth = Math.max(input.main.width, input.branch.width);
+  const diffHeight = Math.max(input.main.height, input.branch.height);
   const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
   return `<!doctype html>
 <html lang="en">
@@ -64,20 +104,29 @@ export function renderPixelReport(input: {
     figure { margin: 0; background: #1a1a1a; padding: 8px; }
     figcaption { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #aaa; margin-bottom: 6px; }
     img { display: block; width: 100%; height: auto; background: #000; }
+    .frame { position: relative; }
+    .box { position: absolute; box-sizing: border-box; min-width: 6px; min-height: 6px; pointer-events: auto; }
+    .box.change { border: 2px solid #ffd400; }
+    .box.noise { border: 1px dashed #8a8a8a; }
+    .regions { margin: 12px 0 0; padding: 0 0 0 20px; color: #ccc; font-size: 12px; }
+    .regions .noise { color: #888; }
   </style>
 </head>
 <body>
   <header>
     <h1>PixelSlash</h1>
     <p>${count}</p>
-    ${options}${floored}<p>${sizes}</p>
+    ${options}${floored}
+    <p>${esc(regionSummary(input.regions, input.specks))}</p>
+    <p>${sizes}</p>
   </header>
   <section>
     <div class="row">
       <figure><figcaption>Main</figcaption><img src="main.png" alt="Main"></figure>
       <figure><figcaption>Branch</figcaption><img src="branch.png" alt="Branch"></figure>
-      <figure><figcaption>Diff</figcaption><img src="diff.png" alt="Diff"></figure>
+      <figure><figcaption>Diff</figcaption><div class="frame"><img src="diff.png" alt="Diff">${regionBoxes(input.regions, diffWidth, diffHeight)}</div></figure>
     </div>
+    ${regionList(input.regions)}
   </section>
 </body>
 </html>

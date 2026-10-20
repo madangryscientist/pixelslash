@@ -1,4 +1,14 @@
 import { PNG } from "pngjs";
+import {
+  findRegions,
+  newField,
+  PIXEL_ANTIALIASED,
+  PIXEL_CHANGED,
+  type DiffField,
+  type Region,
+  type RegionOptions,
+  type Specks,
+} from "./regions.ts";
 
 export type DiffOptions = {
   /**
@@ -10,15 +20,19 @@ export type DiffOptions = {
   minChangedPixels?: number;
   /** A run with a smaller changed share of the overlap (0 to 1) is not `changed`. */
   minChangedRatio?: number;
-};
+} & RegionOptions;
 
 export type PixelDiff = {
-  /** The verdict: sizes differ, or the changed pixels clear the floors. */
+  /** The verdict: sizes differ, or a `change` region survives and the changed pixels clear the floors. */
   changed: boolean;
   /** Pixels in the overlap that differ and are not anti-aliased edges. */
   changedPixels: number;
   /** Differing pixels that are anti-aliased edges in either shot; not counted as changed. */
   antialiased: number;
+  /** Boxes of the changed pixels in the overlap, largest first; `noise` ones do not make a run changed. */
+  regions: Region[];
+  /** Boxes dropped for being below `minRegionArea`: counted, never silently lost. */
+  specks: Specks;
   overlay: Buffer;
   width: number;
   height: number;
@@ -123,21 +137,32 @@ function isAntialiased(img: Raster, x: number, y: number, other: Raster): boolea
   return flatBoth(min) || flatBoth(max);
 }
 
-type Counts = { changedPixels: number; antialiased: number };
+type Counts = { changedPixels: number; antialiased: number; field: DiffField };
 
 /** Diff the overlapping rectangle, painting changed pixels magenta onto `overlay`. */
 function diffOverlap(a: PNG, b: PNG, threshold: number, overlay: PNG): Counts {
   const maxDelta = MAX_YIQ_DELTA * threshold * threshold;
-  const counts: Counts = { changedPixels: 0, antialiased: 0 };
-  for (let y = 0; y < Math.min(a.height, b.height); y++) {
-    for (let x = 0; x < Math.min(a.width, b.width); x++) {
+  const width = Math.min(a.width, b.width);
+  const height = Math.min(a.height, b.height);
+  const field = newField(width, height);
+  const counts: Counts = { changedPixels: 0, antialiased: 0, field };
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
       const delta = colourDelta(a.data, (y * a.width + x) << 2, b.data, (y * b.width + x) << 2);
       if (Math.abs(delta) <= maxDelta) continue;
+      const at = y * width + x;
       if (isAntialiased(a, x, y, b) || isAntialiased(b, x, y, a)) {
         counts.antialiased++;
+        field.kind[at] = PIXEL_ANTIALIASED;
         continue;
       }
       counts.changedPixels++;
+      field.kind[at] = PIXEL_CHANGED;
+      field.amplitude[at] = Math.min(
+        255,
+        Math.round(Math.sqrt(Math.abs(delta) / MAX_YIQ_DELTA) * 255),
+      );
+      field.lighter[at] = delta < 0 ? 1 : 0;
       const io = (y * overlay.width + x) << 2;
       overlay.data.set([255, 0, 255, 255], io);
     }
@@ -152,22 +177,28 @@ export function diffPngs(main: Buffer, branch: Buffer, options: DiffOptions = {}
     width: Math.max(a.width, b.width),
     height: Math.max(a.height, b.height),
   });
-  const { changedPixels, antialiased } = diffOverlap(
+  const { changedPixels, antialiased, field } = diffOverlap(
     a,
     b,
     options.threshold ?? DEFAULT_THRESHOLD,
     overlay,
   );
-  const overlap = Math.min(a.width, b.width) * Math.min(a.height, b.height);
+  const { regions, specks } = findRegions(field, options);
+  const overlap = field.width * field.height;
   const sizeChanged = a.width !== b.width || a.height !== b.height;
+  const surviving = regions
+    .filter((r) => r.kind === "change")
+    .reduce((n, r) => n + r.changedPixels, 0);
   const clearsFloors =
-    changedPixels > 0 &&
-    changedPixels >= (options.minChangedPixels ?? 0) &&
-    changedPixels / overlap >= (options.minChangedRatio ?? 0);
+    surviving > 0 &&
+    surviving >= (options.minChangedPixels ?? 0) &&
+    surviving / overlap >= (options.minChangedRatio ?? 0);
   return {
     changed: sizeChanged || clearsFloors,
     changedPixels,
     antialiased,
+    regions,
+    specks,
     overlay: PNG.sync.write(overlay),
     width: overlay.width,
     height: overlay.height,

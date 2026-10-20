@@ -106,6 +106,15 @@ describe("parseConfig", () => {
       { ...base, diff: { minChangedRatio: -0.1 } },
       /diff\.minChangedRatio must be a number from 0 to 1/,
     ],
+    [
+      { ...base, diff: { mergeDistance: 2.5 } },
+      /diff\.mergeDistance must be a non-negative integer/,
+    ],
+    [
+      { ...base, diff: { minRegionArea: -1 } },
+      /diff\.minRegionArea must be a non-negative integer/,
+    ],
+    [{ ...base, diff: { noiseAmplitude: 2 } }, /diff\.noiseAmplitude must be a number from 0 to 1/],
     [{ ...base, diff: { treshold: 0.1 } }, /diff\.treshold is not a diff option/],
     [{ ...base, diff: 0.1 }, /diff must be an object/],
     [
@@ -155,7 +164,7 @@ describe("parseConfig", () => {
 describe("resolveDiff", () => {
   const config = parseConfig({
     baseUrl: "http://127.0.0.1:3000",
-    diff: { threshold: 0.1, minChangedPixels: 10 },
+    diff: { threshold: 0.1, minChangedPixels: 10, mergeDistance: 40 },
     variants: [{ name: "desktop" }, { name: "mobile-dark", theme: "dark" }],
     routes: [
       "/",
@@ -171,14 +180,15 @@ describe("resolveDiff", () => {
     resolveDiff(config, config.routes[route]!, config.variants[variant]!);
 
   test("variant > route > project > engine default, key by key", () => {
-    expect(resolve(0, 0)).toEqual({ threshold: 0.1, minChangedPixels: 10 });
+    expect(resolve(0, 0)).toEqual({ threshold: 0.1, minChangedPixels: 10, mergeDistance: 40 });
     expect(resolve(1, 0)).toEqual({
       threshold: 0.05,
       minChangedPixels: 10,
       minChangedRatio: 0.001,
+      mergeDistance: 40,
     });
-    expect(resolve(2, 0)).toEqual({ threshold: 0.05, minChangedPixels: 10 });
-    expect(resolve(2, 1)).toEqual({ threshold: 0.3, minChangedPixels: 50 });
+    expect(resolve(2, 0)).toEqual({ threshold: 0.05, minChangedPixels: 10, mergeDistance: 40 });
+    expect(resolve(2, 1)).toEqual({ threshold: 0.3, minChangedPixels: 50, mergeDistance: 40 });
   });
 
   test("no diff anywhere resolves to {}: the engine default is not baked in", () => {

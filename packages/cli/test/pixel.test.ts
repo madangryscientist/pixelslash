@@ -81,6 +81,9 @@ describe("diff options", () => {
     [["--threshold", "abc"], /--threshold must be a number from 0 to 1/],
     [["--min-changed-pixels", "1.5"], /--min-changed-pixels must be a non-negative integer/],
     [["--min-changed-ratio", "-1"], /--min-changed-ratio must be a number from 0 to 1/],
+    [["--merge-distance", "1.5"], /--merge-distance must be a non-negative integer/],
+    [["--min-region-area", "-1"], /--min-region-area must be a non-negative integer/],
+    [["--noise-amplitude", "2"], /--noise-amplitude must be a number from 0 to 1/],
   ])("%j exits 2", async (flags, message) => {
     const dir = await tmp();
     const { live, local } = await faintPair(dir);
@@ -121,6 +124,9 @@ describe("pixel run", () => {
     expect(manifest.changedPixels).toBeLessThanOrEqual(120 * 40);
     expect(manifest.createdAt).toMatch(/^\d{4}-/);
     expect(manifest.label).toBe("widget");
+    expect(manifest.changed).toBe(true);
+    expect(manifest.regions.length).toBeGreaterThan(0);
+    expect(manifest.regions[0]).toMatchObject({ kind: "change" });
     expect(cap.stdout).toContain("report.html");
     expect(cap.stdout).not.toContain("manifest.json");
     const html = await Bun.file(join(out, "report.html")).text();
@@ -130,6 +136,8 @@ describe("pixel run", () => {
     expect(html).toContain(`${manifest.changedPixels} changed pixels`);
     expect(html).toContain("Main 120x40");
     expect(html).toContain("Branch 160x80");
+    expect(html).toContain('class="box change"');
+    expect(html).toMatch(/\d+ changed regions?/);
     const overlay = PNG.sync.read(Buffer.from(await Bun.file(join(out, "diff.png")).arrayBuffer()));
     const gutter = (79 * overlay.width + 159) << 2;
     expect(overlay.data[gutter + 3]).toBe(0);

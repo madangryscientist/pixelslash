@@ -135,6 +135,9 @@ export type DiffOptions = {
   threshold?: number;
   minChangedPixels?: number;
   minChangedRatio?: number;
+  mergeDistance?: number;
+  minRegionArea?: number;
+  noiseAmplitude?: number;
 };
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;

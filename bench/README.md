@@ -120,19 +120,25 @@ real one.
   (`diffImages`, threshold 0.5). Nothing is tuned for the benchmark.
 - **Results file.** `bench/results/<date>.md` for people, `<date>.json` for `bench:check`: both
   corpora, each tool, per-corpus counts and PixelSlash's verdict per case.
-- **Regions.** Neither tool returns a region list, only a diff image. Both masks go through the
-  same extractor (`src/regions.ts`): changed pixels within 8px of each other form one region.
+- **Regions.** PixelSlash's are the engine's own (`packages/engine/src/regions.ts`: changed pixels
+  and boxes within 24px merge, a box under 4px area is a speck, and `noise` regions are left out of
+  the IoU). Argos returns only a diff image, so its regions are extracted from the cached image by
+  `src/regions.ts` (changed pixels within 8px form one region). The two merge distances differ: at
+  the same 24px Argos's IoU is 0.68 on main and 0.57 on held-out, a tie with PixelSlash's, which is
+  why the table also has the paired row below.
 - **IoU.** Read the gap between the tools, not the absolute number: the box is the element's rect,
   so a tight change (an 8px icon glyph in a 16px box) scores low for any tool.
 - **IoU, how.** Pixel IoU between the union of a tool's regions and the ground-truth box. A tool that
   finds the box but also paints elsewhere loses on the union. Reported as the mean over the real
-  cases the tool flagged.
+  cases the tool flagged. The paired row is the same mean over the real cases *both* tools
+  flagged: a tool that also catches a faint or tiny change the other misses (and so scores a low
+  IoU on it) is not penalised for catching it.
 - **Time.** PixelSlash: `diffPngs` in-process, including PNG decode and overlay encode. Argos:
   `diffImages` inside the container, without ssh, tar or container start, as measured when the
   cache entry was made.
 - **Size mismatch.** PixelSlash diffs only the overlapping rectangle (invariant 1) and states both
   sizes in the report, and the verdict is `changed` whenever the sizes differ; Argos pads the smaller
-  shot and counts the padding as changed. The `size` cases measure that difference.
+  shot and counts the padding as changed. The `size` cases measure that difference. They also cost PixelSlash IoU: the overlap is identical, so there is no region (the gutter is not a measurement), where Argos's padded region lands on the added content.
 
 The results file also lists every case, and `bench/results/<date>/disagreements.html` shows the
 cases where the tools disagree, or flag the same change in different places, with both diff images.

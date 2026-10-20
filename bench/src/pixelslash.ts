@@ -1,9 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PNG } from "pngjs";
 import { diffPngs } from "@pixelslash/engine";
 import { caseKey, type CorpusCase } from "./corpus.ts";
-import { extractRegions, maskFromRgba } from "./regions.ts";
 import type { ToolResult } from "./types.ts";
 
 /** PixelSlash's diff at its defaults: perceptual threshold, anti-aliased edges set aside, a size mismatch is a change (packages/engine/src/diff.ts). */
@@ -11,8 +9,10 @@ export function pixelslashDiff(base: Buffer, head: Buffer): ToolResult {
   const started = performance.now();
   const diff = diffPngs(base, head);
   const ms = performance.now() - started;
-  const overlay = PNG.sync.read(diff.overlay);
-  const regions = extractRegions(maskFromRgba(overlay.width, overlay.height, overlay.data));
+  // The engine's own regions, not noise ones: those are kept in the result but are not "changed".
+  const regions = diff.regions
+    .filter((r) => r.kind === "change")
+    .map(({ x, y, w, h }) => ({ x, y, w, h }));
   return {
     changed: diff.changed,
     regions,

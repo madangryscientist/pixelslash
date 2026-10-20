@@ -12,6 +12,8 @@ export type ToolScore = {
   realTotal: number;
   /** mean IoU over the real cases the tool flagged; null when it flagged none */
   meanIouCaught: number | null;
+  /** mean IoU over the real cases both tools flagged; null without Argos or without such a case */
+  meanIouBoth: number | null;
   /** noise cases wrongly flagged */
   noiseFlagged: number;
   noiseTotal: number;
@@ -43,7 +45,13 @@ function median(xs: number[]): number | null {
     : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
 }
 
-type Tally = { score: ToolScore; ious: number[]; times: number[]; kinds: Map<string, KindScore> };
+type Tally = {
+  score: ToolScore;
+  ious: number[];
+  bothIous: number[];
+  times: number[];
+  kinds: Map<string, KindScore>;
+};
 
 function tallyKind(t: Tally, row: CaseResult, r: ToolResult): void {
   const label = row.case.label;
@@ -65,6 +73,7 @@ function tally(t: Tally, row: CaseResult, r: ToolResult, tool: Tool): void {
     if (!r.changed) return;
     t.score.realCaught++;
     t.ious.push(caseIou(row, tool) ?? 0);
+    if (row.argos?.changed) t.bothIous.push(caseIou(row, tool) ?? 0);
   } else if (label === "noise") {
     t.score.noiseTotal++;
     t.score.noiseFlagged += Number(r.changed);
@@ -82,6 +91,7 @@ export function scoreTool(rows: CaseResult[], tool: Tool): ToolScore {
       realCaught: 0,
       realTotal: 0,
       meanIouCaught: null,
+      meanIouBoth: null,
       noiseFlagged: 0,
       noiseTotal: 0,
       identicalFlagged: 0,
@@ -91,6 +101,7 @@ export function scoreTool(rows: CaseResult[], tool: Tool): ToolScore {
       byKind: [],
     },
     ious: [],
+    bothIous: [],
     times: [],
     kinds: new Map(),
   };
@@ -99,6 +110,7 @@ export function scoreTool(rows: CaseResult[], tool: Tool): ToolScore {
     if (r) tally(t, row, r, tool);
   }
   t.score.meanIouCaught = t.ious.length > 0 ? sum(t.ious) / t.ious.length : null;
+  t.score.meanIouBoth = t.bothIous.length > 0 ? sum(t.bothIous) / t.bothIous.length : null;
   t.score.medianMs = median(t.times);
   t.score.totalMs = t.times.length > 0 ? sum(t.times) : null;
   t.score.byKind = [...t.kinds.values()];

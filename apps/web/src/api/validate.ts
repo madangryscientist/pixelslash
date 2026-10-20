@@ -59,6 +59,9 @@ const DIFF_KINDS: Record<keyof DiffOptions, "share" | "count"> = {
   threshold: "share",
   minChangedPixels: "count",
   minChangedRatio: "share",
+  mergeDistance: "count",
+  minRegionArea: "count",
+  noiseAmplitude: "share",
 };
 
 function isDiffKey(k: string): k is keyof DiffOptions {

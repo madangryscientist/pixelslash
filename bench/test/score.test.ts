@@ -64,6 +64,13 @@ describe("scoreTool", () => {
     expect(scoreTool(rows, "argos").meanIouCaught).toBe(1);
   });
 
+  test("the paired IoU counts only the real cases both tools flagged", () => {
+    expect(scoreTool(rows, "pixelslash").meanIouBoth).toBe(0.5);
+    expect(scoreTool(rows, "argos").meanIouBoth).toBe(1);
+    const alone = rows.map((r) => ({ ...r, argos: null }));
+    expect(scoreTool(alone, "pixelslash").meanIouBoth).toBeNull();
+  });
+
   test("per-kind hit rate treats leaving noise alone as a hit", () => {
     const caret = scoreTool(rows, "pixelslash").byKind.find((k) => k.kind === "caret");
     expect(caret).toMatchObject({ hit: 1, total: 2 });

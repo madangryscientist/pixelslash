@@ -48,7 +48,9 @@ describe("diffPngs", () => {
     const b = PNG.sync.write(img);
     const d = diffPngs(a, b);
     expect(d.changedPixels).toBe(1);
-    expect(d.changed).toBe(true);
+    expect(d.changed).toBe(false);
+    expect(d.specks).toEqual({ count: 1, pixels: 1 });
+    expect(diffPngs(a, b, { minRegionArea: 1 }).changed).toBe(true);
   });
 
   test("size mismatch diffs the overlap and does not paint the gutter", () => {
@@ -91,7 +93,7 @@ describe("diffPngs", () => {
     img.data[at] = 190;
     img.data[at + 1] = 190;
     img.data[at + 2] = 190;
-    const d = diffPngs(a, PNG.sync.write(img));
+    const d = diffPngs(a, PNG.sync.write(img), { minRegionArea: 1 });
     expect(d.changed).toBe(true);
     expect(d.changedPixels).toBe(1);
     expect(d.antialiased).toBe(0);
@@ -102,8 +104,8 @@ describe("diffPngs", () => {
     const img = PNG.sync.read(solid(9, 9, [200, 200, 200, 255]));
     img.data[(4 * 9 + 4) << 2] = 201;
     const b = PNG.sync.write(img);
-    expect(diffPngs(a, b).changed).toBe(false);
-    expect(diffPngs(a, b, { threshold: 0 }).changed).toBe(true);
+    expect(diffPngs(a, b, { minRegionArea: 1 }).changed).toBe(false);
+    expect(diffPngs(a, b, { threshold: 0, minRegionArea: 1 }).changed).toBe(true);
   });
 
   test("alpha is blended over white before comparing", () => {
@@ -136,12 +138,16 @@ describe("diffPngs", () => {
     const img = PNG.sync.read(solid(10, 10, [0, 0, 0, 255]));
     for (let i = 0; i < 3; i++) img.data[i << 2] = 255;
     const b = PNG.sync.write(img);
-    expect(diffPngs(a, b, { minChangedPixels: 4 })).toMatchObject({
+    expect(diffPngs(a, b, { minChangedPixels: 4, minRegionArea: 1 })).toMatchObject({
       changed: false,
       changedPixels: 3,
     });
-    expect(diffPngs(a, b, { minChangedRatio: 0.05 })).toMatchObject({ changed: false });
-    expect(diffPngs(a, b, { minChangedPixels: 3, minChangedRatio: 0.03 }).changed).toBe(true);
+    expect(diffPngs(a, b, { minChangedRatio: 0.05, minRegionArea: 1 })).toMatchObject({
+      changed: false,
+    });
+    expect(
+      diffPngs(a, b, { minChangedPixels: 3, minChangedRatio: 0.03, minRegionArea: 1 }).changed,
+    ).toBe(true);
   });
 
   test("a size mismatch is changed even past the floors", () => {
