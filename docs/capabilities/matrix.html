@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PixelSlash vs the field</title>
+<style>
+  :root { --ink: var(--foreground, #eee); --dim: var(--muted-foreground, #999); --line: var(--border, #333);
+          --yes: #6cc08b; --part: #e5c07b; --no: #6b7280; --unk: #4b5563; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 var(--font-sans, ui-sans-serif, system-ui, sans-serif); color: var(--ink); background: #111; }
+  h1 { font-size: 19px; line-height: 1.3; margin: 0 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+  h2 { font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--dim);
+       margin: 26px 0 8px; font-weight: 600; }
+  p { margin: 0 0 9px; }
+  .lede { color: var(--dim); font-size: 13px; }
+  code { font: 11.5px/1.4 var(--font-mono, ui-monospace, monospace); background: rgba(255,255,255,.06);
+         padding: 1px 4px; border-radius: 4px; }
+  .stats { display: flex; gap: 22px; margin: 14px 0 4px; flex-wrap: wrap; }
+  .stat b { display: block; font-size: 21px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; }
+  .stat span { font: 10.5px/1.3 var(--font-sans, sans-serif); letter-spacing: .05em; text-transform: uppercase; color: var(--dim); }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0 6px; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: var(--dim); }
+  .legend i { font-style: normal; font-size: 12px; }
+  .toggle { font-size: 11.5px; color: var(--dim); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  col.c0 { width: 40%; }
+  th, td { padding: 5px 3px; border-top: 1px solid var(--line); vertical-align: middle; }
+  thead th { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--dim);
+             font-weight: 600; text-align: center; border-top: 0; padding-bottom: 3px; }
+  thead th.self { color: var(--ink); }
+  td.row { font-size: 11.5px; line-height: 1.35; }
+  td.row small { display: block; font: 10px/1.3 var(--font-mono, monospace); color: var(--dim); }
+  td.c { text-align: center; font-size: 12px; }
+  tr.grp td { border-top: 1px solid var(--line); padding-top: 12px; font: 9.5px/1 var(--font-sans, sans-serif);
+              letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  .v-y { color: var(--yes); } .v-p { color: var(--part); } .v-n { color: var(--no); } .v-? { color: var(--unk); }
+  td.psc { font-weight: 700; }
+  .plan { color: var(--dim); }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 20px; }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+  .card { border-top: 1px solid var(--line); padding: 9px 0; }
+  .card b { font-size: 12.5px; display: block; }
+  .card span { font-size: 12px; color: var(--dim); }
+  .card em { font: 10.5px/1.4 var(--font-mono, monospace); color: var(--dim); font-style: normal; }
+  ul { margin: 0; padding-left: 16px; } li { margin-bottom: 6px; font-size: 12.5px; }
+  .foot { font: 10.5px/1.6 var(--font-mono, monospace); color: var(--dim); margin-top: 22px; }
+</style>
+
+<h1>PixelSlash, against the field</h1>
+<p class="lede">37 capabilities. Our column is read from the code at <code>3969ae0</code>: a yes means it exists in the code and is exercised by the gate where it has a test, not that a customer can reach it. The other five are their public docs, fetched 2026-10-20. A ? means the docs did not say, not that the tool lacks it.</p>
+
+<div class="stats">
+  <div class="stat"><b>37</b><span>capabilities</span></div>
+  <div class="stat"><b>24</b><span>level or ahead</span></div>
+  <div class="stat"><b>13</b><span>behind</span></div>
+  <div class="stat"><b>0</b><span>nobody else has</span></div>
+</div>
+
+<div class="bar">
+  <div class="legend">
+    <span><i class="v-y">●</i> yes</span><span><i class="v-p">◐</i> partial</span>
+    <span><i class="v-n">○</i> no</span><span><i class="v-?">?</i> not documented</span>
+  </div>
+  <label class="toggle"><input type="checkbox" id="onlyDiff" checked> only where we're behind</label>
+</div>
+
+<table><colgroup><col class="c0"><col span="5"></colgroup>
+<thead><tr><th></th><th class="self" title="read from the code">PixelSlash</th><th class="" title="https://argos-ci.com/docs">Argos</th><th class="" title="https://www.chromatic.com/docs">Chromatic</th><th class="" title="https://www.browserstack.com/docs/percy">Percy</th><th class="" title="https://applitools.com/docs">Applitools</th><th class="" title="https://github.com/lost-pixel/lost-pixel">Lost Pixel</th></tr></thead><tbody id="tb"></tbody></table>
+
+<h2>Nothing we have is unique</h2>
+<p class="lede">Every capability in the table exists somewhere else. Two are rare rather than unique: a
+local-only mode where nothing is uploaded (one other tool, and it is archived), and an AI judgement
+against design-system rasters (the others have AI that compares builds, not one that reads a design
+system). The diff's own accuracy is the other claim, and it is measured, not asserted: 35/37 real
+changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
+(<code>bench/results/2026-10-20.md</code>).</p>
+
+<h2>What is actually missing</h2>
+<div class="cards" id="cards"></div>
+
+<h2>The field, today</h2>
+<ul>
+  <li><b>Lost Pixel is gone.</b> The repository was archived on 22 April 2026; the README says it is joining
+    Figma and sunsetting the product. Its column is a historical comparison, not a live competitor.</li>
+  <li><b>Argos is the closest thing to us</b>: MIT-licensed, free hobby tier, deterministic diff, merge-base
+    baselines, and the only one whose docs argue against AI. Its weakness is capture: it runs in your CI, so
+    the renderer is whatever your runner has, and it has no diff-time ignore region.</li>
+  <li><b>Chromatic</b> is the benchmark for the review loop (modes, diff inspector, checks, flake filter) and
+    the one with the tightened free tier: 5,000 snapshots on Chrome only.</li>
+  <li><b>Percy</b> (BrowserStack) sells cross-browser cloud rendering and Intelli Ignore; sensitivity is set at
+    project or region level, not per snapshot.</li>
+  <li><b>Applitools</b> has the deepest match-level surface (layout, content, strict, exact), accessibility
+    checks, self-hosting via Private Cloud, and no free tier: the price is the opening for a cheap, honest diff.</li>
+</ul>
+
+<div class="foot">
+  Our column: README.md, packages/engine/src, packages/cli/src, apps/web/src at <b>3969ae0</b>,
+  2026-10-20.<br>
+  Theirs: https://argos-ci.com/docs · https://www.chromatic.com/docs · https://www.browserstack.com/docs/percy · https://applitools.com/docs · https://github.com/lost-pixel/lost-pixel (all fetched 2026-10-20).<br>
+  A "partial" is a documented subset, not a guess: read the note on the cell. Regenerate with
+  <code>python3 docs/capabilities/build.py</code> after editing <code>data.json</code>.
+</div>
+
+<script id="payload" type="application/json">{"rows": [{"g": "capture", "k": "url_pairs", "label": "Capture a page pair by URL", "ps": {"v": "y", "note": "pair mode, or --routes over an origin"}, "t": {"argos": "y", "chromatic": "p", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "", "behind": false}, {"g": "capture", "k": "storybook", "label": "No Storybook dependency", "ps": {"v": "y", "note": "pages and PNG dirs, nothing to wrap"}, "t": {"argos": "n", "chromatic": "n", "percy": "n", "applitools": "n", "lost": "n"}, "plan": "", "behind": false}, {"g": "capture", "k": "component_sdk", "label": "Component SDK for your own test run", "ps": {"v": "n", "note": "open: Playwright helper ob 1498"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "p"}, "plan": "ob 1498", "behind": true}, {"g": "capture", "k": "playwright_sdk", "label": "First-class Playwright helper", "ps": {"v": "n", "note": "Playwright is our capture engine, not your SDK"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "p"}, "plan": "ob 1498", "behind": true}, {"g": "capture", "k": "browsers", "label": "More than one browser engine", "ps": {"v": "p", "note": "config takes a browser; the image ships chromium only"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "capture image", "behind": true}, {"g": "capture", "k": "viewports", "label": "Configurable viewports, several per run", "ps": {"v": "y", "note": "variants carry viewport, per route"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "", "behind": false}, {"g": "capture", "k": "variants", "label": "Browser / viewport / theme variants", "ps": {"v": "y", "note": "a variant is browser + viewport + theme"}, "t": {"argos": "y", "chromatic": "y", "percy": "p", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "capture", "k": "full_page", "label": "Full-page screenshots", "ps": {"v": "y", "note": "fullPage: true"}, "t": {"argos": "y", "chromatic": "p", "percy": "y", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "capture", "k": "pinned_env", "label": "Pinned render environment", "ps": {"v": "y", "note": "image digest + font hash in the fingerprint"}, "t": {"argos": "n", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "p"}, "plan": "", "behind": false}, {"g": "capture", "k": "stabilisation", "label": "Animations, caret, clock, timers", "ps": {"v": "y", "note": "all four, plus a bounded settle"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "p", "lost": "p"}, "plan": "", "behind": false}, {"g": "capture", "k": "masks_redact", "label": "Redact before the image is stored", "ps": {"v": "y", "note": "painted #FF00FF before the PNG is written"}, "t": {"argos": "y", "chromatic": "n", "percy": "y", "applitools": "?", "lost": "n"}, "plan": "", "behind": false}, {"g": "capture", "k": "ignore_areas", "label": "Skip an area in the diff, keep it visible", "ps": {"v": "y", "note": "dropped before clustering, hatched, counted"}, "t": {"argos": "n", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "", "behind": false}, {"g": "diff", "k": "perceptual", "label": "Perceptual diff, not raw pixel-exact", "ps": {"v": "y", "note": "YIQ threshold, alpha over white"}, "t": {"argos": "p", "chromatic": "p", "percy": "y", "applitools": "y", "lost": "n"}, "plan": "", "behind": false}, {"g": "diff", "k": "aa", "label": "Anti-aliasing handled, not counted", "ps": {"v": "y", "note": "edge pixels set aside in either shot"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "diff", "k": "subpixel", "label": "Tolerates sub-pixel content shift", "ps": {"v": "y", "note": "four-test fit with an edge-tile veto (ob 1487)"}, "t": {"argos": "p", "chromatic": "?", "percy": "p", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "diff", "k": "noise", "label": "Classifies renderer noise, does not fail on it", "ps": {"v": "y", "note": "faint + uneven + both directions is noise"}, "t": {"argos": "p", "chromatic": "?", "percy": "y", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "diff", "k": "size", "label": "Size change measured, overlap only", "ps": {"v": "y", "note": "both sizes stated, non-overlap never painted"}, "t": {"argos": "p", "chromatic": "p", "percy": "?", "applitools": "?", "lost": "?"}, "plan": "", "behind": false}, {"g": "diff", "k": "regions", "label": "Changed regions, not just a pixel count", "ps": {"v": "y", "note": "boxes, 24px merge, speck floor"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "diff", "k": "thresholds", "label": "Per-snapshot thresholds", "ps": {"v": "y", "note": "three config levels, stored on upload"}, "t": {"argos": "y", "chromatic": "y", "percy": "p", "applitools": "y", "lost": "y"}, "plan": "", "behind": false}, {"g": "flow", "k": "merge_base", "label": "Baseline from merge-base / ancestors", "ps": {"v": "y", "note": "server diff picks it per snapshot (ob 1470)"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "n", "lost": "?"}, "plan": "", "behind": false}, {"g": "flow", "k": "carry_forward", "label": "Approvals carry forward on a branch", "ps": {"v": "y", "note": "an acceptance on the branch survives a rebase or amend"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "?"}, "plan": "", "behind": false}, {"g": "flow", "k": "auto_accept", "label": "Main auto-accepted", "ps": {"v": "y", "note": "acceptMainBuild on finalise"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "?", "lost": "y"}, "plan": "", "behind": false}, {"g": "flow", "k": "review_ui", "label": "Accept / reject in a web UI", "ps": {"v": "n", "note": "the API accepts and rejects; no page renders it yet"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "ob 1421", "behind": true}, {"g": "flow", "k": "keyboard", "label": "Keyboard review", "ps": {"v": "n", "note": "j/k/a/r specified, not built"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "?"}, "plan": "ob 1421", "behind": true}, {"g": "flow", "k": "checks", "label": "PR status blocked on review", "ps": {"v": "n", "note": "no check run"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "ob 1471", "behind": true}, {"g": "flow", "k": "github", "label": "GitHub App integration", "ps": {"v": "p", "note": "sign-in only"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "ob 1471", "behind": true}, {"g": "flow", "k": "ci_tokens", "label": "CI tokens", "ps": {"v": "y", "note": "psci_ token per project, env or file"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "", "behind": false}, {"g": "platform", "k": "orgs", "label": "Orgs, projects, builds, snapshots", "ps": {"v": "y", "note": "D1 tables, org invites, per-project tokens"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "y", "lost": "y"}, "plan": "", "behind": false}, {"g": "platform", "k": "upload", "label": "Documented upload API", "ps": {"v": "y", "note": "upload and capture --upload"}, "t": {"argos": "y", "chromatic": "p", "percy": "p", "applitools": "p", "lost": "?"}, "plan": "", "behind": false}, {"g": "platform", "k": "self_host", "label": "Self-hosting", "ps": {"v": "p", "note": "DB and blob seams are swappable; nothing shipped"}, "t": {"argos": "p", "chromatic": "p", "percy": "?", "applitools": "y", "lost": "p"}, "plan": "", "behind": true}, {"g": "platform", "k": "local_only", "label": "Local-only mode (nothing leaves)", "ps": {"v": "y", "note": "the default; --upload is the only way out"}, "t": {"argos": "n", "chromatic": "n", "percy": "n", "applitools": "?", "lost": "y"}, "plan": "", "behind": false}, {"g": "platform", "k": "ai_judge", "label": "AI judgement against a design system", "ps": {"v": "y", "note": "local mlx or ollama, DS rasters, violations"}, "t": {"argos": "n", "chromatic": "?", "percy": "p", "applitools": "p", "lost": "?"}, "plan": "", "behind": false}, {"g": "platform", "k": "a11y", "label": "Accessibility checks", "ps": {"v": "n", "note": "no WCAG surface"}, "t": {"argos": "p", "chromatic": "y", "percy": "?", "applitools": "y", "lost": "?"}, "plan": "not planned", "behind": true}, {"g": "platform", "k": "flake", "label": "Flake detection", "ps": {"v": "n", "note": "bench labels noise; no product flake signal"}, "t": {"argos": "y", "chromatic": "y", "percy": "p", "applitools": "p", "lost": "p"}, "plan": "not planned", "behind": true}, {"g": "platform", "k": "retention", "label": "Documented retention", "ps": {"v": "n", "note": "no hosted product to retain"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "p", "lost": "?"}, "plan": "not planned", "behind": true}, {"g": "platform", "k": "free_tier", "label": "Free tier / OSS plan", "ps": {"v": "n", "note": "no pricing exists yet"}, "t": {"argos": "y", "chromatic": "y", "percy": "y", "applitools": "n", "lost": "y"}, "plan": "ob 1426", "behind": true}, {"g": "platform", "k": "open_source", "label": "Open source", "ps": {"v": "p", "note": "private repo today; the map has us opening the source at launch"}, "t": {"argos": "y", "chromatic": "?", "percy": "p", "applitools": "?", "lost": "y"}, "plan": "", "behind": true}], "notes": {"argos:perceptual": "pixel diff with tolerance + AA, explicitly not AI", "argos:pinned_env": "capture runs in your CI browser", "argos:self_host": "MIT source, self-hosting unsupported", "argos:retention": "no expiry on any plan", "argos:upload": "documented REST API", "chromatic:full_page": "width-only viewports trimmed to content", "chromatic:masks_redact": "ignore is diff-time; pixels stay stored", "chromatic:upload": "CLI uploads archives, no image API", "chromatic:retention": "12 months minimum", "percy:subpixel": "isolated 1px diffs ignored in a 7px circle", "percy:thresholds": "project or region level, not per snapshot", "percy:ai_judge": "AI review agent, no design-system rules", "applitools:merge_base": "branch and parent-branch, not merge-base", "applitools:self_host": "Private Cloud", "applitools:free_tier": "trial only", "lost:masks_redact": "masks are diff-time only", "lost:local_only": "generateOnly keeps shots local", "lost:open_source": "MIT repo, archived 22 Apr 2026", "lost:self_host": "engine yes, platform SaaS only"}, "src": {"ps": "", "argos": "https://argos-ci.com/docs", "chromatic": "https://www.chromatic.com/docs", "percy": "https://www.browserstack.com/docs/percy", "applitools": "https://applitools.com/docs", "lost": "https://github.com/lost-pixel/lost-pixel"}, "names": {"ps": "PixelSlash", "argos": "Argos", "chromatic": "Chromatic", "percy": "Percy", "applitools": "Applitools", "lost": "Lost Pixel"}, "competitors": ["argos", "chromatic", "percy", "applitools", "lost"]}</script>
+<script>
+const D = JSON.parse(document.getElementById('payload').textContent);
+const GLYPH = { y: '●', p: '◐', n: '○', '?': '?' };
+const tb = document.getElementById('tb');
+let lastGroup = null;
+D.rows.forEach(r => {
+  if (r.g !== lastGroup) {
+    lastGroup = r.g;
+    const g = document.createElement('tr');
+    g.className = 'grp';
+    g.innerHTML = '<td colspan="6">' + r.g + '</td>';
+    tb.appendChild(g);
+  }
+  const tr = document.createElement('tr');
+  tr.dataset.behind = r.behind ? '1' : '0';
+  tr.innerHTML = '<td class="row">' + r.label +
+    (r.behind && r.plan ? ' <small class="plan">' + r.plan + '</small>' : '') +
+    '<small>' + r.ps.note + '</small></td>' +
+    '<td class="c psc v-' + r.ps.v + '" title="' + r.ps.note.replace(/"/g, '') + '">' + GLYPH[r.ps.v] + '</td>' +
+    D.competitors.map(k => {
+      const v = r.t[k];
+      const note = D.notes[k + ':' + r.k] || (k + ': ' + v);
+      return '<td class="c v-' + v + '" title="' + note.replace(/"/g, '') + '">' + GLYPH[v] + '</td>';
+    }).join('');
+  tb.appendChild(tr);
+});
+
+const onlyDiff = document.getElementById('onlyDiff');
+function apply() {
+  [...tb.querySelectorAll('tr')].forEach(tr => {
+    if (tr.classList.contains('grp')) return;
+    tr.style.display = (!onlyDiff.checked || tr.dataset.behind === '1') ? '' : 'none';
+  });
+  [...tb.querySelectorAll('tr.grp')].forEach(g => {
+    let n = g.nextElementSibling, any = false;
+    while (n && !n.classList.contains('grp')) { if (n.style.display !== 'none') any = true; n = n.nextElementSibling; }
+    g.style.display = any ? '' : 'none';
+  });
+}
+onlyDiff.onchange = apply;
+apply();
+
+const BEHIND = [
+  ['Review UI', 'the accept/reject loop on a page — build list, side-by-side, overlay, slider, j/k/a/r', 'ob 1421'],
+  ['PR gate', 'a GitHub check that blocks on unreviewed changes', 'ob 1471'],
+  ['A Playwright helper', 'so teams using their own tests can call us', 'ob 1498'],
+  ['Self-hosting shipped', 'the seams exist; no Docker image or guide yet', 'map: Hosting'],
+  ['Flake signal, accessibility, retention, pricing', 'deliberately unbuilt until there is a product to sell', 'ob 1426']
+];
+document.getElementById('cards').innerHTML = BEHIND.map(([t, d, ref]) =>
+  '<div class="card"><b>' + t + '</b><span>' + d + '</span> <em>' + ref + '</em></div>').join('');
+</script>

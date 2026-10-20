@@ -185,6 +185,38 @@ opencode api get "/api/plugin?location%5Bdirectory%5D=$PWD" \
 The skills need no wiring here — the global config registers `omnibus/skills`,
 so `ob-cli`, `ob-spinoff`, `ob-land`, `ob-skeptical-review` and the rest resolve.
 
+## Capability matrix — `docs/capabilities/`
+
+`docs/capabilities/matrix.html` is the standing answer to "what does this do, against the field":
+a capability table with our column and five public tools. `data.json` is the source; `build.py`
+renders the page (no dependencies, `python3 docs/capabilities/build.py`); the HTML is committed so
+it opens as `file://` without a build step.
+
+**It is kept current as we go, not written once.** Two triggers:
+
+- **A landing changes what we can do** — a new diff kind, a new flow step, an acceptance that no
+  longer needs a human, a threshold that moves. That is the same commit: edit our row's `v` and
+  `note` in `data.json`, clear its `plan` when the ticket lands, re-run `build.py`, commit the
+  regenerated `matrix.html` with it. A row that says "open: ob N" after N has landed is a lie
+  with a ticket number on it.
+- **A positioning or pricing decision is about to be made** — refresh the competitor columns
+  (1422, 1425, 1426). Fetch each vendor's docs again, update `updated`, and keep the per-cell
+  notes: they are what makes a `partial` arguable rather than a guess.
+
+The honesty rules are the same as the report's:
+
+1. Our column is read from the code at `ours_commit`. A `y` means it exists in the code and the
+   gate exercises it where there is a test — never "we specified it". `build.py` refuses nothing,
+   so this is on the author.
+2. A competitor cell comes from a page actually fetched, with the date in `updated`. Not from
+   memory, not generalised from another vendor. `?` means the docs did not say; it is never
+   evidence of absence and never renders as a gap we can sell.
+3. `behind` is computed, not curated: a row is behind when our value scores below the best
+   competitor's. Do not hand-tune it to make the number smaller.
+4. Do not add a row for something no tool has, to flatter the count. The page states plainly
+   that nothing we have is unique; if that changes, it is because a landing changed it, and the
+   landing updates the text.
+
 ## Repo invariants
 
 1. **The report never claims more than was measured.** When shot sizes differ,

@@ -4,6 +4,7 @@
     "bench/fixtures/**",
     "bench/results/**",
     "**/*.md",
+    "docs/capabilities/matrix.html",
     "**/routeTree.gen.ts",
     "**/worker-configuration.d.ts",
     "apps/web/drizzle/**"

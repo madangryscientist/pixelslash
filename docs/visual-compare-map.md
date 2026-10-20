@@ -11,6 +11,9 @@ title: PixelSlash — open, no-lock-in Chromatic replacement
 
 **Lead against Argos** (the real rival: MIT, $100/35k, same baseline model): supported self-host + deterministic capture image + an AI that explains the diff's regions and judges against a design system, with BYO model. Price supports the pitch; it is not the headline.
 
+**Where we stand against the field:** `docs/capabilities/matrix.html` (source `data.json`, rendered by
+`build.py`). It is kept current as tickets land — see "Capability matrix" in `AGENTS.md`.
+
 ## Notes
 
 - Parent ticket: [Visual Compare: Figma + live site + new version, plus AI/tracker confidence](ob://649). Grilled 2026-09-13; re-grilled 2026-10-19 for the Chromatic-replacement pivot, readback confirmed.
