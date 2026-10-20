@@ -23,7 +23,33 @@ import type { BlobStore } from "#/storage/blobs";
 /** A build on this branch is auto-accepted: there is no reviewer to ask. */
 export const MAIN_BRANCH = "main";
 
-export type ProcessDeps = { db: Db; blobs: BlobStore };
+/**
+ * The Worker's CPU limit is 30 s and the diff runs inline in the finalise request (decided
+ * 2026-10-20: inline for beta). A kill by the runtime cannot be caught, so the build stops itself
+ * first: this is the share of that limit the shots may use, which leaves the rest for the baseline
+ * pick, the removed markers and the verdict. Wall time stands in for CPU time, so it only errs
+ * early.
+ */
+export const DIFF_BUDGET_MS = 25_000;
+
+export type ProcessDeps = {
+  db: Db;
+  blobs: BlobStore;
+  /** The clock the budget reads; a test passes a fake one. workerd advances it at I/O, and each shot ends in a blob write. */
+  now?: (() => number) | undefined;
+};
+
+/** The build's diff would not finish inside the Worker's limit; the reason names the limit. */
+export class DiffCeilingError extends Error {
+  constructor(measured: number, total: number, usedMs: number, slowestMs: number) {
+    super(
+      `diff ceiling: measured ${measured} of ${total} shots in ${(usedMs / 1000).toFixed(1)} s ` +
+        `(slowest ${(slowestMs / 1000).toFixed(1)} s); the next could pass the Worker's 30 s CPU ` +
+        `limit. The server diff fits one whole-page change at 1280x4000, not several.`,
+    );
+    this.name = "DiffCeilingError";
+  }
+}
 
 type SnapshotRow = typeof snapshots.$inferSelect;
 
@@ -163,7 +189,18 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
       build,
       new Set(rows.map(snapshotKeyOf)),
     );
-    for (const shot of rows) await diffOne(deps, shot, baselines.byKey.get(snapshotKeyOf(shot)));
+    const now = deps.now ?? Date.now;
+    const started = now();
+    let slowest = 0;
+    for (const [i, shot] of rows.entries()) {
+      // Stop before a shot that, if it costs as much as the slowest so far, would pass the limit.
+      const used = now() - started;
+      if (i > 0 && used + slowest > DIFF_BUDGET_MS)
+        throw new DiffCeilingError(i, rows.length, used, slowest);
+      const began = now();
+      await diffOne(deps, shot, baselines.byKey.get(snapshotKeyOf(shot)));
+      slowest = Math.max(slowest, now() - began);
+    }
     await markRemoved(deps, build, baselines.removed);
     await acceptMainBuild(deps.db, build);
   } catch (e) {

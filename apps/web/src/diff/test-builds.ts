@@ -47,7 +47,7 @@ export type BuildSpec = {
 };
 
 /** Create, fill, finalise and diff one build; returns it as the database holds it afterwards. */
-export async function upload(ctx: Ctx, spec: BuildSpec): Promise<Build> {
+export async function upload(ctx: Ctx, spec: BuildSpec, now?: () => number): Promise<Build> {
   const id = await createBuild(ctx.db, ctx.projectId, {
     commitSha: spec.commit,
     branch: spec.branch,
@@ -75,7 +75,7 @@ export async function upload(ctx: Ctx, spec: BuildSpec): Promise<Build> {
     );
   }
   const done = await finaliseBuild(ctx.db, open, spec.shots.length);
-  await processBuild({ db: ctx.db, blobs: ctx.scoped }, done);
+  await processBuild({ db: ctx.db, blobs: ctx.scoped, now }, done);
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

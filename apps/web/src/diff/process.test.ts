@@ -215,3 +215,57 @@ describe("build status", () => {
     expect(branch.status).toBe("passed");
   });
 });
+
+/** A clock that advances `step` ms per reading, so each shot appears to cost a fixed time. */
+const clock = (step: number) => {
+  let t = 0;
+  return () => (t += step);
+};
+
+async function build(ctx: Awaited<ReturnType<typeof context>>, now: () => number) {
+  const named = (png: typeof white) => ["a", "b", "c"].map((name) => ({ name, png }));
+  await upload(ctx, { branch: "main", commit: sha(1), shots: named(white) });
+  return upload(
+    ctx,
+    { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(red) },
+    now,
+  );
+}
+
+describe("the Worker ceiling", () => {
+  test("a build whose shots cannot all finish ends errored, naming the limit", async () => {
+    const ctx = await context();
+    // Each shot reads ~3 ticks of 4 s: the third would pass the 25 s budget.
+    const branch = await build(ctx, clock(4000));
+    expect(branch.status).toBe("errored");
+    expect(branch.error).toMatch(/diff ceiling: measured \d of 3 shots/);
+    expect(branch.error).toContain("30 s CPU limit");
+    expect(branch.error).toContain("one whole-page change at 1280x4000");
+  });
+
+  test("a build inside the budget is not stopped", async () => {
+    const ctx = await context();
+    const branch = await build(ctx, clock(10));
+    expect(branch.status).toBe("changes");
+    expect(branch.error).toBeNull();
+  });
+
+  test("a throw while the diff runs is recorded as errored, with its message", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const branch = await upload(
+      ctx,
+      {
+        branch: "feat/x",
+        commit: sha(2),
+        mergeBase: sha(1),
+        shots: [{ png: red }],
+      },
+      () => {
+        throw new Error("isolate died");
+      },
+    );
+    expect(branch.status).toBe("errored");
+    expect(branch.error).toBe("isolate died");
+  });
+});

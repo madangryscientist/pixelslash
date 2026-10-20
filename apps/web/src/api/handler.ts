@@ -78,9 +78,10 @@ async function addSnapshot(ctx: Ctx, build: Build): Promise<Response> {
 
 async function closeBuild(ctx: Ctx, build: Build): Promise<Response> {
   const done = await finaliseBuild(ctx.db, build, parseFinalise(await jsonBody(ctx.request)));
-  // The diff runs here, in the request. Measured in workerd at 1280x4000 (2026-10-20): ~0.8 s per
-  // typical shot, ~15 s when every pixel differs and near the 128 MB isolate limit. One shot fits
-  // the 30 s CPU limit; a build of several whole-page changes does not (see the map's server diff).
+  // The diff runs here, in the request: inline for beta, no Queue (the map's server diff). One
+  // whole-page change at 1280x4000 fits the 30 s CPU limit; several do not, and processBuild stops
+  // before the limit and ends the build `errored` with a reason that names it, so the reply carries
+  // `error`. A kill by the runtime itself is not caught here (ob 1545).
   const result = await processBuild(
     { db: ctx.db, blobs: orgBlobs(ctx.store, ctx.auth.orgId) },
     done,
