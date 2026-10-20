@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -30,12 +30,17 @@ function fileUrl(path: string): string {
 async function figmaDs(cli: Cli, file: string, deps: Deps): Promise<string> {
   const token = await resolveToken(cli.tokenPath, deps.env ?? process.env);
   const dest = await mkdtemp(join(tmpdir(), "pixelslash-ds-"));
-  await fetchFigmaRasters({
-    fileKey: file,
-    token,
-    dest,
-    fetch: deps.fetch ?? globalThis.fetch.bind(globalThis),
-  });
+  try {
+    await fetchFigmaRasters({
+      fileKey: file,
+      token,
+      dest,
+      fetch: deps.fetch ?? globalThis.fetch.bind(globalThis),
+    });
+  } catch (e) {
+    await rm(dest, { recursive: true, force: true });
+    throw e;
+  }
   return dest;
 }
 
@@ -71,9 +76,15 @@ export async function run(
     async () => {
       const cli = parseArgs(argv);
       if (cli.routesFile) cli.routes = await loadRoutes(cli.routesFile);
-      if (cli.file) cli.ds = await figmaDs(cli, cli.file, deps);
-      const result = cli.routes ? await compareRoutes(cli, deps) : await compare(cli, deps);
-      return report(cli, result, io);
+      const figma = cli.file ? await figmaDs(cli, cli.file, deps) : undefined;
+      if (figma) cli.ds = figma;
+      try {
+        const result = cli.routes ? await compareRoutes(cli, deps) : await compare(cli, deps);
+        return report(cli, result, io);
+      } finally {
+        // `compare` has already copied the rasters into `--out/ds`, so the temp dir is spent.
+        if (figma) await rm(figma, { recursive: true, force: true });
+      }
     },
     io,
     USAGE,

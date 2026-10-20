@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../src/run.ts";
@@ -77,6 +77,11 @@ describe("usage", () => {
   });
 });
 
+const leftovers = () => readdirSync(tmpdir()).filter((n) => n.startsWith("pixelslash-ds-"));
+const judgeBoom = () => {
+  throw new Error("judge exploded");
+};
+
 describe("figma file", () => {
   test("--file without token exits 2", async () => {
     const cap = capture();
@@ -137,4 +142,68 @@ describe("figma file", () => {
     expect(cap.stdout).toMatch(/0 new/);
     expect(existsSync(join(out, "ds/button.png"))).toBe(true);
   }, 30_000);
+
+  describe("temp raster dir", () => {
+    test("a passing run leaves no pixelslash-ds-* behind", async () => {
+      const pages = await servePages();
+      const dir = await tmp();
+      const live = pages.url("live.html");
+      const code = await run(
+        ["--live", live, "--local", live, "--file", FILE_KEY, "--out", join(dir, "out")],
+        capture().io,
+        { spawn: identicalSpawn(), fetch: figmaFetch(), env: { FIGMA_TOKEN } },
+      );
+      expect(code).toBe(0);
+      expect(existsSync(join(dir, "out/ds/button.png"))).toBe(true);
+      expect(leftovers()).toEqual([]);
+    }, 30_000);
+
+    test("a thrown judge error leaves none behind", async () => {
+      const pages = await servePages();
+      const dir = await tmp();
+      const live = pages.url("live.html");
+      await expect(
+        run(
+          ["--live", live, "--local", live, "--file", FILE_KEY, "--out", join(dir, "out")],
+          capture().io,
+          { spawn: judgeBoom, fetch: figmaFetch(), env: { FIGMA_TOKEN } },
+        ),
+      ).rejects.toThrow("judge exploded");
+      expect(leftovers()).toEqual([]);
+    }, 30_000);
+
+    test("a capture error leaves none behind", async () => {
+      const dir = await tmp();
+      const cap = capture();
+      const code = await run(
+        [
+          "--live",
+          "http://127.0.0.1:1/",
+          "--local",
+          "http://127.0.0.1:1/",
+          "--file",
+          FILE_KEY,
+          "--out",
+          join(dir, "out"),
+        ],
+        cap.io,
+        { spawn: identicalSpawn(), fetch: figmaFetch(), env: { FIGMA_TOKEN } },
+      );
+      expect(code).toBe(1);
+      expect(leftovers()).toEqual([]);
+    }, 30_000);
+
+    test("a failed Figma fetch leaves none behind", async () => {
+      const dir = await tmp();
+      const cap = capture();
+      const code = await run(
+        ["--live-png", "x.png", "--local-png", "y.png", "--file", FILE_KEY, "--out", dir],
+        cap.io,
+        { fetch: async () => new Response("nope", { status: 500 }), env: { FIGMA_TOKEN } },
+      );
+      expect(code).toBe(1);
+      expect(cap.stderr).toMatch(/figma file 500/);
+      expect(leftovers()).toEqual([]);
+    });
+  });
 });
