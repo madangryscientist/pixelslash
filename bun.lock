@@ -22,7 +22,7 @@
         "@tailwindcss/vite": "^4.1.18",
         "@tanstack/react-router": "1.170.45",
         "@tanstack/react-start": "1.169.3",
-        "drizzle-orm": "latest",
+        "drizzle-orm": "^0.45.4",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "tailwindcss": "^4.1.18",
@@ -35,8 +35,9 @@
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
         "@vitejs/plugin-react": "^6.0.1",
-        "drizzle-kit": "latest",
+        "drizzle-kit": "^0.31.11",
         "vite": "^8.0.0",
+        "vitest": "5.0.5",
         "wrangler": "^4.151.2",
       },
     },
@@ -48,7 +49,9 @@
         "pngjs": "^7.0.0",
       },
       "devDependencies": {
+        "@types/bun": "1.4.3",
         "@types/pngjs": "^6.0.5",
+        "vitest": "5.0.5",
       },
     },
     "packages/cli": {
@@ -60,8 +63,10 @@
         "@pixelslash/engine": "workspace:*",
       },
       "devDependencies": {
+        "@types/bun": "1.4.3",
         "@types/pngjs": "^6.0.5",
         "pngjs": "^7.0.0",
+        "vitest": "5.0.5",
       },
     },
     "packages/engine": {
@@ -71,7 +76,9 @@
         "pngjs": "^7.0.0",
       },
       "devDependencies": {
+        "@types/bun": "1.4.3",
         "@types/pngjs": "^6.0.5",
+        "vitest": "5.0.5",
       },
     },
   },
