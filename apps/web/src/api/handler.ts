@@ -9,6 +9,7 @@ import {
   putSnapshot,
 } from "#/db/builds";
 import { verifyCiToken } from "#/db/tokens";
+import { processBuild } from "#/diff/process";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { BadRequest, isPng, parseFinalise, parseNewBuild, parseSnapshotInput } from "./validate";
 
@@ -77,7 +78,14 @@ async function addSnapshot(ctx: Ctx, build: Build): Promise<Response> {
 
 async function closeBuild(ctx: Ctx, build: Build): Promise<Response> {
   const done = await finaliseBuild(ctx.db, build, parseFinalise(await jsonBody(ctx.request)));
-  return json({ id: done.id, status: done.status });
+  // The diff runs here, in the request. Measured in workerd at 1280x4000 (2026-10-20): ~0.8 s per
+  // typical shot, ~15 s when every pixel differs and near the 128 MB isolate limit. One shot fits
+  // the 30 s CPU limit; a build of several whole-page changes does not (see the map's server diff).
+  const result = await processBuild(
+    { db: ctx.db, blobs: orgBlobs(ctx.store, ctx.auth.orgId) },
+    done,
+  );
+  return json({ id: done.id, status: result.status, error: result.error });
 }
 
 async function route(ctx: Ctx, buildId?: string, action?: string): Promise<Response> {
@@ -107,7 +115,7 @@ function errorResponse(e: unknown): Response {
  *
  *   POST /api/v1/builds                     {commitSha, branch, mergeBaseSha?, ancestorShas?, prNumber?} → {id}
  *   PUT  /api/v1/builds/:id/snapshots       multipart: meta (JSON), file (PNG) → {id}
- *   POST /api/v1/builds/:id/finalize        {snapshots: N} → {id, status}
+ *   POST /api/v1/builds/:id/finalize        {snapshots: N} → {id, status, error}: diffs, then the build status
  */
 export async function handleApi(request: Request, deps: ApiDeps): Promise<Response> {
   const parts = new URL(request.url).pathname.split("/").filter(Boolean).slice(2);

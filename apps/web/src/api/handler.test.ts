@@ -38,7 +38,7 @@ describe("upload API", () => {
       acme.token,
       JSON.stringify({ snapshots: 1 }),
     );
-    expect(await done.json()).toEqual({ id, status: "processing" });
+    expect(await done.json()).toEqual({ id, status: "passed", error: null });
 
     const [build] = await db.select().from(builds).where(eq(builds.id, id));
     expect(build).toMatchObject({
@@ -48,7 +48,7 @@ describe("upload API", () => {
       mergeBaseSha: "b".repeat(40),
       ancestorShas: ["c".repeat(40), "d".repeat(40)],
       prNumber: 7,
-      status: "processing",
+      status: "passed",
     });
     const [snap] = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
     expect(snap).toMatchObject({ name: "pricing", viewport: "1280x720", tags: ["web"] });

@@ -26,7 +26,10 @@ export function memoryStore(failPuts = false) {
       if (failPuts) throw new Error("r2 down");
       if (body instanceof ArrayBuffer) data.set(key, body);
     },
-    get: async () => null,
+    get: async (key) => {
+      const held = data.get(key);
+      return held ? new Blob([held]).stream() : null;
+    },
     delete: async (key) => void data.delete(key),
   };
   return { store, data };

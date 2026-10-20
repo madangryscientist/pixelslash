@@ -1,4 +1,4 @@
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, isNull, ne, or } from "drizzle-orm";
 import type { Db } from "./db";
 import { builds, orgs, projects, snapshots } from "./schema";
 import { real } from "./synthetic";
@@ -20,6 +20,13 @@ export async function usageCounts(db: Db): Promise<{ builds: number; snapshots: 
     .innerJoin(builds, eq(builds.id, snapshots.buildId))
     .innerJoin(projects, eq(projects.id, builds.projectId))
     .innerJoin(orgs, eq(orgs.id, projects.orgId))
-    .where(and(real(orgs.isSmoke), ne(builds.status, "uploading")));
+    .where(
+      and(
+        real(orgs.isSmoke),
+        ne(builds.status, "uploading"),
+        // A removed marker is written by the diff, not uploaded: it is not a shot to bill for.
+        or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
+      ),
+    );
   return { builds: b?.n ?? 0, snapshots: s?.n ?? 0 };
 }

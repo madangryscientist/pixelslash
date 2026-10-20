@@ -111,6 +111,30 @@ async function rows(sql: string): Promise<Record<string, string>[]> {
   return JSON.parse(out.slice(out.indexOf("[")))[0].results;
 }
 
+/** The server diffed the first build in the Worker; a second upload baselines on it. */
+async function checkServerDiff(
+  row: Record<string, string> | undefined,
+  token: string,
+  dir: string,
+) {
+  const again = upload(dir, token);
+  expect(again.code).toBe(0);
+  const secondId = /build: (\S+)/.exec(again.stdout)?.[1] ?? "";
+  const [second] = await rows(
+    `SELECT b.status, s.diff_status, s.diff_key, s.baseline_key, s.diff_result
+     FROM builds b JOIN snapshots s ON s.build_id = b.id WHERE b.id = '${secondId}'`,
+  );
+  expect(second).toMatchObject({ status: "passed", diff_status: "unchanged" });
+  expect(second?.baseline_key).toBe(row?.image_key);
+  expect(second?.diff_key).toMatch(/\.diff\.png$/);
+  const result: unknown = JSON.parse(second?.diff_result ?? "{}");
+  expect(result).toMatchObject({ sizeChanged: false, width: 1, height: 1, changedPixels: 0 });
+  const diffOut = join(await tempDir("ps-e2e-diff-"), "diff.png");
+  const object = `pixelslash-blobs/orgs/${row?.org_id}/${second?.diff_key}`;
+  await wrangler("r2", "object", "get", object, "--file", diffOut);
+  expect((await readFile(diffOut)).subarray(0, 8)).toEqual(PNG.subarray(0, 8));
+}
+
 test("the CLI uploads a snapshot dir; rows and R2 objects land under the right org", async ({
   page,
 }) => {
@@ -137,11 +161,13 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
   expect(row).toMatchObject({
     name: "home",
     viewport: "1x1",
-    status: "processing",
+    status: "passed",
     branch: "e2e",
     org: "Upload Co",
     project: "ship",
   });
+
+  await checkServerDiff(row, acme, dir);
 
   const out = join(await tempDir("ps-e2e-out-"), "got.png");
   const key = `orgs/${row?.org_id}/${row?.image_key}`;

@@ -125,6 +125,8 @@ export const builds = sqliteTable(
     ancestorShas: text("ancestor_shas", { mode: "json" }).$type<string[]>().notNull().default([]),
     prNumber: integer("pr_number"),
     status: text("status", { enum: BUILD_STATUSES }).notNull().default("uploading"),
+    /** Why processing ended in `errored`; null otherwise. Never a guess at a diff. */
+    error: text("error"),
     createdAt: createdAt(),
   },
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],
@@ -144,12 +146,55 @@ export type DiffOptions = {
 /** A rectangle in image px that the diff skips; the same shape as the engine's `IgnoreRect`. */
 export type IgnoreRect = { x: number; y: number; width: number; height: number };
 
+export type RegionKind = "change" | "noise" | "shift";
+
+/** A box of differing pixels, the same shape as the engine's `Region` (ob 1486, 1487). */
+export type DiffRegion = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  changedPixels: number;
+  antialiasedPixels: number;
+  /** Only `change` blocks a build; a `noise` or `shift` box is kept for the reviewer. */
+  kind: RegionKind;
+  why?: string;
+};
+
+/**
+ * What the diff measured for one snapshot, as stored. `null` means it was not compared: no
+ * baseline (`new`), a removed shot, or a fingerprint that needs a re-baseline.
+ */
+export type DiffResult = {
+  changedPixels: number;
+  antialiasedPixels: number;
+  /** Pixels of the overlap inside an ignore area: skipped, so neither changed nor unchanged. */
+  ignoredPixels: number;
+  ignored: IgnoreRect[];
+  /** Boxes dropped below `minRegionArea`: counted, never silently lost. */
+  specks: { count: number; pixels: number };
+  regions: DiffRegion[];
+  /** The overlap that was measured; `main*` and `branch*` are both shots, which may differ. */
+  width: number;
+  height: number;
+  mainWidth: number;
+  mainHeight: number;
+  branchWidth: number;
+  branchHeight: number;
+  /** The shots are different sizes: `changed`, and only the overlap was measured. */
+  sizeChanged: boolean;
+};
+
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
 
 /**
  * A name + a fixed variant (platform, browser, viewport, theme). Images live in the blob
  * store under the org's prefix; these are their keys. `diffStatus` is null until diffed.
+ *
+ * A `removed` row is a marker, not an upload: it keeps the baseline build's `image_key` and
+ * `baseline_key` so a reviewer can still see what went away. Every reader that counts or picks
+ * a baseline must skip it; `diff_result` is null on it.
  */
 export const snapshots = sqliteTable(
   "snapshots",
@@ -179,6 +224,10 @@ export const snapshots = sqliteTable(
     baselineKey: text("baseline_key"),
     diffKey: text("diff_key"),
     diffStatus: text("diff_status", { enum: DIFF_STATUSES }),
+    /** What the diff measured; null when the shot was not compared (see `DiffResult`). */
+    diffResult: text("diff_result", { mode: "json" }).$type<DiffResult>(),
+    /** The baseline's environment differs: needs a new baseline, measured against nothing. */
+    rebaselineNeeded: integer("rebaseline_needed", { mode: "boolean" }).notNull().default(false),
     reviewState: text("review_state", { enum: REVIEW_STATES }).notNull().default("pending"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),

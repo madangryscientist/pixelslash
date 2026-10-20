@@ -67,6 +67,28 @@ describe("usage counts", () => {
 
     await buildWithSnapshots(db, realProject.id, 4, "uploading");
     expect(await usageCounts(db)).toEqual(before);
-    expect(await usageCounts(db)).toEqual(before);
+
+    // A removed marker is written by the server diff, not uploaded: never a shot to bill for.
+    const buildId = crypto.randomUUID();
+    await db.insert(builds).values({
+      id: buildId,
+      projectId: realProject.id,
+      commitSha: "def",
+      branch: "feat/x",
+      status: "passed",
+    });
+    await db.insert(snapshots).values({
+      id: crypto.randomUUID(),
+      buildId,
+      name: "gone",
+      platform: "web",
+      browser: "chromium",
+      viewport: "1280x720",
+      theme: "light",
+      envFingerprint: "fp",
+      imageKey: `builds/${buildId}/gone.png`,
+      diffStatus: "removed",
+    });
+    expect(await usageCounts(db)).toEqual({ builds: 2, snapshots: 3 });
   });
 });

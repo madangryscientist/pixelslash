@@ -1,0 +1,217 @@
+import { describe, expect, test } from "vitest";
+import { getBuild } from "#/db/builds";
+import { refreshBuildStatus, reviewSnapshot } from "#/db/review";
+import { context, FINGERPRINT, onlyShot, rows, sha, upload } from "./test-builds";
+import { RED, shot } from "./test-shots";
+
+/**
+ * The server's half of the diff (ob 1470): which shot is the baseline, and what the build does
+ * with the verdict. The measurement itself is the engine's and is tested there.
+ */
+
+const white = shot();
+const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
+
+describe("baseline selection", () => {
+  test("the main build at the merge-base is the baseline; an identical shot is unchanged", async () => {
+    const ctx = await context();
+    const main = await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const mainShot = await onlyShot(ctx, main);
+    expect(main.status).toBe("passed");
+    expect(mainShot?.reviewState).toBe("accepted");
+
+    const branch = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: white }],
+    });
+    const branchShot = await onlyShot(ctx, branch);
+    expect(branch.status).toBe("passed");
+    expect(branchShot).toMatchObject({
+      diffStatus: "unchanged",
+      baselineKey: mainShot?.imageKey,
+      rebaselineNeeded: false,
+    });
+    expect(branchShot?.diffKey).toMatch(/\.diff\.png$/);
+  });
+
+  test("an acceptance on the branch carries forward after a rebase", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const first = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: red }],
+    });
+    expect(first.status).toBe("changes");
+    const firstShot = await onlyShot(ctx, first);
+    expect(
+      await reviewSnapshot(ctx.db, {
+        projectId: ctx.projectId,
+        snapshotId: firstShot?.id ?? "",
+        state: "accepted",
+        userId: ctx.userId,
+      }),
+    ).toBe("passed");
+
+    // Rebased: commit sha(2) is not an ancestor any more, and no main build holds this shot.
+    const second = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(3),
+      mergeBase: sha(9),
+      ancestors: [sha(3)],
+      shots: [{ png: red }],
+    });
+    const secondShot = await onlyShot(ctx, second);
+    expect(secondShot).toMatchObject({
+      diffStatus: "unchanged",
+      baselineKey: firstShot?.imageKey,
+    });
+    expect(second.status).toBe("passed");
+  });
+
+  test("a squash-merged main build is auto-accepted and is the next baseline", async () => {
+    const ctx = await context();
+    const before = await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const squash = await upload(ctx, {
+      branch: "main",
+      commit: sha(2),
+      ancestors: [sha(1)],
+      shots: [{ png: white }],
+    });
+    const squashShot = await onlyShot(ctx, squash);
+    expect(squash.status).toBe("passed");
+    expect(squashShot?.reviewState).toBe("accepted");
+    expect([...(await rows(ctx, before))].map((r) => r.id)).not.toContain(squashShot?.id);
+
+    const branch = await upload(ctx, {
+      branch: "feat/y",
+      commit: sha(3),
+      mergeBase: sha(2),
+      shots: [{ png: red }],
+    });
+    const branchShot = await onlyShot(ctx, branch);
+    expect(branchShot).toMatchObject({ diffStatus: "changed", baselineKey: squashShot?.imageKey });
+    expect(branch.status).toBe("changes");
+  });
+
+  test("a fingerprint change needs a re-baseline: not compared, and it does not block", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const branch = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: red, fingerprint: { ...FINGERPRINT, browser: "chromium 149" } }],
+    });
+    const branchShot = await onlyShot(ctx, branch);
+    expect(branchShot).toMatchObject({
+      diffStatus: null,
+      diffResult: null,
+      rebaselineNeeded: true,
+    });
+    expect(branchShot?.diffKey).toBeNull();
+    expect(branch.status).toBe("passed");
+  });
+});
+
+describe("build status", () => {
+  test("a changed shot blocks until it is accepted", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const branch = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: red }],
+    });
+    expect(branch.status).toBe("changes");
+    const branchShot = await onlyShot(ctx, branch);
+    await reviewSnapshot(ctx.db, {
+      projectId: ctx.projectId,
+      snapshotId: branchShot?.id ?? "",
+      state: "accepted",
+      userId: ctx.userId,
+    });
+    expect((await getBuild(ctx.db, ctx.projectId, branch.id)).status).toBe("passed");
+    expect(branchShot?.diffStatus).toBe("changed");
+  });
+
+  test("new and removed shots do not block", async () => {
+    const ctx = await context();
+    const main = await upload(ctx, {
+      branch: "main",
+      commit: sha(1),
+      shots: [{ png: white }, { name: "checkout", png: white }],
+    });
+    const [, gone] = await rows(ctx, main);
+    expect(gone?.name).toBe("checkout");
+
+    const branch = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: white }, { name: "signup", png: white }],
+    });
+    const held = await rows(ctx, branch);
+    expect(held.find((r) => r.name === "signup")?.diffStatus).toBe("new");
+    expect(held.find((r) => r.name === "checkout")).toMatchObject({
+      diffStatus: "removed",
+      imageKey: gone?.imageKey,
+    });
+    expect(branch.status).toBe("passed");
+  });
+
+  test("any rejection fails the build; the next build is judged on its own", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const first = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: red }],
+    });
+    const firstShot = await onlyShot(ctx, first);
+    const verdict = await reviewSnapshot(ctx.db, {
+      projectId: ctx.projectId,
+      snapshotId: firstShot?.id ?? "",
+      state: "rejected",
+      userId: ctx.userId,
+    });
+    expect(verdict).toBe("failed");
+    expect((await getBuild(ctx.db, ctx.projectId, first.id)).status).toBe("failed");
+
+    const second = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(3),
+      mergeBase: sha(1),
+      ancestors: [sha(2)],
+      shots: [{ png: red }],
+    });
+    expect(second.status).toBe("changes");
+    expect(await refreshBuildStatus(ctx.db, first.id)).toBe("failed");
+  });
+
+  test("the engine's verdict is the only one that blocks", async () => {
+    const ctx = await context();
+    const flat = shot({ base: [200, 200, 200] });
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: flat }] });
+    // A speckled patch is noise: differing pixels, but no `change` region survives.
+    const noisy = shot({
+      base: [200, 200, 200],
+      noise: { x: 10, y: 10, w: 12, h: 12, rgb: [0, 0, 0] },
+    });
+    const branch = await upload(ctx, {
+      branch: "feat/x",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: noisy }],
+    });
+    const branchShot = await onlyShot(ctx, branch);
+    expect(branchShot?.diffStatus).toBe("unchanged");
+    expect(branchShot?.diffResult?.regions.every((r) => r.kind !== "change")).toBe(true);
+    expect(branch.status).toBe("passed");
+  });
+});
