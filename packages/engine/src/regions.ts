@@ -31,7 +31,7 @@ export function newField(width: number, height: number): DiffField {
   };
 }
 
-export type RegionKind = "change" | "noise";
+export type RegionKind = "change" | "noise" | "shift";
 
 export type Region = {
   x: number;
@@ -42,9 +42,9 @@ export type Region = {
   changedPixels: number;
   /** Differing pixels inside the box that are anti-aliased edges. */
   antialiasedPixels: number;
-  /** `noise` regions are kept for the reviewer but do not make a run changed. */
+  /** `noise` and `shift` regions are kept for the reviewer but do not make a run changed. */
   kind: RegionKind;
-  /** Why a `noise` region was called noise; absent on a `change`. */
+  /** Why a `noise` or `shift` region was called so; absent on a `change`. */
   why?: string;
 };
 

@@ -23,6 +23,74 @@ function page(
 }
 
 const png = (img: PNG) => PNG.sync.write(img);
+
+/**
+ * A page with each `[x, y, w, h, grey]` rectangle painted at its fractional position, an edge
+ * pixel taking the share of itself the rectangle covers (what a rasteriser does at a sub-pixel offset).
+ */
+type SoftRect = [number, number, number, number, number];
+
+/** The share of pixel `px` a span `[lo, lo + len)` covers. */
+function cover(lo: number, len: number, px: number): number {
+  return Math.max(0, Math.min(lo + len, px + 1) - Math.max(lo, px));
+}
+
+/** The grey at (x, y): `rects` painted over white, each taking the share of the pixel it covers. */
+function shade(rects: SoftRect[], x: number, y: number): number {
+  let v = 255;
+  for (const [rx, ry, rw, rh, grey] of rects) {
+    const c = cover(rx, rw, x) * cover(ry, rh, y);
+    if (c > 0) v = v * (1 - c) + grey * c;
+  }
+  return Math.round(v);
+}
+
+function softPage(width: number, height: number, rects: SoftRect[]): PNG {
+  const img = new PNG({ width, height });
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const v = shade(rects, x, y);
+      img.data.set([v, v, v, 255], (y * width + x) << 2);
+    }
+  }
+  return img;
+}
+
+/** Strokes in rows, like lines of text: 2px-wide, 10px-tall glyphs at uneven gaps. */
+function textBlock(
+  left: number,
+  top: number,
+  dx = 0,
+  dy = 0,
+): Array<[number, number, number, number, number]> {
+  const out: Array<[number, number, number, number, number]> = [];
+  for (let row = 0; row < 4; row++) {
+    let x = left;
+    for (let g = 0; g < 14; g++) {
+      out.push([x + dx, top + row * 18 + dy, 2, 10, 20]);
+      if (g % 3 === 0) out.push([x + 4 + dx, top + row * 18 + 4 + dy, 5, 2, 20]);
+      x += 7 + (g % 4);
+    }
+  }
+  return out;
+}
+
+/** A page with one text block, shifted `dx` pixels right. */
+const shiftedText = (dx: number) => softPage(300, 120, textBlock(20, 20, dx));
+
+/** Two buttons side by side, the second moved `second` pixels away, with a line of text below. */
+const buttons = (second: number): SoftRect[] => [
+  [20, 20, 60, 24, 60],
+  [84 + second, 20, 60, 24, 60],
+  ...textBlock(20, 60),
+];
+
+/** Four lines of text, the second moved `second` pixels right against the ones around it. */
+const shiftedLine = (second: number) =>
+  textBlock(20, 10).map(([x, y, w, h, grey]): SoftRect =>
+    y >= 28 && y < 46 ? [x + second, y, w, h, grey] : [x, y, w, h, grey],
+  );
+
 const RED: Rgba = [220, 30, 30, 255];
 const BLUE: Rgba = [30, 30, 220, 255];
 const BLACK: Rgba = [0, 0, 0, 255];
@@ -171,5 +239,63 @@ describe("regions", () => {
     const d = diffPngs(png(page(50, 50)), png(page(50, 80)));
     expect(d.regions).toEqual([]);
     expect(d.changed).toBe(true);
+  });
+
+  describe("shift regions", () => {
+    test("a text block shifted half a pixel is a shift, and the run is not changed", () => {
+      const d = diffPngs(png(shiftedText(0)), png(shiftedText(0.5)));
+      expect(d.regions.length).toBeGreaterThan(0);
+      expect(d.regions.every((r) => r.kind === "shift")).toBe(true);
+      expect(d.regions[0]?.why).toMatch(/^moved /);
+      expect(d.changed).toBe(false);
+    });
+
+    test("a vertical half-pixel shift is a shift too", () => {
+      const down = softPage(300, 120, textBlock(20, 20, 0, 0.5));
+      const d = diffPngs(png(shiftedText(0)), png(down));
+      expect(d.regions.every((r) => r.kind === "shift")).toBe(true);
+      expect(d.changed).toBe(false);
+    });
+
+    test("a whole pixel is a real move", () => {
+      const d = diffPngs(png(shiftedText(0)), png(shiftedText(1)));
+      expect(d.regions.length).toBeGreaterThan(0);
+      expect(d.regions.every((r) => r.kind === "change")).toBe(true);
+      expect(d.changed).toBe(true);
+    });
+
+    test("one button moved 1px away from its neighbour is a change", () => {
+      const d = diffPngs(png(softPage(300, 150, buttons(0))), png(softPage(300, 150, buttons(1))));
+      expect(d.regions.some((r) => r.kind === "change")).toBe(true);
+      expect(d.regions.some((r) => r.kind === "shift")).toBe(false);
+      expect(d.changed).toBe(true);
+    });
+
+    test.each([
+      [0.25, false],
+      [0.5, true],
+    ])(
+      "a %spx move of one line of text against the lines around it is never a shift",
+      (step, changed) => {
+        const d = diffPngs(
+          png(softPage(300, 90, shiftedLine(0))),
+          png(softPage(300, 90, shiftedLine(step))),
+        );
+        expect(d.regions.some((r) => r.kind === "shift")).toBe(false);
+        expect(d.changed).toBe(changed);
+      },
+    );
+
+    test("maxShift 0 turns the call off", () => {
+      const d = diffPngs(png(shiftedText(0)), png(shiftedText(0.5)), { maxShift: 0 });
+      expect(d.regions.some((r) => r.kind === "shift")).toBe(false);
+      expect(d.regions[0]?.kind).toBe("change");
+      expect(d.changed).toBe(true);
+    });
+
+    test("maxShift below the shift leaves it a change", () => {
+      const d = diffPngs(png(shiftedText(0)), png(shiftedText(0.5)), { maxShift: 0.3 });
+      expect(d.regions.every((r) => r.kind === "change")).toBe(true);
+    });
   });
 });

@@ -19,7 +19,7 @@ const META = {
   viewport: "1280x720",
   theme: "light",
   tags: ["web"],
-  diff: { threshold: 0.2, minChangedPixels: 50, mergeDistance: 40, minRegionArea: 9 },
+  diff: { threshold: 0.2, minChangedPixels: 50, mergeDistance: 40, minRegionArea: 9, maxShift: 1 },
   fingerprint: { image: "version:0", browser: "chromium 148", fonts: "sha256:f" },
 };
 
@@ -266,9 +266,9 @@ describe("upload API", () => {
     expect(await bad(snapshotForm({ ...META, theme: "sepia" }))).toBe(400);
     expect(await bad(snapshotForm({ ...META, viewport: "wide" }))).toBe(400);
     expect(await bad(snapshotForm({ ...META, name: "" }))).toBe(400);
-    for (const diff of [{ threshold: 2 }, { mergeDistance: 2.5 }, { noiseAmplitude: 2 }, 0.2]) {
-      expect(await bad(snapshotForm({ ...META, diff }))).toBe(400);
-    }
+    const diffs: unknown[] = [{ threshold: 2 }, { mergeDistance: 2.5 }, { noiseAmplitude: 2 }];
+    diffs.push({ maxShift: 2 }, 0.2);
+    for (const diff of diffs) expect(await bad(snapshotForm({ ...META, diff }))).toBe(400);
     expect(await bad("not multipart")).toBe(400);
     expect(await db.select().from(snapshots)).toHaveLength(0);
     expect(blobs.data.size).toBe(0);

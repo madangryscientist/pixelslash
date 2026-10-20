@@ -84,6 +84,7 @@ describe("diff options", () => {
     [["--merge-distance", "1.5"], /--merge-distance must be a non-negative integer/],
     [["--min-region-area", "-1"], /--min-region-area must be a non-negative integer/],
     [["--noise-amplitude", "2"], /--noise-amplitude must be a number from 0 to 1/],
+    [["--max-shift", "2"], /--max-shift must be a number from 0 to 1/],
   ])("%j exits 2", async (flags, message) => {
     const dir = await tmp();
     const { live, local } = await faintPair(dir);

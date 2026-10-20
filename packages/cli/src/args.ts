@@ -7,7 +7,7 @@ import {
 } from "@pixelslash/engine";
 
 export const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1]\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1]\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
 const DEFAULT_WIDTH = 1280;
 
 export type Cli = CompareOptions & {
@@ -67,6 +67,7 @@ const DIFF_FLAGS = {
   "merge-distance": "mergeDistance",
   "min-region-area": "minRegionArea",
   "noise-amplitude": "noiseAmplitude",
+  "max-shift": "maxShift",
 } as const;
 
 /** `--threshold` and friends, validated like the config's `diff` keys; unset flags are left out. */

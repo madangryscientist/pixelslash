@@ -138,6 +138,7 @@ export type DiffOptions = {
   mergeDistance?: number;
   minRegionArea?: number;
   noiseAmplitude?: number;
+  maxShift?: number;
 };
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "date": "2026-10-20",
-  "pixelslashCommit": "093c70c+dirty",
+  "pixelslashCommit": "e42a336+dirty",
   "argos": {
     "commit": "21e8520c28129d501b22028a5499546b03336e38",
     "threshold": 0.5
@@ -12,7 +12,7 @@
       "pixelslash": {
         "realCaught": 35,
         "realTotal": 37,
-        "noiseFlagged": 15,
+        "noiseFlagged": 12,
         "noiseTotal": 30,
         "identicalFlagged": 0,
         "identicalTotal": 5
@@ -40,7 +40,7 @@
         "noise-dither-dashboard-1": false,
         "noise-dither-form-1": false,
         "noise-emoji-glyph-positioning-form": true,
-        "noise-emoji-subpixel-dashboard": true,
+        "noise-emoji-subpixel-dashboard": false,
         "noise-geometric-precision-article": true,
         "noise-hero-shimmer-frame": true,
         "noise-hinting-full-vs-lcd-article": true,
@@ -54,8 +54,8 @@
         "noise-shadow-offset-form": false,
         "noise-shift-article-main": false,
         "noise-shift-dashboard-main": false,
-        "noise-shift-dashboard-stats": true,
-        "noise-shift-form-main": true,
+        "noise-shift-dashboard-stats": false,
+        "noise-shift-form-main": false,
         "noise-spinner-frame": true,
         "noise-subpixel-glyphs-article": true,
         "noise-subpixel-glyphs-dashboard": true,
@@ -105,7 +105,7 @@
       "pixelslash": {
         "realCaught": 42,
         "realTotal": 45,
-        "noiseFlagged": 17,
+        "noiseFlagged": 11,
         "noiseTotal": 36,
         "identicalFlagged": 0,
         "identicalTotal": 4
@@ -135,9 +135,9 @@
         "noise-dither-inbox": false,
         "noise-dither-pricing": false,
         "noise-dither-settings": false,
-        "noise-emoji-subpixel-inbox": true,
-        "noise-emoji-subpixel-pricing": true,
-        "noise-emoji-subpixel-settings": true,
+        "noise-emoji-subpixel-inbox": false,
+        "noise-emoji-subpixel-pricing": false,
+        "noise-emoji-subpixel-settings": false,
         "noise-hinting-inbox": true,
         "noise-hinting-pricing": true,
         "noise-hinting-settings": true,
@@ -150,9 +150,9 @@
         "noise-shift-container-inbox": false,
         "noise-shift-container-pricing": false,
         "noise-shift-container-settings": false,
-        "noise-shift-part-inbox": true,
-        "noise-shift-part-pricing": true,
-        "noise-shift-part-settings": true,
+        "noise-shift-part-inbox": false,
+        "noise-shift-part-pricing": false,
+        "noise-shift-part-settings": false,
         "noise-subpixel-glyphs-inbox": false,
         "noise-subpixel-glyphs-pricing": true,
         "noise-subpixel-glyphs-settings": true,

@@ -115,6 +115,7 @@ describe("parseConfig", () => {
       /diff\.minRegionArea must be a non-negative integer/,
     ],
     [{ ...base, diff: { noiseAmplitude: 2 } }, /diff\.noiseAmplitude must be a number from 0 to 1/],
+    [{ ...base, diff: { maxShift: 2 } }, /diff\.maxShift must be a number from 0 to 1/],
     [{ ...base, diff: { treshold: 0.1 } }, /diff\.treshold is not a diff option/],
     [{ ...base, diff: 0.1 }, /diff must be an object/],
     [

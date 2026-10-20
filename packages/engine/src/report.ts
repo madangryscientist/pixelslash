@@ -42,14 +42,20 @@ function regionBoxes(regions: Region[], width: number, height: number): string {
 }
 
 function regionLabel(r: Region, i: number): string {
-  const what = r.kind === "noise" ? `noise (${r.why ?? "scattered"})` : "changed";
+  const what = {
+    noise: `noise (${r.why ?? "scattered"})`,
+    shift: `shifted (${r.why ?? "moved alike"})`,
+    change: "changed",
+  }[r.kind];
   return `#${i + 1} ${r.x},${r.y} ${r.w}x${r.h} · ${r.changedPixels} changed px · ${what}`;
 }
 
 function regionSummary(regions: Region[], specks: Specks): string {
   const changed = regions.filter((r) => r.kind === "change").length;
-  const noise = regions.length - changed;
+  const noise = regions.filter((r) => r.kind === "noise").length;
+  const shifted = regions.filter((r) => r.kind === "shift").length;
   const parts = [`${changed} changed ${changed === 1 ? "region" : "regions"}`];
+  if (shifted > 0) parts.push(`${shifted} shifted`);
   if (noise > 0) parts.push(`${noise} noise`);
   if (specks.count > 0)
     parts.push(`${specks.count} ${specks.count === 1 ? "speck" : "specks"} dropped`);
@@ -108,8 +114,10 @@ export function renderPixelReport(input: {
     .box { position: absolute; box-sizing: border-box; min-width: 6px; min-height: 6px; pointer-events: auto; }
     .box.change { border: 2px solid #ffd400; }
     .box.noise { border: 1px dashed #8a8a8a; }
+    .box.shift { border: 2px dotted #4dd0e1; }
     .regions { margin: 12px 0 0; padding: 0 0 0 20px; color: #ccc; font-size: 12px; }
     .regions .noise { color: #888; }
+    .regions .shift { color: #4dd0e1; }
   </style>
 </head>
 <body>

@@ -9,6 +9,7 @@ import {
   type RegionOptions,
   type Specks,
 } from "./regions.ts";
+import { labelShifts, type ShiftOptions } from "./shift.ts";
 
 export type DiffOptions = {
   /**
@@ -20,7 +21,8 @@ export type DiffOptions = {
   minChangedPixels?: number;
   /** A run with a smaller changed share of the overlap (0 to 1) is not `changed`. */
   minChangedRatio?: number;
-} & RegionOptions;
+} & RegionOptions &
+  ShiftOptions;
 
 export type PixelDiff = {
   /** The verdict: sizes differ, or a `change` region survives and the changed pixels clear the floors. */
@@ -29,7 +31,7 @@ export type PixelDiff = {
   changedPixels: number;
   /** Differing pixels that are anti-aliased edges in either shot; not counted as changed. */
   antialiased: number;
-  /** Boxes of the changed pixels in the overlap, largest first; `noise` ones do not make a run changed. */
+  /** Boxes of the changed pixels in the overlap, largest first; `noise` and `shift` ones do not make a run changed. */
   regions: Region[];
   /** Boxes dropped for being below `minRegionArea`: counted, never silently lost. */
   specks: Specks;
@@ -170,6 +172,23 @@ function diffOverlap(a: PNG, b: PNG, threshold: number, overlay: PNG): Counts {
   return counts;
 }
 
+/** The regions with `shift` labels applied; none when the sizes differ (there is no common grid). */
+function labelRegions(regions: Region[], a: PNG, b: PNG, options: DiffOptions): Region[] {
+  if (a.width !== b.width || a.height !== b.height) return regions;
+  return labelShifts(
+    regions,
+    {
+      main: a.data,
+      branch: b.data,
+      width: a.width,
+      height: a.height,
+      maxDelta: MAX_YIQ_DELTA * (options.threshold ?? DEFAULT_THRESHOLD) ** 2,
+      delta: (ia, ib) => colourDelta(a.data, ia, b.data, ib),
+    },
+    options,
+  );
+}
+
 export function diffPngs(main: Buffer, branch: Buffer, options: DiffOptions = {}): PixelDiff {
   const a = PNG.sync.read(main);
   const b = PNG.sync.read(branch);
@@ -183,9 +202,11 @@ export function diffPngs(main: Buffer, branch: Buffer, options: DiffOptions = {}
     options.threshold ?? DEFAULT_THRESHOLD,
     overlay,
   );
-  const { regions, specks } = findRegions(field, options);
+  const found = findRegions(field, options);
+  const { specks } = found;
   const overlap = field.width * field.height;
   const sizeChanged = a.width !== b.width || a.height !== b.height;
+  const regions = labelRegions(found.regions, a, b, options);
   const surviving = regions
     .filter((r) => r.kind === "change")
     .reduce((n, r) => n + r.changedPixels, 0);
