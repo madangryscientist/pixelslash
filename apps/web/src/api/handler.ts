@@ -81,7 +81,9 @@ async function closeBuild(ctx: Ctx, build: Build): Promise<Response> {
   // The diff runs here, in the request: inline for beta, no Queue (the map's server diff). One
   // whole-page change at 1280x4000 fits the 30 s CPU limit; several do not, and processBuild stops
   // before the limit and ends the build `errored` with a reason that names it, so the reply carries
-  // `error`. A kill by the runtime itself is not caught here (ob 1545).
+  // `error`. A kill by the runtime itself is not caught here; the build reads `processing` until it is
+  // older than STALE_PROCESSING_MS, and a finalise sent again after that re-runs it (ob 1545). So does
+  // one sent after `errored`.
   const result = await processBuild(
     { db: ctx.db, blobs: orgBlobs(ctx.store, ctx.auth.orgId) },
     done,

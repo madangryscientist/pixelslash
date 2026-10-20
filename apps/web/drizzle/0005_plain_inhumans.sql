@@ -1,0 +1,1 @@
+ALTER TABLE `builds` ADD `processing_started_at` integer;

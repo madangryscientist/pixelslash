@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { diffPngs } from "@pixelslash/engine/diff";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import {
   type Baselines,
   type BaselineSnapshot,
@@ -8,7 +8,7 @@ import {
   snapshotKeyOf,
 } from "#/db/baselines";
 import type { Db } from "#/db/db";
-import type { Build } from "#/db/builds";
+import { type Build, getBuild } from "#/db/builds";
 import { refreshBuildStatus } from "#/db/review";
 import { type DiffResult, builds, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
@@ -175,15 +175,89 @@ async function markErrored(db: Db, build: Build, e: unknown): Promise<void> {
 export type ProcessResult = { status: Build["status"]; error: string | null };
 
 /**
- * Diff every shot of a finalised build and move it to its verdict. A build that has moved on is
- * left alone, which covers the sequential retry after a lost reply. No claim is taken: two
- * concurrent calls would each measure the build, so a client should not retry a finalise that is
- * still running.
+ * How long a `processing` build is presumed alive. A run killed mid-diff (the isolate hits its
+ * 30 s CPU limit on a build of several whole-page changes, or the Worker is evicted) never gets
+ * to write `errored`, so its build would read `processing` for ever. Nothing heartbeats, so age
+ * is the only evidence of death: a build claimed longer ago than this has no live run, and the
+ * next finalise may take it over. It must outlast any run that is still going — the request is
+ * capped at 30 s of CPU, and R2 waits add wall time, not CPU — and stay short enough that a
+ * client retrying finalise is not left waiting on a corpse. Five minutes is ten times the cap.
+ *
+ * The claim is a lease without a fence: a run still alive past the bound would be overwritten by
+ * its successor's verdict. That is a choice; fencing every write is more than this needs.
+ */
+export const STALE_PROCESSING_MS = 5 * 60 * 1000;
+
+/**
+ * Take the build for one diff run, or learn that someone else holds it. One conditional UPDATE,
+ * so of two concurrent calls only one wins. A build is claimable when it errored, when it was
+ * finalised and no run has started (null), or when its run began more than the bound ago.
+ */
+async function claim(db: Db, build: Build): Promise<boolean> {
+  const cutoff = new Date(Date.now() - STALE_PROCESSING_MS);
+  const claimed = await db
+    .update(builds)
+    .set({ status: "processing", error: null, processingStartedAt: new Date() })
+    .where(
+      and(
+        eq(builds.id, build.id),
+        or(
+          eq(builds.status, "errored"),
+          and(
+            eq(builds.status, "processing"),
+            or(isNull(builds.processingStartedAt), lt(builds.processingStartedAt, cutoff)),
+          ),
+        ),
+      ),
+    )
+    .returning({ id: builds.id });
+  return claimed.length > 0;
+}
+
+/**
+ * Forget what an earlier run wrote, so the re-run replaces it instead of adding to it. The
+ * uploaded shots stay (they are what usage counts); the removed markers are the diff's own and
+ * go, since the re-run writes the ones the baseline calls for. Nothing here can lose a review:
+ * only a diffed (`changes` / `passed`) build can be reviewed, and this build is not one.
+ */
+async function resetSnapshots(deps: ProcessDeps, build: Build): Promise<void> {
+  const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
+  for (const row of rows) if (row.diffKey) await deps.blobs.delete(row.diffKey);
+  await deps.db
+    .delete(snapshots)
+    .where(and(eq(snapshots.buildId, build.id), eq(snapshots.diffStatus, "removed")));
+  await deps.db
+    .update(snapshots)
+    .set({
+      baselineKey: null,
+      diffKey: null,
+      diffStatus: null,
+      diffResult: null,
+      rebaselineNeeded: false,
+      reviewState: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+    })
+    .where(eq(snapshots.buildId, build.id));
+}
+
+/**
+ * Diff every shot of a finalised build and move it to its verdict. It takes `processing` (just
+ * finalised), `errored` (a retry after a failure such as a transient R2 miss) and a `processing`
+ * build whose run died (see `STALE_PROCESSING_MS`); any other build has moved on and is left
+ * alone. The take is atomic, so a finalise retried while a run is live gets that run's status
+ * back instead of a second, racing diff.
  */
 export async function processBuild(deps: ProcessDeps, build: Build): Promise<ProcessResult> {
-  if (build.status !== "processing") return { status: build.status, error: build.error };
-  const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
+  if (build.status !== "processing" && build.status !== "errored")
+    return { status: build.status, error: build.error };
+  if (!(await claim(deps.db, build))) {
+    const current = await getBuild(deps.db, build.projectId, build.id);
+    return { status: current.status, error: current.error };
+  }
   try {
+    await resetSnapshots(deps, build);
+    const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
     const baselines: Baselines = await selectBaselines(
       deps.db,
       build,

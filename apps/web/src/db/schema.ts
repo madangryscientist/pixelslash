@@ -127,6 +127,11 @@ export const builds = sqliteTable(
     status: text("status", { enum: BUILD_STATUSES }).notNull().default("uploading"),
     /** Why processing ended in `errored`; null otherwise. Never a guess at a diff. */
     error: text("error"),
+    /**
+     * When a diff run claimed this build; null until one does. A run that is killed mid-diff
+     * cannot write `errored`, so this is how a `processing` build is told from a dead one.
+     */
+    processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],
