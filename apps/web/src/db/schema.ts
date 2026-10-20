@@ -193,6 +193,9 @@ export type DiffResult = {
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
 
+export type DiffStatus = (typeof DIFF_STATUSES)[number];
+export type ReviewState = (typeof REVIEW_STATES)[number];
+
 /**
  * A name + a fixed variant (platform, browser, viewport, theme). Images live in the blob
  * store under the org's prefix; these are their keys. `diffStatus` is null until diffed.

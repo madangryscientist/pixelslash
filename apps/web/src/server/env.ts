@@ -9,6 +9,13 @@ export const database = (): Db => drizzle(env.DB);
 
 export const blobStore = (): BlobStore => r2BlobStore(env.BLOBS);
 
+/** Signs the short-lived image URLs; a deployment sets it with `wrangler secret put`. */
+export function imageSigningSecret(): string {
+  const secret = env.IMAGE_SIGNING_SECRET;
+  if (!secret) throw new Error("IMAGE_SIGNING_SECRET must be set to sign image URLs");
+  return secret;
+}
+
 export function githubConfig(): GithubConfig {
   const clientSecret = env.GITHUB_CLIENT_SECRET;
   if (!env.GITHUB_CLIENT_ID || !clientSecret)

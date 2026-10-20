@@ -23,7 +23,13 @@ function Orgs() {
             <ul className="my-3 divide-y divide-neutral-100">
               {org.projects.map((p) => (
                 <li key={p.id} className="flex justify-between py-2">
-                  <span>{p.name}</span>
+                  <Link
+                    to="/projects/$projectId"
+                    params={{ projectId: p.id }}
+                    className="font-medium text-blue-700 hover:underline"
+                  >
+                    {p.name}
+                  </Link>
                   <Link
                     to="/projects/$projectId/settings"
                     params={{ projectId: p.id }}

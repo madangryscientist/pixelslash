@@ -13,9 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrgsRouteImport } from './routes/orgs'
 import { Route as AuthGithubRouteImport } from './routes/auth/github'
 import { Route as AuthSignOutRouteImport } from './routes/auth/sign-out'
+import { Route as ImagesSplatRouteImport } from './routes/images/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AuthGithubCallbackRouteImport } from './routes/auth/github.callback'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId.index'
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects/$projectId.settings'
+import { Route as ProjectsProjectIdBuildsBuildIdRouteImport } from './routes/projects/$projectId.builds.$buildId'
+import { Route as ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRouteImport } from './routes/projects/$projectId.builds.$buildId_.snapshots.$snapshotId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -37,6 +41,11 @@ const AuthSignOutRoute = AuthSignOutRouteImport.update({
   path: '/auth/sign-out',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ImagesSplatRoute = ImagesSplatRouteImport.update({
+  id: '/images/$',
+  path: '/images/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   id: '/api/v1/$',
   path: '/api/v1/$',
@@ -47,10 +56,27 @@ const AuthGithubCallbackRoute = AuthGithubCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => AuthGithubRoute,
 } as any)
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/projects/$projectId/',
+  path: '/projects/$projectId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsProjectIdSettingsRoute =
   ProjectsProjectIdSettingsRouteImport.update({
     id: '/projects/$projectId/settings',
     path: '/projects/$projectId/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProjectsProjectIdBuildsBuildIdRoute =
+  ProjectsProjectIdBuildsBuildIdRouteImport.update({
+    id: '/projects/$projectId/builds/$buildId',
+    path: '/projects/$projectId/builds/$buildId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute =
+  ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRouteImport.update({
+    id: '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId',
+    path: '/projects/$projectId/builds/$buildId/snapshots/$snapshotId',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -59,18 +85,26 @@ export interface FileRoutesByFullPath {
   '/orgs': typeof OrgsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
+  '/images/$': typeof ImagesSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
+  '/projects/$projectId/builds/$buildId/snapshots/$snapshotId': typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/orgs': typeof OrgsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
+  '/images/$': typeof ImagesSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
+  '/projects/$projectId/builds/$buildId/snapshots/$snapshotId': typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,9 +112,13 @@ export interface FileRoutesById {
   '/orgs': typeof OrgsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
+  '/images/$': typeof ImagesSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
+  '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId': typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -89,27 +127,39 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/auth/github'
     | '/auth/sign-out'
+    | '/images/$'
     | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/settings'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/builds/$buildId'
+    | '/projects/$projectId/builds/$buildId/snapshots/$snapshotId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/orgs'
     | '/auth/github'
     | '/auth/sign-out'
+    | '/images/$'
     | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/settings'
+    | '/projects/$projectId'
+    | '/projects/$projectId/builds/$buildId'
+    | '/projects/$projectId/builds/$buildId/snapshots/$snapshotId'
   id:
     | '__root__'
     | '/'
     | '/orgs'
     | '/auth/github'
     | '/auth/sign-out'
+    | '/images/$'
     | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/settings'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/builds/$buildId'
+    | '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,8 +167,12 @@ export interface RootRouteChildren {
   OrgsRoute: typeof OrgsRoute
   AuthGithubRoute: typeof AuthGithubRouteWithChildren
   AuthSignOutRoute: typeof AuthSignOutRoute
+  ImagesSplatRoute: typeof ImagesSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdBuildsBuildIdRoute: typeof ProjectsProjectIdBuildsBuildIdRoute
+  ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute: typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -151,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignOutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/images/$': {
+      id: '/images/$'
+      path: '/images/$'
+      fullPath: '/images/$'
+      preLoaderRoute: typeof ImagesSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/$': {
       id: '/api/v1/$'
       path: '/api/v1/$'
@@ -165,11 +226,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthGithubCallbackRouteImport
       parentRoute: typeof AuthGithubRoute
     }
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId/settings': {
       id: '/projects/$projectId/settings'
       path: '/projects/$projectId/settings'
       fullPath: '/projects/$projectId/settings'
       preLoaderRoute: typeof ProjectsProjectIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/builds/$buildId': {
+      id: '/projects/$projectId/builds/$buildId'
+      path: '/projects/$projectId/builds/$buildId'
+      fullPath: '/projects/$projectId/builds/$buildId'
+      preLoaderRoute: typeof ProjectsProjectIdBuildsBuildIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId': {
+      id: '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId'
+      path: '/projects/$projectId/builds/$buildId/snapshots/$snapshotId'
+      fullPath: '/projects/$projectId/builds/$buildId/snapshots/$snapshotId'
+      preLoaderRoute: typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -192,8 +274,13 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsRoute: OrgsRoute,
   AuthGithubRoute: AuthGithubRouteWithChildren,
   AuthSignOutRoute: AuthSignOutRoute,
+  ImagesSplatRoute: ImagesSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
+  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+  ProjectsProjectIdBuildsBuildIdRoute: ProjectsProjectIdBuildsBuildIdRoute,
+  ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute:
+    ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

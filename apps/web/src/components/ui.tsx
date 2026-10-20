@@ -17,11 +17,63 @@ export function useHydrated(): boolean {
   );
 }
 
-export function Page({ title, children }: { title: string; children: ReactNode }) {
+/** A build's verdict, in the colours a reviewer reads first. */
+export function StatusBadge({ status }: { status: string }) {
+  const tone: Record<string, string> = {
+    changes: "bg-amber-100 text-amber-900",
+    passed: "bg-emerald-100 text-emerald-900",
+    failed: "bg-red-100 text-red-900",
+    errored: "bg-red-100 text-red-900",
+    processing: "bg-blue-100 text-blue-900",
+    uploading: "bg-neutral-200 text-neutral-800",
+  };
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <span
+      data-testid="build-status"
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${tone[status] ?? "bg-neutral-200"}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+/** One review state or decision, e.g. `accepted by ada`. */
+export function ReviewChip({ state, by }: { state: string; by?: string | null }) {
+  const tone: Record<string, string> = {
+    pending: "bg-neutral-100 text-neutral-700",
+    accepted: "bg-emerald-50 text-emerald-800",
+    rejected: "bg-red-50 text-red-800",
+  };
+  return (
+    <span
+      data-testid="review-state"
+      className={`rounded px-2 py-0.5 text-xs ${tone[state] ?? "bg-neutral-100"}`}
+    >
+      {by ? `${state} by ${by}` : state}
+    </span>
+  );
+}
+
+/**
+ * `data-hydrated` is false in the server HTML and true once React owns the page. The controls
+ * disable themselves until then, and a browser test can wait for the same signal.
+ */
+export function Page({
+  title,
+  wide = false,
+  children,
+}: {
+  title: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  const hydrated = useHydrated();
+  return (
+    <div className="min-h-screen bg-neutral-50 text-neutral-900" data-hydrated={hydrated}>
       <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
+        <div
+          className={`mx-auto flex items-center justify-between px-6 py-3 ${wide ? "max-w-6xl" : "max-w-3xl"}`}
+        >
           <Link to="/orgs" className="font-bold">
             PixelSlash
           </Link>
@@ -32,7 +84,7 @@ export function Page({ title, children }: { title: string; children: ReactNode }
           </form>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-6 py-8">
+      <main className={`mx-auto px-6 py-8 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
         <h1 className="mb-6 text-2xl font-bold">{title}</h1>
         {children}
       </main>

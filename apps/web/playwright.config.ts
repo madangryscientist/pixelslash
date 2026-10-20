@@ -12,6 +12,8 @@ export default defineConfig({
   globalSetup: "../../scripts/test-tmp-scope.ts",
   forbidOnly: !!process.env["CI"],
   reporter: "list",
+  // One local D1 holds every spec's rows: concurrent writers fail with SQLITE_BUSY.
+  workers: 1,
   use: { baseURL: "http://localhost:4173", trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [

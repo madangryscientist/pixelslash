@@ -413,8 +413,8 @@
       "k": "review_ui",
       "label": "Accept / reject in a web UI",
       "ps": {
-        "v": "n",
-        "note": "the API accepts and rejects; no page renders it yet"
+        "v": "y",
+        "note": "project / build / snapshot pages; accept or reject records who and when; Playwright e2e"
       },
       "t": {
         "argos": "y",
@@ -423,15 +423,15 @@
         "applitools": "y",
         "lost": "y"
       },
-      "plan": "ob 1421"
+      "plan": ""
     },
     {
       "g": "flow",
       "k": "keyboard",
       "label": "Keyboard review",
       "ps": {
-        "v": "n",
-        "note": "j/k/a/r specified, not built"
+        "v": "y",
+        "note": "j/k walk the build, a accept, r reject; e2e walks one"
       },
       "t": {
         "argos": "y",
@@ -440,7 +440,7 @@
         "applitools": "y",
         "lost": "?"
       },
-      "plan": "ob 1421"
+      "plan": ""
     },
     {
       "g": "flow",
