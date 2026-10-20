@@ -1,6 +1,8 @@
 /** Markdown tables and the side-by-side HTML page (ob 1477). */
 import { type CalibrationRow } from "./calibration.ts";
 import { ARGOS_THRESHOLD } from "./argos-cache.ts";
+import { captureSection } from "./capture-render.ts";
+import type { CaptureStage } from "./capture-stage.ts";
 import { CORPUS_IDS, type CorpusId } from "./corpus.ts";
 import {
   caseIou,
@@ -187,6 +189,7 @@ export function resultsMarkdown(
   rows: CaseResult[],
   info: RunInfo,
   cal: CalibrationRow[] | null,
+  capture: CaptureStage | null = null,
 ): string {
   const disagree = verdictDisagreements(rows);
   const main = inCorpus(rows, "main");
@@ -225,5 +228,6 @@ export function resultsMarkdown(
     caseTable(holdout),
   ];
   if (cal) parts.push("", calibrationSection(cal));
+  if (capture) parts.push("", captureSection(capture));
   return `${parts.join("\n")}\n`;
 }

@@ -4,17 +4,21 @@
  * bench/corpus-holdout/ to PixelSlash's diff and to Argos, score both, and write
  * bench/results/<date>.{md,json} plus the side-by-side disagreement page.
  *
- *   bun bench/src/run.ts [--no-argos] [--refresh-argos] [--calibration]
+ *   bun bench/src/run.ts [--no-argos] [--refresh-argos] [--calibration] [--capture]
  *
  * Argos's verdicts come from bench/argos-cache.json, so no VM is needed. --refresh-argos asks
  * VM 101 (ops/argos-bench/run-pairs.sh, ARGOS_BENCH_HOST / ARGOS_BENCH_KEY) about the pairs the
  * cache does not know and rewrites the cache. --no-argos scores PixelSlash alone and writes no
- * files. --calibration adds Argos's own 19 cases, which are streamed from the VM.
+ * files. --calibration adds Argos's own 19 cases, which are streamed from the VM. --capture adds
+ * the capture stage (ob 1489): fixture pages captured in the pinned image and bare. It needs Docker
+ * and is skipped with a message without it; Argos is not involved.
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARGOS_THRESHOLD, argosVerdicts } from "./argos-cache.ts";
 import { runCalibration, type CalibrationRow } from "./calibration.ts";
+import { captureSection } from "./capture-render.ts";
+import { runCaptureStage, type CaptureStage } from "./capture-stage.ts";
 import { BENCH_DIR, caseKey, loadCorpora, type CorpusCase } from "./corpus.ts";
 import { disagreementCases, disagreementsHtml } from "./html.ts";
 import { runPixelslash } from "./pixelslash.ts";
@@ -24,21 +28,30 @@ import { RESULTS_DIR, summarise, type ResultsFile } from "./results-json.ts";
 import { say, warn } from "./say.ts";
 import type { CaseResult, ToolResult } from "./types.ts";
 
-const USAGE = "usage: bun bench/src/run.ts [--no-argos] [--refresh-argos] [--calibration]";
+const USAGE =
+  "usage: bun bench/src/run.ts [--no-argos] [--refresh-argos] [--calibration] [--capture]";
 
-type Flags = { argos: boolean; refresh: boolean; calibration: boolean; date: string };
+type Flags = {
+  argos: boolean;
+  refresh: boolean;
+  calibration: boolean;
+  capture: boolean;
+  date: string;
+};
 
 function parseFlags(argv: string[]): Flags {
   const flags: Flags = {
     argos: true,
     refresh: false,
     calibration: false,
+    capture: false,
     date: new Date().toISOString().slice(0, 10),
   };
   for (const a of argv) {
     if (a === "--no-argos") flags.argos = false;
     else if (a === "--refresh-argos") flags.refresh = true;
     else if (a === "--calibration") flags.calibration = true;
+    else if (a === "--capture") flags.capture = true;
     else throw new Error(`unknown argument: ${a}\n${USAGE}`);
   }
   if (flags.refresh && !flags.argos) throw new Error("--refresh-argos needs Argos");
@@ -93,12 +106,15 @@ function writeResults(
   rows: CaseResult[],
   flags: Flags,
   info: RunInfo,
-  cal: CalibrationRow[] | null,
+  extra: { cal: CalibrationRow[] | null; captured: CaptureStage | null },
 ): void {
   const dayDir = join(RESULTS_DIR, flags.date);
   rmSync(dayDir, { recursive: true, force: true });
   for (const id of CORPUS_IDS) mkdirSync(join(dayDir, "diffs", id), { recursive: true });
-  writeFileSync(join(RESULTS_DIR, `${flags.date}.md`), resultsMarkdown(rows, info, cal));
+  writeFileSync(
+    join(RESULTS_DIR, `${flags.date}.md`),
+    resultsMarkdown(rows, info, extra.cal, extra.captured),
+  );
   writeFileSync(
     join(RESULTS_DIR, `${flags.date}.json`),
     `${JSON.stringify(resultsJson(rows, info), null, 2)}\n`,
@@ -114,6 +130,13 @@ function writeResults(
   writeFileSync(join(dayDir, "disagreements.html"), disagreementsHtml(rows, flags.date));
 }
 
+/** The capture stage when asked for: printed here, and returned for the results file. Null when skipped. */
+async function captureStage(flags: Flags): Promise<CaptureStage | null> {
+  const stage = flags.capture ? await runCaptureStage() : null;
+  if (stage) say(`\n${captureSection(stage)}\n`);
+  return stage;
+}
+
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
   const corpus = loadCorpora();
@@ -125,6 +148,7 @@ async function main() {
   if (argos?.refreshed) say(`argos: ${argos.refreshed} pair(s) added to bench/argos-cache.json`);
   const rows = pair(corpus, ps, argos?.results ?? null);
   say(`\n${summaryMarkdown(rows)}\n`);
+  const captured = await captureStage(flags);
   if (!flags.argos) {
     say("--no-argos: nothing written");
     return;
@@ -139,7 +163,7 @@ async function main() {
     pixelslashCommit: await pixelslashCommit(),
     argosCommit: argos?.commit ?? null,
   };
-  writeResults(rows, flags, info, cal);
+  writeResults(rows, flags, info, { cal, captured });
   say(`wrote bench/results/${flags.date}.md, .json and ${flags.date}/disagreements.html`);
 }
 

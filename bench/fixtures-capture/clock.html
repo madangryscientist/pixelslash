@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Clock and relative time</title>
+<style>
+  body {
+    font: 16px/1.5 sans-serif;
+    margin: 32px;
+    color: #1d2433;
+  }
+  .big {
+    font: 700 40px/1.2 monospace;
+  }
+  .muted {
+    color: #5b6477;
+  }
+</style>
+<h1>Status</h1>
+<div class="big" id="now"></div>
+<p class="muted">Last deploy <span id="ago"></span></p>
+<p class="muted">Year <span id="year"></span></p>
+<script>
+  // Everything here derives from the clock, so a frozen clock makes it static.
+  const deployed = Date.parse("2026-01-01T00:00:00Z") - 7 * 60 * 1000 - 20 * 1000;
+  function minutes(ms) {
+    return Math.floor(ms / 60000);
+  }
+  function render() {
+    const now = new Date();
+    document.getElementById("now").textContent = now.toISOString().slice(11, 23);
+    document.getElementById("ago").textContent = minutes(now.getTime() - deployed) + " min ago";
+    document.getElementById("year").textContent = String(now.getFullYear());
+  }
+  render();
+  setInterval(render, 50);
+</script>
