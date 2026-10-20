@@ -6,7 +6,7 @@ import { caseKey, type CorpusCase } from "./corpus.ts";
 import { extractRegions, maskFromRgba } from "./regions.ts";
 import type { ToolResult } from "./types.ts";
 
-/** PixelSlash's diff as it is today: every differing pixel counts, no tolerance (packages/engine/src/diff.ts). */
+/** PixelSlash's diff at its defaults: perceptual threshold, anti-aliased edges set aside, a size mismatch is a change (packages/engine/src/diff.ts). */
 export function pixelslashDiff(base: Buffer, head: Buffer): ToolResult {
   const started = performance.now();
   const diff = diffPngs(base, head);
@@ -14,11 +14,11 @@ export function pixelslashDiff(base: Buffer, head: Buffer): ToolResult {
   const overlay = PNG.sync.read(diff.overlay);
   const regions = extractRegions(maskFromRgba(overlay.width, overlay.height, overlay.data));
   return {
-    changed: diff.changedPixels > 0,
+    changed: diff.changed,
     regions,
     ms,
-    note: `${diff.changedPixels} px`,
-    diffPng: diff.changedPixels > 0 ? diff.overlay : null,
+    note: `${diff.changedPixels} px${diff.antialiased > 0 ? `, ${diff.antialiased} anti-aliased` : ""}`,
+    diffPng: diff.changed ? diff.overlay : null,
     sizeMismatch: diff.mainWidth !== diff.branchWidth || diff.mainHeight !== diff.branchHeight,
   };
 }

@@ -199,7 +199,7 @@ export function resultsMarkdown(
     "",
     `Two corpora, scored the same way for both tools: \`bench/corpus/\` (main), ${COMPOSITION(main)}, and \`bench/corpus-holdout/\` (held out), ${COMPOSITION(holdout)}. Tuning work looks at the main corpus only; the held-out one, made from pages the main corpus never sees, says whether a change helped beyond them. \`bun run bench\` reproduces this; \`bench/README.md\` says how it is measured.`,
     "",
-    `- PixelSlash: \`${info.pixelslashCommit}\`, \`diffPngs\` as it is (exact pixels, no tolerance, no anti-aliasing detection). It reports a count and an overlay, not regions: regions are extracted from the overlay for both tools by the same code.`,
+    `- PixelSlash: \`${info.pixelslashCommit}\`, \`diffPngs\` at its defaults (perceptual threshold, anti-aliased edges set aside, a size mismatch is a change). It reports a count and an overlay, not regions: regions are extracted from the overlay for both tools by the same code.`,
     `- Argos: ${info.argosCommit ? `\`${info.argosCommit}\`` : "not run"}, \`diffImages\` at threshold ${ARGOS_THRESHOLD}, answers from \`bench/argos-cache.json\` (VM 101 only for new or changed pairs, \`--refresh-argos\`). Its time is \`diffImages\` alone, as measured when the cache entry was made, without ssh, tar or container start.`,
     "",
     "## Scores",

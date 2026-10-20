@@ -116,7 +116,7 @@ real one.
 
 ## How it is scored
 
-- **Verdict.** PixelSlash: any differing pixel (`diffPngs`, today's engine). Argos: score above 0
+- **Verdict.** PixelSlash: `changed` from `diffPngs` at its defaults (perceptual threshold, anti-aliased edges not counted, a size mismatch always changed). Argos: score above 0
   (`diffImages`, threshold 0.5). Nothing is tuned for the benchmark.
 - **Results file.** `bench/results/<date>.md` for people, `<date>.json` for `bench:check`: both
   corpora, each tool, per-corpus counts and PixelSlash's verdict per case.
@@ -131,8 +131,8 @@ real one.
   `diffImages` inside the container, without ssh, tar or container start, as measured when the
   cache entry was made.
 - **Size mismatch.** PixelSlash diffs only the overlapping rectangle (invariant 1) and states both
-  sizes in the report; Argos pads the smaller shot and counts the padding as changed. The `size`
-  cases measure that difference, and the results say how many PixelSlash misses are of that kind.
+  sizes in the report, and the verdict is `changed` whenever the sizes differ; Argos pads the smaller
+  shot and counts the padding as changed. The `size` cases measure that difference.
 
 The results file also lists every case, and `bench/results/<date>/disagreements.html` shows the
 cases where the tools disagree, or flag the same change in different places, with both diff images.
