@@ -247,6 +247,9 @@ async function resetSnapshots(deps: ProcessDeps, build: Build): Promise<void> {
  * build whose run died (see `STALE_PROCESSING_MS`); any other build has moved on and is left
  * alone. The take is atomic, so a finalise retried while a run is live gets that run's status
  * back instead of a second, racing diff.
+ *
+ * The verdict write is inside the try (ob 1561): a status write that throws must end the build at
+ * `errored` with the reason, never leave it looking like it is still being measured.
  */
 export async function processBuild(deps: ProcessDeps, build: Build): Promise<ProcessResult> {
   if (build.status !== "processing" && build.status !== "errored")
@@ -277,10 +280,10 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     }
     await markRemoved(deps, build, baselines.removed);
     await acceptMainBuild(deps.db, build);
+    const status = await refreshBuildStatus(deps.db, build.id);
+    return { status, error: null };
   } catch (e) {
     await markErrored(deps.db, build, e);
     return { status: "errored", error: e instanceof Error ? e.message : String(e) };
   }
-  const status = await refreshBuildStatus(deps.db, build.id);
-  return { status, error: null };
 }

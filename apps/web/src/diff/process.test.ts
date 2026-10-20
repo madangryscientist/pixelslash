@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";
+import type { Db } from "#/db/db";
 import { refreshBuildStatus, reviewSnapshot } from "#/db/review";
 import { context, FINGERPRINT, onlyShot, rows, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
@@ -11,6 +12,43 @@ import { RED, shot } from "./test-shots";
 
 const white = shot();
 const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
+
+const VERDICTS: ReadonlySet<unknown> = new Set(["changes", "passed", "failed"]);
+/** The statuses the diff writes: a verdict, or the reason it could not reach one. */
+const RECORDED: ReadonlySet<unknown> = new Set([...VERDICTS, "errored"]);
+
+/**
+ * A `Db` in front of the test store that records the statuses the diff writes and, when asked,
+ * fails the verdict one the way a contending D1 write does. The claim (`processing`) and the
+ * `errored` write carrying a reason are let through: the store is otherwise healthy and only the
+ * verdict statement throws.
+ */
+function statusWrites(db: Db, failVerdict = false) {
+  const writes: unknown[] = [];
+  const update: Db["update"] = (...args) => {
+    const builder = db.update(...args);
+    const set = builder.set.bind(builder);
+    return new Proxy(builder, {
+      get(target, prop, receiver) {
+        if (prop !== "set") return Reflect.get(target, prop, receiver);
+        return (values: Parameters<typeof set>[0]) => {
+          const status = "status" in values ? values.status : null;
+          if (failVerdict && status !== null && VERDICTS.has(status)) throw new Error("d1 blip");
+          if (status !== null && RECORDED.has(status)) writes.push(values);
+          return set(values);
+        };
+      },
+    });
+  };
+  return {
+    db: new Proxy(db, {
+      get(target, prop, receiver) {
+        return prop === "update" ? update : Reflect.get(target, prop, receiver);
+      },
+    }),
+    writes,
+  };
+}
 
 describe("baseline selection", () => {
   test("the main build at the merge-base is the baseline; an identical shot is unchanged", async () => {
@@ -139,6 +177,34 @@ describe("build status", () => {
     expect(branchShot?.diffStatus).toBe("changed");
   });
 
+  test("the happy path writes the verdict once and blocks on it", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const store = statusWrites(ctx.db);
+    const branch = await upload(
+      ctx,
+      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: red }] },
+      { db: store.db },
+    );
+    expect(branch.status).toBe("changes");
+    expect(store.writes).toEqual([{ status: "changes" }]);
+  });
+
+  test("a status write that throws ends the build at errored, never processing", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const store = statusWrites(ctx.db, true);
+    const branch = await upload(
+      ctx,
+      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: white }] },
+      { db: store.db },
+    );
+    expect(branch.status).toBe("errored");
+    expect(branch.error).toBe("d1 blip");
+    // The verdict write failed; the reason was written instead, so nothing is left measuring.
+    expect(store.writes).toEqual([{ status: "errored", error: "d1 blip" }]);
+  });
+
   test("new and removed shots do not block", async () => {
     const ctx = await context();
     const main = await upload(ctx, {
@@ -228,7 +294,7 @@ async function build(ctx: Awaited<ReturnType<typeof context>>, now: () => number
   return upload(
     ctx,
     { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(red) },
-    now,
+    { now },
   );
 }
 
@@ -261,8 +327,10 @@ describe("the Worker ceiling", () => {
         mergeBase: sha(1),
         shots: [{ png: red }],
       },
-      () => {
-        throw new Error("isolate died");
+      {
+        now: () => {
+          throw new Error("isolate died");
+        },
       },
     );
     expect(branch.status).toBe("errored");

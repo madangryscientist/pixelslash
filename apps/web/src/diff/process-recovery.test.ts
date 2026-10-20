@@ -130,7 +130,7 @@ describe("recovery (ob 1545)", () => {
     const stopped = await upload(
       ctx,
       { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(red) },
-      slow(4000),
+      { now: slow(4000) },
     );
     expect(stopped.error).toMatch(/diff ceiling/);
 

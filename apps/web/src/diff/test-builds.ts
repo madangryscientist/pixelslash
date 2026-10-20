@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { setup } from "#/api/test-support";
 import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#/db/builds";
+import type { Db } from "#/db/db";
 import { snapshots } from "#/db/schema";
 import { orgBlobs } from "#/storage/blobs";
 import { processBuild } from "./process";
@@ -46,8 +47,16 @@ export type BuildSpec = {
   shots: Shot[];
 };
 
-/** Create, fill, finalise and diff one build; returns it as the database holds it afterwards. */
-export async function upload(ctx: Ctx, spec: BuildSpec, now?: () => number): Promise<Build> {
+/**
+ * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
+ * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
+ * front of the diff only, so a failure there is not the store the assertions read back from.
+ */
+export async function upload(
+  ctx: Ctx,
+  spec: BuildSpec,
+  { now, db = ctx.db }: { now?: () => number; db?: Db } = {},
+): Promise<Build> {
   const id = await createBuild(ctx.db, ctx.projectId, {
     commitSha: spec.commit,
     branch: spec.branch,
@@ -75,7 +84,7 @@ export async function upload(ctx: Ctx, spec: BuildSpec, now?: () => number): Pro
     );
   }
   const done = await finaliseBuild(ctx.db, open, spec.shots.length);
-  await processBuild({ db: ctx.db, blobs: ctx.scoped, now }, done);
+  await processBuild({ db, blobs: ctx.scoped, now }, done);
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 
