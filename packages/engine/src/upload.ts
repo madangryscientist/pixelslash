@@ -1,5 +1,6 @@
 import { join, resolve, sep } from "node:path";
 import { isHttpUrl } from "./config.ts";
+import { parseDiffOptions } from "./diff-options.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
@@ -54,6 +55,7 @@ function entry(v: unknown, i: number): SnapshotEntry {
       theme: variant.theme,
     },
     tags: tags.map((t, j) => str(t, `${where}.tags[${j}]`)),
+    diff: v.diff === undefined ? {} : parseDiffOptions(v.diff, `${where}.diff`, bad),
     file: str(v.file, `${where}.file`),
     fingerprint: {
       image: str(fingerprint.image, `${where}.fingerprint.image`),
@@ -228,6 +230,7 @@ function snapshotMeta(e: SnapshotEntry) {
     viewport: `${e.variant.viewport.width}x${e.variant.viewport.height}`,
     theme: e.variant.theme,
     tags: e.tags,
+    diff: e.diff,
     fingerprint: e.fingerprint,
   };
 }

@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
+import { snapshotDiffOptions } from "#/db/builds";
 import { createOrg, createProject } from "#/db/orgs";
 import { builds, snapshots } from "#/db/schema";
 import { testDb } from "#/db/test-db";
@@ -18,6 +19,7 @@ const META = {
   viewport: "1280x720",
   theme: "light",
   tags: ["web"],
+  diff: { threshold: 0.2, minChangedPixels: 50 },
   fingerprint: { image: "version:0", browser: "chromium 148", fonts: "sha256:f" },
 };
 
@@ -123,9 +125,29 @@ describe("upload API", () => {
     });
     const [snap] = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
     expect(snap).toMatchObject({ name: "pricing", viewport: "1280x720", tags: ["web"] });
+    expect(snap?.diffOptions).toEqual({ threshold: 0.2, minChangedPixels: 50 });
+    expect(await snapshotDiffOptions(db, snap?.id ?? "")).toEqual({
+      threshold: 0.2,
+      minChangedPixels: 50,
+    });
     expect(JSON.parse(snap?.envFingerprint ?? "")).toEqual(META.fingerprint);
     expect([...blobs.data.keys()]).toEqual([`orgs/${acme.org.id}/${snap?.imageKey}`]);
     expect(await usageCounts(db)).toEqual({ builds: 1, snapshots: 1 });
+  });
+
+  test("a snapshot sent without diff options stores {}", async () => {
+    const { db, deps, acme } = await setup();
+    const id = await openBuild(deps, acme.token);
+    const { diff: _diff, ...old } = META;
+    const put = await call(
+      deps,
+      `PUT /api/v1/builds/${id}/snapshots`,
+      acme.token,
+      snapshotForm(old),
+    );
+    expect(put.status).toBe(200);
+    const [snap] = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
+    expect(snap?.diffOptions).toEqual({});
   });
 
   test("a missing, wrong or revoked token is refused before anything is written", async () => {
@@ -247,6 +269,9 @@ describe("upload API", () => {
     expect(await bad(snapshotForm({ ...META, theme: "sepia" }))).toBe(400);
     expect(await bad(snapshotForm({ ...META, viewport: "wide" }))).toBe(400);
     expect(await bad(snapshotForm({ ...META, name: "" }))).toBe(400);
+    for (const diff of [{ threshold: 2 }, { minChangedPixels: 1.5 }, { fuzz: 1 }, 0.2]) {
+      expect(await bad(snapshotForm({ ...META, diff }))).toBe(400);
+    }
     expect(await bad("not multipart")).toBe(400);
     expect(await db.select().from(snapshots)).toHaveLength(0);
     expect(blobs.data.size).toBe(0);

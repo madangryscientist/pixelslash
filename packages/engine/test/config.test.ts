@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseConfig } from "../src/config.ts";
+import { parseConfig, resolveDiff } from "../src/config.ts";
 
 const base = { baseUrl: "http://127.0.0.1:3000", routes: ["/"] };
 
@@ -22,7 +22,9 @@ describe("parseConfig", () => {
         theme: "light",
       },
     ]);
-    expect(config.routes).toEqual([{ path: "/", name: "index", masks: [], tags: [] }]);
+    expect(config.routes).toEqual([
+      { path: "/", name: "index", masks: [], tags: [], diff: {}, variantDiff: {} },
+    ]);
     expect(config.start).toBeUndefined();
   });
 
@@ -72,6 +74,8 @@ describe("parseConfig", () => {
       name: "pricing",
       masks: [".clock", { x: 0, y: 0, width: 10, height: 5 }],
       tags: ["web", "billing"],
+      diff: {},
+      variantDiff: {},
     });
   });
 
@@ -92,6 +96,42 @@ describe("parseConfig", () => {
   });
 
   test.each([
+    [{ ...base, diff: { threshold: 1.5 } }, /diff\.threshold must be a number from 0 to 1/],
+    [{ ...base, diff: { threshold: "0.2" } }, /diff\.threshold must be a number from 0 to 1/],
+    [
+      { ...base, diff: { minChangedPixels: 1.5 } },
+      /diff\.minChangedPixels must be a non-negative integer/,
+    ],
+    [
+      { ...base, diff: { minChangedRatio: -0.1 } },
+      /diff\.minChangedRatio must be a number from 0 to 1/,
+    ],
+    [{ ...base, diff: { treshold: 0.1 } }, /diff\.treshold is not a diff option/],
+    [{ ...base, diff: 0.1 }, /diff must be an object/],
+    [
+      { ...base, routes: [{ path: "/", diff: { minChangedPixels: -1 } }] },
+      /routes\[0\]\.diff\.minChangedPixels must be a non-negative integer/,
+    ],
+    [
+      { ...base, routes: [{ path: "/", variants: { phone: { diff: {} } } }] },
+      /routes\[0\]\.variants\.phone names no variant \(have chromium-1280x720-light\)/,
+    ],
+    [
+      {
+        ...base,
+        routes: [
+          { path: "/", variants: { "chromium-1280x720-light": { diff: { threshold: 2 } } } },
+        ],
+      },
+      /routes\[0\]\.variants\.chromium-1280x720-light\.diff\.threshold must be a number from 0 to 1/,
+    ],
+    [
+      {
+        ...base,
+        routes: [{ path: "/", variants: { "chromium-1280x720-light": { tolerance: {} } } }],
+      },
+      /\.tolerance is not a variant option \(diff\)/,
+    ],
     [{ ...base, baseUrl: "nope" }, /baseUrl must be a URL/],
     [{ ...base, routes: [] }, /routes must list at least one path/],
     [{ ...base, routes: ["pricing"] }, /must start with \//],
@@ -109,5 +149,49 @@ describe("parseConfig", () => {
     [{ ...base, stabilise: { clock: false, timers: true } }, /needs a clock to pause/],
   ])("rejects %j", (raw, message) => {
     expect(() => parseConfig(raw)).toThrow(message);
+  });
+});
+
+describe("resolveDiff", () => {
+  const config = parseConfig({
+    baseUrl: "http://127.0.0.1:3000",
+    diff: { threshold: 0.1, minChangedPixels: 10 },
+    variants: [{ name: "desktop" }, { name: "mobile-dark", theme: "dark" }],
+    routes: [
+      "/",
+      { path: "/pricing", diff: { threshold: 0.05, minChangedRatio: 0.001 } },
+      {
+        path: "/dashboard",
+        diff: { threshold: 0.05 },
+        variants: { "mobile-dark": { diff: { threshold: 0.3, minChangedPixels: 50 } } },
+      },
+    ],
+  });
+  const resolve = (route: number, variant: number) =>
+    resolveDiff(config, config.routes[route]!, config.variants[variant]!);
+
+  test("variant > route > project > engine default, key by key", () => {
+    expect(resolve(0, 0)).toEqual({ threshold: 0.1, minChangedPixels: 10 });
+    expect(resolve(1, 0)).toEqual({
+      threshold: 0.05,
+      minChangedPixels: 10,
+      minChangedRatio: 0.001,
+    });
+    expect(resolve(2, 0)).toEqual({ threshold: 0.05, minChangedPixels: 10 });
+    expect(resolve(2, 1)).toEqual({ threshold: 0.3, minChangedPixels: 50 });
+  });
+
+  test("no diff anywhere resolves to {}: the engine default is not baked in", () => {
+    const plain = parseConfig(base);
+    expect(resolveDiff(plain, plain.routes[0]!, plain.variants[0]!)).toEqual({});
+  });
+
+  test("0 is a value, not an absence", () => {
+    const strict = parseConfig({
+      ...base,
+      diff: { threshold: 0.2 },
+      routes: [{ path: "/", diff: { threshold: 0 } }],
+    });
+    expect(resolveDiff(strict, strict.routes[0]!, strict.variants[0]!)).toEqual({ threshold: 0 });
   });
 });

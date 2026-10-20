@@ -1,4 +1,5 @@
 import type { NewBuild, SnapshotInput } from "#/db/builds";
+import type { DiffOptions } from "#/db/schema";
 
 /** A request the client got wrong: surfaces as a 400 with this message. */
 export class BadRequest extends Error {}
@@ -53,6 +54,37 @@ export function parseNewBuild(raw: unknown): NewBuild {
   };
 }
 
+/** The engine's `DiffOptions` keys and what each takes: a 0 to 1 share, or a count. A key not listed is refused. */
+const DIFF_KINDS: Record<keyof DiffOptions, "share" | "count"> = {
+  threshold: "share",
+  minChangedPixels: "count",
+  minChangedRatio: "share",
+};
+
+function isDiffKey(k: string): k is keyof DiffOptions {
+  return Object.hasOwn(DIFF_KINDS, k);
+}
+
+function diffValue(key: keyof DiffOptions, value: unknown): number {
+  const where = `diff.${key}`;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    bad(where, "must be a non-negative number");
+  if (DIFF_KINDS[key] === "count" && !Number.isInteger(value)) bad(where, "must be an integer");
+  if (DIFF_KINDS[key] === "share" && value > 1) bad(where, "must be a number from 0 to 1");
+  return value;
+}
+
+/** Absent is `{}`: older clients send no `diff`. */
+function parseDiff(v: unknown): DiffOptions {
+  if (v === undefined) return {};
+  const out: DiffOptions = {};
+  for (const [key, value] of Object.entries(object(v, "diff"))) {
+    if (!isDiffKey(key)) bad(`diff.${key}`, "is not a diff option");
+    out[key] = diffValue(key, value);
+  }
+  return out;
+}
+
 export function parseSnapshotInput(raw: unknown): SnapshotInput {
   const m = object(raw, "meta");
   const tags = m.tags ?? [];
@@ -68,6 +100,7 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
     viewport: text(m.viewport, "viewport", 11, /^\d{1,5}x\d{1,5}$/),
     theme,
     tags: tags.map((t, i) => text(t, `tags[${i}]`, 100)),
+    diff: parseDiff(m.diff),
     fingerprint: {
       image: text(fp.image, "fingerprint.image", 300),
       browser: text(fp.browser, "fingerprint.browser", 300),

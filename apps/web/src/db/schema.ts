@@ -130,6 +130,13 @@ export const builds = sqliteTable(
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],
 );
 
+/** The diff tolerance a snapshot is compared with; the same keys as the engine's `DiffOptions`. */
+export type DiffOptions = {
+  threshold?: number;
+  minChangedPixels?: number;
+  minChangedRatio?: number;
+};
+
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
 
@@ -150,6 +157,11 @@ export const snapshots = sqliteTable(
     viewport: text("viewport").notNull(),
     theme: text("theme").notNull(),
     tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /** Resolved from the customer's capture config at upload; `{}` means the engine defaults. */
+    diffOptions: text("diff_options", { mode: "json" })
+      .$type<DiffOptions>()
+      .notNull()
+      .default(sql`'{}'`),
     envFingerprint: text("env_fingerprint").notNull(),
     imageKey: text("image_key").notNull(),
     baselineKey: text("baseline_key"),

@@ -12,6 +12,7 @@ export type { ProcLike, SpawnProc } from "./judge.ts";
 export { loadRoutes } from "./routes.ts";
 export type { RunManifest } from "./run.ts";
 export { findConfig, findConfigIfAny, loadConfig, type CaptureConfig } from "./config.ts";
+export { parseDiffOption } from "./diff-options.ts";
 export type { Fingerprint } from "./fingerprint.ts";
 export {
   captureSnapshots,

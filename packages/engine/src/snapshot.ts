@@ -3,7 +3,15 @@ import { join } from "node:path";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { PNG } from "pngjs";
 import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
-import type { CaptureConfig, MaskRect, Route, Stabilise, Variant } from "./config.ts";
+import {
+  resolveDiff,
+  type CaptureConfig,
+  type MaskRect,
+  type Route,
+  type Stabilise,
+  type Variant,
+} from "./config.ts";
+import type { DiffOptions } from "./diff.ts";
 import { CaptureError } from "./errors.ts";
 import {
   BARE,
@@ -26,6 +34,12 @@ export type SnapshotEntry = {
   path: string;
   variant: Variant;
   tags: string[];
+  /**
+   * The diff options this snapshot is compared with, resolved from the config (variant > route >
+   * project). Only keys someone set; absent keys take the engine default at diff time. Manifests
+   * written before this field existed have none, read as `{}`.
+   */
+  diff: DiffOptions;
   /** Relative to the manifest's directory. */
   file: string;
   fingerprint: Fingerprint;
@@ -154,6 +168,7 @@ async function shootAll(
         path: route.path,
         variant,
         tags: route.tags,
+        diff: resolveDiff(config, route, variant),
         file,
         fingerprint: ctx.fingerprint,
       });

@@ -1,8 +1,13 @@
 import { resolve } from "node:path";
-import { UsageError, type CompareOptions } from "@pixelslash/engine";
+import {
+  UsageError,
+  parseDiffOption,
+  type CompareOptions,
+  type DiffOptions,
+} from "@pixelslash/engine";
 
 export const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT]\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1]\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.";
 const DEFAULT_WIDTH = 1280;
 
 export type Cli = CompareOptions & {
@@ -55,6 +60,25 @@ function parseWidth(raw: string | undefined): number {
   return width;
 }
 
+const DIFF_FLAGS = {
+  threshold: "threshold",
+  "min-changed-pixels": "minChangedPixels",
+  "min-changed-ratio": "minChangedRatio",
+} as const;
+
+/** `--threshold` and friends, validated like the config's `diff` keys; unset flags are left out. */
+function parseDiff(flags: Map<string, string>): DiffOptions {
+  const diff: DiffOptions = {};
+  for (const [flag, key] of Object.entries(DIFF_FLAGS)) {
+    const raw = flags.get(flag);
+    if (raw === undefined) continue;
+    diff[key] = parseDiffOption(key, Number(raw), `--${flag}`, (where, what) => {
+      throw new UsageError(`${where} ${what}`);
+    });
+  }
+  return diff;
+}
+
 function resolved(flags: Map<string, string>, key: string): string | undefined {
   const raw = flags.get(key);
   return raw ? resolve(raw) : undefined;
@@ -84,5 +108,6 @@ export function parseArgs(argv: string[]): Cli {
     out: resolve(flags.get("out") ?? ".pixelslash"),
     width,
     label: flags.get("label"),
+    diff: parseDiff(flags),
   };
 }

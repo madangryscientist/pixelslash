@@ -16,6 +16,81 @@ import {
 
 afterAll(cleanup);
 
+/** Two solid shots one grey step apart: a faint change the default threshold flags. */
+async function faintPair(dir: string) {
+  const [live, local] = [join(dir, "live.png"), join(dir, "local.png")];
+  await Bun.write(live, solidPng(20, 20, [100, 100, 100, 255]));
+  await Bun.write(local, solidPng(20, 20, [110, 110, 110, 255]));
+  return { live, local };
+}
+
+describe("diff options", () => {
+  test("--threshold 0.2 flips a faint change to unchanged, and the report says so", async () => {
+    const dir = await tmp();
+    const { live, local } = await faintPair(dir);
+    const defaults = capture();
+    await run(["--live-png", live, "--local-png", local, "--out", join(dir, "a")], defaults.io, {});
+    expect(defaults.stdout).toContain("400 changed pixels");
+    expect(await Bun.file(join(dir, "a/report.html")).text()).not.toContain("Diff options");
+
+    const loose = capture();
+    const code = await run(
+      ["--live-png", live, "--local-png", local, "--out", join(dir, "b"), "--threshold", "0.2"],
+      loose.io,
+      {},
+    );
+    expect(code).toBe(0);
+    expect(loose.stdout).toContain("0 changed pixels");
+    expect(await Bun.file(join(dir, "b/report.html")).text()).toContain(
+      "Diff options: threshold 0.2",
+    );
+    expect(await readManifest(join(dir, "b/manifest.json"))).toMatchObject({
+      changedPixels: 0,
+      diff: { threshold: 0.2 },
+    });
+  });
+
+  test("a floor keeps the count but the report says the shot is not changed", async () => {
+    const dir = await tmp();
+    const { live, local } = await faintPair(dir);
+    const cap = capture();
+    await run(
+      ["--live-png", live, "--local-png", local, "--out", dir, "--min-changed-pixels", "1000"],
+      cap.io,
+      {},
+    );
+    const html = await Bun.file(join(dir, "report.html")).text();
+    expect(html).toContain("400 changed pixels");
+    expect(html).toContain("Diff options: min changed pixels 1000");
+    expect(html).toContain("Not changed: 400 changed pixels are under the floors above.");
+  });
+
+  test("an option equal to the engine default is not reported as a difference", async () => {
+    const dir = await tmp();
+    const { live, local } = await faintPair(dir);
+    await run(
+      ["--live-png", live, "--local-png", local, "--out", dir, "--threshold", "0.01"],
+      capture().io,
+      {},
+    );
+    expect(await Bun.file(join(dir, "report.html")).text()).not.toContain("Diff options");
+  });
+
+  test.each([
+    [["--threshold", "2"], /--threshold must be a number from 0 to 1/],
+    [["--threshold", "abc"], /--threshold must be a number from 0 to 1/],
+    [["--min-changed-pixels", "1.5"], /--min-changed-pixels must be a non-negative integer/],
+    [["--min-changed-ratio", "-1"], /--min-changed-ratio must be a number from 0 to 1/],
+  ])("%j exits 2", async (flags, message) => {
+    const dir = await tmp();
+    const { live, local } = await faintPair(dir);
+    const cap = capture();
+    const code = await run(["--live-png", live, "--local-png", local, ...flags], cap.io, {});
+    expect(code).toBe(2);
+    expect(cap.stderr).toMatch(message);
+  });
+});
+
 describe("pixel run", () => {
   test("--live-png --local-png without --ds stores overlay + manifest", async () => {
     const dir = await tmp();

@@ -2,7 +2,7 @@ import { and, count, eq } from "drizzle-orm";
 import { sha256Hex } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
-import { builds, snapshots } from "./schema";
+import { type DiffOptions, builds, snapshots } from "./schema";
 
 export type Build = typeof builds.$inferSelect;
 
@@ -22,6 +22,7 @@ export type SnapshotInput = {
   viewport: string;
   theme: string;
   tags: string[];
+  diff: DiffOptions;
   fingerprint: { image: string; browser: string; fonts: string };
 };
 
@@ -75,6 +76,7 @@ export async function putSnapshot(
   await blobs.put(imageKey, png, "image/png");
   const fields = {
     tags: input.tags,
+    diffOptions: input.diff,
     envFingerprint: JSON.stringify(input.fingerprint),
     imageKey,
   };
@@ -124,4 +126,17 @@ export async function finaliseBuild(db: Db, build: Build, expected: number): Pro
     .set({ status: "processing" })
     .where(and(eq(builds.id, build.id), eq(builds.status, "uploading")));
   return getBuild(db, build.projectId, build.id);
+}
+
+/**
+ * The diff options a snapshot is to be compared with, as the customer's config resolved them at
+ * upload. Keys left out take the engine default. The server diff reads them here.
+ */
+export async function snapshotDiffOptions(db: Db, snapshotId: string): Promise<DiffOptions> {
+  const [row] = await db
+    .select({ diffOptions: snapshots.diffOptions })
+    .from(snapshots)
+    .where(eq(snapshots.id, snapshotId));
+  if (!row) throw new NotFoundError("snapshot");
+  return row.diffOptions;
 }

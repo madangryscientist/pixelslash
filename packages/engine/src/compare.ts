@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser } from "playwright";
 import { capturePair, launchBrowser, shotPair, type CapturePage } from "./capture.ts";
+import type { DiffOptions } from "./diff.ts";
 import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import {
@@ -38,6 +39,8 @@ export type CompareOptions = {
   out: string;
   width: number;
   label: string | undefined;
+  /** Diff options for this run; keys left out take the engine default. */
+  diff: DiffOptions;
 };
 
 export type CompareResult = {
@@ -158,7 +161,12 @@ export async function compare(
 
   const main = Buffer.from(await Bun.file(join(opts.out, "live.png")).arrayBuffer());
   const branch = Buffer.from(await Bun.file(join(opts.out, "local.png")).arrayBuffer());
-  const written = await writeRunFiles(opts.out, { main, branch, label: opts.label });
+  const written = await writeRunFiles(opts.out, {
+    main,
+    branch,
+    label: opts.label,
+    diff: opts.diff,
+  });
   const manifest = written.manifest;
 
   const reportPath = join(opts.out, "report.html");
@@ -166,6 +174,8 @@ export async function compare(
     const html = renderPixelReport({
       path: routePath,
       changedPixels: manifest.changedPixels,
+      changed: written.changed,
+      diff: opts.diff,
       main: written.main,
       branch: written.branch,
     });

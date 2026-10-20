@@ -1,3 +1,5 @@
+import type { DiffOptions } from "./diff.ts";
+import { describeDiffOptions } from "./diff-options.ts";
 import { stem, type Violation } from "./judge.ts";
 
 export type RouteRow = {
@@ -29,6 +31,9 @@ function renderViolations(title: string, items: Violation[], empty: string, cls:
 export function renderPixelReport(input: {
   path?: string | undefined;
   changedPixels: number;
+  /** False when the changed pixels sit under the diff floors. */
+  changed?: boolean;
+  diff?: DiffOptions;
   main: { width: number; height: number };
   branch: { width: number; height: number };
 }): string {
@@ -36,6 +41,12 @@ export function renderPixelReport(input: {
   const count = input.path
     ? `${esc(input.path)} · ${input.changedPixels} changed pixels`
     : `${input.changedPixels} changed pixels`;
+  const used = describeDiffOptions(input.diff ?? {});
+  const options = used ? `<p>Diff options: ${esc(used)}</p>\n    ` : "";
+  const floored =
+    input.changed === false && input.changedPixels > 0
+      ? `<p>Not changed: ${input.changedPixels} changed pixels are under the floors above.</p>\n    `
+      : "";
   const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
   return `<!doctype html>
 <html lang="en">
@@ -59,7 +70,7 @@ export function renderPixelReport(input: {
   <header>
     <h1>PixelSlash</h1>
     <p>${count}</p>
-    <p>${sizes}</p>
+    ${options}${floored}<p>${sizes}</p>
   </header>
   <section>
     <div class="row">

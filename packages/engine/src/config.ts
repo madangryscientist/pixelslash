@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
+import type { DiffOptions } from "./diff.ts";
+import { mergeDiffOptions, parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
 import { routeSlug } from "./routes.ts";
 
@@ -20,7 +22,16 @@ export type Variant = {
   theme: Theme;
 };
 
-export type Route = { path: string; name: string; masks: Mask[]; tags: string[] };
+export type Route = {
+  path: string;
+  name: string;
+  masks: Mask[];
+  tags: string[];
+  /** This route's own diff options (a layer, not the resolved set; see `resolveDiff`). */
+  diff: DiffOptions;
+  /** Per-variant diff options for this route, keyed by variant name. */
+  variantDiff: Record<string, DiffOptions>;
+};
 
 export type Stabilise = {
   /** Playwright `animations: "disabled"`: finite animations jump to the end, infinite ones reset. */
@@ -48,6 +59,8 @@ export type CaptureConfig = {
   baseUrl: string;
   start: StartCommand | undefined;
   upload: UploadConfig;
+  /** The project-wide diff options; routes and their variants layer over it. */
+  diff: DiffOptions;
   routes: Route[];
   variants: Variant[];
   stabilise: Stabilise;
@@ -143,10 +156,28 @@ function timers(v: unknown, fixedClock: string | false): boolean {
   return v;
 }
 
+function diff(v: unknown, where: string): DiffOptions {
+  return v === undefined ? {} : parseDiffOptions(v, where, bad);
+}
+
+function variantDiff(v: unknown, where: string): Record<string, DiffOptions> {
+  if (v === undefined) return {};
+  if (!isObj(v)) bad(where, "must be an object keyed by variant name");
+  const out: Record<string, DiffOptions> = {};
+  for (const [name, entry] of Object.entries(v)) {
+    if (!isObj(entry)) bad(`${where}.${name}`, "must be { diff }");
+    for (const key of Object.keys(entry)) {
+      if (key !== "diff") bad(`${where}.${name}.${key}`, "is not a variant option (diff)");
+    }
+    out[name] = diff(entry.diff, `${where}.${name}.diff`);
+  }
+  return out;
+}
+
 function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] }): Route {
   const where = `routes[${i}]`;
   const r = typeof v === "string" ? { path: v } : v;
-  if (!isObj(r)) bad(where, "must be a path or { path, name?, masks?, tags? }");
+  if (!isObj(r)) bad(where, "must be a path or { path, name?, masks?, tags?, diff?, variants? }");
   const path = str(r.path, `${where}.path`);
   if (!path.startsWith("/")) bad(`${where}.path`, "must start with /");
   const name = fileName(r.name, `${where}.name`, routeSlug(path));
@@ -158,6 +189,8 @@ function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] })
       ...list(r.masks, `${where}.masks`).map((m, j) => mask(m, `${where}.masks[${j}]`)),
     ],
     tags: [...new Set([...global.tags, ...strings(r.tags, `${where}.tags`)])],
+    diff: diff(r.diff, `${where}.diff`),
+    variantDiff: variantDiff(r.variants, `${where}.variants`),
   };
 }
 
@@ -251,14 +284,33 @@ export function parseConfig(raw: unknown): CaptureConfig {
   const variants = (rawVariants.length === 0 ? [{}] : rawVariants).map(variant);
   uniqueNames(routes, "routes");
   uniqueNames(variants, "variants");
+  for (const [i, r] of routes.entries()) {
+    for (const name of Object.keys(r.variantDiff)) {
+      if (!variants.some((vr) => vr.name === name))
+        bad(
+          `routes[${i}].variants.${name}`,
+          `names no variant (have ${variants.map((vr) => vr.name).join(", ")})`,
+        );
+    }
+  }
   return {
     baseUrl,
     start: start(raw.start, baseUrl),
     upload: upload(raw.upload),
+    diff: diff(raw.diff, "diff"),
     routes,
     variants,
     stabilise: stabilise(raw.stabilise),
   };
+}
+
+/**
+ * The diff options a snapshot is compared with: variant > route > project > engine default.
+ * Only keys someone set are in the result, so the engine default still applies to the rest.
+ * The one place the layers are combined; a UI override layer goes on top here.
+ */
+export function resolveDiff(config: CaptureConfig, shot: Route, as: Variant): DiffOptions {
+  return mergeDiffOptions(config.diff, shot.diff, shot.variantDiff[as.name] ?? {});
 }
 
 /** `findConfig`, but no config at all is `undefined`: `upload` runs fine without one. */

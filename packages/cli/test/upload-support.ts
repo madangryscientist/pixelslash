@@ -58,6 +58,7 @@ export async function snapshotDir(): Promise<string> {
       theme: "light",
     },
     tags: [],
+    diff: { threshold: 0.2 },
     file: "home.png",
     fingerprint: { image: "version:t", browser: "chromium 1", fonts: "sha256:f" },
   };

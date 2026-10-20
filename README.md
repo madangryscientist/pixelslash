@@ -13,12 +13,14 @@ bun run pixelslash -- <args below>
 ```
 
 ```
-bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT]
+bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1]
 ```
 
 `--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up — the command does not start a dev server. Each capture waits for the page to settle before shooting: web fonts, every image, a short network-idle window, then two animation frames — all bounded by the capture timeout, so a page that never settles fails rather than hangs.
 
 A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-diffs them, stores `main.png`, `branch.png`, `diff.png`, a manifest (`changedPixels`, `createdAt`, optional `--label`), and `report.html`, and exits 0. stdout points at `report.html`. Same store as PNG mode. Identical shots still store a run (`changedPixels` 0). The diff is perceptual: a pixel counts toward `changedPixels` only when its colour differs by more than a small YIQ threshold (alpha blended over white) and it is not an anti-aliased edge in either shot, so `changedPixels` is smaller than a raw pixel-difference count. If width or height differs, only the overlapping rectangle is diffed: `changedPixels` is that overlap count, the report states both sizes, the non-overlap is not painted as changed, and the engine's verdict (`changed`) is true because the sizes differ. Default `--out` is `.pixelslash`.
+
+`--threshold` (per-pixel tolerance, 0 to 1; engine default 0.01), `--min-changed-pixels` (a run with fewer changed pixels is not `changed`) and `--min-changed-ratio` (a run with a smaller changed share of the overlap, 0 to 1, is not `changed`) tune the diff in every mode here. Out-of-range or non-numeric values exit 2. The counts are still reported when a floor says the shot is not changed. When the options differ from the engine defaults the report states them (`Diff options: threshold 0.2`, and `Not changed: … under the floors above` when a floor decided it) and the run's `manifest.json` records them as `diff`; with none set, the report says nothing and the manifest has no `diff`.
 
 `--live-png` / `--local-png` skip Playwright and use existing screenshots. `--ds` / `--file` may be omitted in this mode too: same pixel-diff store and `report.html`.
 
@@ -47,13 +49,14 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 {
   "baseUrl": "http://127.0.0.1:4173",
   "start": { "command": "bun run preview", "readyUrl": "http://127.0.0.1:4173", "timeoutMs": 60000 },
-  "routes": ["/", { "path": "/pricing", "name": "pricing", "masks": [".clock", { "x": 0, "y": 0, "width": 200, "height": 40 }], "tags": ["billing"] }],
+  "routes": ["/", { "path": "/pricing", "name": "pricing", "masks": [".clock", { "x": 0, "y": 0, "width": 200, "height": 40 }], "tags": ["billing"], "diff": { "threshold": 0.05 } }, { "path": "/dashboard", "variants": { "mobile-dark": { "diff": { "minChangedPixels": 50 } } } }],
   "variants": [
     { "name": "desktop", "viewport": { "width": 1280, "height": 720 } },
     { "name": "mobile-dark", "viewport": { "width": 390, "height": 844 }, "theme": "dark", "browser": "chromium" }
   ],
   "masks": ["[data-pixelslash-mask]"],
   "tags": ["web"],
+  "diff": { "threshold": 0.02 },
   "stabilise": { "animations": true, "caret": true, "clock": "2026-01-01T00:00:00.000Z", "timers": true, "deviceScaleFactor": 1, "timeoutMs": 8000 }
 }
 ```
@@ -62,6 +65,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 - `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`). Top-level `masks` and `tags` apply to every route.
 - `variants` default to one: Chromium, 1280×720, light. `theme` sets `prefers-color-scheme`. `browser` must be one the image ships — today only `chromium`.
 - `masks` are CSS selectors (every match) or rectangles in full-page CSS px (scaled by the device scale factor); both are painted `#FF00FF`. A selector that matches nothing prints a warning.
+- `diff` sets the diff tolerance a snapshot is compared with, as `{ threshold?, minChangedPixels?, minChangedRatio? }` (the same keys as the pair-mode flags; unknown keys, a threshold or ratio outside 0 to 1, or a non-integer `minChangedPixels` is a config error naming the key). It is allowed at three levels: top level (the project default), on a route, and per variant on a route as `variants: { "<variant name>": { "diff": {…} } }` (the name must be one of the config's `variants`). The most specific wins, key by key: variant > route > project > engine default. So the `/dashboard` route above compares `mobile-dark` with `minChangedPixels: 50` and `threshold: 0.02`, and every other variant of it with `threshold: 0.02` only. The resolved options are written to each manifest entry as `diff` and uploaded; a key nobody set is left out so the engine default still applies to it. The config lives in your repo, so a tolerance is reviewed and versioned with the code.
 - `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), page timers (`setInterval` / `setTimeout`) paused so carousels and tickers capture the same every time (`timers: false` lets them run; with `clock: false` they run too, and `timers: true` there is an error), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off. With timers paused the settle never advances the page clock, so no timer fires during it either (a page that needs a delayed timer to render needs `timers: false`; Playwright's paused clock still runs zero-delay timers at load).
 
 `manifest.json` (version 1) lists one entry per PNG; it has no timestamps, so two captures of the same build write the same bytes:
@@ -75,6 +79,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
       "path": "/pricing",
       "variant": { "name": "desktop", "browser": "chromium", "viewport": { "width": 1280, "height": 720 }, "theme": "light" },
       "tags": ["web", "billing"],
+      "diff": { "threshold": 0.05 },
       "file": "pricing/desktop.png",
       "fingerprint": { "image": "version:0.1.0-dev", "browser": "chromium 148.0.7778.96", "fonts": "sha256:…" }
     }
@@ -84,7 +89,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 
 The fingerprint says what rendered the snapshot; only snapshots with equal fingerprints are compared. `image` is `PIXELSLASH_IMAGE_DIGEST` when the run is given it (`-e PIXELSLASH_IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' …)`), else `version:<image version>`. `fonts` hashes every font file fontconfig can see.
 
-`file` is relative to the manifest's directory and must stay inside it. See "Uploading to a server" for `--upload`.
+`diff` is the resolved diff options (`{}` when none are set; a manifest written before the field existed reads as `{}`). `file` is relative to the manifest's directory and must stay inside it. See "Uploading to a server" for `--upload`.
 
 Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
 
@@ -103,7 +108,7 @@ pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-
 - From the local git checkout it sends the commit, the branch, the **merge-base** with the base branch (`--base`, else `upload.baseBranch`, else `main`; `origin/<base>` is tried first) and up to **20 ancestor SHAs**, nearest first. Without the base branch in the checkout (a shallow clone) it warns and sends no merge-base: fetch full history in CI. The branch is `--branch`, else `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`, else the checked-out branch; a detached `HEAD` with none of those is a usage error. The PR number is `--pr`, else read from `GITHUB_REF` (`refs/pull/N/…`).
 - It opens a build, uploads each PNG, then finalises with the snapshot count. Exit 0 on success. Exit 1 when the server refuses (wrong or revoked token, 4xx/5xx) or cannot be reached; the build is then left open on the server, unfinalised, and its snapshots are not counted. Exit 2 on a bad flag, a missing token or server, or a bad manifest. Re-running makes a new build.
 
-What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (`WxH`), `theme`, `tags`, the environment fingerprint, and the PNG under the org's prefix in the blob store (R2 on Cloudflare). The manifest's `path` and the variant's `name` are not uploaded: a snapshot is identified by name + browser + viewport + theme, so two manifest entries that differ only by variant name are refused. The manifest carries no platform; `upload` sends `linux`, which is what the pinned capture image is.
+What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (`WxH`), `theme`, `tags`, the resolved diff options (`diff`, stored as JSON in `snapshots.diff_options`; a client that sends none stores `{}`), the environment fingerprint, and the PNG under the org's prefix in the blob store (R2 on Cloudflare). The manifest's `path` and the variant's `name` are not uploaded: a snapshot is identified by name + browser + viewport + theme, so two manifest entries that differ only by variant name are refused. The manifest carries no platform; `upload` sends `linux`, which is what the pinned capture image is.
 
 The API, for other CI integrations (`Authorization: Bearer <token>`; errors are `{"error": "…"}`):
 

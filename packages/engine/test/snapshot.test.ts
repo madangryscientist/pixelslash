@@ -37,6 +37,7 @@ const config = parseConfig({
     "/motion",
     { path: "/masks", masks: [".ad", { x: 0, y: 200, width: 320, height: 40 }] },
   ],
+  diff: { threshold: 0.1 },
   variants: [{ name: "desktop", viewport: { width: 800, height: 400 } }],
   tags: ["fixture"],
 });
@@ -50,7 +51,7 @@ function pixel(img: PNG, x: number, y: number): number[] {
 
 /** One route captured alone, with page timers frozen or running; the PNG bytes. */
 async function shootPage(path: string, timers: boolean): Promise<Buffer> {
-  const routes = [{ path, name: "page", masks: [], tags: [] }];
+  const routes = [{ path, name: "page", masks: [], tags: [], diff: {}, variantDiff: {} }];
   const out = await tmp();
   await captureSnapshots(
     { ...config, routes, stabilise: { ...config.stabilise, timers } },
@@ -83,6 +84,7 @@ describe("captureSnapshots", () => {
       name: "index",
       path: "/",
       tags: ["fixture"],
+      diff: { threshold: 0.1 },
       file: "index/desktop.png",
       variant: {
         name: "desktop",
@@ -127,7 +129,9 @@ describe("captureSnapshots", () => {
 
   test("outside the image: warns, records a bare fingerprint; a mask matching nothing warns", async () => {
     const warnings: string[] = [];
-    const routes = [{ path: "/", name: "index", masks: [".nope"], tags: [] }];
+    const routes = [
+      { path: "/", name: "index", masks: [".nope"], tags: [], diff: {}, variantDiff: {} },
+    ];
     const result = await captureSnapshots({ ...config, routes }, await tmp(), {
       env: {},
       listFonts: async () => [],

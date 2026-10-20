@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { UploadError, UsageError } from "../src/errors.ts";
 import { gitContext } from "../src/git.ts";
 import { readManifest, uploadSnapshots } from "../src/upload.ts";
+import { fakeServer, metaOf } from "./fake-server.ts";
 
 const dirs: string[] = [];
 afterAll(() => Promise.all(dirs.map((d) => rm(d, { recursive: true, force: true }))));
@@ -63,6 +64,7 @@ function entry(name: string, variant = "desktop", extra: object = {}) {
       theme: "light",
     },
     tags: ["web"],
+    diff: { threshold: 0.2 },
     file: `${name}/${variant}.png`,
     fingerprint: FP,
     ...extra,
@@ -196,34 +198,6 @@ describe("readManifest", () => {
   });
 });
 
-type Call = { method: string; url: string; auth: string | null; body: unknown };
-
-function fakeServer(failOn?: (call: Call) => Response | undefined) {
-  const calls: Call[] = [];
-  const fetch = async (url: string, init?: RequestInit) => {
-    const body = init?.body;
-    const call: Call = {
-      method: init?.method ?? "GET",
-      url,
-      auth: new Headers(init?.headers).get("authorization"),
-      body: typeof body === "string" ? JSON.parse(body) : body,
-    };
-    calls.push(call);
-    const refused = failOn?.(call);
-    if (refused) return refused;
-    if (call.method === "POST" && url.endsWith("/builds")) return Response.json({ id: "b1" });
-    return Response.json({ id: "x" });
-  };
-  return { calls, fetch };
-}
-
-function metaOf(body: unknown): { name: string } {
-  const meta = body instanceof FormData ? body.get("meta") : null;
-  if (typeof meta !== "string") throw new Error("request has no meta field");
-  const parsed: { name: string } = JSON.parse(meta);
-  return parsed;
-}
-
 describe("uploadSnapshots", () => {
   test("opens a build, sends every PNG with its metadata, then finalises", async () => {
     const { dir: cwd, fork } = await repo(2, 1);
@@ -253,6 +227,7 @@ describe("uploadSnapshots", () => {
       viewport: "1280x720",
       theme: "light",
       tags: ["billing"],
+      diff: { threshold: 0.2 },
       fingerprint: FP,
     });
     expect(server.calls.at(-1)).toMatchObject({
