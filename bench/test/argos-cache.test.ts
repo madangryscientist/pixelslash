@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   ARGOS_THRESHOLD,
   CACHE_FILE,
@@ -94,10 +94,13 @@ describe("the cache file", () => {
 
   test("a missing file is an empty cache", () => {
     const dir = mkdtempSync(join(tmpdir(), "ps-cache-test-"));
-    afterAll(() => rmSync(dir, { recursive: true, force: true }));
-    expect(loadCache(join(dir, "none.json")).entries).toEqual({});
-    writeFileSync(join(dir, "c.json"), cacheText(cache));
-    expect(Object.keys(loadCache(join(dir, "c.json")).entries)).toEqual(["a", "b"]);
+    try {
+      expect(loadCache(join(dir, "none.json")).entries).toEqual({});
+      writeFileSync(join(dir, "c.json"), cacheText(cache));
+      expect(Object.keys(loadCache(join(dir, "c.json")).entries)).toEqual(["a", "b"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

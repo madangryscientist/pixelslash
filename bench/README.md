@@ -51,7 +51,7 @@ for that fix, and the pages should be replaced.
 
 The corpus cases are image pairs, so a caret, an animation frame or a clock in them is scored against
 the diff alone. In the product the capture stage is meant to remove that noise before any diff runs
-(animations off, caret hidden, frozen clock, settled page; the pinned image in `docker/capture`).
+(animations off, caret hidden, frozen clock and page timers, settled page; the pinned image in `docker/capture`).
 `bun run bench -- --capture` measures that stage on its own and adds a "Capture stage" section to the
 results (Argos is not involved; its capture SDK is not run).
 

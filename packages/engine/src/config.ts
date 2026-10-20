@@ -29,6 +29,11 @@ export type Stabilise = {
   caret: boolean;
   /** Freeze `Date.now()` / `new Date()` at this instant, or `false` for the real clock. */
   clock: string | false;
+  /**
+   * Stop page timers (`setInterval` / `setTimeout`) so carousels and tickers are in the same state on
+   * every capture. Needs a clock to pause, so it follows `clock`: on by default, off when `clock` is `false`.
+   */
+  timers: boolean;
   deviceScaleFactor: number;
   /** Bounds navigation and the settle (fonts, images, network idle, two frames). The settle itself is not optional. */
   timeoutMs: number;
@@ -55,6 +60,7 @@ const DEFAULT_STABILISE: Stabilise = {
   animations: true,
   caret: true,
   clock: "2026-01-01T00:00:00.000Z",
+  timers: true,
   deviceScaleFactor: 1,
   timeoutMs: 8_000,
 };
@@ -125,6 +131,14 @@ function clock(v: unknown): string | false {
   return iso;
 }
 
+function timers(v: unknown, fixedClock: string | false): boolean {
+  if (v === undefined) return fixedClock !== false;
+  if (typeof v !== "boolean") bad("stabilise.timers", "must be true or false");
+  if (v && fixedClock === false)
+    bad("stabilise.timers", "needs a clock to pause: set stabilise.clock, or timers: false");
+  return v;
+}
+
 function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] }): Route {
   const where = `routes[${i}]`;
   const r = typeof v === "string" ? { path: v } : v;
@@ -177,6 +191,7 @@ function stabilise(v: unknown): Stabilise {
     s[key] = flag;
   }
   s.clock = clock(v.clock);
+  s.timers = timers(v.timers, s.clock);
   if (v.deviceScaleFactor !== undefined)
     s.deviceScaleFactor = posInt(v.deviceScaleFactor, "stabilise.deviceScaleFactor");
   if (v.timeoutMs !== undefined) s.timeoutMs = posInt(v.timeoutMs, "stabilise.timeoutMs");

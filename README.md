@@ -54,7 +54,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
   ],
   "masks": ["[data-pixelslash-mask]"],
   "tags": ["web"],
-  "stabilise": { "animations": true, "caret": true, "clock": "2026-01-01T00:00:00.000Z", "deviceScaleFactor": 1, "timeoutMs": 8000 }
+  "stabilise": { "animations": true, "caret": true, "clock": "2026-01-01T00:00:00.000Z", "timers": true, "deviceScaleFactor": 1, "timeoutMs": 8000 }
 }
 ```
 
@@ -62,7 +62,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 - `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`). Top-level `masks` and `tags` apply to every route.
 - `variants` default to one: Chromium, 1280×720, light. `theme` sets `prefers-color-scheme`. `browser` must be one the image ships — today only `chromium`.
 - `masks` are CSS selectors (every match) or rectangles in full-page CSS px (scaled by the device scale factor); both are painted `#FF00FF`. A selector that matches nothing prints a warning.
-- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off.
+- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), page timers (`setInterval` / `setTimeout`) paused so carousels and tickers capture the same every time (`timers: false` lets them run; with `clock: false` they run too, and `timers: true` there is an error), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off. With timers paused the settle never advances the page clock, so no timer fires during it either (a page that needs a delayed timer to render needs `timers: false`; Playwright's paused clock still runs zero-delay timers at load).
 
 `manifest.json` (version 1) lists one entry per PNG; it has no timestamps, so two captures of the same build write the same bytes:
 

@@ -10,6 +10,7 @@ describe("parseConfig", () => {
       animations: true,
       caret: true,
       clock: "2026-01-01T00:00:00.000Z",
+      timers: true,
       deviceScaleFactor: 1,
       timeoutMs: 8_000,
     });
@@ -32,6 +33,7 @@ describe("parseConfig", () => {
         animations: false,
         caret: false,
         clock: false,
+        timers: false,
         deviceScaleFactor: 2,
         timeoutMs: 100,
       },
@@ -40,9 +42,15 @@ describe("parseConfig", () => {
       animations: false,
       caret: false,
       clock: false,
+      timers: false,
       deviceScaleFactor: 2,
       timeoutMs: 100,
     });
+  });
+
+  test("timers follow the clock unless set: a real clock leaves them running", () => {
+    expect(parseConfig({ ...base, stabilise: { clock: false } }).stabilise.timers).toBe(false);
+    expect(parseConfig({ ...base, stabilise: { timers: false } }).stabilise.timers).toBe(false);
   });
 
   test("global masks and tags apply to every route, before the route's own", () => {
@@ -87,6 +95,8 @@ describe("parseConfig", () => {
       /masks\[0\]\.width must be a positive integer/,
     ],
     [{ ...base, stabilise: { clock: "soon" } }, /ISO date or false/],
+    [{ ...base, stabilise: { timers: "yes" } }, /stabilise.timers must be true or false/],
+    [{ ...base, stabilise: { clock: false, timers: true } }, /needs a clock to pause/],
   ])("rejects %j", (raw, message) => {
     expect(() => parseConfig(raw)).toThrow(message);
   });

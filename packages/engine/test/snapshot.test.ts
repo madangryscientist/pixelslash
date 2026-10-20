@@ -48,6 +48,18 @@ function pixel(img: PNG, x: number, y: number): number[] {
   return Array.from(img.data.subarray(o, o + 4));
 }
 
+/** One route captured alone, with page timers frozen or running; the PNG bytes. */
+async function shootPage(path: string, timers: boolean): Promise<Buffer> {
+  const routes = [{ path, name: "page", masks: [], tags: [] }];
+  const out = await tmp();
+  await captureSnapshots(
+    { ...config, routes, stabilise: { ...config.stabilise, timers } },
+    out,
+    pinned,
+  );
+  return Buffer.from(await Bun.file(join(out, "page/desktop.png")).bytes());
+}
+
 describe("captureSnapshots", () => {
   test("two runs write byte-identical PNGs and the same manifest (motion, caret, clock included)", async () => {
     const [a, b] = [await tmp(), await tmp()];
@@ -97,6 +109,20 @@ describe("captureSnapshots", () => {
     expect(pixel(img, 10, 310)).toEqual([37, 99, 235, 255]);
     expect(pixel(img, 600, 20)).toEqual([255, 255, 255, 255]);
     expect(pixel(img, 0, 241)).toEqual([255, 255, 255, 255]);
+  }, 60_000);
+
+  test("a page changing on a 100 ms setInterval captures identically twice, and timers: false lets it run", async () => {
+    const [a, b] = [await shootPage("/ticker", true), await shootPage("/ticker", true)];
+    expect(Buffer.compare(a, b)).toBe(0);
+    // Frozen means the interval never ran: "Ticks: 0" in the shot. Let it run and the count has moved on.
+    expect(Buffer.compare(a, await shootPage("/ticker", false))).not.toBe(0);
+  }, 60_000);
+
+  test("no page timer fires while the settle runs, however short", async () => {
+    const frozen = PNG.sync.read(await shootPage("/early-timers", true));
+    expect(pixel(frozen, 700, 300)).toEqual([255, 255, 255, 255]);
+    const running = PNG.sync.read(await shootPage("/early-timers", false));
+    expect(pixel(running, 700, 300)).toEqual([225, 29, 72, 255]);
   }, 60_000);
 
   test("outside the image: warns, records a bare fingerprint; a mask matching nothing warns", async () => {

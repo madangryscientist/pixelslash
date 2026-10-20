@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { Browser, Page } from "playwright";
+import type { Browser, BrowserContext, Page } from "playwright";
 import { PNG } from "pngjs";
-import { launchChromium, settleCapture } from "./capture.ts";
+import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
 import type { CaptureConfig, MaskRect, Route, Stabilise, Variant } from "./config.ts";
 import { CaptureError } from "./errors.ts";
 import {
@@ -76,6 +76,20 @@ type Shot = {
   warn: (m: string) => void;
 };
 
+/**
+ * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
+ * instant, so nothing the page schedules fires on its own, and the clock is never advanced after
+ * (the settle uses the browser's own frames; see `keepNativeRaf`). Without, only Date is fixed and
+ * timers run. A real clock is left alone.
+ */
+async function pinClock(context: BrowserContext, { clock, timers }: Stabilise): Promise<void> {
+  if (clock === false) return;
+  if (!timers) return context.clock.setFixedTime(clock);
+  await context.addInitScript(keepNativeRaf);
+  await context.clock.install({ time: clock });
+  await context.clock.pauseAt(clock);
+}
+
 async function shoot(browser: Browser, shot: Shot): Promise<Buffer> {
   const { variant, stabilise, route, url } = shot;
   const context = await browser.newContext({
@@ -84,7 +98,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Buffer> {
     colorScheme: variant.theme,
   });
   try {
-    if (stabilise.clock) await context.clock.setFixedTime(stabilise.clock);
+    await pinClock(context, stabilise);
     const page = await context.newPage();
     await open(page, url, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");

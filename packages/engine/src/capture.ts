@@ -27,12 +27,34 @@ declare const document: {
   images: ArrayLike<{ complete: boolean; naturalWidth: number }>;
 };
 declare function requestAnimationFrame(callback: () => void): number;
+declare const window: {
+  pixelslashRaf?: (callback: () => void) => number;
+  requestAnimationFrame(callback: () => void): number;
+};
+
+/**
+ * Init script that keeps the browser's own `requestAnimationFrame` where the settle can reach it.
+ * Added before a fake clock is installed: the clock replaces the page's rAF with one that only
+ * fires when the clock is advanced, and the settle must not advance it (that would run page timers).
+ */
+export function keepNativeRaf(): void {
+  window.pixelslashRaf = window.requestAnimationFrame.bind(window);
+}
+
+const twoFrames = () =>
+  new Promise<void>((resolve) => {
+    const raf = window.pixelslashRaf ?? requestAnimationFrame;
+    raf(() => raf(() => resolve()));
+  });
 
 /**
  * Wait for a page to settle before screenshotting: web fonts, every image, a
  * short network-idle window, then two animation frames. Bounded by `timeoutMs`
  * (default CAPTURE_TIMEOUT_MS) so a page whose fonts never load does not hang
  * the capture past it.
+ *
+ * The frames are the browser's real ones even when page timers are frozen (see
+ * `keepNativeRaf`), so the settle never gives a frozen page any timer time.
  */
 export function settleCapture(page: SettlePage, timeoutMs = CAPTURE_TIMEOUT_MS): Promise<void> {
   const steps = (async () => {
@@ -41,12 +63,7 @@ export function settleCapture(page: SettlePage, timeoutMs = CAPTURE_TIMEOUT_MS):
       Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0),
     );
     await page.waitForLoadState("networkidle");
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-        }),
-    );
+    await page.evaluate(twoFrames);
   })();
   return withTimeout(steps, timeoutMs, `capture settle exceeded ${timeoutMs}ms`);
 }
