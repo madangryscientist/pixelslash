@@ -17,12 +17,9 @@ const PNG = Buffer.from(
   "base64",
 );
 
-/** Fill a form and submit it. Filling before React hydrates is wiped, so retry until the button enables. */
+/** Fill a form and submit it. The controls stay disabled until hydrated, so fill and click wait for it. */
 async function submit(input: Locator, value: string, button: Locator) {
-  await expect(async () => {
-    await input.fill(value);
-    await expect(button).toBeEnabled({ timeout: 500 });
-  }).toPass();
+  await input.fill(value);
   await button.click();
 }
 

@@ -1,5 +1,21 @@
 import { Link } from "@tanstack/react-router";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useState, useSyncExternalStore } from "react";
+
+const subscribeNever = () => () => {};
+
+/**
+ * False in the server render and while React hydrates, true once this component is live.
+ * The server renders every control, but a click or keystroke before hydration is lost: React
+ * resets a controlled field to its empty state and never sees the event. Controls that
+ * depend on React disable themselves until this is true.
+ */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
+}
 
 export function Page({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -37,6 +53,7 @@ export function InlineForm({
   button: string;
   onSubmit: (value: string) => Promise<unknown>;
 }) {
+  const hydrated = useHydrated();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const submit = (event: FormEvent) => {
@@ -53,12 +70,13 @@ export function InlineForm({
         aria-label={label}
         placeholder={label}
         value={value}
+        disabled={!hydrated}
         onChange={(e) => setValue(e.target.value)}
         className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
       />
       <button
         type="submit"
-        disabled={value.trim().length === 0}
+        disabled={!hydrated || value.trim().length === 0}
         className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
       >
         {button}

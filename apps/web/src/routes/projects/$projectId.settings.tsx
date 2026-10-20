@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { InlineForm, Page } from "#/components/ui";
+import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { getProjectSettings, issueToken, revokeToken } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/settings")({
@@ -11,6 +11,7 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
 function ProjectSettings() {
   const { project, tokens } = Route.useLoaderData();
   const router = useRouter();
+  const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
   const issue = async (name: string) => {
     const { token } = await issueToken({ data: { projectId: project.id, name } });
@@ -57,6 +58,7 @@ function ProjectSettings() {
                 {!t.revokedAt && (
                   <button
                     type="button"
+                    disabled={!hydrated}
                     onClick={() => void revoke(t.id)}
                     className="text-red-700 hover:underline"
                   >
