@@ -75,6 +75,14 @@ describe("parseConfig", () => {
     });
   });
 
+  test("upload names a server and a base branch, both optional", () => {
+    expect(parseConfig(base).upload).toEqual({ server: undefined, baseBranch: undefined });
+    expect(
+      parseConfig({ ...base, upload: { server: "https://ps.example", baseBranch: "develop" } })
+        .upload,
+    ).toEqual({ server: "https://ps.example", baseBranch: "develop" });
+  });
+
   test("a start command waits on baseUrl unless it names a ready URL", () => {
     expect(parseConfig({ ...base, start: { command: "bun dev" } }).start).toEqual({
       command: "bun dev",
@@ -94,6 +102,8 @@ describe("parseConfig", () => {
       { ...base, masks: [{ x: 0, y: 0, width: 0, height: 1 }] },
       /masks\[0\]\.width must be a positive integer/,
     ],
+    [{ ...base, upload: { server: "ftp://x" } }, /upload\.server must be an http\(s\) URL/],
+    [{ ...base, upload: "https://ps.example" }, /upload must be/],
     [{ ...base, stabilise: { clock: "soon" } }, /ISO date or false/],
     [{ ...base, stabilise: { timers: "yes" } }, /stabilise.timers must be true or false/],
     [{ ...base, stabilise: { clock: false, timers: true } }, /needs a clock to pause/],

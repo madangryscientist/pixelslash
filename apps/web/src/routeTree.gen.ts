@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrgsRouteImport } from './routes/orgs'
 import { Route as AuthGithubRouteImport } from './routes/auth/github'
 import { Route as AuthSignOutRouteImport } from './routes/auth/sign-out'
+import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AuthGithubCallbackRouteImport } from './routes/auth/github.callback'
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects/$projectId.settings'
 
@@ -36,6 +37,11 @@ const AuthSignOutRoute = AuthSignOutRouteImport.update({
   path: '/auth/sign-out',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
+  id: '/api/v1/$',
+  path: '/api/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthGithubCallbackRoute = AuthGithubCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/orgs': typeof OrgsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
 }
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/orgs': typeof OrgsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
 }
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/orgs': typeof OrgsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
 }
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/auth/github'
     | '/auth/sign-out'
+    | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/settings'
   fileRoutesByTo: FileRoutesByTo
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/auth/github'
     | '/auth/sign-out'
+    | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/settings'
   id:
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/auth/github'
     | '/auth/sign-out'
+    | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/settings'
   fileRoutesById: FileRoutesById
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   OrgsRoute: typeof OrgsRoute
   AuthGithubRoute: typeof AuthGithubRouteWithChildren
   AuthSignOutRoute: typeof AuthSignOutRoute
+  ApiV1SplatRoute: typeof ApiV1SplatRoute
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
 }
 
@@ -136,6 +149,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/sign-out'
       fullPath: '/auth/sign-out'
       preLoaderRoute: typeof AuthSignOutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/$': {
+      id: '/api/v1/$'
+      path: '/api/v1/$'
+      fullPath: '/api/v1/$'
+      preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/github/callback': {
@@ -172,6 +192,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsRoute: OrgsRoute,
   AuthGithubRoute: AuthGithubRouteWithChildren,
   AuthSignOutRoute: AuthSignOutRoute,
+  ApiV1SplatRoute: ApiV1SplatRoute,
   ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
 }
 export const routeTree = rootRouteImport

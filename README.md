@@ -84,7 +84,36 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 
 The fingerprint says what rendered the snapshot; only snapshots with equal fingerprints are compared. `image` is `PIXELSLASH_IMAGE_DIGEST` when the run is given it (`-e PIXELSLASH_IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' …)`), else `version:<image version>`. `fonts` hashes every font file fontconfig can see.
 
+`file` is relative to the manifest's directory and must stay inside it. See "Uploading to a server" for `--upload`.
+
 Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
+
+## Uploading to a server
+
+Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots, and they send them only to the server you name. The same CLI talks to the hosted app and to a self-hosted one.
+
+```
+pixelslash upload DIR [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE]
+pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N]
+```
+
+- `DIR` is a snapshot dir: a `manifest.json` and the PNGs it names (what `capture` writes). The whole manifest and every PNG are checked before anything is sent, so a bad dir never opens a build on the server.
+- The token is a per-project CI token (`psci_…`, issued in the project's settings). It comes from `PIXELSLASH_TOKEN`, or from the file `--token-path` names. Never put it in git.
+- The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
+- From the local git checkout it sends the commit, the branch, the **merge-base** with the base branch (`--base`, else `upload.baseBranch`, else `main`; `origin/<base>` is tried first) and up to **20 ancestor SHAs**, nearest first. Without the base branch in the checkout (a shallow clone) it warns and sends no merge-base: fetch full history in CI. The branch is `--branch`, else `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`, else the checked-out branch; a detached `HEAD` with none of those is a usage error. The PR number is `--pr`, else read from `GITHUB_REF` (`refs/pull/N/…`).
+- It opens a build, uploads each PNG, then finalises with the snapshot count. Exit 0 on success. Exit 1 when the server refuses (wrong or revoked token, 4xx/5xx) or cannot be reached; the build is then left open on the server, unfinalised, and its snapshots are not counted. Exit 2 on a bad flag, a missing token or server, or a bad manifest. Re-running makes a new build.
+
+What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (`WxH`), `theme`, `tags`, the environment fingerprint, and the PNG under the org's prefix in the blob store (R2 on Cloudflare). The manifest's `path` and the variant's `name` are not uploaded: a snapshot is identified by name + browser + viewport + theme, so two manifest entries that differ only by variant name are refused. The manifest carries no platform; `upload` sends `linux`, which is what the pinned capture image is.
+
+The API, for other CI integrations (`Authorization: Bearer <token>`; errors are `{"error": "…"}`):
+
+| Request | Body | Reply |
+| --- | --- | --- |
+| `POST /api/v1/builds` | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber? }` | `201 { id }` |
+| `PUT /api/v1/builds/:id/snapshots` | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, fingerprint }`), `file` (PNG, ≤32 MiB) | `200 { id }` |
+| `POST /api/v1/builds/:id/finalize` | JSON `{ snapshots: N }` | `200 { id, status }` |
+
+Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A token only reaches its own project's builds; another project's build id is a 404. 401 is a missing, wrong or revoked token.
 
 ## Local-screenshot dogfood (GTK windows)
 

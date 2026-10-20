@@ -9,9 +9,11 @@ export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 type Component = { id: string; name: string };
 
+/** A token from `--token-path`, else the env var `name` (the Figma token, or `PIXELSLASH_TOKEN` for upload). */
 export async function resolveToken(
   tokenPath: string | undefined,
   env: NodeJS.ProcessEnv,
+  name = "FIGMA_TOKEN",
 ): Promise<string> {
   if (tokenPath) {
     if (!existsSync(tokenPath)) throw new UsageError(`token file not found: ${tokenPath}`);
@@ -19,9 +21,9 @@ export async function resolveToken(
     if (!t) throw new UsageError(`token file empty: ${tokenPath}`);
     return t;
   }
-  const t = env.FIGMA_TOKEN?.trim();
+  const t = env[name]?.trim();
   if (t) return t;
-  throw new UsageError("need FIGMA_TOKEN or --token-path");
+  throw new UsageError(`need ${name} or --token-path`);
 }
 
 function stringField(node: object, key: "id" | "name" | "type"): string {

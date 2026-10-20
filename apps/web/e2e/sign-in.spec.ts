@@ -10,9 +10,11 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByRole("heading", { name: "Acme" })).toBeVisible();
 
-  await page.getByLabel("New project name").fill("storefront");
-  await page.getByRole("button", { name: "Create project" }).click();
-  await page.getByRole("link", { name: "Settings" }).click();
+  // Other specs share this database and add their own orgs to the page.
+  const card = page.locator("li", { has: page.getByRole("heading", { name: "Acme" }) }).first();
+  await card.getByLabel("New project name").fill("storefront");
+  await card.getByRole("button", { name: "Create project" }).click();
+  await card.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "storefront · settings" })).toBeVisible();
 
   await page.getByLabel("Token name, e.g. github-actions").fill("github-actions");

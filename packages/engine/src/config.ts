@@ -41,9 +41,13 @@ export type Stabilise = {
 
 export type StartCommand = { command: string; readyUrl: string; timeoutMs: number };
 
+/** Where `upload` sends builds, and the branch it takes the merge-base against. */
+export type UploadConfig = { server: string | undefined; baseBranch: string | undefined };
+
 export type CaptureConfig = {
   baseUrl: string;
   start: StartCommand | undefined;
+  upload: UploadConfig;
   routes: Route[];
   variants: Variant[];
   stabilise: Stabilise;
@@ -208,6 +212,22 @@ function start(v: unknown, baseUrl: string): StartCommand | undefined {
   };
 }
 
+/** An absolute `http:` or `https:` URL. */
+export function isHttpUrl(value: string): boolean {
+  return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
+}
+
+function upload(v: unknown): UploadConfig {
+  if (v === undefined) return { server: undefined, baseBranch: undefined };
+  if (!isObj(v)) bad("upload", "must be { server?, baseBranch? }");
+  const server = v.server === undefined ? undefined : str(v.server, "upload.server");
+  if (server !== undefined && !isHttpUrl(server)) bad("upload.server", "must be an http(s) URL");
+  return {
+    server,
+    baseBranch: v.baseBranch === undefined ? undefined : str(v.baseBranch, "upload.baseBranch"),
+  };
+}
+
 function uniqueNames(items: { name: string }[], what: string): void {
   const seen = new Set<string>();
   for (const { name } of items) {
@@ -234,10 +254,17 @@ export function parseConfig(raw: unknown): CaptureConfig {
   return {
     baseUrl,
     start: start(raw.start, baseUrl),
+    upload: upload(raw.upload),
     routes,
     variants,
     stabilise: stabilise(raw.stabilise),
   };
+}
+
+/** `findConfig`, but no config at all is `undefined`: `upload` runs fine without one. */
+export function findConfigIfAny(explicit: string | undefined, cwd: string): string | undefined {
+  if (explicit) return findConfig(explicit, cwd);
+  return CONFIG_NAMES.map((n) => join(cwd, n)).find((p) => existsSync(p));
 }
 
 /** Find the config: `explicit` if given, else the first `pixelslash.config.*` in `cwd`. */

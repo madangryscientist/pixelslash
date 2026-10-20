@@ -11,7 +11,8 @@ export type Cli = CompareOptions & {
   tokenPath: string | undefined;
 };
 
-function readFlags(argv: string[]): Map<string, string> {
+/** `--flag value` pairs, in order; which flags are allowed is the caller's call. */
+export function readFlags(argv: string[]): Map<string, string> {
   const flags = new Map<string, string>();
   for (let i = 0; i < argv.length; i += 2) {
     const a = argv[i] ?? "";

@@ -108,7 +108,10 @@ export const BUILD_STATUSES = [
   "errored",
 ] as const;
 
-/** One upload for one project at one commit. `ancestorShas` feed the baseline pick. */
+/**
+ * One upload for one project at one commit. `ancestorShas` feed the baseline pick.
+ * `uploading` is the only mutable status: finalising moves it on, and nothing moves it back.
+ */
 export const builds = sqliteTable(
   "builds",
   {
@@ -120,6 +123,7 @@ export const builds = sqliteTable(
     branch: text("branch").notNull(),
     mergeBaseSha: text("merge_base_sha"),
     ancestorShas: text("ancestor_shas", { mode: "json" }).$type<string[]>().notNull().default([]),
+    prNumber: integer("pr_number"),
     status: text("status", { enum: BUILD_STATUSES }).notNull().default("uploading"),
     createdAt: createdAt(),
   },

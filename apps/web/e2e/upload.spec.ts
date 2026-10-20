@@ -1,0 +1,189 @@
+import { execFile, spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { type Locator, type Page, expect, test } from "@playwright/test";
+
+const run = promisify(execFile);
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const WEB = fileURLToPath(new URL("..", import.meta.url));
+const CLI = join(ROOT, "packages/cli/src/index.ts");
+const SERVER = "http://localhost:4173";
+// A 1×1 PNG.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+/** Fill a form and submit it. Filling before React hydrates is wiped, so retry until the button enables. */
+async function submit(input: Locator, value: string, button: Locator) {
+  await expect(async () => {
+    await input.fill(value);
+    await expect(button).toBeEnabled({ timeout: 500 });
+  }).toPass();
+  await button.click();
+}
+
+/** Make an org, a project and a CI token, signing in through the stub first when `signIn`. */
+async function provision(page: Page, org: string, project: string, signIn: boolean) {
+  if (signIn) {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+  } else {
+    await page.goto("/orgs");
+  }
+  await expect(page).toHaveURL(/\/orgs$/);
+  await submit(
+    page.getByLabel("New organization name"),
+    org,
+    page.getByRole("button", { name: "Create organization" }),
+  );
+  const card = page.locator("li", { has: page.getByRole("heading", { name: org }) }).first();
+  await submit(
+    card.getByLabel("New project name"),
+    project,
+    card.getByRole("button", { name: "Create project" }),
+  );
+  await card.getByRole("link", { name: "Settings" }).click();
+  await submit(
+    page.getByLabel("Token name, e.g. github-actions"),
+    "ci",
+    page.getByRole("button", { name: "Issue token" }),
+  );
+  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
+  expect(token).toMatch(/^psci_/);
+  return token;
+}
+
+async function snapshotDir() {
+  const dir = await mkdtemp(join(tmpdir(), "ps-e2e-"));
+  await mkdir(join(dir, "home"));
+  await writeFile(join(dir, "home/desktop.png"), PNG);
+  const entry = {
+    name: "home",
+    path: "/",
+    variant: {
+      name: "desktop",
+      browser: "chromium",
+      viewport: { width: 1, height: 1 },
+      theme: "light",
+    },
+    tags: ["web"],
+    file: "home/desktop.png",
+    fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
+  };
+  await writeFile(join(dir, "manifest.json"), JSON.stringify({ version: 1, snapshots: [entry] }));
+  return dir;
+}
+
+/** The real CLI against the running app. A non-zero exit is a result, not a throw. */
+function upload(dir: string, token: string) {
+  const res = spawnSync("bun", [CLI, "upload", dir, "--server", SERVER, "--branch", "e2e"], {
+    cwd: ROOT,
+    env: { ...process.env, PIXELSLASH_TOKEN: token },
+    encoding: "utf8",
+  });
+  return { code: res.status, stdout: res.stdout, stderr: res.stderr };
+}
+
+async function wrangler(...args: string[]) {
+  const { stdout } = await run(
+    "bunx",
+    ["wrangler", ...args, "--local", "--env", "e2e", "--persist-to", ".wrangler/e2e"],
+    { cwd: WEB },
+  );
+  return stdout;
+}
+
+async function rows(sql: string): Promise<Record<string, string>[]> {
+  const out = await wrangler("d1", "execute", "DB", "--json", "--command", sql);
+  return JSON.parse(out.slice(out.indexOf("[")))[0].results;
+}
+
+test("the CLI uploads a snapshot dir; rows and R2 objects land under the right org", async ({
+  page,
+}) => {
+  const acme = await provision(page, "Upload Co", "ship", true);
+  const rival = await provision(page, "Rival Co", "other", false);
+  const dir = await snapshotDir();
+
+  const bad = upload(dir, "psci_not-a-real-token");
+  expect(bad.code).toBe(1);
+  expect(bad.stderr).toContain("401");
+
+  const ok = upload(dir, acme);
+  expect(ok.stderr).toBe("");
+  expect(ok.code).toBe(0);
+  const buildId = /build: (\S+)/.exec(ok.stdout)?.[1] ?? "";
+  expect(buildId).not.toBe("");
+
+  const [row] = await rows(
+    `SELECT s.name, s.viewport, s.image_key, b.status, b.branch, p.org_id, p.name AS project, o.name AS org
+     FROM snapshots s JOIN builds b ON b.id = s.build_id
+     JOIN projects p ON p.id = b.project_id JOIN orgs o ON o.id = p.org_id
+     WHERE b.id = '${buildId}'`,
+  );
+  expect(row).toMatchObject({
+    name: "home",
+    viewport: "1x1",
+    status: "processing",
+    branch: "e2e",
+    org: "Upload Co",
+    project: "ship",
+  });
+
+  const out = join(await mkdtemp(join(tmpdir(), "ps-e2e-out-")), "got.png");
+  const key = `orgs/${row?.org_id}/${row?.image_key}`;
+  await wrangler("r2", "object", "get", `pixelslash-blobs/${key}`, "--file", out);
+  expect(await readFile(out)).toEqual(PNG);
+
+  // Another org's token cannot write to this build, and nothing is added to it.
+  const crossed = new FormData();
+  crossed.set("meta", "{}");
+  const cross = await fetch(`${SERVER}/api/v1/builds/${buildId}/snapshots`, {
+    method: "PUT",
+    headers: { authorization: `Bearer ${rival}` },
+    body: crossed,
+  });
+  expect(cross.status).toBe(404);
+  const [held] = await rows(`SELECT count(*) AS n FROM snapshots WHERE build_id = '${buildId}'`);
+  expect(held?.n).toBe(1);
+
+  // A finalised build is immutable: a late snapshot is refused and not stored.
+  const late = new FormData();
+  late.set(
+    "meta",
+    JSON.stringify({
+      name: "late",
+      platform: "linux",
+      browser: "chromium",
+      viewport: "1x1",
+      theme: "light",
+      tags: [],
+      fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
+    }),
+  );
+  late.set("file", new Blob([PNG], { type: "image/png" }), "late.png");
+  const refused = await fetch(`${SERVER}/api/v1/builds/${buildId}/snapshots`, {
+    method: "PUT",
+    headers: { authorization: `Bearer ${acme}` },
+    body: late,
+  });
+  expect(refused.status).toBe(409);
+  const [after] = await rows(`SELECT count(*) AS n FROM snapshots WHERE build_id = '${buildId}'`);
+  expect(after?.n).toBe(1);
+
+  // A revoked token is refused.
+  await page.goto("/orgs");
+  const card = page
+    .locator("li", { has: page.getByRole("heading", { name: "Upload Co" }) })
+    .first();
+  await card.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Revoke" }).click();
+  await expect(page.getByRole("row", { name: /ci/ })).toContainText("revoked");
+  const revoked = upload(dir, acme);
+  expect(revoked.code).toBe(1);
+  expect(revoked.stderr).toContain("401");
+});

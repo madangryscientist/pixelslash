@@ -7,9 +7,20 @@ import { testDb } from "./test-db";
 import { usageCounts } from "./usage";
 import { signInGithubUser } from "./users";
 
-async function buildWithSnapshots(db: Db, projectId: string, n: number) {
+async function buildWithSnapshots(
+  db: Db,
+  projectId: string,
+  n: number,
+  status: "uploading" | "processing" = "processing",
+) {
   const buildId = crypto.randomUUID();
-  await db.insert(builds).values({ id: buildId, projectId, commitSha: "abc", branch: "main" });
+  await db.insert(builds).values({
+    id: buildId,
+    projectId,
+    commitSha: "abc",
+    branch: "main",
+    status,
+  });
   for (let i = 0; i < n; i++)
     await db.insert(snapshots).values({
       id: crypto.randomUUID(),
@@ -53,6 +64,9 @@ describe("usage counts", () => {
     await buildWithSnapshots(db, (await createProject(db, smoke.id, smokeOrg.id, "web")).id, 5);
 
     expect(before).toEqual({ builds: 1, snapshots: 3 });
+
+    await buildWithSnapshots(db, realProject.id, 4, "uploading");
+    expect(await usageCounts(db)).toEqual(before);
     expect(await usageCounts(db)).toEqual(before);
   });
 });

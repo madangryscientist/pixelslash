@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   CaptureError,
   FigmaError,
+  UploadError,
   UsageError,
   compare,
   compareRoutes,
@@ -13,9 +14,11 @@ import {
   type CompareResult,
   type Deps,
   type SnapshotDeps,
+  type UploadDeps,
 } from "@pixelslash/engine";
 import { USAGE, parseArgs, type Cli } from "./args.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
+import { UPLOAD_USAGE, runUpload } from "./upload.ts";
 
 export type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
 
@@ -58,10 +61,12 @@ function report(cli: Cli, result: CompareResult, io: Io): number {
 export async function run(
   argv: string[],
   io: Io = process,
-  deps: Deps & SnapshotDeps = {},
+  deps: Deps & SnapshotDeps & UploadDeps = {},
 ): Promise<number> {
   if (argv[0] === "capture")
     return guarded(() => runCapture(argv.slice(1), io, deps), io, CAPTURE_USAGE);
+  if (argv[0] === "upload")
+    return guarded(() => runUpload(argv.slice(1), io, deps), io, UPLOAD_USAGE);
   return guarded(
     async () => {
       const cli = parseArgs(argv);
@@ -75,7 +80,7 @@ export async function run(
   );
 }
 
-/** Map the known errors to exit codes: usage 2, capture or Figma 1. Anything else is a bug and throws. */
+/** Map the known errors to exit codes: usage 2, capture, Figma or upload 1. Anything else is a bug and throws. */
 async function guarded(work: () => Promise<number>, io: Io, usage: string): Promise<number> {
   try {
     return await work();
@@ -84,7 +89,7 @@ async function guarded(work: () => Promise<number>, io: Io, usage: string): Prom
       io.stderr.write(`${e.message}\n${usage}\n`);
       return 2;
     }
-    if (e instanceof CaptureError || e instanceof FigmaError) {
+    if (e instanceof CaptureError || e instanceof FigmaError || e instanceof UploadError) {
       io.stderr.write(`${e.message}\n`);
       return 1;
     }
