@@ -58,7 +58,8 @@ The repo is a small Nx workspace on Bun workspaces:
 A change is green when all of these pass **from the worktree**:
 
 ```bash
-bun install                       # a fresh worktree has no node_modules
+bun install                       # FIRST: a fresh worktree has no node_modules, and nx stops with
+                                  # "Could not find Nx modules" until it is installed
 bun run typecheck                 # nx run-many -t typecheck  (tsc, strict)
 bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
@@ -70,6 +71,20 @@ One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
 remote cache. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
+
+**/tmp is a quota'd tmpfs; do not fill it.** A full /tmp fails unrelated tests with
+`Disk quota exceeded` / `SQLITE_IOERR`. Two rules keep it empty:
+
+- Every project's test run goes through `scripts/test-tmp-scope.ts` (a Vitest and
+  Playwright `globalSetup`): `TMPDIR` is a fresh dir for the run and is removed after it,
+  so anything a test or the code under it leaves in the temp dir goes with the run. A test
+  that makes its own temp dir still removes it in `afterAll`/`finally`; a new project's
+  `vitest.config.ts` must list the same `globalSetup`. Check a new test with
+  `ls -A /tmp | sort` before and after `bun run test --skip-nx-cache`.
+- `nx.json` sets `"useDaemonProcess": false`. With the daemon on, every non-CI `nx` run
+  made the daemon install `nx@latest` into `/tmp/tmp-<pid>-*/` (~97 MB) to check for
+  outdated AI-agent config, and a stopped daemon did not remove it. Do not turn the daemon
+  back on, and do not run `nx daemon` here.
 
 A change to `apps/web` also runs the standard's web gate (from the worktree root):
 

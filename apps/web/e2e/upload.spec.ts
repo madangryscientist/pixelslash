@@ -1,5 +1,5 @@
 import { execFile, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,8 +54,20 @@ async function provision(page: Page, org: string, project: string, signIn: boole
   return token;
 }
 
+const temps: string[] = [];
+
+test.afterAll(async () => {
+  await Promise.all(temps.map((d) => rm(d, { recursive: true, force: true })));
+});
+
+async function tempDir(prefix: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), prefix));
+  temps.push(dir);
+  return dir;
+}
+
 async function snapshotDir() {
-  const dir = await mkdtemp(join(tmpdir(), "ps-e2e-"));
+  const dir = await tempDir("ps-e2e-");
   await mkdir(join(dir, "home"));
   await writeFile(join(dir, "home/desktop.png"), PNG);
   const entry = {
@@ -131,7 +143,7 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
     project: "ship",
   });
 
-  const out = join(await mkdtemp(join(tmpdir(), "ps-e2e-out-")), "got.png");
+  const out = join(await tempDir("ps-e2e-out-"), "got.png");
   const key = `orgs/${row?.org_id}/${row?.image_key}`;
   await wrangler("r2", "object", "get", `pixelslash-blobs/${key}`, "--file", out);
   expect(await readFile(out)).toEqual(PNG);
