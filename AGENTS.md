@@ -78,6 +78,15 @@ remote cache. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
 
+**Generated files are not formatted.** `oxfmt` rewrites what it is given, so anything a tool
+writes must be excluded in `.oxfmtrc.json`'s `ignorePatterns` rather than hand-formatted: the
+capability page (`docs/capabilities/*.html`), the bench fixtures, results and Argos cache, the
+route tree, `worker-configuration.d.ts` and the drizzle migrations. They are already listed —
+add a pattern when a new generator appears, or `format:check` will fail on a file whose content
+the next run of its generator overwrites. Sources (`data.json`, `build.py`, `bench/src`,
+`scripts`) are formatted normally: a generated file is ignored, its input is not. `**/*.md` is
+ignored too, so prose is never reflowed by a formatter.
+
 **/tmp is a quota'd tmpfs; do not fill it.** A full /tmp fails unrelated tests with
 `Disk quota exceeded` / `SQLITE_IOERR`. Two rules keep it empty:
 

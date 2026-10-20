@@ -2,9 +2,14 @@
   "ignorePatterns": [
     "fixtures/**",
     "bench/fixtures/**",
+    "bench/fixtures*/**",
     "bench/results/**",
+    "bench/argos-cache.json",
+    "bench/argos-cache/**",
     "**/*.md",
-    "docs/capabilities/matrix.html",
+    "docs/capabilities/*.html",
+    "docs/**/*.generated.*",
+    "**/*.gen.ts",
     "**/routeTree.gen.ts",
     "**/worker-configuration.d.ts",
     "apps/web/drizzle/**"
