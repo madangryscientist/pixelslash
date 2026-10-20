@@ -1,3 +1,4 @@
+import { statfs } from "node:fs/promises";
 import { chromium, type Browser } from "playwright";
 import { CaptureError } from "./errors.ts";
 
@@ -64,8 +65,37 @@ async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Pr
   }
 }
 
+const SHM_DIR = "/dev/shm";
+const SHM_MIN_BYTES = 1024 * 1024 * 1024;
+
+/**
+ * Whether /dev/shm has room for Chromium's shared memory.
+ * Playwright launches Chromium with `--disable-dev-shm-usage`, which moves that
+ * memory into the temp dir. On a host whose /tmp is a quota'd or busy tmpfs the GPU
+ * process then dies mid-screenshot ("Unable to capture screenshot"), a different
+ * shot each run once several browsers run at once. That flag exists for Docker's
+ * 64 MB /dev/shm, so it is dropped only when /dev/shm is big enough.
+ */
+export async function roomyShm(): Promise<boolean> {
+  try {
+    const { bavail, bsize } = await statfs(SHM_DIR);
+    return bavail * bsize >= SHM_MIN_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+/** Launch headless Chromium, using /dev/shm for shared memory when it has room (see `roomyShm`). */
+export async function launchChromium(args: string[] = []): Promise<Browser> {
+  return chromium.launch({
+    headless: true,
+    args,
+    ...((await roomyShm()) ? { ignoreDefaultArgs: ["--disable-dev-shm-usage"] } : {}),
+  });
+}
+
 export function launchBrowser(): Promise<Browser> {
-  return chromium.launch({ headless: true });
+  return launchChromium();
 }
 
 async function shot(browser: Browser, url: string, dest: string, width: number): Promise<void> {

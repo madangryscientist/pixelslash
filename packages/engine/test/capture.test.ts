@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { settleCapture, type SettlePage } from "../src/capture.ts";
+import { roomyShm, settleCapture, type SettlePage } from "../src/capture.ts";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -42,5 +42,11 @@ describe("settleCapture", () => {
     const started = Date.now();
     await expect(settleCapture(page, 40)).rejects.toThrow(/capture settle exceeded 40ms/);
     expect(Date.now() - started).toBeLessThan(1_000);
+  });
+});
+
+describe("roomyShm", () => {
+  test("answers without throwing", async () => {
+    expect(typeof (await roomyShm())).toBe("boolean");
   });
 });

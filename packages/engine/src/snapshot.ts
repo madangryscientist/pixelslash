@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { chromium, type Browser, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { PNG } from "pngjs";
-import { settleCapture } from "./capture.ts";
+import { launchChromium, settleCapture } from "./capture.ts";
 import type { CaptureConfig, MaskRect, Route, Stabilise, Variant } from "./config.ts";
 import { CaptureError } from "./errors.ts";
 import {
@@ -169,7 +169,7 @@ export async function captureSnapshots(
   let browser: Browser | undefined;
   try {
     if (config.start) stopApp = await startApp(config.start);
-    browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+    browser = await launchChromium(LAUNCH_ARGS);
     const fingerprint: Fingerprint = { image, browser: `chromium ${browser.version()}`, fonts };
     await mkdir(out, { recursive: true });
     const snapshots = await shootAll(config, out, { fingerprint, browser, warn });
