@@ -146,7 +146,20 @@ export const getBuildPage = createServerFn()
     const user = await requireViewer();
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
-    return { org, project, ...(await or404(buildView(db, project.id, data.buildId))) };
+    const view = await or404(buildView(db, project.id, data.buildId));
+    // A card shows the branch shot (cropped to the change in the browser): a changed or new shot has
+    // one, a removed one only has the baseline's. No blob is made for it.
+    const thumbs: Record<string, string> = {};
+    for (const shot of view.snapshots) {
+      if (shot.diffStatus !== "changed" && shot.diffStatus !== "new") continue;
+      const { branch } = await imageUrls(project.orgId, {
+        main: null,
+        branch: shot.imageKey,
+        diff: null,
+      });
+      if (branch) thumbs[shot.id] = branch;
+    }
+    return { org, project, ...view, thumbs };
   });
 
 export const getSnapshotPage = createServerFn()

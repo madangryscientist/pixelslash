@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
+import { expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
@@ -282,15 +283,12 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await rows.first().getByRole("link", { name: "review" }).click();
   const buildUrl = page.url();
   const buildId = /\/builds\/([^/]+)/.exec(buildUrl)?.[1] ?? "";
-  await expect(group(page, "changed").getByTestId("snapshot-row")).toHaveCount(2);
-  await expect(group(page, "changed")).toContainText("size changed 40×40 → 48×40");
-  await expect(group(page, "new").getByTestId("snapshot-row")).toHaveCount(1);
-  await expect(group(page, "removed").getByTestId("snapshot-row")).toHaveCount(1);
-  await expect(group(page, "unchanged").getByTestId("snapshot-row")).toHaveCount(1);
+  await expectBuildWorkspaceOpen(page);
   await capture(page, "02-build");
+  await walkBuildTabs(page);
 
   // The changed shot: both modes, boxes from the stored regions, signed image URLs.
-  await group(page, "changed").getByRole("link", { name: /about/ }).click();
+  await group(page, "changed").getByRole("link", { name: /about/i }).click();
   await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.getByTestId("position")).toHaveText("1 of 5");
   await expect(page.getByTestId("sizes")).toContainText("compared at 40×40");
@@ -333,7 +331,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(page.getByText("1 to review")).toBeVisible();
 
   // r rejects the size-changed shot and the build fails.
-  await group(page, "changed").getByRole("link", { name: /hero/ }).click();
+  await group(page, "changed").getByRole("link", { name: /hero/i }).click();
   await expect(page.getByTestId("position")).toHaveText("2 of 5");
   await rejectThenWalkFailedBuild(page);
   await open(page, buildUrl);
