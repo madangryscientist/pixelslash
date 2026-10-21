@@ -38,7 +38,7 @@ describe("upload API", () => {
       acme.token,
       JSON.stringify({ snapshots: 1 }),
     );
-    expect(await done.json()).toEqual({ id, status: "passed", error: null });
+    expect(await done.json()).toEqual({ id, status: "passed", error: null, unmeasured: 0 });
 
     const [build] = await db.select().from(builds).where(eq(builds.id, id));
     expect(build).toMatchObject({

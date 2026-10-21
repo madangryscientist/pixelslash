@@ -238,6 +238,42 @@ async function send(client: Client, call: Call): Promise<unknown> {
   }
 }
 
+/**
+ * Finalise, and again while the server's diff runs out of budget with shots left (ob 1645). The
+ * server resumes: a finalise sent again measures only what is not yet measured, so this is the
+ * CLI doing what a person would otherwise click. It goes on only while the count left falls, so a
+ * build that is failing for another reason is tried once more and then given up, never looped.
+ */
+async function finalise(client: Client, id: string, count: number): Promise<unknown> {
+  let left = Infinity;
+  for (;;) {
+    const reply = await send(client, {
+      step: "finalize",
+      method: "POST",
+      path: `/api/v1/builds/${id}/finalize`,
+      body: JSON.stringify({ snapshots: count }),
+    });
+    if (!isObj(reply) || reply.status !== "errored") return reply;
+    const now = reply.unmeasured;
+    if (typeof now !== "number" || now <= 0 || now >= left) return reply;
+    client.warn(`upload: ${now} of ${count} shots still to measure on the server; continuing`);
+    left = now;
+  }
+}
+
+/**
+ * A finalise runs the diff in the request, so its reply is the outcome. `processing` means a retry
+ * met an earlier try's run that has not ended (or was killed): nothing was measured yet. `errored`
+ * is said, not failed, as before: the build is on the server and the reason is the server's.
+ */
+function checkOutcome(client: Client, id: string, done: unknown): void {
+  if (!isObj(done)) return;
+  if (done.status === "processing")
+    throw new UploadError(`upload failed: finalize: build ${id} is still processing on the server`);
+  if (done.status === "errored")
+    client.warn(`upload: build ${id} is errored on the server: ${String(done.error)}`);
+}
+
 async function openBuild(client: Client, ctx: GitContext): Promise<string> {
   const body = await send(client, {
     step: "open build",
@@ -290,16 +326,7 @@ export async function uploadSnapshots(
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  const done = await send(client, {
-    step: "finalize",
-    method: "POST",
-    path: `/api/v1/builds/${id}/finalize`,
-    body: JSON.stringify({ snapshots: manifest.snapshots.length }),
-  });
-  // A finalise runs the diff in the request, so its reply is the outcome. `processing` means a
-  // retry met an earlier try's run that has not ended (or was killed): nothing was measured yet.
-  if (isObj(done) && done.status === "processing")
-    throw new UploadError(`upload failed: finalize: build ${id} is still processing on the server`);
+  checkOutcome(client, id, await finalise(client, id, manifest.snapshots.length));
   return { buildId: id, snapshots: manifest.snapshots.length, git: ctx };
 }
 

@@ -39,15 +39,20 @@ export type ProcessDeps = {
   now?: (() => number) | undefined;
 };
 
-/** The build's diff would not finish inside the Worker's limit; the reason names the limit. */
+/**
+ * This run stopped before the Worker's limit with shots left. Not a failure to start over from:
+ * what was measured is kept, and the next finalise measures only the rest (ob 1645).
+ */
 export class DiffCeilingError extends Error {
+  readonly unmeasured: number;
   constructor(measured: number, total: number, usedMs: number, slowestMs: number) {
     super(
-      `diff ceiling: measured ${measured} of ${total} shots in ${(usedMs / 1000).toFixed(1)} s ` +
-        `(slowest ${(slowestMs / 1000).toFixed(1)} s); the next could pass the Worker's 30 s CPU ` +
-        `limit. The server diff fits one whole-page change at 1280x4000, not several.`,
+      `diff ceiling: measured ${measured} of ${total} shots (${total - measured} left); this run ` +
+        `used ${(usedMs / 1000).toFixed(1)} s (slowest shot ${(slowestMs / 1000).toFixed(1)} s) ` +
+        `and the next could pass the Worker's 30 s CPU limit. Finalise again to measure the rest.`,
     );
     this.name = "DiffCeilingError";
+    this.unmeasured = total - measured;
   }
 }
 
@@ -104,14 +109,31 @@ async function diffOne(
   shot: SnapshotRow,
   baseline: BaselineSnapshot | undefined,
 ): Promise<void> {
-  if (!baseline) return storeSnapshot(deps.db, shot.id, { diffStatus: "new" });
-  if (baseline.envFingerprint !== shot.envFingerprint)
-    return storeSnapshot(deps.db, shot.id, {
-      diffStatus: null,
-      diffResult: null,
-      rebaselineNeeded: true,
-      baselineKey: baseline.imageKey,
-    });
+  // A shot measured again against another baseline may have had an overlay; one that now has no
+  // overlay to write drops it.
+  if (!baseline || baseline.envFingerprint !== shot.envFingerprint) {
+    await storeSnapshot(
+      deps.db,
+      shot.id,
+      baseline
+        ? {
+            diffStatus: null,
+            diffResult: null,
+            diffKey: null,
+            rebaselineNeeded: true,
+            baselineKey: baseline.imageKey,
+          }
+        : {
+            diffStatus: "new",
+            diffResult: null,
+            diffKey: null,
+            baselineKey: null,
+            rebaselineNeeded: false,
+          },
+    );
+    if (shot.diffKey) await deps.blobs.delete(shot.diffKey);
+    return;
+  }
   const [main, branch] = await Promise.all([
     readBlob(deps.blobs, baseline.imageKey),
     readBlob(deps.blobs, shot.imageKey),
@@ -172,7 +194,12 @@ async function markErrored(db: Db, build: Build, e: unknown): Promise<void> {
   await db.update(builds).set({ status: "errored", error }).where(eq(builds.id, build.id));
 }
 
-export type ProcessResult = { status: Build["status"]; error: string | null };
+export type ProcessResult = {
+  status: Build["status"];
+  error: string | null;
+  /** Shots a finalise sent again would still measure; non-zero only when the budget stopped the run. */
+  unmeasured: number;
+};
 
 /**
  * How long a `processing` build is presumed alive. A run killed mid-diff (the isolate hits its
@@ -215,75 +242,98 @@ async function claim(db: Db, build: Build): Promise<boolean> {
 }
 
 /**
- * Forget what an earlier run wrote, so the re-run replaces it instead of adding to it. The
- * uploaded shots stay (they are what usage counts); the removed markers are the diff's own and
- * go, since the re-run writes the ones the baseline calls for. Nothing here can lose a review:
- * only a diffed (`changes` / `passed`) build can be reviewed, and this build is not one.
+ * Drop the removed markers an earlier run wrote; the run writes the ones the baseline calls for.
+ * Everything else an earlier run stored stays, so a re-run resumes instead of starting over
+ * (ob 1645). The uploaded shots are what usage counts and are never touched.
  */
-async function resetSnapshots(deps: ProcessDeps, build: Build): Promise<void> {
-  const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
-  for (const row of rows) if (row.diffKey) await deps.blobs.delete(row.diffKey);
+async function clearMarkers(deps: ProcessDeps, build: Build): Promise<void> {
   await deps.db
     .delete(snapshots)
     .where(and(eq(snapshots.buildId, build.id), eq(snapshots.diffStatus, "removed")));
-  await deps.db
-    .update(snapshots)
-    .set({
-      baselineKey: null,
-      diffKey: null,
-      diffStatus: null,
-      diffResult: null,
-      rebaselineNeeded: false,
-      reviewState: "pending",
-      reviewedBy: null,
-      reviewedAt: null,
-    })
-    .where(eq(snapshots.buildId, build.id));
 }
 
 /**
- * Diff every shot of a finalised build and move it to its verdict. It takes `processing` (just
+ * Whether a shot's stored result still stands. It does when it was measured (a status, or a
+ * re-baseline that measured nothing) against the baseline that would be picked now. The baseline
+ * is chosen from other builds' accepted shots, and one can be accepted between two runs; a shot
+ * measured against another baseline is measured again, so a resumed build ends with the verdict
+ * a single run would have given. A shot's own image, options and ignore areas cannot change: the
+ * build is closed to uploads once finalised.
+ */
+function stands(shot: SnapshotRow, baseline: BaselineSnapshot | undefined): boolean {
+  const measured = shot.diffStatus !== null || shot.rebaselineNeeded;
+  return measured && shot.baselineKey === (baseline?.imageKey ?? null);
+}
+
+/**
+ * Measure the shots whose stored result no longer stands, under this run's budget. Throws
+ * `DiffCeilingError` when the budget stops it with shots left; what it measured stays stored.
+ * The budget is per run and its first shot always goes, so every run makes progress.
+ */
+async function measure(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baselines) {
+  const now = deps.now ?? Date.now;
+  const started = now();
+  let slowest = 0;
+  let diffed = 0;
+  let kept = 0;
+  for (const shot of rows) {
+    const baseline = baselines.byKey.get(snapshotKeyOf(shot));
+    if (stands(shot, baseline)) {
+      kept++;
+      continue;
+    }
+    // Stop before a shot that, if it costs as much as the slowest so far, would pass the limit.
+    const used = now() - started;
+    if (diffed > 0 && used + slowest > DIFF_BUDGET_MS)
+      throw new DiffCeilingError(kept + diffed, rows.length, used, slowest);
+    const began = now();
+    await diffOne(deps, shot, baseline);
+    diffed++;
+    slowest = Math.max(slowest, now() - began);
+  }
+}
+
+/**
+ * Diff the shots of a finalised build that have no result and move it to its verdict. It takes `processing` (just
  * finalised), `errored` (a retry after a failure such as a transient R2 miss) and a `processing`
  * build whose run died (see `STALE_PROCESSING_MS`); any other build has moved on and is left
  * alone. The take is atomic, so a finalise retried while a run is live gets that run's status
  * back instead of a second, racing diff.
+ *
+ * A build too big for one run's budget is resumed, not restarted (ob 1645): a run measures what
+ * the budget allows and ends the build `errored` naming how many are left, and the next one keeps
+ * what stands (`stands`) and measures the rest. The build is never given a verdict while a shot is
+ * unmeasured. The budget is per run, so a run always measures at least one shot and repeated
+ * finalises reach the end.
  *
  * The verdict write is inside the try (ob 1561): a status write that throws must end the build at
  * `errored` with the reason, never leave it looking like it is still being measured.
  */
 export async function processBuild(deps: ProcessDeps, build: Build): Promise<ProcessResult> {
   if (build.status !== "processing" && build.status !== "errored")
-    return { status: build.status, error: build.error };
+    return { status: build.status, error: build.error, unmeasured: 0 };
   if (!(await claim(deps.db, build))) {
     const current = await getBuild(deps.db, build.projectId, build.id);
-    return { status: current.status, error: current.error };
+    return { status: current.status, error: current.error, unmeasured: 0 };
   }
   try {
-    await resetSnapshots(deps, build);
+    await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
     const baselines: Baselines = await selectBaselines(
       deps.db,
       build,
       new Set(rows.map(snapshotKeyOf)),
     );
-    const now = deps.now ?? Date.now;
-    const started = now();
-    let slowest = 0;
-    for (const [i, shot] of rows.entries()) {
-      // Stop before a shot that, if it costs as much as the slowest so far, would pass the limit.
-      const used = now() - started;
-      if (i > 0 && used + slowest > DIFF_BUDGET_MS)
-        throw new DiffCeilingError(i, rows.length, used, slowest);
-      const began = now();
-      await diffOne(deps, shot, baselines.byKey.get(snapshotKeyOf(shot)));
-      slowest = Math.max(slowest, now() - began);
-    }
+    await measure(deps, rows, baselines);
     await markRemoved(deps, build, baselines.removed);
     await acceptMainBuild(deps.db, build);
     const status = await refreshBuildStatus(deps.db, build.id);
-    return { status, error: null };
+    return { status, error: null, unmeasured: 0 };
   } catch (e) {
     await markErrored(deps.db, build, e);
-    return { status: "errored", error: e instanceof Error ? e.message : String(e) };
+    // The ceiling's count includes shots a changed baseline sends back to be measured again, which
+    // a count of rows with no result would miss.
+    const unmeasured = e instanceof DiffCeilingError ? e.unmeasured : 0;
+    return { status: "errored", error: e instanceof Error ? e.message : String(e), unmeasured };
   }
 }

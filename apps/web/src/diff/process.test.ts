@@ -306,7 +306,7 @@ describe("the Worker ceiling", () => {
     expect(branch.status).toBe("errored");
     expect(branch.error).toMatch(/diff ceiling: measured \d of 3 shots/);
     expect(branch.error).toContain("30 s CPU limit");
-    expect(branch.error).toContain("one whole-page change at 1280x4000");
+    expect(branch.error).toContain("Finalise again to measure the rest");
   });
 
   test("a build inside the budget is not stopped", async () => {

@@ -3,7 +3,7 @@ import { setup } from "#/api/test-support";
 import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#/db/builds";
 import type { Db } from "#/db/db";
 import { snapshots } from "#/db/schema";
-import { orgBlobs } from "#/storage/blobs";
+import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { processBuild } from "./process";
 
 /** Uploading and diffing whole builds, as the CI API does. Tests only. */
@@ -47,16 +47,8 @@ export type BuildSpec = {
   shots: Shot[];
 };
 
-/**
- * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
- * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
- * front of the diff only, so a failure there is not the store the assertions read back from.
- */
-export async function upload(
-  ctx: Ctx,
-  spec: BuildSpec,
-  { now, db = ctx.db }: { now?: () => number; db?: Db } = {},
-): Promise<Build> {
+/** Create a build and send its shots, as a client does before it finalises. */
+async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
   const id = await createBuild(ctx.db, ctx.projectId, {
     commitSha: spec.commit,
     branch: spec.branch,
@@ -64,11 +56,11 @@ export async function upload(
     ancestorShas: spec.ancestors ?? [],
     prNumber: null,
   });
-  const open = await getBuild(ctx.db, ctx.projectId, id);
+  const build = await getBuild(ctx.db, ctx.projectId, id);
   for (const s of spec.shots) {
     await putSnapshot(
       { db: ctx.db, blobs: ctx.scoped },
-      open,
+      build,
       {
         name: s.name ?? "pricing",
         platform: "linux",
@@ -83,8 +75,22 @@ export async function upload(
       s.png.buffer,
     );
   }
-  const done = await finaliseBuild(ctx.db, open, spec.shots.length);
-  await processBuild({ db, blobs: ctx.scoped, now }, done);
+  return build;
+}
+
+/**
+ * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
+ * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
+ * front of the diff only, so a failure there is not the store the assertions read back from;
+ * `blobs` does the same for the images.
+ */
+export async function upload(
+  ctx: Ctx,
+  spec: BuildSpec,
+  { now, db = ctx.db, blobs = ctx.scoped }: { now?: () => number; db?: Db; blobs?: BlobStore } = {},
+): Promise<Build> {
+  const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
+  await processBuild({ db, blobs, now }, done);
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

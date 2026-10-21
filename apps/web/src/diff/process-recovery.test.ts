@@ -39,7 +39,7 @@ describe("recovery (ob 1545)", () => {
     const before = await usageCounts(ctx.db);
 
     const result = await processBuild({ db: ctx.db, blobs: ctx.scoped }, errored);
-    expect(result).toEqual({ status: "changes", error: null });
+    expect(result).toEqual({ status: "changes", error: null, unmeasured: 0 });
     const after = await getBuild(ctx.db, ctx.projectId, errored.id);
     expect(after).toMatchObject({ status: "changes", error: null });
     expect(await rows(ctx, after)).toHaveLength(1);
@@ -51,7 +51,7 @@ describe("recovery (ob 1545)", () => {
     const ctx = await context();
     const done = await pair(ctx);
     const shotBefore = await onlyShot(ctx, done);
-    // The dead run's leavings: processing, claimed long ago, one stale verdict and a stray marker.
+    // The dead run's leavings: processing, claimed long ago, a shot it never reached and a stray marker.
     const claimedAt = new Date(Date.now() - STALE_PROCESSING_MS - 1000);
     await ctx.db
       .update(builds)
@@ -59,7 +59,7 @@ describe("recovery (ob 1545)", () => {
       .where(eq(builds.id, done.id));
     await ctx.db
       .update(snapshots)
-      .set({ diffStatus: "unchanged", diffResult: null, reviewState: "accepted" })
+      .set({ diffStatus: null, diffResult: null, diffKey: null, baselineKey: null })
       .where(eq(snapshots.buildId, done.id));
     await ctx.db.insert(snapshots).values({
       id: crypto.randomUUID(),
@@ -103,7 +103,7 @@ describe("recovery (ob 1545)", () => {
 
     const live = await getBuild(ctx.db, ctx.projectId, done.id);
     const result = await processBuild({ db: ctx.db, blobs: ctx.scoped }, live);
-    expect(result).toEqual({ status: "processing", error: null });
+    expect(result).toEqual({ status: "processing", error: null, unmeasured: 0 });
     expect(await onlyShot(ctx, done)).toMatchObject({ diffStatus: null });
   });
 
@@ -119,11 +119,11 @@ describe("recovery (ob 1545)", () => {
     });
     const passed = await getBuild(ctx.db, ctx.projectId, done.id);
     const result = await processBuild({ db: ctx.db, blobs: ctx.scoped }, passed);
-    expect(result).toEqual({ status: "passed", error: null });
+    expect(result).toEqual({ status: "passed", error: null, unmeasured: 0 });
     expect(await onlyShot(ctx, done)).toMatchObject({ reviewState: "accepted" });
   });
 
-  test("a build the Worker ceiling stopped is re-diffed on retry: errored again if still too slow, a verdict if not", async () => {
+  test("a build the Worker ceiling stopped is resumed on retry, and the retry gives the verdict", async () => {
     const ctx = await context();
     const named = (png: typeof white) => ["a", "b", "c"].map((name) => ({ name, png }));
     await upload(ctx, { branch: "main", commit: sha(1), shots: named(white) });
@@ -132,16 +132,13 @@ describe("recovery (ob 1545)", () => {
       { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(red) },
       { now: slow(4000) },
     );
-    expect(stopped.error).toMatch(/diff ceiling/);
+    expect(stopped.status).toBe("errored");
+    expect(stopped.error).toMatch(/diff ceiling: measured 2 of 3 shots \(1 left\)/);
+    expect((await rows(ctx, stopped)).filter((r) => r.diffStatus === null)).toHaveLength(1);
 
-    // The same ceiling again: errored, with the reason, and the retry ends (nothing loops).
-    const again = await processBuild({ db: ctx.db, blobs: ctx.scoped, now: slow(4000) }, stopped);
-    expect(again.status).toBe("errored");
-    expect(again.error).toMatch(/diff ceiling/);
+    // The same slow clock: the one shot left fits, and the build gets its verdict.
+    const result = await processBuild({ db: ctx.db, blobs: ctx.scoped, now: slow(4000) }, stopped);
+    expect(result).toEqual({ status: "changes", error: null, unmeasured: 0 });
     expect(await rows(ctx, stopped)).toHaveLength(3);
-
-    const fast = await getBuild(ctx.db, ctx.projectId, stopped.id);
-    const result = await processBuild({ db: ctx.db, blobs: ctx.scoped, now: slow(10) }, fast);
-    expect(result).toEqual({ status: "changes", error: null });
   });
 });

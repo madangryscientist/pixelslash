@@ -115,4 +115,6 @@ token of its own in another file.
 
 The diff runs inline in the finalise request with a 25 s budget (`DIFF_BUDGET_MS`), which stands in
 for a Worker's CPU limit. On the CT's 2 vCPU a build of hackcove's 145 shots measures about 126 and
-then stops at the budget: the build reads `errored` and names the shots it did not measure.
+then stops at the budget: the build reads `errored` and names how many shots are left. A finalise
+sent again resumes (it keeps what was measured and diffs the rest), and `pixelslash upload` sends it
+again by itself while the count falls, so the build ends with all 145 measured and its real verdict.
