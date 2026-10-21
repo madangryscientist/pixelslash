@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { shotChips, shotLabeller, titleWords } from "./shot-label";
+import { shotChips, shotLabeller, titleWords, variantChips } from "./shot-label";
 
 const NAMES = [
   "ui-callout-tones@theme=default",
@@ -71,5 +71,20 @@ describe("shotChips", () => {
       "Dark",
       "1280x720",
     ]);
+  });
+});
+
+describe("variantChips", () => {
+  const label = shotLabeller(["ui-callout-tones@theme=catppuccin-mocha@density=compact", "solo"]);
+
+  test("the name's own theme, then its other globals", () => {
+    expect(variantChips(label("ui-callout-tones@theme=catppuccin-mocha@density=compact"))).toEqual([
+      "Catppuccin Mocha",
+      "Density: Compact",
+    ]);
+  });
+
+  test("a name with no theme gets no theme chip: the colour scheme is never one", () => {
+    expect(variantChips(label("solo"))).toEqual([]);
   });
 });

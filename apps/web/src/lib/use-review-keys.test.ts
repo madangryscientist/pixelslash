@@ -16,4 +16,9 @@ describe("reviewKeyAction", () => {
     expect(reviewKeyAction("a", false)).toBeNull();
     expect(reviewKeyAction("r", false)).toBeNull();
   });
+
+  it("opens the shortcut list on ? whatever the build's state", () => {
+    expect(reviewKeyAction("?", true)).toBe("help");
+    expect(reviewKeyAction("?", false)).toBe("help");
+  });
 });

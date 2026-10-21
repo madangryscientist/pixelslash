@@ -11,6 +11,7 @@ import { checkout, removeHistoryRepo } from "./history-repo";
 import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
+import { checkSnapshotViewer } from "./snapshot-viewer";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const WEB = fileURLToPath(new URL("..", import.meta.url));
@@ -308,6 +309,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await page.getByLabel("Compare position").fill("70");
   await expect(page.getByLabel("Compare position")).toHaveValue("70");
   await capture(page, "05-snapshot-slider");
+  await checkSnapshotViewer(page);
 
   // j walks to the next shot in the build's order; k comes back.
   await page.locator("h1").click();

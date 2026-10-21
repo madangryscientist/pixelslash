@@ -214,8 +214,22 @@ export const getSnapshotPage = createServerFn()
       total: view.snapshots.length,
       previousId: index > 0 ? (view.snapshots[index - 1]?.id ?? null) : null,
       nextId: view.snapshots[index + 1]?.id ?? null,
+      /** Every name in the build, so the label reads the same as on the build page. */
+      names: view.snapshots.map((shot) => shot.name),
+      /**
+       * Where this shot sits among the changed ones, the shots a reviewer decides on. The build
+       * order puts them first, so their walk index is their review index; null off that set.
+       */
+      review: {
+        index: snapshot.diffStatus === "changed" ? changedBefore(view.snapshots, index) + 1 : null,
+        total: view.snapshots.filter((shot) => shot.diffStatus === "changed").length,
+      },
     };
   });
+
+function changedBefore(shots: { diffStatus: string | null }[], index: number): number {
+  return shots.slice(0, index).filter((shot) => shot.diffStatus === "changed").length;
+}
 
 export const reviewShot = createServerFn({ method: "POST" })
   .validator((d: unknown) => {

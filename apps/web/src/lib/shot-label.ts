@@ -51,6 +51,18 @@ export function shotChips(shot: { theme: string; viewport: string }, label: Shot
   return chips.filter((chip) => chip.length > 0);
 }
 
+/**
+ * Only what the name says: its `@theme=` global as the theme, then the other globals as
+ * `Key: Value`. The snapshot page shows the capture's colour scheme apart, as what it is.
+ */
+export function variantChips(label: ShotLabel): string[] {
+  const theme = label.variants.find((variant) => variant.key === "theme");
+  const others = label.variants
+    .filter((variant) => variant.key !== "theme")
+    .map((variant) => `${titleWords(variant.key)}: ${titleWords(variant.value)}`);
+  return [...(theme ? [titleWords(theme.value)] : []), ...others].filter((chip) => chip.length > 0);
+}
+
 function sharedSegments(a: string[], b: string[]): number {
   let n = 0;
   while (n < a.length && n < b.length && a[n] === b[n]) n += 1;

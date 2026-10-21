@@ -1,198 +1,234 @@
+import { Pill } from "@hackcove/ui";
+import { type ReactNode, useEffect, useRef } from "react";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
-import type { DiffOptions } from "#/db/schema";
-import { formatDateTime, formatNumber } from "#/lib/format";
+import { formatDateTime } from "#/lib/format";
+import { type ShotLabel, variantChips } from "#/lib/shot-label";
 
-const OPTION_KEYS: (keyof DiffOptions)[] = [
-  "threshold",
-  "minChangedPixels",
-  "minChangedRatio",
-  "mergeDistance",
-  "minRegionArea",
-  "noiseAmplitude",
-  "maxShift",
+/** Every key the page answers to, for the `?` list. */
+const SHORTCUTS: [string, string][] = [
+  ["j", "Next shot"],
+  ["k", "Previous shot"],
+  ["a", "Accept this shot"],
+  ["r", "Reject this shot"],
+  ["?", "Show these shortcuts"],
+  ["Esc", "Close this list"],
 ];
 
-export function SnapshotHeader({
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd
+      aria-hidden="true"
+      className="ml-1.5 rounded border border-current/30 px-1 font-mono text-[10px] leading-4 opacity-75"
+    >
+      {children}
+    </kbd>
+  );
+}
+
+const barButton =
+  "inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50";
+
+type Review = { index: number | null; total: number };
+
+function reviewText(review: Review): string {
+  if (review.index !== null) return `${review.index} / ${review.total} changed`;
+  if (review.total === 0) return "nothing to review";
+  return `not to review · ${review.total} changed`;
+}
+
+/**
+ * The readable name with the raw key as its tooltip, the name's variants, and where the build and
+ * this shot's decision stand.
+ */
+function ShotTitle({
   build,
   snapshot,
-  position,
-  total,
+  label,
 }: {
   build: BuildView["build"];
   snapshot: SnapshotView;
-  position: number;
-  total: number;
+  label: ShotLabel;
 }) {
+  const title = label.component ? `${label.component} · ${label.story}` : label.story;
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-slate-600">
-          {snapshot.platform} · {snapshot.browser} · {snapshot.viewport} · {snapshot.theme}
-        </span>
-        <StatusBadge status={build.status} />
-        <ReviewChip state={snapshot.reviewState} by={snapshot.reviewedBy} />
-        {snapshot.reviewedAt && (
-          <span className="text-slate-500">{formatDateTime(snapshot.reviewedAt)}</span>
-        )}
-        <span data-testid="position" className="ml-auto text-slate-500">
-          {position} of {total}
-        </span>
-      </div>
-    </>
-  );
-}
-
-/** Both sizes whenever they differ; the overlap is what the diff measured (invariant 1). */
-export function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
-  const result = snapshot.diffResult;
-  let line = "Not compared: this shot has no baseline in a matching environment.";
-  if (snapshot.diffStatus === "removed")
-    line = "Removed: not compared. The baseline image is shown.";
-  if (snapshot.diffStatus === "new")
-    line = "No baseline: this shot is new, so nothing was compared.";
-  if (snapshot.rebaselineNeeded)
-    line = "Not compared: the baseline came from a different environment.";
-  if (result) {
-    const main = `${result.mainWidth}×${result.mainHeight}`;
-    const branch = `${result.branchWidth}×${result.branchHeight}`;
-    line = result.sizeChanged
-      ? `Main ${main} · Branch ${branch} · compared at ${result.width}×${result.height} (the overlap). The rest was not painted as changed.`
-      : `Both shots are ${main}; compared at ${result.width}×${result.height}.`;
-  }
-  return (
-    <p data-testid="sizes" className="mb-4 text-sm text-slate-600">
-      {line}
-    </p>
-  );
-}
-
-/** Why a shot has no measurement, in the diff's own terms. */
-function CompareNote({ snapshot }: { snapshot: SnapshotView }) {
-  if (snapshot.diffStatus === "new")
-    return (
-      <p className="mt-2 text-sm text-slate-600">
-        No baseline: this shot is new and nothing was compared.
-      </p>
-    );
-  if (snapshot.diffStatus === "removed")
-    return (
-      <p className="mt-2 text-sm text-slate-600">
-        Removed: the baseline has this shot, this build does not. It never blocks the build.
-      </p>
-    );
-  if (snapshot.rebaselineNeeded)
-    return (
-      <p className="mt-2 text-sm text-slate-600">
-        The baseline was rendered in a different environment, so it was not compared. A new baseline
-        is needed.
-      </p>
-    );
-  return null;
-}
-
-export function MeasuredPanel({ snapshot }: { snapshot: SnapshotView }) {
-  const result = snapshot.diffResult;
-  const rows: [string, string][] = [
-    ["Changed pixels", formatNumber(result?.changedPixels ?? 0)],
-    ["Antialiased pixels", formatNumber(result?.antialiasedPixels ?? 0)],
-    ["Ignored pixels", formatNumber(result?.ignoredPixels ?? 0)],
-    ["Specks dropped", result ? `${result.specks.count} (${result.specks.pixels} px)` : "—"],
-  ];
-  return (
-    <section>
-      <h2 className="mb-2 text-sm font-semibold text-slate-700">Measured</h2>
-      <dl className="space-y-1 text-sm">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between">
-            <dt className="text-slate-600">{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <CompareNote snapshot={snapshot} />
-    </section>
-  );
-}
-
-export function SettingsPanel({
-  snapshot,
-  options,
-}: {
-  snapshot: SnapshotView;
-  options: DiffOptions;
-}) {
-  return (
-    <section>
-      <h2 className="mb-2 text-sm font-semibold text-slate-700">Diff options</h2>
-      <dl data-testid="diff-options" className="space-y-1 text-sm">
-        {OPTION_KEYS.map((key) => (
-          <div key={key} className="flex justify-between">
-            <dt className="text-slate-600">{key}</dt>
-            <dd>{options[key] ?? "engine default"}</dd>
-          </div>
-        ))}
-      </dl>
-      <h2 className="mt-4 mb-2 text-sm font-semibold text-slate-700">Ignore areas</h2>
-      <p className="text-sm text-slate-600">
-        {snapshot.ignore.length === 0
-          ? "None: every pixel was measured."
-          : `${snapshot.ignore.length} area${snapshot.ignore.length === 1 ? "" : "s"} skipped.`}
-      </p>
-    </section>
-  );
-}
-
-export function ReviewBar({
-  reviewable,
-  busy,
-  status,
-  error,
-  onAccept,
-  onReject,
-}: {
-  reviewable: boolean;
-  busy: boolean;
-  status: string;
-  error: string | null;
-  onAccept: () => void;
-  onReject: () => void;
-}) {
-  const hydrated = useHydrated();
-  const disabled = !hydrated || busy || !reviewable;
-  return (
-    <>
-      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onAccept}
-          className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50"
-        >
-          Accept
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onReject}
-          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
-        >
-          Reject
-        </button>
-        {!reviewable && (
-          <span className="text-sm text-slate-600">
-            This build is {status}; a new build is needed to review it.
-          </span>
-        )}
-        <span data-testid="keyboard-hint" className="text-sm text-slate-500">
-          j / k next · previous · a accept · r reject
-        </span>
-      </div>
-      {error && (
-        <p role="alert" className="mt-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
-          {error}
-        </p>
+      <h1 className="min-w-0 truncate text-base font-semibold" title={snapshot.name}>
+        {title}
+      </h1>
+      {variantChips(label).map((chip) => (
+        <Pill key={chip} tone="slate">
+          {chip}
+        </Pill>
+      ))}
+      <StatusBadge status={build.status} />
+      <ReviewChip state={snapshot.reviewState} by={snapshot.reviewedBy} />
+      {snapshot.reviewedAt && (
+        <span className="text-sm text-slate-500">{formatDateTime(snapshot.reviewedAt)}</span>
       )}
     </>
+  );
+}
+
+type BarActions = {
+  onPrevious: (() => void) | null;
+  onNext: (() => void) | null;
+  onAccept: () => void;
+  onReject: () => void;
+  onHelp: () => void;
+};
+
+const outline = `${barButton} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
+
+/** Walk, decide, and the key list: each button shows the key that does the same. */
+function Actions({
+  actions,
+  canDecide,
+  why,
+}: {
+  actions: BarActions;
+  canDecide: boolean;
+  why: string | undefined;
+}) {
+  const hydrated = useHydrated();
+  const { onPrevious, onNext } = actions;
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        aria-label="Previous shot"
+        aria-keyshortcuts="k"
+        disabled={!hydrated || !onPrevious}
+        onClick={() => onPrevious?.()}
+        className={outline}
+      >
+        ‹<Kbd>k</Kbd>
+      </button>
+      <button
+        type="button"
+        aria-label="Next shot"
+        aria-keyshortcuts="j"
+        disabled={!hydrated || !onNext}
+        onClick={() => onNext?.()}
+        className={outline}
+      >
+        ›<Kbd>j</Kbd>
+      </button>
+      <button
+        type="button"
+        aria-keyshortcuts="r"
+        disabled={!hydrated || !canDecide}
+        title={why}
+        onClick={actions.onReject}
+        className={`${barButton} border border-red-300 bg-white text-red-700 hover:bg-red-50`}
+      >
+        Reject<Kbd>r</Kbd>
+      </button>
+      <button
+        type="button"
+        aria-keyshortcuts="a"
+        disabled={!hydrated || !canDecide}
+        title={why}
+        onClick={actions.onAccept}
+        className={`${barButton} border border-transparent bg-emerald-700 text-white hover:bg-emerald-800`}
+      >
+        Accept<Kbd>a</Kbd>
+      </button>
+      <button
+        type="button"
+        data-testid="keyboard-hint"
+        aria-label="Keyboard shortcuts"
+        aria-keyshortcuts="?"
+        disabled={!hydrated}
+        onClick={actions.onHelp}
+        className={`${barButton} text-slate-500 hover:text-slate-700`}
+      >
+        ?
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The bar that stays on screen: what this shot is, where it sits in the review, and the decision.
+ * The review position counts the changed shots; the build position, the whole j/k walk.
+ */
+export function ViewerBar({
+  build,
+  snapshot,
+  label,
+  position,
+  total,
+  review,
+  reviewable,
+  busy,
+  actions,
+}: {
+  build: BuildView["build"];
+  snapshot: SnapshotView;
+  label: ShotLabel;
+  position: number;
+  total: number;
+  review: Review;
+  reviewable: boolean;
+  busy: boolean;
+  actions: BarActions;
+}) {
+  const why = reviewable ? undefined : `This build is ${build.status}; a new build is needed.`;
+  return (
+    <div className="sticky top-0 z-10 border-b border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-2.5">
+        <ShotTitle build={build} snapshot={snapshot} label={label} />
+        <span className="flex-1" />
+        <span data-testid="review-position" className="text-sm text-slate-600 tabular-nums">
+          {reviewText(review)}
+        </span>
+        <span data-testid="position" className="text-sm text-slate-500 tabular-nums">
+          {position} of {total}
+        </span>
+        <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
+      </div>
+    </div>
+  );
+}
+
+/** The `?` list. The browser's <dialog> makes the page inert and closes it on Esc. */
+export function ShortcutHelp({ onClose }: { onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      aria-labelledby="shortcut-help-title"
+      onClose={onClose}
+      // A click on the scrim is a click on the <dialog> element itself, not on its contents.
+      onClick={(event) => event.target === dialog.current && dialog.current?.close()}
+      className="mx-auto mt-28 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-(--ps-scrim)"
+    >
+      <h2 id="shortcut-help-title" className="mb-3 text-[17px] font-semibold">
+        Keyboard shortcuts
+      </h2>
+      <dl className="space-y-1.5 text-sm">
+        {SHORTCUTS.map(([key, what]) => (
+          <div key={key} className="flex items-center justify-between">
+            <dt className="text-slate-600">{what}</dt>
+            <dd>
+              <kbd className="rounded border border-slate-300 px-1.5 font-mono text-xs">{key}</kbd>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <form method="dialog" className="mt-4 flex justify-end">
+        <button
+          type="submit"
+          autoFocus
+          className={`${barButton} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
+        >
+          Close
+        </button>
+      </form>
+    </dialog>
   );
 }

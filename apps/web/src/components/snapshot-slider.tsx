@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
+import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
 import { useHydrated } from "#/components/ui";
 import type { DiffResult } from "#/db/schema";
 
@@ -10,6 +12,7 @@ function Stack({
   onion,
   mains,
   branches,
+  boxes,
 }: {
   name: string;
   mainUrl: string | null;
@@ -18,9 +21,10 @@ function Stack({
   onion: boolean;
   mains: string;
   branches: string;
+  boxes: ReactNode;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="relative overflow-hidden border border-slate-200 bg-white">
       {mainUrl ? (
         <img src={mainUrl} alt={`${name} on main`} className="block" style={{ width: mains }} />
       ) : (
@@ -48,6 +52,7 @@ function Stack({
           style={{ left: `${position}%` }}
         />
       )}
+      {boxes}
     </div>
   );
 }
@@ -94,6 +99,12 @@ function Controls({
   );
 }
 
+/** The frame is as tall as the main shot, so the boxes are drawn at the frame's scale. */
+function FrameBoxes({ result, frameW }: { result: DiffResult | null; frameW: number }) {
+  if (!result) return null;
+  return <RegionBoxes width={frameW} height={result.mainHeight} regions={result.regions} />;
+}
+
 /**
  * A wipe between the two shots (or the branch faded over the main). Both render at one scale:
  * each width as a share of the wider frame, so the pixels line up.
@@ -103,11 +114,17 @@ export function SnapshotSlider({
   mainUrl,
   branchUrl,
   result,
+  highlight,
+  scale,
+  crop,
 }: {
   name: string;
   mainUrl: string | null;
   branchUrl: string | null;
   result: DiffResult | null;
+  highlight: boolean;
+  scale: Scale;
+  crop: Crop | null;
 }) {
   const [position, setPosition] = useState(50);
   const [onion, setOnion] = useState(false);
@@ -117,7 +134,7 @@ export function SnapshotSlider({
   const share = (px: number) => (frameW ? `${(px / frameW) * 100}%` : "100%");
   return (
     <div>
-      <div style={frameW ? { width: `${frameW}px`, maxWidth: "100%" } : undefined}>
+      <Viewport width={frameW || null} scale={scale} crop={crop}>
         <Stack
           name={name}
           mainUrl={mainUrl}
@@ -126,8 +143,9 @@ export function SnapshotSlider({
           onion={onion}
           mains={share(mainW || 1)}
           branches={share(branchW || 1)}
+          boxes={highlight && mainUrl ? <FrameBoxes result={result} frameW={frameW} /> : null}
         />
-      </div>
+      </Viewport>
       <Controls
         position={position}
         onion={onion}
