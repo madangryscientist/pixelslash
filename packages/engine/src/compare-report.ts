@@ -3,7 +3,7 @@ import { esc } from "./report.ts";
 /** One snapshot in a `compare` of two snapshot dirs. */
 export type CompareRow = {
   name: string;
-  /** `chromium 1280x720 light`: the rest of the identity. */
+  /** `chromium 1280x720 prefers: dark`: the rest of the identity; the scheme only when the compare varied it. */
   shot: string;
   /** Relative to the index; only a changed snapshot has a report. */
   report: string | undefined;

@@ -50,11 +50,21 @@ function dirFor(e: SnapshotEntry, taken: Set<string>): string {
   return dir;
 }
 
-function rowOf(e: SnapshotEntry): CompareRow {
+/**
+ * The shot's identity without its name. The colour scheme is what the browser was asked to prefer
+ * (`prefers: dark`), so it is named as such, and only when this compare varied it: a run that shot
+ * everything in one scheme does not print it on every card. A Storybook global shows in the name.
+ */
+function shotLabel(e: SnapshotEntry, varied: boolean): string {
   const { width, height } = e.variant.viewport;
+  const base = `${e.variant.browser} ${width}x${height}`;
+  return varied ? `${base} prefers: ${e.variant.theme}` : base;
+}
+
+function rowOf(e: SnapshotEntry, varied: boolean): CompareRow {
   return {
     name: e.name,
-    shot: `${e.variant.browser} ${width}x${height} ${e.variant.theme}`,
+    shot: shotLabel(e, varied),
     report: undefined,
     changedPixels: 0,
     mismatch: [],
@@ -70,12 +80,15 @@ async function readPng(dir: string, e: SnapshotEntry): Promise<Buffer> {
  * new place. The diff options are the Branch entry's, also like the server.
  */
 async function diffMatch(
-  paths: { main: string; branch: string; out: string },
+  paths: { main: string; branch: string; out: string; varied: boolean },
   main: SnapshotEntry,
   branch: SnapshotEntry,
   dir: string,
 ): Promise<{ row: CompareRow; changed: boolean }> {
-  const row = { ...rowOf(branch), mismatch: fingerprintDiff(main.fingerprint, branch.fingerprint) };
+  const row = {
+    ...rowOf(branch, paths.varied),
+    mismatch: fingerprintDiff(main.fingerprint, branch.fingerprint),
+  };
   const mainPng = await readPng(paths.main, main);
   const branchPng = await readPng(paths.branch, branch);
   let diff;
@@ -137,6 +150,8 @@ export async function compareSnapshots(
   refuseOverlap(out, [opts.mainDir, opts.branchDir]);
   const main = await readManifest(opts.mainDir);
   const branch = await readManifest(opts.branchDir);
+  const schemes = new Set([...main.snapshots, ...branch.snapshots].map((e) => e.variant.theme));
+  const varied = schemes.size > 1;
   const mainBy = new Map(main.snapshots.map((e) => [identity(e), e]));
   const branchIds = new Set(branch.snapshots.map(identity));
   const result: SnapshotCompareResult = {
@@ -152,10 +167,10 @@ export async function compareSnapshots(
   for (const e of branch.snapshots) {
     const before = mainBy.get(identity(e));
     if (!before) {
-      result.added.push(rowOf(e));
+      result.added.push(rowOf(e, varied));
       continue;
     }
-    const paths = { main: opts.mainDir, branch: opts.branchDir, out };
+    const paths = { main: opts.mainDir, branch: opts.branchDir, out, varied };
     const { row, changed } = await diffMatch(paths, before, e, dirFor(e, taken));
     if (row.mismatch.length > 0) {
       result.mismatched.push(row);
@@ -165,7 +180,8 @@ export async function compareSnapshots(
     }
     (changed ? result.changed : result.unchanged).push(row);
   }
-  for (const e of main.snapshots) if (!branchIds.has(identity(e))) result.removed.push(rowOf(e));
+  for (const e of main.snapshots)
+    if (!branchIds.has(identity(e))) result.removed.push(rowOf(e, varied));
   await Bun.write(result.indexPath, renderCompareIndex(result));
   return result;
 }

@@ -84,7 +84,7 @@ describe("compare", () => {
     expect(index.match(/report\.html/g)).toHaveLength(2);
 
     const report = await Bun.file(join(out, "home/chromium-40x40-light/report.html")).text();
-    expect(report).toContain("home · chromium 40x40 light");
+    expect(report).toContain("home · chromium 40x40 prefers: light");
     expect(report).toContain("1600 changed pixels");
     for (const f of ["main.png", "branch.png", "diff.png"])
       expect(existsSync(join(out, "home/chromium-40x40-light", f))).toBe(true);
@@ -125,7 +125,7 @@ describe("compare", () => {
     const code = await run(["compare", main, branch, "--out", out], cap.io, {});
     expect(code).toBe(0);
     expect(cap.stderr).toContain(
-      "warning: about (chromium 40x40 light): rendered by a different fonts",
+      "warning: about (chromium 40x40 prefers: light): rendered by a different fonts",
     );
     expect(cap.stdout).toContain("fingerprint: 1 differ (diffed anyway)");
     expect(cap.stdout).toContain("2 changed, 4 unchanged");
