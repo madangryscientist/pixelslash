@@ -5,7 +5,14 @@ import { joinOrigin } from "./routes.ts";
 
 const FETCH_TIMEOUT_MS = 10_000;
 
-type Story = { id: string; title: string; name: string };
+type Story = { id: string; title: string; name: string; tags: string[] };
+
+/**
+ * The index tag a story carries to be shot once, without the config's globals. A story's
+ * parameters are not in `index.json`, but its tags are, and capture reads nothing else before it
+ * opens a page.
+ */
+export const ONCE_TAG = "pixelslash-once";
 
 /** Lower-case, camelCase split, everything outside letters and digits one `-`. */
 function slug(text: string): string {
@@ -72,7 +79,10 @@ function storiesIn(index: unknown, url: string): Story[] {
     const { id, title, name } = entry;
     if (typeof id !== "string" || typeof title !== "string" || typeof name !== "string")
       throw new CaptureError(`storybook: ${url} has a story without an id, title and name`);
-    stories.push({ id, title, name });
+    const tags = Array.isArray(entry["tags"])
+      ? entry["tags"].filter((t): t is string => typeof t === "string")
+      : [];
+    stories.push({ id, title, name, tags });
   }
   return stories;
 }
@@ -95,8 +105,8 @@ async function readIndex(url: string): Promise<unknown> {
 }
 
 /**
- * One route per story × combination of globals, read from the running Storybook's `index.json`.
- * `taken` is the hand-written routes' names: a story that lands on one, or two that land on each
+ * One route per story × combination of globals, read from the running Storybook's `index.json`;
+ * a story tagged `ONCE_TAG` is one route, at the globals' defaults. `taken` is the hand-written routes' names: a story that lands on one, or two that land on each
  * other, is a config error. A Storybook with nothing left after include/exclude is one too, since
  * a run that shoots nothing would pass for ever.
  */
@@ -108,7 +118,7 @@ export async function storybookRoutes(sb: StorybookConfig, taken: string[]): Pro
   const owner = new Map(taken.map((name) => [name, "a route in routes"]));
   const routes: Route[] = [];
   for (const story of stories) {
-    for (const combo of globalCombos(sb.globals)) {
+    for (const combo of story.tags.includes(ONCE_TAG) ? [[]] : globalCombos(sb.globals)) {
       const name = storyName(story, combo);
       const clash = owner.get(name);
       if (clash)

@@ -12,6 +12,12 @@ const entry = (id: string, title: string, name: string, type = "story") => [
   { type, id, title, name, importPath: "./x.stories.tsx", tags: [] },
 ];
 
+/** An index entry that carries Storybook tags. */
+const tagged = (id: string, title: string, name: string, tags: string[]) => [
+  id,
+  { type: "story", id, title, name, importPath: "./x.stories.tsx", tags },
+];
+
 const INDEX = {
   v: 5,
   entries: Object.fromEntries([
@@ -122,6 +128,33 @@ describe("storybookRoutes", () => {
     await expect(storybookRoutes(sb({ include: ["nope"] }).storybook!, [])).rejects.toThrow(
       /no story in .* matches include\/exclude/,
     );
+  });
+
+  test("a story tagged pixelslash-once is one route with no globals; the others stay per theme", async () => {
+    const overview = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: () =>
+        Response.json({
+          entries: Object.fromEntries([
+            entry("ui-card--default", "UI/Card", "Default"),
+            tagged("overview--all-themes", "Overview", "All Themes", ["dev", "pixelslash-once"]),
+          ]),
+        }),
+    });
+    try {
+      const config = parseConfig({
+        storybook: { url: `http://127.0.0.1:${overview.port}`, globals: { theme: THEMES } },
+      });
+      const routes = await storybookRoutes(config.storybook!, []);
+      expect(routes.map((r) => r.name)).toEqual([
+        ...THEMES.map((t) => `ui-card-default@theme=${t}`),
+        "overview-all-themes",
+      ]);
+      expect(routes.at(-1)?.path).toBe("/iframe.html?id=overview--all-themes&viewMode=story");
+    } finally {
+      await overview.stop(true);
+    }
   });
 
   test("two stories slugging to one name are a config error", async () => {
