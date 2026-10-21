@@ -5,12 +5,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Locator, type Page, expect, test } from "@playwright/test";
+import { SERVER } from "./ports";
 
 const run = promisify(execFile);
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const WEB = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "packages/cli/src/index.ts");
-const SERVER = "http://localhost:4173";
 // A 1×1 PNG.
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",

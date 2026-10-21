@@ -27,6 +27,17 @@ const pngjsSyncInflate: Plugin = {
   resolveId: swapSyncInflate,
 };
 
+/**
+ * The e2e run's GitHub stand-in listens on a free port picked per run (`e2e/ports.ts`), so the
+ * URLs in `wrangler.jsonc` (:4174, for running the stand-in by hand) are replaced with it.
+ */
+function pointAtStub(config: { vars?: Record<string, unknown> }) {
+  const port = process.env["PIXELSLASH_E2E_STUB_PORT"];
+  if (!port) return {};
+  const base = `http://localhost:${port}`;
+  return { vars: { ...config.vars, GITHUB_OAUTH_BASE: base, GITHUB_API_BASE: base } };
+}
+
 export default defineConfig({
   resolve: { tsconfigPaths: true },
   // `vite dev` pre-bundles pngjs, and that bundling does not run Vite's resolver plugins: it needs
@@ -45,6 +56,9 @@ export default defineConfig({
     cloudflare({
       viteEnvironment: { name: "ssr" },
       persistState: e2e ? { path: ".wrangler/e2e" } : true,
+      // The plugin probes for a free debugger port starting at 9229 and two runs probing at once
+      // both get it (EADDRINUSE). Nothing in e2e attaches a debugger.
+      ...(e2e ? { inspectorPort: false, config: pointAtStub } : {}),
     }),
     tailwindcss(),
     tanstackStart(),

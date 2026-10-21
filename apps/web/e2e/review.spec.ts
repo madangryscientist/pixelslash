@@ -6,12 +6,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
+import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const WEB = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "packages/cli/src/index.ts");
-const SERVER = "http://localhost:4173";
 /** Screens I actually looked at; kept outside the wiped e2e state. */
 const SHOTS = process.env["PS_SHOT_DIR"] ?? join(WEB, ".wrangler/e2e/shots");
 

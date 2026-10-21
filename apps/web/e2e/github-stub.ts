@@ -47,4 +47,4 @@ createServer((req, res) => {
   const route = ROUTES[url.pathname];
   if (route) void route(req, res, url);
   else res.writeHead(404).end();
-}).listen(4174);
+}).listen(Number(process.env["PIXELSLASH_E2E_STUB_PORT"] ?? 4174));
