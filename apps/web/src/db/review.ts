@@ -74,7 +74,7 @@ export type SnapshotView = {
 
 export type BuildView = {
   build: typeof builds.$inferSelect;
-  /** Ordered as the review walks them: changed, new, removed, unchanged, re-baseline. */
+  /** Ordered as the review walks them: changed, new, removed, unchanged, re-baseline, unmeasured. */
   snapshots: SnapshotView[];
 };
 
@@ -146,6 +146,7 @@ const emptyCounts = (): BuildCounts => ({
   removed: 0,
   unchanged: 0,
   rebaseline: 0,
+  unmeasured: 0,
   pending: 0,
 });
 
@@ -169,6 +170,7 @@ export async function listBuilds(db: Db, projectId: string): Promise<BuildSummar
     .select({
       buildId: snapshots.buildId,
       diffStatus: snapshots.diffStatus,
+      rebaselineNeeded: snapshots.rebaselineNeeded,
       reviewState: snapshots.reviewState,
       n: count(),
     })
@@ -179,7 +181,12 @@ export async function listBuilds(db: Db, projectId: string): Promise<BuildSummar
         rows.map((row) => row.id),
       ),
     )
-    .groupBy(snapshots.buildId, snapshots.diffStatus, snapshots.reviewState);
+    .groupBy(
+      snapshots.buildId,
+      snapshots.diffStatus,
+      snapshots.rebaselineNeeded,
+      snapshots.reviewState,
+    );
   const counts = new Map<string, BuildCounts>();
   for (const stat of stats) {
     const held = counts.get(stat.buildId) ?? emptyCounts();

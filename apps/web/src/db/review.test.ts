@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { context, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
+import { groupOf } from "#/lib/snapshot-groups";
 import { createBuild } from "./builds";
 import { NotFoundError } from "./db";
 import { builds as buildRows } from "./schema";
@@ -74,6 +75,32 @@ describe("the review model reads", () => {
       pending: 4,
     });
     expect(builds[1]?.counts).toMatchObject({ new: 3, changed: 0, pending: 0 });
+  });
+
+  test("a shot of an errored build is not measured, never a re-baseline", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ name: "home", png: shot() }] });
+    const errored = await upload(
+      ctx,
+      {
+        branch: "feat/x",
+        commit: sha(2),
+        mergeBase: sha(1),
+        shots: [{ name: "home", png: shot({ blocks: [block] }) }],
+      },
+      {
+        now: () => {
+          throw new Error("isolate died");
+        },
+      },
+    );
+    expect(errored.status).toBe("errored");
+    const [summary] = (await listBuilds(ctx.db, ctx.projectId)).filter(
+      (b) => b.branch === "feat/x",
+    );
+    expect(summary?.counts).toMatchObject({ unmeasured: 1, rebaseline: 0, changed: 0 });
+    const view = await buildView(ctx.db, ctx.projectId, errored.id);
+    expect(view.snapshots.map((s) => groupOf(s))).toEqual(["unmeasured"]);
   });
 
   test("accepting the changed shot records the reviewer and passes the build", async () => {

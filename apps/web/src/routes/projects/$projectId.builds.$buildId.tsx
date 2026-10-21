@@ -16,7 +16,9 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
 function measured(shot: SnapshotView): string {
   if (shot.diffStatus === "new") return "no baseline: not compared";
   if (shot.diffStatus === "removed") return "in the baseline only";
-  if (shot.diffStatus === null) return "not compared: needs a new baseline";
+  if (shot.diffStatus === null) {
+    return groupOf(shot) === "unmeasured" ? "not measured" : "not compared: needs a new baseline";
+  }
   const result = shot.diffResult;
   if (!result) return "not compared";
   if (shot.diffStatus === "unchanged") return "no change";

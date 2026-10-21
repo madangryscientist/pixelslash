@@ -17,6 +17,7 @@ function countsText(counts: BuildCounts): string {
     counts.removed && `${counts.removed} removed`,
     counts.unchanged && `${counts.unchanged} unchanged`,
     counts.rebaseline && `${counts.rebaseline} re-baseline`,
+    counts.unmeasured && `${counts.unmeasured} not measured`,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "no snapshots";
 }
