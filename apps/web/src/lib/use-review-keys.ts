@@ -8,31 +8,40 @@ function isTyping(target: EventTarget | null): boolean {
   );
 }
 
+export type ReviewKeyAction = "next" | "previous" | "accepted" | "rejected";
+
+/** j/k walk whatever the build's state; a/r decide a shot, so they need `canDecide`. */
+export function reviewKeyAction(key: string, canDecide: boolean): ReviewKeyAction | null {
+  if (key === "j") return "next";
+  if (key === "k") return "previous";
+  if (!canDecide) return null;
+  if (key === "a") return "accepted";
+  if (key === "r") return "rejected";
+  return null;
+}
+
 /**
  * j/k walk the build in its review order, a/r decide the shot on screen. A modified key belongs
  * to the browser.
  */
 export function useReviewKeys(opts: {
-  enabled: boolean;
+  canDecide: boolean;
   nextId: string | null;
   previousId: string | null;
   go: (id: string | null) => void;
   decide: (state: "accepted" | "rejected") => void;
 }) {
-  const { enabled, nextId, previousId, go, decide } = opts;
+  const { canDecide, nextId, previousId, go, decide } = opts;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const modified = event.metaKey || event.ctrlKey || event.altKey;
-      if (!enabled || modified || isTyping(event.target)) return;
-      const actions: Record<string, () => void> = {
-        j: () => go(nextId),
-        k: () => go(previousId),
-        a: () => decide("accepted"),
-        r: () => decide("rejected"),
-      };
-      actions[event.key]?.();
+      if (modified || isTyping(event.target)) return;
+      const action = reviewKeyAction(event.key, canDecide);
+      if (action === "next") go(nextId);
+      else if (action === "previous") go(previousId);
+      else if (action) decide(action);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, nextId, previousId, go, decide]);
+  }, [canDecide, nextId, previousId, go, decide]);
 }

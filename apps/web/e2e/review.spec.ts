@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
+import { rejectThenWalkFailedBuild } from "./review-keys";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const WEB = fileURLToPath(new URL("..", import.meta.url));
@@ -331,8 +332,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   // r rejects the size-changed shot and the build fails.
   await group(page, "changed").getByRole("link", { name: /hero/ }).click();
   await expect(page.getByTestId("position")).toHaveText("2 of 5");
-  await page.keyboard.press("r");
-  await expect(page.getByTestId("review-state")).toHaveText("rejected by e2e-octocat");
+  await rejectThenWalkFailedBuild(page);
   await open(page, buildUrl);
   await expect(page.getByTestId("build-status")).toHaveText("failed");
   await expect(page.getByRole("button", { name: "Accept all" })).toBeDisabled();

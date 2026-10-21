@@ -59,7 +59,7 @@ function SnapshotPage() {
     [reviewable, project.id, snapshot.id, router],
   );
 
-  useReviewKeys({ enabled: reviewable, nextId, previousId, go, decide });
+  useReviewKeys({ canDecide: reviewable, nextId, previousId, go, decide });
 
   return (
     <Page title={`${project.name} · ${snapshot.name}`} wide>
