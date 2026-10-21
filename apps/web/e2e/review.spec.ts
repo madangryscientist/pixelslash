@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
+import { checkout, removeHistoryRepo } from "./history-repo";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
 
@@ -89,6 +90,7 @@ const temps: string[] = [];
 
 test.afterAll(async () => {
   await Promise.all(temps.map((dir) => rm(dir, { recursive: true, force: true })));
+  removeHistoryRepo();
 });
 
 async function tempDir(prefix: string): Promise<string> {
@@ -124,10 +126,11 @@ async function snapshotDir(shots: Fixture[]): Promise<string> {
 
 /** The real CLI against the running app; returns the new build id. */
 function upload(dir: string, token: string, branch: string, pr?: number): string {
+  const repo = checkout(branch === "main" ? "main" : "work");
   const args = [CLI, "upload", dir, "--server", SERVER, "--branch", branch];
   if (pr !== undefined) args.push("--pr", String(pr));
   const res = spawnSync("bun", args, {
-    cwd: ROOT,
+    cwd: repo,
     env: { ...process.env, PIXELSLASH_TOKEN: token },
     encoding: "utf8",
   });

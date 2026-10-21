@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import type { DiffOptions } from "#/db/schema";
@@ -15,13 +14,11 @@ const OPTION_KEYS: (keyof DiffOptions)[] = [
 ];
 
 export function SnapshotHeader({
-  project,
   build,
   snapshot,
   position,
   total,
 }: {
-  project: { id: string; name: string };
   build: BuildView["build"];
   snapshot: SnapshotView;
   position: number;
@@ -29,25 +26,16 @@ export function SnapshotHeader({
 }) {
   return (
     <>
-      <p className="mb-1 text-sm text-neutral-600">
-        <Link
-          to="/projects/$projectId/builds/$buildId"
-          params={{ projectId: project.id, buildId: build.id }}
-          className="text-blue-700 hover:underline"
-        >
-          ← {build.branch} · {build.commitSha.slice(0, 7)}
-        </Link>
-      </p>
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-neutral-600">
+        <span className="text-slate-600">
           {snapshot.platform} · {snapshot.browser} · {snapshot.viewport} · {snapshot.theme}
         </span>
         <StatusBadge status={build.status} />
         <ReviewChip state={snapshot.reviewState} by={snapshot.reviewedBy} />
         {snapshot.reviewedAt && (
-          <span className="text-neutral-500">{formatDateTime(snapshot.reviewedAt)}</span>
+          <span className="text-slate-500">{formatDateTime(snapshot.reviewedAt)}</span>
         )}
-        <span data-testid="position" className="ml-auto text-neutral-500">
+        <span data-testid="position" className="ml-auto text-slate-500">
           {position} of {total}
         </span>
       </div>
@@ -73,7 +61,7 @@ export function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
       : `Both shots are ${main}; compared at ${result.width}×${result.height}.`;
   }
   return (
-    <p data-testid="sizes" className="mb-4 text-sm text-neutral-600">
+    <p data-testid="sizes" className="mb-4 text-sm text-slate-600">
       {line}
     </p>
   );
@@ -83,19 +71,19 @@ export function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
 function CompareNote({ snapshot }: { snapshot: SnapshotView }) {
   if (snapshot.diffStatus === "new")
     return (
-      <p className="mt-2 text-sm text-neutral-600">
+      <p className="mt-2 text-sm text-slate-600">
         No baseline: this shot is new and nothing was compared.
       </p>
     );
   if (snapshot.diffStatus === "removed")
     return (
-      <p className="mt-2 text-sm text-neutral-600">
+      <p className="mt-2 text-sm text-slate-600">
         Removed: the baseline has this shot, this build does not. It never blocks the build.
       </p>
     );
   if (snapshot.rebaselineNeeded)
     return (
-      <p className="mt-2 text-sm text-neutral-600">
+      <p className="mt-2 text-sm text-slate-600">
         The baseline was rendered in a different environment, so it was not compared. A new baseline
         is needed.
       </p>
@@ -113,11 +101,11 @@ export function MeasuredPanel({ snapshot }: { snapshot: SnapshotView }) {
   ];
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold text-neutral-700">Measured</h2>
+      <h2 className="mb-2 text-sm font-semibold text-slate-700">Measured</h2>
       <dl className="space-y-1 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="flex justify-between">
-            <dt className="text-neutral-600">{label}</dt>
+            <dt className="text-slate-600">{label}</dt>
             <dd>{value}</dd>
           </div>
         ))}
@@ -136,17 +124,17 @@ export function SettingsPanel({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold text-neutral-700">Diff options</h2>
+      <h2 className="mb-2 text-sm font-semibold text-slate-700">Diff options</h2>
       <dl data-testid="diff-options" className="space-y-1 text-sm">
         {OPTION_KEYS.map((key) => (
           <div key={key} className="flex justify-between">
-            <dt className="text-neutral-600">{key}</dt>
+            <dt className="text-slate-600">{key}</dt>
             <dd>{options[key] ?? "engine default"}</dd>
           </div>
         ))}
       </dl>
-      <h2 className="mt-4 mb-2 text-sm font-semibold text-neutral-700">Ignore areas</h2>
-      <p className="text-sm text-neutral-600">
+      <h2 className="mt-4 mb-2 text-sm font-semibold text-slate-700">Ignore areas</h2>
+      <p className="text-sm text-slate-600">
         {snapshot.ignore.length === 0
           ? "None: every pixel was measured."
           : `${snapshot.ignore.length} area${snapshot.ignore.length === 1 ? "" : "s"} skipped.`}
@@ -174,12 +162,12 @@ export function ReviewBar({
   const disabled = !hydrated || busy || !reviewable;
   return (
     <>
-      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-neutral-200 pt-4">
+      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
         <button
           type="button"
           disabled={disabled}
           onClick={onAccept}
-          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50"
         >
           Accept
         </button>
@@ -187,16 +175,16 @@ export function ReviewBar({
           type="button"
           disabled={disabled}
           onClick={onReject}
-          className="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
         >
           Reject
         </button>
         {!reviewable && (
-          <span className="text-sm text-neutral-600">
+          <span className="text-sm text-slate-600">
             This build is {status}; a new build is needed to review it.
           </span>
         )}
-        <span data-testid="keyboard-hint" className="text-sm text-neutral-500">
+        <span data-testid="keyboard-hint" className="text-sm text-slate-500">
           j / k next · previous · a accept · r reject
         </span>
       </div>

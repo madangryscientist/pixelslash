@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { NotFoundError } from "./db";
-import { createOrg, createProject, getProject, inviteMember, listOrgs } from "./orgs";
+import {
+  createOrg,
+  createProject,
+  getProject,
+  getProjectWithOrg,
+  inviteMember,
+  listOrgs,
+} from "./orgs";
 import { testDb } from "./test-db";
 import { createSession, endSession, sessionUser, signInGithubUser } from "./users";
 
@@ -25,6 +32,20 @@ describe("org isolation", () => {
     await expect(inviteMember(db, alice, orgB.id, "alice")).rejects.toThrow(NotFoundError);
     expect((await listOrgs(db, alice.id)).map((o) => o.id)).toEqual([orgA.id]);
     expect(await getProject(db, bob.id, projectB.id)).toEqual(projectB);
+  });
+
+  test("a project comes with its org's name, and only for a member", async () => {
+    const db = testDb();
+    const alice = await signInGithubUser(db, profile(1, "alice"));
+    const bob = await signInGithubUser(db, profile(2, "bob"));
+    const org = await createOrg(db, alice.id, "Acme");
+    const project = await createProject(db, alice.id, org.id, "web");
+
+    expect(await getProjectWithOrg(db, alice.id, project.id)).toEqual({
+      project,
+      org: { id: org.id, name: "Acme" },
+    });
+    await expect(getProjectWithOrg(db, bob.id, project.id)).rejects.toThrow(NotFoundError);
   });
 
   test("an invite becomes a membership when that GitHub login signs in", async () => {

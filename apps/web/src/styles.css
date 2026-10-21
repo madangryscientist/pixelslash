@@ -1,1 +1,56 @@
 @import "tailwindcss";
+@import "@hackcove/theme-catppuccin-mocha/theme.css";
+/* Tailwind skips node_modules: scan the design system for the utilities its components use. */
+@source "../node_modules/@hackcove/ui/dist";
+
+/*
+ * Catppuccin Mocha palette © 2021 Catppuccin, MIT license (notice in
+ * @hackcove/theme-catppuccin-mocha/NOTICE). Tailwind's build drops the credit comment from the
+ * theme file, so it is repeated here.
+ */
+
+@theme {
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, "JetBrains Mono", "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+/*
+ * The page behind the cards. The components' own slate/white is the light theme; the Mocha theme
+ * file remaps it under `.dark` on <html> but names no canvas, so the page's is set here: slate-50
+ * in light, Mocha mantle in dark, so a card (white / base) lifts off it in both.
+ */
+.app-canvas {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+.dark .app-canvas {
+  background-color: #181825;
+  color: #cdd6f4;
+}
+
+/*
+ * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.1.0 does not remap.
+ * Without these a Callout's text, an error line or an outline button's hover would be a light-theme
+ * colour on a dark surface. They sit here, not in a fork of the theme: delete a rule when the
+ * theme ships it.
+ */
+.dark .text-red-700,
+.dark .text-red-800 {
+  color: #f38ba8; /* red */
+}
+.dark .border-red-200 {
+  border-color: rgba(243, 139, 168, 0.4);
+}
+.dark .border-amber-200 {
+  border-color: rgba(249, 226, 175, 0.4);
+}
+.dark .hover\:bg-violet-50:hover {
+  background-color: rgba(203, 166, 247, 0.14); /* mauve tint */
+}
+.dark .divide-slate-100 > :not(:last-child) {
+  border-color: #282839; /* what border-slate-100 maps to */
+}

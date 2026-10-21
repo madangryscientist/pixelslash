@@ -84,3 +84,19 @@ export async function getProject(db: Db, userId: string, projectId: string): Pro
   if (!row) throw new NotFoundError("project");
   return row.project;
 }
+
+/** A visible project with the org it belongs to: the page header names both. */
+export async function getProjectWithOrg(
+  db: Db,
+  userId: string,
+  projectId: string,
+): Promise<{ project: Project; org: Pick<Org, "id" | "name"> }> {
+  const [row] = await db
+    .select({ project: projects, org: { id: orgs.id, name: orgs.name } })
+    .from(projects)
+    .innerJoin(orgs, eq(orgs.id, projects.orgId))
+    .innerJoin(members, and(eq(members.orgId, projects.orgId), eq(members.userId, userId)))
+    .where(eq(projects.id, projectId));
+  if (!row) throw new NotFoundError("project");
+  return row;
+}

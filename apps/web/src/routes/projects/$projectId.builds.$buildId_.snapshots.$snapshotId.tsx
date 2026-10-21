@@ -8,6 +8,7 @@ import {
   SnapshotHeader,
 } from "#/components/snapshot-panels";
 import { SnapshotViewer } from "#/components/snapshot-viewer";
+import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
 import { useReviewKeys } from "#/lib/use-review-keys";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
@@ -27,8 +28,18 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snap
 );
 
 function SnapshotPage() {
-  const { project, build, snapshot, images, diffOptions, position, total, previousId, nextId } =
-    Route.useLoaderData();
+  const {
+    project,
+    org,
+    build,
+    snapshot,
+    images,
+    diffOptions,
+    position,
+    total,
+    previousId,
+    nextId,
+  } = Route.useLoaderData();
   const router = useRouter();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -62,14 +73,12 @@ function SnapshotPage() {
   useReviewKeys({ canDecide: reviewable, nextId, previousId, go, decide });
 
   return (
-    <Page title={`${project.name} · ${snapshot.name}`} wide>
-      <SnapshotHeader
-        project={project}
-        build={build}
-        snapshot={snapshot}
-        position={position}
-        total={total}
-      />
+    <Page
+      title={`${project.name} · ${snapshot.name}`}
+      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumb(project.id, build), snapshot.name]}
+      wide
+    >
+      <SnapshotHeader build={build} snapshot={snapshot} position={position} total={total} />
       <SizeLine snapshot={snapshot} />
       <SnapshotViewer
         name={snapshot.name}

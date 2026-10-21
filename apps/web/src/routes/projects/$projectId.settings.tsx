@@ -1,5 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { Body, Callout, SectionHeading } from "@hackcove/ui";
+import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { getProjectSettings, issueToken, revokeToken } from "#/server/fns";
 
@@ -9,7 +11,7 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
 });
 
 function ProjectSettings() {
-  const { project, tokens } = Route.useLoaderData();
+  const { project, org, tokens } = Route.useLoaderData();
   const router = useRouter();
   const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
@@ -23,22 +25,29 @@ function ProjectSettings() {
     await router.invalidate();
   };
   return (
-    <Page title={`${project.name} · settings`}>
-      <h2 className="mb-2 text-lg font-semibold">CI tokens</h2>
-      <p className="mb-4 text-sm text-neutral-600">
+    <Page
+      title={`${project.name} · settings`}
+      crumbs={[orgCrumb(org), projectCrumb(project), "Settings"]}
+    >
+      <SectionHeading className="mb-2">CI tokens</SectionHeading>
+      <Body as="p" className="mb-4">
         CI uploads builds with a token. It is shown once, when issued; store it as a CI secret.
-      </p>
+      </Body>
       {issued && (
-        <div role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3">
-          <p className="text-sm font-medium">Copy this token now. It will not be shown again.</p>
-          <code data-testid="issued-token" className="mt-1 block break-all text-sm">
+        <Callout
+          tone="warn"
+          role="status"
+          title="Copy this token now. It will not be shown again."
+          className="mb-4"
+        >
+          <code data-testid="issued-token" className="block break-all font-mono text-sm">
             {issued}
           </code>
-        </div>
+        </Callout>
       )}
       <InlineForm label="Token name, e.g. github-actions" button="Issue token" onSubmit={issue} />
       <table className="mt-6 w-full text-left text-sm">
-        <thead className="text-neutral-500">
+        <thead className="text-slate-500">
           <tr>
             <th className="py-2">Name</th>
             <th>Token</th>
@@ -47,11 +56,11 @@ function ProjectSettings() {
             <th />
           </tr>
         </thead>
-        <tbody className="divide-y divide-neutral-100">
+        <tbody className="divide-y divide-slate-100">
           {tokens.map((t) => (
             <tr key={t.id}>
               <td className="py-2">{t.name}</td>
-              <td className="font-mono">{t.prefix}…</td>
+              <td className="font-mono text-slate-600">{t.prefix}…</td>
               <td>{t.createdAt.toLocaleDateString()}</td>
               <td>{t.revokedAt ? "revoked" : "active"}</td>
               <td className="text-right">
@@ -60,7 +69,7 @@ function ProjectSettings() {
                     type="button"
                     disabled={!hydrated}
                     onClick={() => void revoke(t.id)}
-                    className="text-red-700 hover:underline"
+                    className="rounded text-red-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50"
                   >
                     Revoke
                   </button>

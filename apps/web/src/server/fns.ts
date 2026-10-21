@@ -1,8 +1,9 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { getCookie } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
 import { NotFoundError } from "#/db/db";
-import { createOrg, createProject, getProject, inviteMember, listOrgs } from "#/db/orgs";
+import { createOrg, createProject, getProjectWithOrg, inviteMember, listOrgs } from "#/db/orgs";
 import {
   NotReviewableError,
   acceptAllSnapshots,
@@ -11,6 +12,7 @@ import {
   reviewSnapshot,
 } from "#/db/review";
 import { issueCiToken, listCiTokens, revokeCiToken } from "#/db/tokens";
+import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
 import { database, imageSigningSecret } from "./env";
 import { requireViewer, viewer } from "./session";
@@ -63,10 +65,18 @@ function field(input: unknown, key: string): string {
   return text;
 }
 
-export const getViewer = createServerFn().handler(async () => {
+/** What every page's shell needs: who is signed in, and the theme the cookie asks for. */
+export const getShell = createServerFn().handler(async () => ({
+  viewer: await getViewerSummary(),
+  theme: parseTheme(getCookie(THEME_COOKIE)),
+}));
+
+async function getViewerSummary() {
   const user = await viewer();
-  return user && { login: user.login, name: user.name, avatarUrl: user.avatarUrl };
-});
+  return user && { login: user.login, name: user.name };
+}
+
+export const getViewer = createServerFn().handler(getViewerSummary);
 
 export const getOrgs = createServerFn().handler(async () => {
   const user = await requireViewer();
@@ -101,8 +111,8 @@ export const getProjectSettings = createServerFn()
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const project = await or404(getProject(db, user.id, data.projectId));
-    return { project, tokens: await listCiTokens(db, user.id, project.id) };
+    const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
+    return { org, project, tokens: await listCiTokens(db, user.id, project.id) };
   });
 
 export const issueToken = createServerFn({ method: "POST" })
@@ -126,8 +136,8 @@ export const getProjectPage = createServerFn()
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const project = await or404(getProject(db, user.id, data.projectId));
-    return { project, builds: await listBuilds(db, project.id) };
+    const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
+    return { org, project, builds: await listBuilds(db, project.id) };
   });
 
 export const getBuildPage = createServerFn()
@@ -135,8 +145,8 @@ export const getBuildPage = createServerFn()
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const project = await or404(getProject(db, user.id, data.projectId));
-    return { project, ...(await or404(buildView(db, project.id, data.buildId))) };
+    const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
+    return { org, project, ...(await or404(buildView(db, project.id, data.buildId))) };
   });
 
 export const getSnapshotPage = createServerFn()
@@ -148,7 +158,7 @@ export const getSnapshotPage = createServerFn()
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const project = await or404(getProject(db, user.id, data.projectId));
+    const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const view = await or404(buildView(db, project.id, data.buildId));
     const index = view.snapshots.findIndex((shot) => shot.id === data.snapshotId);
     if (index === -1) throw notFound();
@@ -160,6 +170,7 @@ export const getSnapshotPage = createServerFn()
       diff: snapshot.diffKey,
     });
     return {
+      org,
       project,
       build: view.build,
       snapshot,

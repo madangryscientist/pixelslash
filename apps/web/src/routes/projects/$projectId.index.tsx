@@ -1,4 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { Body } from "@hackcove/ui";
+import { orgCrumb } from "#/components/crumbs";
 import { Page, StatusBadge } from "#/components/ui";
 import type { BuildCounts } from "#/db/review";
 import { formatDateTime } from "#/lib/format";
@@ -23,31 +25,32 @@ function countsText(counts: BuildCounts): string {
 }
 
 function ProjectPage() {
-  const { project, builds } = Route.useLoaderData();
+  const { project, org, builds } = Route.useLoaderData();
   return (
-    <Page title={project.name} wide>
+    <Page title={project.name} crumbs={[orgCrumb(org), project.name]} wide>
       <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-neutral-600">
+        <Body as="p">
           Builds newest first. {builds.length === 0 ? "" : `${builds.length} in this project.`}
-        </p>
+        </Body>
         <Link
           to="/projects/$projectId/settings"
           params={{ projectId: project.id }}
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm text-violet-600 hover:underline"
         >
           Settings
         </Link>
       </div>
       {builds.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-600">
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-600">
           <p className="font-medium">No builds yet.</p>
           <p className="mt-1 text-sm">
-            Upload one with <code className="font-mono">pixelslash upload DIR</code> and a CI token.
+            Upload one with <code className="font-mono text-slate-900">pixelslash upload DIR</code>{" "}
+            and a CI token.
           </p>
         </div>
       ) : (
         <table className="w-full text-left text-sm">
-          <thead className="text-neutral-500">
+          <thead className="text-slate-500">
             <tr>
               <th className="py-2">Branch</th>
               <th>Commit</th>
@@ -58,28 +61,28 @@ function ProjectPage() {
               <th>Uploaded</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-slate-100">
             {builds.map((build) => (
               <tr key={build.id} data-testid="build-row">
                 <td className="py-2">
                   <Link
                     to="/projects/$projectId/builds/$buildId"
                     params={{ projectId: project.id, buildId: build.id }}
-                    className="font-medium text-blue-700 hover:underline"
+                    className="font-medium text-violet-600 hover:underline"
                   >
                     {build.branch}
                   </Link>
                 </td>
-                <td className="font-mono text-xs">{build.commitSha.slice(0, 7)}</td>
+                <td className="font-mono text-xs text-slate-600">{build.commitSha.slice(0, 7)}</td>
                 <td>{build.prNumber === null ? "—" : `#${build.prNumber}`}</td>
                 <td>
                   <StatusBadge status={build.status} />
                 </td>
-                <td className="text-neutral-600">{countsText(build.counts)}</td>
-                <td className="text-neutral-600">
+                <td className="text-slate-600">{countsText(build.counts)}</td>
+                <td className="text-slate-600">
                   {build.counts.pending === 0 ? "all decided" : `${build.counts.pending} pending`}
                 </td>
-                <td className="text-neutral-500">{formatDateTime(build.createdAt)}</td>
+                <td className="text-slate-500">{formatDateTime(build.createdAt)}</td>
               </tr>
             ))}
           </tbody>

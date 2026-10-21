@@ -101,7 +101,7 @@ function Controls({
         />
         Diff image
       </label>
-      <ul className="flex flex-wrap gap-3 text-neutral-600">
+      <ul className="flex flex-wrap gap-3 text-slate-600">
         {KINDS.map((kind) => {
           const n = regions.filter((region) => region.kind === kind).length;
           if (n === 0) return null;
@@ -117,7 +117,7 @@ function Controls({
           );
         })}
       </ul>
-      {compare && <span className="text-neutral-500">compared at {compare}</span>}
+      {compare && <span className="text-slate-500">compared at {compare}</span>}
     </div>
   );
 }
@@ -143,7 +143,7 @@ export function SnapshotOverlay({
   const compare = result ? `${result.width}×${result.height}` : null;
   return (
     <div>
-      <div className="rounded-lg border border-neutral-200 bg-white p-3">
+      <div className="rounded-lg border border-slate-200 bg-white p-3">
         <Stack
           name={name}
           shown={branchUrl ?? mainUrl}

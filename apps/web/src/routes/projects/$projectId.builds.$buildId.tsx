@@ -1,5 +1,7 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { Button } from "@hackcove/ui";
+import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page, ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { formatDateTime, formatNumber } from "#/lib/format";
@@ -34,11 +36,11 @@ function measured(shot: SnapshotView): string {
 function BuildMeta({ build, toReview }: { build: BuildView["build"]; toReview: number }) {
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
-      <span className="font-mono">{build.commitSha.slice(0, 7)}</span>
+      <span className="font-mono text-slate-700">{build.commitSha.slice(0, 7)}</span>
       {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
       <StatusBadge status={build.status} />
-      <span className="text-neutral-500">{formatDateTime(build.createdAt)}</span>
-      <span className="text-neutral-500">
+      <span className="text-slate-500">{formatDateTime(build.createdAt)}</span>
+      <span className="text-slate-500">
         {toReview === 0 ? "nothing to review" : `${toReview} to review`}
       </span>
     </div>
@@ -61,14 +63,13 @@ function AcceptAll({
     void onAccept().finally(() => setBusy(false));
   };
   return (
-    <button
-      type="button"
+    <Button
       disabled={!hydrated || busy || !reviewable || toReview === 0}
       onClick={accept}
-      className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+      className="px-3 py-1.5"
     >
       Accept all
-    </button>
+    </Button>
   );
 }
 
@@ -87,21 +88,21 @@ function GroupSection({
   return (
     <section data-testid={`group-${group}`} className="mb-8">
       <h2 className="mb-2 text-lg font-semibold">
-        {GROUP_LABEL[group]} <span className="text-neutral-500">({rows.length})</span>
+        {GROUP_LABEL[group]} <span className="text-slate-500">({rows.length})</span>
       </h2>
-      <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {rows.map((shot) => (
           <li key={shot.id} data-testid="snapshot-row">
             <Link
               to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
               params={{ projectId, buildId, snapshotId: shot.id }}
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-neutral-50"
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-slate-50"
             >
               <span className="font-medium">{shot.name}</span>
-              <span className="text-sm text-neutral-500">
+              <span className="text-sm text-slate-500">
                 {shot.platform} · {shot.browser} · {shot.viewport} · {shot.theme}
               </span>
-              <span className="text-sm text-neutral-600">{measured(shot)}</span>
+              <span className="text-sm text-slate-600">{measured(shot)}</span>
               <span className="ml-auto">
                 <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
               </span>
@@ -114,7 +115,7 @@ function GroupSection({
 }
 
 function BuildPage() {
-  const { project, build, snapshots } = Route.useLoaderData();
+  const { project, org, build, snapshots } = Route.useLoaderData();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   // Only a changed shot blocks a build (verdictOf); new, removed and unchanged ones do not need a decision.
@@ -132,16 +133,11 @@ function BuildPage() {
     }
   };
   return (
-    <Page title={`${project.name} · ${build.branch}`} wide>
-      <p className="mb-1 text-sm text-neutral-600">
-        <Link
-          to="/projects/$projectId"
-          params={{ projectId: project.id }}
-          className="text-blue-700 hover:underline"
-        >
-          ← {project.name}
-        </Link>
-      </p>
+    <Page
+      title={`${project.name} · ${build.branch}`}
+      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumbLabel(build)]}
+      wide
+    >
       <div className="flex flex-wrap items-center gap-4">
         <BuildMeta build={build} toReview={toReview} />
         <div className="mb-6 ml-auto">
@@ -159,7 +155,7 @@ function BuildPage() {
         </p>
       )}
       {snapshots.length === 0 && (
-        <p className="text-neutral-600">This build holds no snapshots yet.</p>
+        <p className="text-slate-600">This build holds no snapshots yet.</p>
       )}
       {SNAPSHOT_GROUPS.map((group) => (
         <GroupSection
@@ -170,7 +166,7 @@ function BuildPage() {
           rows={snapshots.filter((shot) => groupOf(shot) === group)}
         />
       ))}
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-slate-500">
         A rejection keeps the build failed until a new build arrives. New and removed shots are
         listed for review and never block a build.
       </p>

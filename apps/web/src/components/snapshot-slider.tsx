@@ -20,7 +20,7 @@ function Stack({
   branches: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white">
       {mainUrl ? (
         <img src={mainUrl} alt={`${name} on main`} className="block" style={{ width: mains }} />
       ) : (
@@ -44,7 +44,7 @@ function Stack({
       {!onion && (
         <div
           aria-hidden
-          className="absolute inset-y-0 w-0.5 bg-neutral-900"
+          className="absolute inset-y-0 w-0.5 bg-violet-600"
           style={{ left: `${position}%` }}
         />
       )}
@@ -87,7 +87,7 @@ function Controls({
         />
         Onion skin
       </label>
-      <span className="text-neutral-500">
+      <span className="text-slate-500">
         {onion ? `branch at ${position}% opacity` : `branch from ${position}%`}
       </span>
     </div>

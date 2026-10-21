@@ -1,3 +1,4 @@
+import { Button } from "@hackcove/ui";
 import { useState } from "react";
 import { SnapshotOverlay } from "#/components/snapshot-overlay";
 import { SnapshotSlider } from "#/components/snapshot-slider";
@@ -21,20 +22,16 @@ function ModeButtons({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) =>
   return (
     <div role="group" aria-label="View mode" className="mb-3 flex gap-1">
       {MODES.map(({ id, label }) => (
-        <button
+        <Button
           key={id}
-          type="button"
+          variant={mode === id ? "primary" : "outline"}
           aria-pressed={mode === id}
           disabled={!hydrated}
           onClick={() => onChange(id)}
-          className={`rounded-md border px-3 py-1.5 text-sm ${
-            mode === id
-              ? "border-neutral-900 bg-neutral-900 text-white"
-              : "border-neutral-300 bg-white text-neutral-700"
-          } disabled:opacity-40`}
+          className="px-3 py-1.5"
         >
           {label}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -54,20 +51,20 @@ function Panel({
   empty: string;
 }) {
   return (
-    <figure className="rounded-lg border border-neutral-200 bg-white p-3">
+    <figure className="rounded-lg border border-slate-200 bg-white p-3">
       <figcaption className="mb-2 text-sm font-medium">
         {label}
-        {caption && <span className="ml-2 font-normal text-neutral-500">{caption}</span>}
+        {caption && <span className="ml-2 font-normal text-slate-500">{caption}</span>}
       </figcaption>
       {url ? (
         <img
           src={url}
           alt={alt}
           loading="lazy"
-          className="block max-w-full border border-neutral-100"
+          className="block max-w-full border border-slate-100"
         />
       ) : (
-        <p className="py-8 text-center text-sm text-neutral-500">{empty}</p>
+        <p className="py-8 text-center text-sm text-slate-500">{empty}</p>
       )}
     </figure>
   );
