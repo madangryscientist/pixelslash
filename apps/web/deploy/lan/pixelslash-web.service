@@ -1,0 +1,17 @@
+# apps/web's production build under `vite preview` on :3000. D1 and R2 are miniflare's, in
+# apps/web/.wrangler/state. See apps/web/README.md, "Run it on the Proxmox server".
+[Unit]
+Description=PixelSlash review app
+After=network-online.target pixelslash-stub.service
+Wants=network-online.target pixelslash-stub.service
+
+[Service]
+User=pixelslash
+WorkingDirectory=/home/pixelslash/pixelslash/apps/web
+Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/pixelslash/.bun/bin/bunx vite preview --host 0.0.0.0 --port 3000 --strictPort
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

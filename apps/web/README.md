@@ -75,3 +75,44 @@ PIXELSLASH_TOKEN_PATH=~/.config/pixelslash/hackcove-local.token \
 ```
 
 To start over, stop the server and remove `.wrangler/state`.
+
+## Run it on the Proxmox server
+
+The same local server, on the Proxmox host instead of the desktop, so the dashboard is up without
+anything running here. It is **LAN only**: sign-in is still the GitHub stand-in, so anyone who can
+reach the address signs in as `e2e-octocat` and sees every org. No port forward, no tunnel, no
+public DNS. Real GitHub sign-in is a later ticket.
+
+| | |
+| --- | --- |
+| Dashboard | `http://192.168.0.34:3000` |
+| Stand-in | `http://192.168.0.34:4174` (the browser is sent there to sign in) |
+| Container | CT 135 `pixelslash` on `192.168.0.20`: Debian 13, unprivileged, 2 vCPU, 2 GB, 10 GB on `local-lvm`, starts on boot. The address is static in the CT config, below the router's DHCP pool. |
+| Checkout | `/home/pixelslash/pixelslash`, user `pixelslash`, `origin/main` over a read-only deploy key ("pixelslash CT 135"); the push URL is `no-push-from-this-ct`. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
+| State | D1 and R2 in `apps/web/.wrangler/state` on the CT's disk, kept across restarts and updates. |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`vite preview` of the production build), from `deploy/lan/`. Both restart on failure and start on boot. |
+
+The build is the `e2e` environment's with two values replaced. `apps/web/.dev.vars.e2e` on the CT
+(mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://192.168.0.34:4174`, so the
+browser on another machine is sent to the stand-in at the CT's address rather than its own
+`localhost`, and a random `IMAGE_SIGNING_SECRET`. The Cloudflare plugin copies it into
+`dist/server/.dev.vars` at build time and `vite preview` reads it from there; the `e2e` env in
+`wrangler.jsonc`, and so the tests, are unchanged.
+
+Update to `origin/main` (pull, install, migrate, build, restart) from the desktop. It is not run
+automatically:
+
+```bash
+ssh -i ~/.ssh/id_ed25519_mac root@192.168.0.20 \
+  pct exec 135 -- /home/pixelslash/pixelslash/apps/web/deploy/lan/update.sh
+```
+
+Logs: `pct exec 135 -- journalctl -u pixelslash-web -f`. Point a project's upload at it with
+`PIXELSLASH_SERVER=http://192.168.0.34:3000` and a token issued in its Settings on the CT. A token
+works only on the server that issued it: `~/.config/pixelslash/hackcove-local.token` now holds the
+CT's hackcove token, which replaced the desktop server's, so a desktop server started again needs a
+token of its own in another file.
+
+The diff runs inline in the finalise request with a 25 s budget (`DIFF_BUDGET_MS`), which stands in
+for a Worker's CPU limit. On the CT's 2 vCPU a build of hackcove's 145 shots measures about 126 and
+then stops at the budget: the build reads `errored` and names the shots it did not measure.
