@@ -5,7 +5,18 @@ import { UsageError } from "./errors.ts";
 export function routeSlug(path: string): string {
   const trimmed = path.replace(/\/+$/, "") || "/";
   if (trimmed === "/") return "index";
-  return trimmed.replace(/^\//, "").replace(/\//g, "-");
+  // Anything outside the name's alphabet (`/`, and a query string's `?` `&` `=`) becomes `-`.
+  return (
+    trimmed
+      .replace(/^\//, "")
+      .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "index"
+  );
+}
+
+/** An absolute `http:` or `https:` URL. */
+export function isHttpUrl(value: string): boolean {
+  return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
 }
 
 export function joinOrigin(origin: string, path: string): string {

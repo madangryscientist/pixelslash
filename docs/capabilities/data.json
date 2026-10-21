@@ -57,7 +57,7 @@
       "label": "No Storybook dependency",
       "ps": {
         "v": "y",
-        "note": "pages and PNG dirs, nothing to wrap"
+        "note": "pages and PNG dirs, nothing to wrap; a Storybook is read over HTTP, never imported"
       },
       "t": {
         "argos": "n",
@@ -65,6 +65,40 @@
         "percy": "n",
         "applitools": "n",
         "lost": "n"
+      },
+      "plan": ""
+    },
+    {
+      "g": "capture",
+      "k": "storybook_stories",
+      "label": "Snapshot every Storybook story from its index",
+      "ps": {
+        "v": "y",
+        "note": "reads index.json from a running Storybook 7+; one snapshot per story, no route list"
+      },
+      "t": {
+        "argos": "y",
+        "chromatic": "y",
+        "percy": "y",
+        "applitools": "?",
+        "lost": "y"
+      },
+      "plan": ""
+    },
+    {
+      "g": "capture",
+      "k": "storybook_globals",
+      "label": "Storybook globals as snapshot variants, no extra stories",
+      "ps": {
+        "v": "y",
+        "note": "config lists globals (a theme, say); every story is shot under each combination"
+      },
+      "t": {
+        "argos": "y",
+        "chromatic": "y",
+        "percy": "p",
+        "applitools": "?",
+        "lost": "?"
       },
       "plan": ""
     },
@@ -683,6 +717,14 @@
     "lost:masks_redact": "masks are diff-time only",
     "lost:local_only": "generateOnly keeps shots local",
     "lost:open_source": "MIT repo, archived 22 Apr 2026",
-    "lost:self_host": "engine yes, platform SaaS only"
+    "lost:self_host": "engine yes, platform SaaS only",
+    "argos:storybook_stories": "runs through the Vitest addon or Test Runner, Storybook 9+ or 8+; fetched 2026-10-21",
+    "argos:storybook_globals": "modes in .storybook/modes.ts, no extra stories; fetched 2026-10-21",
+    "chromatic:storybook_stories": "builds and uploads the Storybook, no extra config; fetched 2026-10-21",
+    "chromatic:storybook_globals": "modes save combinations of globals, one snapshot each; fetched 2026-10-21",
+    "percy:storybook_stories": "percy storybook over a built Storybook; docs imply every story; fetched 2026-10-21",
+    "percy:storybook_globals": "per-story additionalSnapshots, no project-wide default shown; fetched 2026-10-21",
+    "lost:storybook_stories": "storybookShots over a built storybook-static; fetched 2026-10-21",
+    "applitools:storybook_stories": "the Eyes docs fetched 2026-10-21 listed no Storybook page"
   }
 }

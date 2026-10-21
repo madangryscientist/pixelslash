@@ -25,6 +25,7 @@ import {
 } from "./fingerprint.ts";
 import { joinOrigin } from "./routes.ts";
 import { startApp, type StopApp } from "./start.ts";
+import { awaitStory, storybookRoutes } from "./storybook.ts";
 
 /** Masked regions are painted this colour, by Playwright for selectors and by us for rectangles. */
 export const MASK_COLOR = "#FF00FF";
@@ -157,13 +158,16 @@ export function paintRects(png: Buffer, rects: MaskRect[], scale: number): Buffe
   return PNG.sync.write(img);
 }
 
-async function open(page: Page, url: string, timeoutMs: number): Promise<void> {
+async function open(page: Page, url: string, route: Route, timeoutMs: number): Promise<void> {
   page.setDefaultNavigationTimeout(timeoutMs);
   const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
   if (!resp) throw new CaptureError(`capture failed for ${url}: no response`);
   if (resp.status() >= 400)
     throw new CaptureError(`capture failed for ${url}: HTTP ${resp.status()}`);
-  await settleCapture(page, timeoutMs);
+  // A story's own render signal and the generic settle share one budget.
+  const started = Date.now();
+  if (route.storybook) await awaitStory(page, route.name, timeoutMs);
+  await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
 }
 
 type Shot = {
@@ -202,7 +206,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   try {
     await pinClock(context, stabilise);
     const page = await context.newPage();
-    await open(page, url, stabilise.timeoutMs);
+    await open(page, url, route, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");
     const locators = selectors.map((s) => page.locator(s));
     for (const [i, loc] of locators.entries()) {
@@ -235,17 +239,18 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   }
 }
 
-/** The page shots a config asks for, every route under every variant, sharing one browser. */
+/** The page shots a config asks for, every route (hand-written, then Storybook's) under every variant, sharing one browser. */
 async function shootAll(
   config: CaptureConfig,
+  routes: Route[],
   out: string,
   ctx: { fingerprint: Fingerprint; browser: Browser; warn: (m: string) => void },
 ): Promise<SnapshotEntry[]> {
   const entries: SnapshotEntry[] = [];
   for (const variant of config.variants) {
-    for (const route of config.routes) {
+    for (const route of routes) {
       const file = `${route.name}/${variant.name}.png`;
-      const url = joinOrigin(config.baseUrl, route.path);
+      const url = joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path);
       const { png, ignore } = await shoot(ctx.browser, {
         url,
         route,
@@ -295,7 +300,17 @@ export async function captureSnapshots(
     browser = await launchChromium(LAUNCH_ARGS);
     const fingerprint: Fingerprint = { image, browser: `chromium ${browser.version()}`, fonts };
     await mkdir(out, { recursive: true });
-    const snapshots = await shootAll(config, out, { fingerprint, browser, warn });
+    // The app is up now, so the Storybook's index can be read.
+    const routes = config.storybook
+      ? [
+          ...config.routes,
+          ...(await storybookRoutes(
+            config.storybook,
+            config.routes.map((r) => r.name),
+          )),
+        ]
+      : config.routes;
+    const snapshots = await shootAll(config, routes, out, { fingerprint, browser, warn });
     const manifest: SnapshotManifest = { version: 1, snapshots };
     const manifestPath = join(out, "manifest.json");
     await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { parseArea, type Ignore, type Mask } from "./config-areas.ts";
+import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
 import type { DiffOptions } from "./diff.ts";
 import { mergeDiffOptions, parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
-import { routeSlug } from "./routes.ts";
+import { isHttpUrl, routeSlug } from "./routes.ts";
 
 /** The browsers the pinned capture image ships. A variant naming another is a usage error. */
 export const IMAGE_BROWSERS = ["chromium"] as const;
@@ -12,6 +13,7 @@ export type BrowserName = (typeof IMAGE_BROWSERS)[number];
 export type Theme = "light" | "dark";
 
 export type { Ignore, Mask, MaskRect } from "./config-areas.ts";
+export { type StorybookConfig } from "./config-storybook.ts";
 
 export type Variant = {
   name: string;
@@ -34,6 +36,8 @@ export type Route = {
   variantDiff: Record<string, DiffOptions>;
   /** Per-variant ignore areas for this route, keyed by variant name. */
   variantIgnore: Record<string, Ignore[]>;
+  /** Set on a route read from a Storybook index: its `path` is on `origin`, and capture waits for the story to render. */
+  storybook?: { origin: string };
 };
 
 export type Stabilise = {
@@ -61,11 +65,13 @@ export type UploadConfig = { server: string | undefined; baseBranch: string | un
 export type CaptureConfig = {
   baseUrl: string;
   start: StartCommand | undefined;
+  storybook: StorybookConfig | undefined;
   upload: UploadConfig;
   /** The project-wide diff options; routes and their variants layer over it. */
   diff: DiffOptions;
   /** The project-wide ignore areas; routes and their variants add to them. */
   ignore: Ignore[];
+  /** The hand-written routes. Storybook's are read from the running Storybook at capture time (`storybookRoutes`). */
   routes: Route[];
   variants: Variant[];
   stabilise: Stabilise;
@@ -251,11 +257,6 @@ function start(v: unknown, baseUrl: string): StartCommand | undefined {
   };
 }
 
-/** An absolute `http:` or `https:` URL. */
-export function isHttpUrl(value: string): boolean {
-  return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
-}
-
 function upload(v: unknown): UploadConfig {
   if (v === undefined) return { server: undefined, baseBranch: undefined };
   if (!isObj(v)) bad("upload", "must be { server?, baseBranch? }");
@@ -278,14 +279,14 @@ function uniqueNames(items: { name: string }[], what: string): void {
 /** Validate a raw config object and fill every default. */
 export function parseConfig(raw: unknown): CaptureConfig {
   if (!isObj(raw)) bad("file", "must hold an object");
-  const baseUrl = str(raw.baseUrl, "baseUrl");
-  if (!URL.canParse(baseUrl)) bad("baseUrl", "must be a URL");
   const global = {
     masks: list(raw.masks, "masks").map((m, i) => mask(m, `masks[${i}]`)),
     tags: strings(raw.tags, "tags"),
   };
+  const sb = parseStorybook(raw.storybook, global, bad);
+  const baseUrl = baseUrlOf(raw.baseUrl, sb, bad);
   const routes = list(raw.routes, "routes").map((r, i) => route(r, i, global));
-  if (routes.length === 0) bad("routes", "must list at least one path");
+  if (routes.length === 0 && !sb) bad("routes", "must list at least one path (or set storybook)");
   const rawVariants = list(raw.variants, "variants");
   const variants = (rawVariants.length === 0 ? [{}] : rawVariants).map(variant);
   uniqueNames(routes, "routes");
@@ -302,6 +303,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
   return {
     baseUrl,
     start: start(raw.start, baseUrl),
+    storybook: sb,
     upload: upload(raw.upload),
     diff: diff(raw.diff, "diff"),
     ignore: ignoreAreas(raw.ignore, "ignore"),

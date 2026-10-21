@@ -1,5 +1,5 @@
 import { join, resolve, sep } from "node:path";
-import { isHttpUrl } from "./config.ts";
+import { isHttpUrl } from "./routes.ts";
 import { parseDiffOptions } from "./diff-options.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";

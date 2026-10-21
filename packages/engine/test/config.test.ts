@@ -106,6 +106,27 @@ describe("parseConfig", () => {
     });
   });
 
+  test("a route path may carry a query string; its name is the slug", () => {
+    const config = parseConfig({
+      ...base,
+      routes: [
+        "/search?q=a&page=2",
+        "/",
+        "/iframe.html?id=x--y&viewMode=story&globals=theme:dark;a:b",
+        { path: "/search?q=b", name: "second" },
+      ],
+    });
+    expect(config.routes.map((r) => [r.path, r.name])).toEqual([
+      ["/search?q=a&page=2", "search-q-a-page-2"],
+      ["/", "index"],
+      [
+        "/iframe.html?id=x--y&viewMode=story&globals=theme:dark;a:b",
+        "iframe.html-id-x--y-viewMode-story-globals-theme-dark-a-b",
+      ],
+      ["/search?q=b", "second"],
+    ]);
+  });
+
   test.each([
     [{ ...base, diff: { threshold: 1.5 } }, /diff\.threshold must be a number from 0 to 1/],
     [{ ...base, diff: { threshold: "0.2" } }, /diff\.threshold must be a number from 0 to 1/],
@@ -171,7 +192,8 @@ describe("parseConfig", () => {
       /routes\[0\]\.variants\.chromium-1280x720-light\.ignore\[0\] must be a CSS selector or/,
     ],
     [{ ...base, baseUrl: "nope" }, /baseUrl must be a URL/],
-    [{ ...base, routes: [] }, /routes must list at least one path/],
+    [{ ...base, routes: [] }, /routes must list at least one path \(or set storybook\)/],
+    [{ routes: ["/"] }, /baseUrl must be a non-empty string/],
     [{ ...base, routes: ["pricing"] }, /must start with \//],
     [{ ...base, routes: ["/a", { path: "/b", name: "a" }] }, /two entries named "a"/],
     [{ ...base, variants: [{ browser: "firefox" }] }, /must be one the image ships: chromium/],
