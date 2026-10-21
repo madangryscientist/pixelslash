@@ -14,7 +14,8 @@
       "command": "bun --bun vitest run",
       "options": {
         "cwd": "bench"
-      }
+      },
+      "dependsOn": ["check"]
     },
     "corpus": {
       "command": "bun bench/src/generate.ts",
@@ -26,7 +27,20 @@
     },
     "check": {
       "command": "bun bench/src/check.ts",
-      "cache": false
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/corpus/**/*",
+        "{projectRoot}/corpus-holdout/**/*",
+        "{projectRoot}/results/*.json",
+        "{projectRoot}/package.json",
+        "{workspaceRoot}/bun.lock",
+        "{workspaceRoot}/packages/engine/src/index.ts",
+        "{workspaceRoot}/packages/engine/src/diff.ts",
+        "{workspaceRoot}/packages/engine/src/diff-options.ts",
+        "{workspaceRoot}/packages/engine/src/regions.ts",
+        "{workspaceRoot}/packages/engine/src/shift.ts"
+      ]
     }
   }
 }

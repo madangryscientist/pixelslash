@@ -53,7 +53,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@pixelslash/engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
-| `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
+| `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
 
 `bunfig.toml` sets `[install] linker = "isolated"`: a package sees its own
 declared dependencies and the root's, not another package's. Declare what a
@@ -77,6 +77,14 @@ One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
 remote cache. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
+
+The bench regression guard is part of `test`: `bench:test` depends on `bench:check`
+(`bun bench/src/check.ts`, no VM, no browser), which fails when a score is worse than the
+committed `bench/results/*.json`. The check is cacheable; its inputs are `bench/src`, the
+committed corpora, `bench/results/*.json` and the engine's diff sources, so an `apps/web`
+change replays it from cache. When a score moves on purpose, commit a new
+`bench/results/<date>.json` in the same change: that file becomes the baseline (see
+`bench/README.md`, "The regression guard").
 
 **Generated files are not formatted.** `oxfmt` rewrites what it is given, so anything a tool
 writes must be excluded in `.oxfmtrc.json`'s `ignorePatterns` rather than hand-formatted: the

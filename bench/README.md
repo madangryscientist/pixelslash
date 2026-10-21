@@ -80,12 +80,22 @@ stage prints `capture: skip: <why>` and the rest of the run goes on.
 
 ## The regression guard
 
-`bun run bench:check` (an Nx target, `bench:check`; not part of the default gate yet) runs PixelSlash
-on both corpora, reads the newest `bench/results/<date>.json`, and exits 1 when, on either corpus,
-real changes caught fall, or noise or identical pairs flagged rise. Fractions are compared exactly
-(a corpus that grew compares by rate). It prints every number before and after, and the cases whose
-verdict moved. It needs no VM and no browser. Commit a new results file when a score moves on purpose;
-that file becomes the baseline.
+`bun run bench:check` (an Nx target, `bench:check`) runs PixelSlash on both corpora, reads the
+committed `bench/results/<date>.json` at git HEAD, and exits 1 when, on either corpus, real changes
+caught fall, or noise or identical pairs flagged rise. Fractions are compared exactly (a corpus that
+grew compares by rate). It prints every number before and after, and the cases whose verdict moved.
+It needs no VM and no browser.
+
+It is in the gate: `bench:test` depends on `bench:check`, so `bun run test` (and `nx run-many -t test`)
+runs it and fails on a regression. The check is cacheable. Its inputs are `bench/src`, the committed
+corpora, `bench/results/*.json`, `bench/package.json`, `bun.lock` and the engine's diff sources
+(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`); an edit to any of them re-runs it,
+and an edit anywhere else (`apps/web`, the CLI) replays it from cache.
+
+When a score moves on purpose (a threshold you meant to change, a new case): run `bun run bench:check`,
+read the before and after numbers, then run `bun run bench` to write a new `bench/results/<date>.json`
+and commit it in the same change. That file becomes the baseline; the next check compares against it.
+Do not loosen `check.ts` to make a regression pass.
 
 ## The corpus
 
