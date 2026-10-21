@@ -31,15 +31,7 @@ function measured(shot: SnapshotView): string {
   return changed;
 }
 
-function BuildMeta({
-  build,
-  pending,
-  total,
-}: {
-  build: BuildView["build"];
-  pending: number;
-  total: number;
-}) {
+function BuildMeta({ build, toReview }: { build: BuildView["build"]; toReview: number }) {
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
       <span className="font-mono">{build.commitSha.slice(0, 7)}</span>
@@ -47,18 +39,18 @@ function BuildMeta({
       <StatusBadge status={build.status} />
       <span className="text-neutral-500">{formatDateTime(build.createdAt)}</span>
       <span className="text-neutral-500">
-        {pending === 0 ? "nothing pending" : `${pending} of ${total} pending`}
+        {toReview === 0 ? "nothing to review" : `${toReview} to review`}
       </span>
     </div>
   );
 }
 
 function AcceptAll({
-  pending,
+  toReview,
   reviewable,
   onAccept,
 }: {
-  pending: number;
+  toReview: number;
   reviewable: boolean;
   onAccept: () => Promise<void>;
 }) {
@@ -71,7 +63,7 @@ function AcceptAll({
   return (
     <button
       type="button"
-      disabled={!hydrated || busy || !reviewable || pending === 0}
+      disabled={!hydrated || busy || !reviewable || toReview === 0}
       onClick={accept}
       className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
     >
@@ -125,7 +117,10 @@ function BuildPage() {
   const { project, build, snapshots } = Route.useLoaderData();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const pending = snapshots.filter((shot) => shot.reviewState === "pending").length;
+  // Only a changed shot blocks a build (verdictOf); new, removed and unchanged ones do not need a decision.
+  const toReview = snapshots.filter(
+    (shot) => shot.diffStatus === "changed" && shot.reviewState === "pending",
+  ).length;
   const reviewable = build.status === "changes" || build.status === "passed";
   const acceptAll = async () => {
     setError(null);
@@ -148,9 +143,9 @@ function BuildPage() {
         </Link>
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <BuildMeta build={build} pending={pending} total={snapshots.length} />
+        <BuildMeta build={build} toReview={toReview} />
         <div className="mb-6 ml-auto">
-          <AcceptAll pending={pending} reviewable={reviewable} onAccept={acceptAll} />
+          <AcceptAll toReview={toReview} reviewable={reviewable} onAccept={acceptAll} />
         </div>
       </div>
       {build.error && (

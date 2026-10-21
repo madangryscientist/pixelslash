@@ -327,7 +327,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await page.keyboard.press("a");
   await expect(page.getByTestId("review-state")).toHaveText("accepted by e2e-octocat");
   await open(page, buildUrl);
-  await expect(page.getByText("4 of 5 pending")).toBeVisible();
+  await expect(page.getByText("1 to review")).toBeVisible();
 
   // r rejects the size-changed shot and the build fails.
   await group(page, "changed").getByRole("link", { name: /hero/ }).click();
@@ -346,7 +346,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await page.getByTestId("build-row").first().getByRole("link", { name: "review" }).click();
   await page.getByRole("button", { name: "Accept all" }).click();
   await expect(page.getByTestId("build-status")).toHaveText("passed");
-  await expect(page.getByText("nothing pending")).toBeVisible();
+  await expect(page.getByText("nothing to review")).toBeVisible();
   await expect(page.getByTestId("review-state").first()).toHaveText(/accepted by e2e-octocat/);
   await capture(page, "07-build-accepted-all");
 
