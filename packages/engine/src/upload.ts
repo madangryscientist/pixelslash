@@ -89,7 +89,7 @@ function entry(v: unknown, i: number): SnapshotEntry {
 }
 
 /** The identity the server keeps a snapshot under; two entries sharing it would overwrite each other. */
-function identity(e: SnapshotEntry): string {
+export function identity(e: SnapshotEntry): string {
   const { width, height } = e.variant.viewport;
   return [e.name, e.variant.browser, `${width}x${height}`, e.variant.theme].join(" / ");
 }

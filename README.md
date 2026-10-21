@@ -97,6 +97,21 @@ The fingerprint says what rendered the snapshot; only snapshots with equal finge
 
 Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
 
+## Comparing two snapshot dirs
+
+`pixelslash compare` is pair mode for two `capture` outputs: Main's snapshot dir against Branch's, on this machine, with no design system and no server.
+
+```
+pixelslash compare MAIN_DIR BRANCH_DIR [--out DIR]
+```
+
+- Each dir is a `manifest.json` and the PNGs it names, checked before anything is diffed. Entries are matched by **name + browser + viewport + theme**, the same identity a server uses (the manifest has no platform; the server's is always `linux`).
+- Each matched pair goes through the engine's pair diff with the **Branch** entry's resolved `diff` options (what the server does: the new shot's options decide) and the **union** of both entries' `ignore` boxes (also the server's rule, so an element that moved is covered at its old and its new place). Note this is wider than "the Branch manifest's ignore boxes" alone.
+- A snapshot only on Branch is **new**; one only on Main is **removed**; neither is diffed. A matched pair the diff calls not changed is **unchanged**.
+- `--out/index.html` states the counts (`N changed · N unchanged · N new · N removed`) and links one `report.html` per **changed** snapshot, which sits in its own dir under `--out` with `main.png`, `branch.png` and `diff.png`. Unchanged snapshots get no files. Default `--out` is `pixelslash-compare`; it is not cleaned, so a re-run into the same dir leaves the old reports of snapshots that have since stopped changing. Use a fresh dir. An `--out` that is, holds or sits inside either snapshot dir is refused.
+- If a pair's fingerprints differ (image, browser or fonts), `compare` warns on stderr by name and **still diffs**; the index says so at the top, since the pixels then mix a real change with a different renderer. A server would instead ask for a re-baseline.
+- stdout is `pixelslash: N changed, N unchanged, N new, N removed`, `fingerprint: N differ (diffed anyway)` when any differ, then `report: file://…/index.html`. Exit 0 whether or not anything changed: this is a viewer, not a gate. Exit 2 on a missing dir or manifest, a bad manifest or PNG, a missing argument, or an overlapping `--out`.
+
 ## Uploading to a server
 
 Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots, and they send them only to the server you name. The same CLI talks to the hosted app and to a self-hosted one.

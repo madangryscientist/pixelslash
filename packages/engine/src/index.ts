@@ -5,6 +5,12 @@ export {
   type CompareResult,
   type Deps,
 } from "./compare.ts";
+export {
+  compareSnapshots,
+  type SnapshotCompareDeps,
+  type SnapshotCompareOptions,
+  type SnapshotCompareResult,
+} from "./compare-snapshots.ts";
 export type { CapturePage } from "./capture.ts";
 export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
