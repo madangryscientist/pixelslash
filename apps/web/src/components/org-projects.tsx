@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
 import { StatusBadge } from "#/components/ui";
 import type { LatestBuild, OrgOverview, ProjectOverview } from "#/db/orgs";
 import { formatNumber, formatRelative } from "#/lib/format";
@@ -6,63 +7,6 @@ import { formatNumber, formatRelative } from "#/lib/format";
 /** The words for a number: `1 invite`, `2 invites`. */
 export function plural(count: number, one: string, many = `${one}s`): string {
   return `${formatNumber(count)} ${count === 1 ? one : many}`;
-}
-
-type Slice = { key: string; label: string; count: number; colour: string };
-
-/**
- * What a build's shots came to, in the order a reviewer cares about. Only what was measured is
- * painted as unchanged: a shot the server never compared, or could not compare against another
- * environment's baseline, is its own grey and its own words.
- */
-function slicesOf(latest: LatestBuild): Slice[] {
-  const { counts } = latest;
-  return [
-    { key: "changed", label: "changed", count: counts.changed, colour: "var(--ps-changed)" },
-    { key: "new", label: "new", count: counts.new, colour: "var(--ps-new)" },
-    { key: "removed", label: "removed", count: counts.removed, colour: "var(--ps-removed)" },
-    {
-      key: "unmeasured",
-      label: "not measured",
-      count: counts.unmeasured + counts.rebaseline,
-      colour: "var(--ps-unmeasured)",
-    },
-    { key: "unchanged", label: "unchanged", count: counts.unchanged, colour: "var(--ps-same)" },
-  ].filter((slice) => slice.count > 0);
-}
-
-function MixBar({ latest }: { latest: LatestBuild }) {
-  const slices = slicesOf(latest);
-  return (
-    <div data-testid="snapshot-mix">
-      <div
-        role="img"
-        aria-label={slices.map((s) => `${s.count} ${s.label}`).join(", ") || "no shots"}
-        className="flex h-1.5 w-full overflow-hidden rounded-[3px] bg-(--ps-same)"
-      >
-        {slices.map((slice) => (
-          <i
-            key={slice.key}
-            className="block h-full"
-            style={{ width: `${(slice.count / latest.total) * 100}%`, background: slice.colour }}
-          />
-        ))}
-      </div>
-      <p className="mt-1.25 text-xs text-slate-400">
-        {slices.length === 0
-          ? "no shots"
-          : slices.map((s) => `${formatNumber(s.count)} ${s.label}`).join(" · ")}
-      </p>
-    </div>
-  );
-}
-
-/** The stripe down a row's left edge: amber when work is waiting, the verdict otherwise. */
-function stripeOf(latest: LatestBuild): string {
-  if (latest.counts.toReview > 0) return "var(--ps-changed)";
-  if (latest.status === "failed" || latest.status === "errored") return "var(--ps-removed)";
-  if (latest.status === "passed") return "var(--ps-ok)";
-  return "var(--ps-unmeasured)";
 }
 
 const HEAD = "text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
@@ -142,8 +86,8 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
         </p>
       </div>
       <BuildCell project={project} />
-      {latest ? <MixBar latest={latest} /> : <span className="text-slate-400">—</span>}
-      <ToReview latest={latest} />
+      {latest ? <MixBar counts={latest.counts} /> : <span className="text-slate-400">—</span>}
+      <ToReview build={latest} />
       <Updated project={project} now={now} />
       <Link
         to="/projects/$projectId/settings"
@@ -162,35 +106,6 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
         </svg>
       </Link>
     </li>
-  );
-}
-
-/** A build in one of these statuses was never diffed, so "nothing to review" would claim a result. */
-const UNMEASURED = new Set<LatestBuild["status"]>(["uploading", "processing", "errored"]);
-
-/** "7 to review" in amber, "auto-accepted" for a build on main (`MAIN_BRANCH` in diff/process.ts accepts those), else a dash. */
-function ToReview({ latest }: { latest: LatestBuild | null }) {
-  if (!latest) return <span className="text-slate-400">—</span>;
-  if (UNMEASURED.has(latest.status)) {
-    return (
-      <span data-testid="to-review" className="text-sm text-slate-400">
-        not measured
-      </span>
-    );
-  }
-  if (latest.counts.toReview > 0) {
-    return (
-      <span data-testid="to-review" className="font-bold text-(--ps-warn)">
-        {latest.counts.toReview} to review
-      </span>
-    );
-  }
-  return (
-    <span data-testid="to-review" className="text-sm text-slate-400">
-      {latest.branch === "main" && latest.status === "passed"
-        ? "auto-accepted"
-        : "nothing to review"}
-    </span>
   );
 }
 

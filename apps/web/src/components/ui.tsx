@@ -1,6 +1,7 @@
-import { Button, Input, PageHeading, Pill } from "@hackcove/ui";
+import { Input, PageHeading, Pill } from "@hackcove/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
+import { ActionButton } from "./action-button";
 import { AppHeader } from "./shell";
 
 export { useHydrated };
@@ -78,22 +79,33 @@ export function Page({
 export function InlineForm({
   label,
   button,
+  busyLabel,
+  emptyReason,
   onSubmit,
 }: {
   label: string;
   button: string;
+  busyLabel: string;
+  /** Why the button is grey while the field is empty: its `title` and the line under the field. */
+  emptyReason: string;
   onSubmit: (value: string) => Promise<unknown>;
 }) {
   const hydrated = useHydrated();
   const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const empty = value.trim().length === 0;
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (empty) return;
     setError(null);
-    onSubmit(value.trim()).then(
-      () => setValue(""),
-      (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
-    );
+    setBusy(true);
+    onSubmit(value.trim())
+      .then(
+        () => setValue(""),
+        (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
+      )
+      .finally(() => setBusy(false));
   };
   return (
     <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
@@ -105,13 +117,21 @@ export function InlineForm({
         onChange={(e) => setValue(e.target.value)}
         className="min-w-0 flex-1 px-3"
       />
-      <Button type="submit" disabled={!hydrated || value.trim().length === 0}>
+      <ActionButton
+        type="submit"
+        waiting={!hydrated}
+        disabledReason={empty ? emptyReason : undefined}
+        busy={busy}
+        busyLabel={busyLabel}
+      >
         {button}
-      </Button>
-      {error && (
+      </ActionButton>
+      {error ? (
         <p role="alert" className="w-full text-sm text-red-700">
           {error}
         </p>
+      ) : (
+        empty && hydrated && <p className="w-full text-xs text-slate-400">{emptyReason}</p>
       )}
     </form>
   );

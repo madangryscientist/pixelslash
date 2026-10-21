@@ -1,7 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { createOrg, createProject, openSettings } from "./orgs-page";
 
+// Not the server's zone or locale, so a date formatted in the reader's own fails hydration.
+test.use({ timezoneId: "America/New_York", locale: "de-DE" });
+
+const HYDRATION = /hydrat|react\.dev\/errors\/(418|423|425)/i;
+
 test("sign in with GitHub, create a project and issue a CI token", async ({ page }) => {
+  const hydrationErrors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && HYDRATION.test(msg.text())) hydrationErrors.push(msg.text());
+  });
+  page.on("pageerror", (error) => {
+    if (HYDRATION.test(error.message)) hydrationErrors.push(error.message);
+  });
   await page.goto("/");
   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
   await expect(page).toHaveURL(/\/orgs$/);
@@ -9,8 +21,23 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
 
   await createOrg(page, "Acme");
   await createProject(page, "storefront");
+
+  // A project with no builds says how to make one: the token, then the exact upload command.
+  await page.getByRole("link", { name: "storefront", exact: true }).click();
+  const empty = page.getByTestId("empty-project");
+  await expect(empty).toContainText("No builds yet");
+  await expect(empty.getByTestId("upload-command")).toContainText(
+    `pixelslash upload DIR --server ${new URL(page.url()).origin}`,
+  );
+  await page.goBack();
+
   await openSettings(page, "storefront");
   await expect(page.getByRole("heading", { name: "storefront · settings" })).toBeVisible();
+  await expect(page.getByTestId("no-tokens")).toBeVisible();
+  await expect(page.locator("[data-hydrated=true]")).toHaveCount(1);
+  // Empty, the button is grey and says why rather than doing nothing.
+  await expect(page.getByRole("button", { name: "Issue token" })).toBeDisabled();
+  await expect(page.getByText("Name the token first")).toBeVisible();
 
   await page.getByLabel("Token name, e.g. github-actions").fill("github-actions");
   await page.getByRole("button", { name: "Issue token" }).click();
@@ -24,4 +51,5 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
   await expect(page.getByTestId("issued-token")).toHaveCount(0);
   await row.getByRole("button", { name: "Revoke" }).click();
   await expect(row).toContainText("revoked");
+  expect(hydrationErrors).toEqual([]);
 });

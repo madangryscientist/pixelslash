@@ -131,7 +131,8 @@ export const getProjectSettings = createServerFn()
     const user = await requireViewer();
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
-    return { org, project, tokens: await listCiTokens(db, user.id, project.id) };
+    const tokens = await listCiTokens(db, user.id, project.id);
+    return { org, project, tokens, serverUrl: getRequestUrl().origin };
   });
 
 export const issueToken = createServerFn({ method: "POST" })
@@ -156,7 +157,9 @@ export const getProjectPage = createServerFn()
     const user = await requireViewer();
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
-    return { org, project, builds: await listBuilds(db, project.id) };
+    const builds = await listBuilds(db, project.id);
+    // `now` and `serverUrl` for the same reasons as `getOrgs`: one "2 h ago", the URL to upload to.
+    return { org, project, builds, now: new Date(), serverUrl: getRequestUrl().origin };
   });
 
 export const getBuildPage = createServerFn()

@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { ActionButton } from "./action-button";
+import { CopyLine } from "./copy-button";
 
 /** An org with no projects: what a project is, and the two steps to a first build. */
 export function EmptyOrg({
@@ -37,12 +37,12 @@ export function EmptyOrg({
           <Step n={2} />
           <div className="min-w-0">
             Upload a build:
-            <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-[12.5px] text-slate-900">
-              <code data-testid="upload-command" className="min-w-0 break-words">
-                {command}
-              </code>
-              <CopyButton text={command} hydrated={hydrated} />
-            </div>
+            <CopyLine
+              text={command}
+              hydrated={hydrated}
+              testId="upload-command"
+              className="mt-1.5"
+            />
           </div>
         </li>
       </ol>
@@ -50,7 +50,8 @@ export function EmptyOrg({
   );
 }
 
-function Step({ n }: { n: number }) {
+/** A numbered step in an empty state's how-to. */
+export function Step({ n }: { n: number }) {
   return (
     <span
       aria-hidden="true"
@@ -58,21 +59,5 @@ function Step({ n }: { n: number }) {
     >
       {n}
     </span>
-  );
-}
-
-function CopyButton({ text, hydrated }: { text: string; hydrated: boolean }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      disabled={!hydrated}
-      onClick={() => {
-        void navigator.clipboard?.writeText(text).then(() => setCopied(true));
-      }}
-      className="shrink-0 rounded font-sans text-xs text-slate-400 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-violet-600"
-    >
-      {copied ? "copied" : "copy"}
-    </button>
   );
 }

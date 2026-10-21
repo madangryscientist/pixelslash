@@ -270,7 +270,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText("review");
   await expect(rows.first()).toContainText("2 changed · 1 new · 1 removed · 1 unchanged");
-  await expect(rows.first()).toContainText("5 pending");
+  await expect(rows.first().getByTestId("to-review")).toHaveText("2 to review");
   await expect(rows.first().getByTestId("build-status")).toHaveText("changes");
   await capture(page, "01-project");
 
@@ -339,7 +339,9 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await page.waitForTimeout(1100);
   upload(await snapshotDir(REVIEW), token, "review");
   await open(page, `/projects/${projectId}`);
-  await expect(page.getByTestId("build-row").first()).toContainText("5 pending");
+  await expect(page.getByTestId("build-row").first().getByTestId("to-review")).toHaveText(
+    "2 to review",
+  );
   await page.getByTestId("build-row").first().getByRole("link", { name: "review" }).click();
   await page.getByRole("button", { name: "Accept all" }).click();
   await expect(page.getByTestId("build-status")).toHaveText("passed");
