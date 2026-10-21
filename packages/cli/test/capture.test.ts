@@ -62,6 +62,33 @@ describe("pixelslash capture", () => {
     expect(cap.stderr).toMatch(/start command exited \(code 3\)/);
   });
 
+  test("a taken ready URL fails with exit 1 and writes no manifest", async () => {
+    const dir = await tmp();
+    const config = join(dir, "c.json");
+    const other = Bun.serve({ port: 0, fetch: () => new Response("another worktree") });
+    try {
+      await Bun.write(
+        config,
+        JSON.stringify({
+          baseUrl: `http://127.0.0.1:${other.port}`,
+          start: { command: "sleep 30" },
+          routes: ["/"],
+        }),
+      );
+      const cap = capture();
+      const code = await run(
+        ["capture", "--config", config, "--out", join(dir, "out")],
+        cap.io,
+        pinned,
+      );
+      expect(code).toBe(1);
+      expect(cap.stderr).toMatch(/something already answers on http:\/\/127\.0\.0\.1:\d+; stop it/);
+      expect(await Bun.file(join(dir, "out", "manifest.json")).exists()).toBe(false);
+    } finally {
+      await other.stop(true);
+    }
+  });
+
   test("a bad flag or a bad config is a usage error, exit 2", async () => {
     const cap = capture();
     expect(await run(["capture", "--live", "x"], cap.io, pinned)).toBe(2);

@@ -33,9 +33,14 @@ function killGroup(pid: number, signal: NodeJS.Signals): void {
 /**
  * Run the config's start command and wait until its ready URL answers below
  * 400. The app's output goes to stderr so stdout stays the CLI's. Returns a stop
- * function; a command that exits early or never gets ready is a CaptureError.
+ * function; a command that exits early or never gets ready is a CaptureError,
+ * and so is a ready URL that already answers before the command runs: that is
+ * someone else's server (a second run on the same port), and an answer from it
+ * would be taken for ours.
  */
 export async function startApp(start: StartCommand): Promise<StopApp> {
+  if (await answers(start.readyUrl))
+    throw new CaptureError(`something already answers on ${start.readyUrl}; stop it`);
   const argv = ["sh", "-c", start.command];
   const proc = Bun.spawn(Bun.which("setsid") ? ["setsid", ...argv] : argv, {
     stdin: "ignore",
@@ -55,11 +60,14 @@ export async function startApp(start: StartCommand): Promise<StopApp> {
   };
   const deadline = Date.now() + start.timeoutMs;
   while (Date.now() < deadline) {
-    if (await answers(start.readyUrl)) return stop;
+    const ready = await answers(start.readyUrl);
+    // Checked after the probe, not before: a command that died (a taken port)
+    // leaves whatever else is on the URL answering, and that is not our app.
     if (exited)
       throw new CaptureError(
         `start command exited (code ${proc.exitCode}) before ${start.readyUrl} was ready`,
       );
+    if (ready) return stop;
     await Bun.sleep(POLL_MS);
   }
   await stop();

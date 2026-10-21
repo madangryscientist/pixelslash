@@ -63,7 +63,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 }
 ```
 
-- `baseUrl` must already be up, unless `start` is given: then the command runs first (in the container, from the working dir), its `readyUrl` (default `baseUrl`) must answer below 400 within `timeoutMs`, and the command's whole process group is stopped after the run. Its output goes to stderr.
+- `baseUrl` must already be up, unless `start` is given: then the command runs first (in the container, from the working dir), its `readyUrl` (default `baseUrl`) must answer below 400 within `timeoutMs`, and the command's whole process group is stopped after the run. Its output goes to stderr. If `readyUrl` already answers before the command runs (another run on the same port), or the command has exited by the time it answers, the capture fails with exit 1 and writes nothing: the answer would be someone else's server.
 - `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`; a query string is slugged too, so `/search?q=a&page=2` is `search-q-a-page-2`). Top-level `masks` and `tags` apply to every route. A route `path` may carry a query string; it is sent as written and recorded as-is in the manifest's `path`.
 - `storybook` shoots a Storybook without a hand-written route list. Once the app is up (after `start`), capture reads `<url>/index.json` (Storybook 7+; `docs` entries are skipped, only `type: "story"`) and adds one route per story × each combination of the listed `globals` (no globals: one per story), each then × the config's `variants`. `url` is required; `baseUrl` defaults to it, so a Storybook-only config needs no `routes`. Example:
 
