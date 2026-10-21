@@ -127,7 +127,11 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
   return { build, snapshots: ordered };
 }
 
-export type BuildCounts = Record<SnapshotGroup, number> & { pending: number };
+export type BuildCounts = Record<SnapshotGroup, number> & {
+  pending: number;
+  /** Changed shots nobody has decided yet: what the build page calls "to review". */
+  toReview: number;
+};
 
 export type BuildSummary = {
   id: string;
@@ -140,7 +144,7 @@ export type BuildSummary = {
   counts: BuildCounts;
 };
 
-const emptyCounts = (): BuildCounts => ({
+export const emptyCounts = (): BuildCounts => ({
   changed: 0,
   new: 0,
   removed: 0,
@@ -148,7 +152,38 @@ const emptyCounts = (): BuildCounts => ({
   rebaseline: 0,
   unmeasured: 0,
   pending: 0,
+  toReview: 0,
 });
+
+/** The per-group counts of each build's shots, in one grouped read. A build with no shots is absent. */
+export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<string, BuildCounts>> {
+  const counts = new Map<string, BuildCounts>();
+  if (buildIds.length === 0) return counts;
+  const stats = await db
+    .select({
+      buildId: snapshots.buildId,
+      diffStatus: snapshots.diffStatus,
+      rebaselineNeeded: snapshots.rebaselineNeeded,
+      reviewState: snapshots.reviewState,
+      n: count(),
+    })
+    .from(snapshots)
+    .where(inArray(snapshots.buildId, buildIds))
+    .groupBy(
+      snapshots.buildId,
+      snapshots.diffStatus,
+      snapshots.rebaselineNeeded,
+      snapshots.reviewState,
+    );
+  for (const stat of stats) {
+    const held = counts.get(stat.buildId) ?? emptyCounts();
+    held[groupOf(stat)] += stat.n;
+    if (stat.reviewState === "pending") held.pending += stat.n;
+    if (stat.diffStatus === "changed" && stat.reviewState === "pending") held.toReview += stat.n;
+    counts.set(stat.buildId, held);
+  }
+  return counts;
+}
 
 /** Every build of a project, newest first, with the counts the project page prints. */
 export async function listBuilds(db: Db, projectId: string): Promise<BuildSummary[]> {
@@ -166,34 +201,10 @@ export async function listBuilds(db: Db, projectId: string): Promise<BuildSummar
     .where(eq(builds.projectId, projectId))
     .orderBy(desc(builds.createdAt), desc(builds.id));
   if (rows.length === 0) return [];
-  const stats = await db
-    .select({
-      buildId: snapshots.buildId,
-      diffStatus: snapshots.diffStatus,
-      rebaselineNeeded: snapshots.rebaselineNeeded,
-      reviewState: snapshots.reviewState,
-      n: count(),
-    })
-    .from(snapshots)
-    .where(
-      inArray(
-        snapshots.buildId,
-        rows.map((row) => row.id),
-      ),
-    )
-    .groupBy(
-      snapshots.buildId,
-      snapshots.diffStatus,
-      snapshots.rebaselineNeeded,
-      snapshots.reviewState,
-    );
-  const counts = new Map<string, BuildCounts>();
-  for (const stat of stats) {
-    const held = counts.get(stat.buildId) ?? emptyCounts();
-    held[groupOf(stat)] += stat.n;
-    if (stat.reviewState === "pending") held.pending += stat.n;
-    counts.set(stat.buildId, held);
-  }
+  const counts = await countBuilds(
+    db,
+    rows.map((row) => row.id),
+  );
   return rows.map((row) => ({ ...row, counts: counts.get(row.id) ?? emptyCounts() }));
 }
 

@@ -1,20 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { createOrg, createProject, openSettings } from "./orgs-page";
 
 test("sign in with GitHub, create a project and issue a CI token", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
   await expect(page).toHaveURL(/\/orgs$/);
-  await expect(page.getByRole("heading", { name: "Organizations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Organizations", exact: true })).toBeVisible();
 
-  await page.getByLabel("New organization name").fill("Acme");
-  await page.getByRole("button", { name: "Create organization" }).click();
-  await expect(page.getByRole("heading", { name: "Acme" })).toBeVisible();
-
-  // Other specs share this database and add their own orgs to the page.
-  const card = page.locator("li", { has: page.getByRole("heading", { name: "Acme" }) }).first();
-  await card.getByLabel("New project name").fill("storefront");
-  await card.getByRole("button", { name: "Create project" }).click();
-  await card.getByRole("link", { name: "Settings" }).click();
+  await createOrg(page, "Acme");
+  await createProject(page, "storefront");
+  await openSettings(page, "storefront");
   await expect(page.getByRole("heading", { name: "storefront · settings" })).toBeVisible();
 
   await page.getByLabel("Token name, e.g. github-actions").fill("github-actions");

@@ -8,6 +8,7 @@ import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
 import { expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
+import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
 
@@ -167,28 +168,17 @@ async function provision(page: Page): Promise<{ token: string; projectId: string
   await page.goto("/");
   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
   await expect(page).toHaveURL(/\/orgs$/);
-  await submit(
-    page.getByLabel("New organization name"),
-    "Review Co",
-    page.getByRole("button", { name: "Create organization" }),
-  );
-  const card = page
-    .locator("li", { has: page.getByRole("heading", { name: "Review Co" }) })
-    .first();
-  await submit(
-    card.getByLabel("New project name"),
-    "shop",
-    card.getByRole("button", { name: "Create project" }),
-  );
-  await card.getByRole("link", { name: "Settings" }).click();
+  const orgId = await createOrg(page, "Review Co");
+  await createProject(page, "shop");
+  await openSettings(page, "shop");
   await submit(
     page.getByLabel("Token name, e.g. github-actions"),
     "ci",
     page.getByRole("button", { name: "Issue token" }),
   );
   const token = (await page.getByTestId("issued-token").textContent()) ?? "";
-  await page.goto("/orgs");
-  await page.getByRole("link", { name: "shop" }).click();
+  await page.goto(`/orgs?org=${orgId}`);
+  await page.getByRole("link", { name: "shop", exact: true }).click();
   const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1];
   if (!projectId) throw new Error(`no project id in ${page.url()}`);
   return { token, projectId };

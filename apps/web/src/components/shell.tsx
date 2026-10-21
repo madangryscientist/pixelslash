@@ -113,15 +113,18 @@ function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }
 export function AppHeader({
   crumbs = [],
   wide = false,
+  full = false,
 }: {
   crumbs?: ReactNode[] | undefined;
   wide?: boolean;
+  /** Edge to edge: the organizations page lays out its own rail and canvas. */
+  full?: boolean;
 }) {
   const { viewer } = rootRoute.useLoaderData();
   return (
     <header className="border-b border-slate-200 bg-white">
       <div
-        className={`mx-auto flex items-center gap-4 px-6 py-3 ${wide ? "max-w-6xl" : "max-w-3xl"}`}
+        className={`flex items-center gap-4 px-6 py-3 ${full ? "" : `mx-auto ${wide ? "max-w-6xl" : "max-w-3xl"}`}`}
       >
         <Link
           to={viewer ? "/orgs" : "/"}

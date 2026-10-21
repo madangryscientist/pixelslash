@@ -54,3 +54,40 @@
 .dark .divide-slate-100 > :not(:last-child) {
   border-color: #282839; /* what border-slate-100 maps to */
 }
+
+/*
+ * The organizations page's own colours: what the snapshot mix bar paints, the amber that marks
+ * work waiting, and the grey of a button that cannot be pressed. Light is the hackcove palette
+ * (Tailwind amber/blue/slate/emerald), dark is Catppuccin Mocha (peach, blue, surface, green).
+ */
+:root {
+  --ps-changed: #f59e0b;
+  --ps-new: #3b82f6;
+  --ps-removed: #ef4444;
+  --ps-unmeasured: #cbd5e1;
+  --ps-same: #e2e8f0;
+  --ps-ok: #059669;
+  --ps-warn: #b45309;
+  --ps-warn-soft: #fffbeb;
+  --ps-brand-soft: #f5f3ff;
+  --ps-brand-ink: #1e1e2e;
+  --ps-dis-bg: #f1f5f9;
+  --ps-dis-ink: #94a3b8;
+  --ps-dis-line: #e2e8f0;
+  --ps-scrim: rgba(15, 23, 42, 0.35);
+}
+.dark {
+  --ps-changed: #fab387;
+  --ps-new: #89b4fa;
+  --ps-removed: #f38ba8;
+  --ps-unmeasured: #585b70;
+  --ps-same: #313244;
+  --ps-ok: #a6e3a1;
+  --ps-warn: #f9e2af;
+  --ps-warn-soft: #2d2a22;
+  --ps-brand-soft: #2a2540;
+  --ps-dis-bg: #262637;
+  --ps-dis-ink: #6c7086;
+  --ps-dis-line: #313244;
+  --ps-scrim: rgba(0, 0, 0, 0.55);
+}

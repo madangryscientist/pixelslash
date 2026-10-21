@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Locator, type Page, expect, test } from "@playwright/test";
+import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 
 const run = promisify(execFile);
@@ -32,18 +33,9 @@ async function provision(page: Page, org: string, project: string, signIn: boole
     await page.goto("/orgs");
   }
   await expect(page).toHaveURL(/\/orgs$/);
-  await submit(
-    page.getByLabel("New organization name"),
-    org,
-    page.getByRole("button", { name: "Create organization" }),
-  );
-  const card = page.locator("li", { has: page.getByRole("heading", { name: org }) }).first();
-  await submit(
-    card.getByLabel("New project name"),
-    project,
-    card.getByRole("button", { name: "Create project" }),
-  );
-  await card.getByRole("link", { name: "Settings" }).click();
+  await createOrg(page, org);
+  await createProject(page, project);
+  await openSettings(page, project);
   await submit(
     page.getByLabel("Token name, e.g. github-actions"),
     "ci",
@@ -212,10 +204,8 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
 
   // A revoked token is refused.
   await page.goto("/orgs");
-  const card = page
-    .locator("li", { has: page.getByRole("heading", { name: "Upload Co" }) })
-    .first();
-  await card.getByRole("link", { name: "Settings" }).click();
+  await page.getByTestId("org-link").filter({ hasText: "Upload Co" }).click();
+  await openSettings(page, "ship");
   await page.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByRole("row", { name: /ci/ })).toContainText("revoked");
   const revoked = upload(dir, acme);

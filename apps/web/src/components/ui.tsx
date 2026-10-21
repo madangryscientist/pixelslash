@@ -44,22 +44,29 @@ export function ReviewChip({ state, by }: { state: string; by?: string | null })
 export function Page({
   title,
   wide = false,
+  full = false,
   crumbs,
   children,
 }: {
   title: string;
   wide?: boolean;
+  /** Edge to edge with no page heading: the page draws its own (the organizations page). */
+  full?: boolean;
   crumbs?: ReactNode[];
   children: ReactNode;
 }) {
   const hydrated = useHydrated();
   return (
     <div className="app-canvas min-h-screen" data-hydrated={hydrated}>
-      <AppHeader crumbs={crumbs} wide={wide} />
-      <main className={`mx-auto px-6 py-8 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
-        <PageHeading className="mb-6">{title}</PageHeading>
-        {children}
-      </main>
+      <AppHeader crumbs={crumbs} wide={wide} full={full} />
+      {full ? (
+        <main>{children}</main>
+      ) : (
+        <main className={`mx-auto px-6 py-8 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
+          <PageHeading className="mb-6">{title}</PageHeading>
+          {children}
+        </main>
+      )}
     </div>
   );
 }

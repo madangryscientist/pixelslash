@@ -1,9 +1,16 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie } from "@tanstack/react-start/server";
+import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
 import { NotFoundError } from "#/db/db";
-import { createOrg, createProject, getProjectWithOrg, inviteMember, listOrgs } from "#/db/orgs";
+import {
+  createOrg,
+  createProject,
+  getProjectWithOrg,
+  inviteMember,
+  listOrgs,
+  withdrawInvite,
+} from "#/db/orgs";
 import {
   NotReviewableError,
   acceptAllSnapshots,
@@ -78,9 +85,14 @@ async function getViewerSummary() {
 
 export const getViewer = createServerFn().handler(getViewerSummary);
 
+/**
+ * The organizations page's data. `now` is read once here so the server's render and the browser's
+ * agree on every "2 h ago"; `serverUrl` is the origin the empty state tells the user to upload to.
+ */
 export const getOrgs = createServerFn().handler(async () => {
   const user = await requireViewer();
-  return listOrgs(database(), user.id);
+  const orgs = await listOrgs(database(), user.id);
+  return { orgs, now: new Date(), serverUrl: getRequestUrl().origin };
 });
 
 export const newOrg = createServerFn({ method: "POST" })
@@ -104,6 +116,13 @@ export const invite = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     await or404(inviteMember(database(), user, data.orgId, data.login));
+  });
+
+export const withdrawOrgInvite = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({ orgId: field(d, "orgId"), inviteId: field(d, "inviteId") }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(withdrawInvite(database(), user.id, data.orgId, data.inviteId));
   });
 
 export const getProjectSettings = createServerFn()

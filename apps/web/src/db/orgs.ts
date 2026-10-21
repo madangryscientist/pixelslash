@@ -1,6 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
 import { type Db, NotFoundError } from "./db";
-import { invites, members, orgs, projects } from "./schema";
+import { type BuildCounts, countBuilds, emptyCounts } from "./review";
+import { builds, invites, members, orgs, projects, users } from "./schema";
 import type { User } from "./users";
 
 export type Org = typeof orgs.$inferSelect;
@@ -14,8 +16,80 @@ export async function createOrg(db: Db, userId: string, name: string): Promise<O
   return org;
 }
 
-/** Every org the user belongs to, each with its projects, by name. */
-export async function listOrgs(db: Db, userId: string) {
+/** A project's newest build, whatever its branch, with what its shots came to. */
+export type LatestBuild = {
+  id: string;
+  branch: string;
+  commitSha: string;
+  prNumber: number | null;
+  status: (typeof builds.$inferSelect)["status"];
+  createdAt: Date;
+  /** Every shot the build holds, removed markers included: the size of the bar's whole. */
+  total: number;
+  counts: BuildCounts;
+};
+
+export type ProjectOverview = Project & { latest: LatestBuild | null };
+
+export type OrgMember = {
+  userId: string;
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  joinedAt: Date;
+};
+
+export type OrgInvite = { id: string; githubLogin: string; createdAt: Date };
+
+export type OrgOverview = Org & {
+  projects: ProjectOverview[];
+  members: OrgMember[];
+  invites: OrgInvite[];
+  /** Projects whose latest build has changed shots still waiting for a decision. */
+  waiting: number;
+};
+
+async function latestBuilds(db: Db, projectIds: string[]): Promise<Map<string, LatestBuild>> {
+  const latest = new Map<string, LatestBuild>();
+  if (projectIds.length === 0) return latest;
+  const rows = await db
+    .select({
+      id: builds.id,
+      projectId: builds.projectId,
+      branch: builds.branch,
+      commitSha: builds.commitSha,
+      prNumber: builds.prNumber,
+      status: builds.status,
+      createdAt: builds.createdAt,
+    })
+    .from(builds)
+    .where(
+      and(
+        inArray(builds.projectId, projectIds),
+        // The id breaks a tie between two builds created in the same millisecond.
+        eq(
+          builds.id,
+          sql`(select b.id from builds b where b.project_id = ${builds.projectId} order by b.created_at desc, b.id desc limit 1)`,
+        ),
+      ),
+    );
+  const counts = await countBuilds(
+    db,
+    rows.map((row) => row.id),
+  );
+  for (const { projectId, ...row } of rows) {
+    const held = counts.get(row.id) ?? emptyCounts();
+    const total = SNAPSHOT_GROUPS.reduce((sum, group) => sum + held[group], 0);
+    latest.set(projectId, { ...row, total, counts: held });
+  }
+  return latest;
+}
+
+/**
+ * Every org the user belongs to, by name, each with its projects (latest build and counts),
+ * its members and its pending invites: what the organizations page draws.
+ */
+export async function listOrgs(db: Db, userId: string): Promise<OrgOverview[]> {
   const rows = await db
     .select({ org: orgs, project: projects })
     .from(members)
@@ -23,12 +97,67 @@ export async function listOrgs(db: Db, userId: string) {
     .leftJoin(projects, eq(projects.orgId, orgs.id))
     .where(eq(members.userId, userId))
     .orderBy(asc(orgs.name), asc(projects.name));
-  const byId = new Map<string, Org & { projects: Project[] }>();
+  const orgIds = [...new Set(rows.map(({ org }) => org.id))];
+  if (orgIds.length === 0) return [];
+  const [latest, memberRows, inviteRows] = await Promise.all([
+    latestBuilds(
+      db,
+      rows.flatMap(({ project }) => (project ? [project.id] : [])),
+    ),
+    db
+      .select({
+        orgId: members.orgId,
+        userId: users.id,
+        login: users.login,
+        name: users.name,
+        avatarUrl: users.avatarUrl,
+        joinedAt: members.createdAt,
+      })
+      .from(members)
+      .innerJoin(users, eq(users.id, members.userId))
+      .where(inArray(members.orgId, orgIds))
+      .orderBy(asc(members.createdAt), asc(users.login)),
+    db
+      .select({
+        id: invites.id,
+        orgId: invites.orgId,
+        githubLogin: invites.githubLogin,
+        createdAt: invites.createdAt,
+      })
+      .from(invites)
+      .where(inArray(invites.orgId, orgIds))
+      .orderBy(asc(invites.createdAt), asc(invites.githubLogin)),
+  ]);
+  return assemble(rows, latest, memberRows, inviteRows);
+}
+
+function addProject(entry: OrgOverview, project: Project, build: LatestBuild | null): void {
+  entry.projects.push({ ...project, latest: build });
+  if (build && build.counts.toReview > 0) entry.waiting += 1;
+}
+
+type OrgRows = { org: Org; project: Project | null }[];
+
+function assemble(
+  rows: OrgRows,
+  latest: Map<string, LatestBuild>,
+  memberRows: (OrgMember & { orgId: string })[],
+  inviteRows: (OrgInvite & { orgId: string })[],
+): OrgOverview[] {
+  const byId = new Map<string, OrgOverview>();
   for (const { org, project } of rows) {
-    const entry = byId.get(org.id) ?? { ...org, projects: [] };
-    if (project) entry.projects.push(project);
+    const entry = byId.get(org.id) ?? {
+      ...org,
+      projects: [],
+      members: [],
+      invites: [],
+      waiting: 0,
+    };
+    if (project) addProject(entry, project, latest.get(project.id) ?? null);
     byId.set(org.id, entry);
   }
+  for (const { orgId, ...member } of memberRows) byId.get(orgId)?.members.push(member);
+  for (const { orgId, ...invite } of inviteRows) byId.get(orgId)?.invites.push(invite);
   return [...byId.values()];
 }
 
@@ -57,6 +186,21 @@ export async function inviteMember(
       invitedBy: inviter.id,
     })
     .onConflictDoNothing();
+}
+
+/** Takes back an invite that has not been taken up. An id from another org is the same 404 as a missing one. */
+export async function withdrawInvite(
+  db: Db,
+  userId: string,
+  orgId: string,
+  inviteId: string,
+): Promise<void> {
+  await requireMember(db, userId, orgId);
+  const gone = await db
+    .delete(invites)
+    .where(and(eq(invites.id, inviteId), eq(invites.orgId, orgId)))
+    .returning({ id: invites.id });
+  if (gone.length === 0) throw new NotFoundError("invite");
 }
 
 export async function createProject(
