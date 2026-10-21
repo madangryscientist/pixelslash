@@ -126,7 +126,11 @@ async function snapshotDir(shots: Fixture[]): Promise<string> {
   return dir;
 }
 
-/** The real CLI against the running app; returns the new build id. */
+/**
+ * The real CLI against the running app; returns the new build id. It runs in `history-repo`, not the
+ * worktree: the server only takes a baseline at the branch build's merge-base or an ancestor, so a
+ * worktree HEAD ahead of `origin/main` would make every shot `new`.
+ */
 function upload(dir: string, token: string, branch: string, pr?: number): string {
   const repo = checkout(branch === "main" ? "main" : "work");
   const args = [CLI, "upload", dir, "--server", SERVER, "--branch", branch];
