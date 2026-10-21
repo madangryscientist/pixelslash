@@ -40,6 +40,18 @@ export function defaultTab(counts: Record<BuildTab, number>): BuildTab {
   );
 }
 
+/**
+ * A build that sets the project's baseline: the first one the project has, and every shot in it is
+ * `new`. A later build whose shots are all new (a new environment, say) still has a baseline to
+ * compare against elsewhere, so it keeps its review actions.
+ */
+export function setsBaseline(
+  firstBuild: boolean,
+  snapshots: { diffStatus: string | null }[],
+): boolean {
+  return firstBuild && snapshots.length > 0 && snapshots.every((shot) => shot.diffStatus === "new");
+}
+
 type Reviewable = { id: string; diffStatus: string | null; reviewState: string };
 
 /** The first changed shot still waiting for a decision, in the build's order. */

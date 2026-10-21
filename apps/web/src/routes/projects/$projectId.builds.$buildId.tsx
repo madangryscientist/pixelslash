@@ -4,7 +4,7 @@ import { BuildHeader } from "#/components/build-header";
 import { TabBody, Tabs } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
-import { BUILD_TABS, type BuildTab, defaultTab, tabCounts } from "#/lib/build-tabs";
+import { BUILD_TABS, type BuildTab, defaultTab, setsBaseline, tabCounts } from "#/lib/build-tabs";
 import { acceptBuild, getBuildPage } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
@@ -18,11 +18,12 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
 });
 
 function BuildPage() {
-  const { project, org, build, snapshots, thumbs } = Route.useLoaderData();
+  const { project, org, build, snapshots, thumbs, firstBuild } = Route.useLoaderData();
   const search = Route.useSearch();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const counts = tabCounts(snapshots);
+  const baseline = setsBaseline(firstBuild, snapshots);
   const active = search.tab ?? defaultTab(counts);
   // Only a changed shot blocks a build (verdictOf); new, removed and unchanged ones do not need a decision.
   const toReview = snapshots.filter(
@@ -51,6 +52,7 @@ function BuildPage() {
         toReview={toReview}
         reviewable={reviewable}
         onAccept={acceptAll}
+        baseline={baseline}
       />
       {build.error && (
         <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
@@ -74,6 +76,7 @@ function BuildPage() {
             tab={active}
             snapshots={snapshots}
             thumbs={thumbs}
+            baseline={baseline}
           />
         </>
       )}

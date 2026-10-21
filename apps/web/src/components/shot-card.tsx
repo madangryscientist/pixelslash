@@ -75,9 +75,13 @@ function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | undefined 
   );
 }
 
+/** A new shot has no baseline to compare with; in the project's first build it is the baseline. */
+const newLine = (baseline: boolean) =>
+  baseline ? "sets the baseline" : "no baseline: not compared";
+
 /** The measured change, in the words the reviewer needs; nothing invented. */
-export function measured(shot: SnapshotView): string {
-  if (shot.diffStatus === "new") return "no baseline: not compared";
+export function measured(shot: SnapshotView, baseline: boolean): string {
+  if (shot.diffStatus === "new") return newLine(baseline);
   if (shot.diffStatus === "removed") return "in the baseline only";
   if (shot.diffStatus === null) {
     return groupOf(shot) === "unmeasured" ? "not measured" : "not compared: needs a new baseline";
@@ -101,14 +105,16 @@ export function ShotCard({
   shot,
   label,
   src,
+  baseline,
 }: {
   projectId: string;
   buildId: string;
   shot: SnapshotView;
   label: ShotLabel;
   src: string | undefined;
+  baseline: boolean;
 }) {
-  const line = measured(shot);
+  const line = measured(shot, baseline);
   return (
     <li data-testid="snapshot-row">
       <Link
@@ -128,7 +134,7 @@ export function ShotCard({
               {label.story}
             </p>
           </div>
-          {(shot.diffStatus === "changed" || shot.reviewState !== "pending") && (
+          {!baseline && (shot.diffStatus === "changed" || shot.reviewState !== "pending") && (
             <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
           )}
         </div>

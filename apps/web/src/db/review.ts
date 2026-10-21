@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import { SNAPSHOT_GROUPS, type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
 import { type Db, NotFoundError } from "./db";
 import {
@@ -125,6 +125,28 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
         a.theme.localeCompare(b.theme),
     );
   return { build, snapshots: ordered };
+}
+
+/**
+ * True when no other build of the project came before this one (older, or the same millisecond with
+ * a smaller id), so nothing could have been its baseline. Read, not stored: how a first build is
+ * stored and diffed is unchanged.
+ */
+export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): Promise<boolean> {
+  const [earlier] = await db
+    .select({ id: builds.id })
+    .from(builds)
+    .where(
+      and(
+        eq(builds.projectId, build.projectId),
+        or(
+          lt(builds.createdAt, build.createdAt),
+          and(eq(builds.createdAt, build.createdAt), lt(builds.id, build.id)),
+        ),
+      ),
+    )
+    .limit(1);
+  return !earlier;
 }
 
 export type BuildCounts = Record<SnapshotGroup, number> & {

@@ -15,6 +15,7 @@ import {
   NotReviewableError,
   acceptAllSnapshots,
   buildView,
+  isFirstBuild,
   listBuilds,
   reviewSnapshot,
 } from "#/db/review";
@@ -181,7 +182,8 @@ export const getBuildPage = createServerFn()
       });
       if (branch) thumbs[shot.id] = branch;
     }
-    return { org, project, ...view, thumbs };
+    const firstBuild = await isFirstBuild(db, view.build);
+    return { org, project, ...view, thumbs, firstBuild };
   });
 
 export const getSnapshotPage = createServerFn()

@@ -44,10 +44,12 @@ function ShotRows({
   projectId,
   buildId,
   rows,
+  baseline,
 }: {
   projectId: string;
   buildId: string;
   rows: SnapshotView[];
+  baseline: boolean;
 }) {
   return (
     <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
@@ -62,8 +64,8 @@ function ShotRows({
             <span className="text-sm text-slate-500">
               {shot.platform} · {shot.browser} · {shot.viewport} · {shot.theme}
             </span>
-            <span className="text-sm text-slate-600">{measured(shot)}</span>
-            {shot.reviewState !== "pending" && (
+            <span className="text-sm text-slate-600">{measured(shot, baseline)}</span>
+            {!baseline && shot.reviewState !== "pending" && (
               <span className="ml-auto">
                 <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
               </span>
@@ -104,16 +106,18 @@ function UnchangedFold({
   projectId,
   buildId,
   rows,
+  baseline,
 }: {
   projectId: string;
   buildId: string;
   rows: SnapshotView[];
+  baseline: boolean;
 }) {
   const [shown, setShown] = useState(false);
   return (
     <GroupSection group="unchanged" count={rows.length} heading={false}>
       {shown ? (
-        <ShotRows projectId={projectId} buildId={buildId} rows={rows} />
+        <ShotRows projectId={projectId} buildId={buildId} rows={rows} baseline={baseline} />
       ) : (
         <button
           type="button"
@@ -134,12 +138,14 @@ export function TabBody({
   tab,
   snapshots,
   thumbs,
+  baseline,
 }: {
   projectId: string;
   buildId: string;
   tab: BuildTab;
   snapshots: SnapshotView[];
   thumbs: Record<string, string>;
+  baseline: boolean;
 }) {
   const label = useMemo(() => shotLabeller(snapshots.map((shot) => shot.name)), [snapshots]);
   const definition = BUILD_TABS.find((candidate) => candidate.id === tab);
@@ -166,6 +172,7 @@ export function TabBody({
               shot={shot}
               label={label(shot.name)}
               src={thumbs[shot.id]}
+              baseline={baseline}
             />
           ))}
         </ul>
@@ -173,13 +180,25 @@ export function TabBody({
     );
   }
   if (tab === "unchanged") {
-    return <UnchangedFold projectId={projectId} buildId={buildId} rows={inGroup("unchanged")} />;
+    return (
+      <UnchangedFold
+        projectId={projectId}
+        buildId={buildId}
+        rows={inGroup("unchanged")}
+        baseline={baseline}
+      />
+    );
   }
   return (
     <>
       {groups.map((group) => (
         <GroupSection key={group} group={group} count={inGroup(group).length} heading>
-          <ShotRows projectId={projectId} buildId={buildId} rows={inGroup(group)} />
+          <ShotRows
+            projectId={projectId}
+            buildId={buildId}
+            rows={inGroup(group)}
+            baseline={baseline}
+          />
         </GroupSection>
       ))}
     </>

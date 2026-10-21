@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
-import { expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
+import { expectBaselineBuild, expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
 import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
@@ -273,6 +273,8 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(rows.first().getByTestId("to-review")).toHaveText("2 to review");
   await expect(rows.first().getByTestId("build-status")).toHaveText("changes");
   await capture(page, "01-project");
+
+  await expectBaselineBuild(page, rows.last());
 
   // The build page: five shots in their groups.
   await rows.first().getByRole("link", { name: "review" }).click();
