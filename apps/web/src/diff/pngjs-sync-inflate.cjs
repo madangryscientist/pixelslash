@@ -6,7 +6,8 @@
  *
  * workerd's `zlib.inflateSync` does work, so the server build swaps pngjs's compatibility
  * wrapper for this one. Only the wrapper changes: pngjs still reads, filters and unfilters
- * every chunk itself. Wired in by the resolver plugin in `vite.config.ts`; Bun and Node keep
+ * every chunk itself. Wired in twice in `vite.config.ts`: by the resolver plugin for the build, and by the ssr
+ * `optimizeDeps` plugin for `vite dev`, which pre-bundles pngjs without running resolver plugins; Bun and Node keep
  * pngjs's own version, so the CLI and the tests are untouched.
  */
 const { inflateSync } = require("node:zlib");

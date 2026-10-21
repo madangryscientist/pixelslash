@@ -12,20 +12,34 @@ const SYNC_INFLATE = fileURLToPath(new URL("./src/diff/pngjs-sync-inflate.cjs", 
 
 /**
  * pngjs decodes a PNG with a wrapper around `zlib.Inflate`, which workerd implements as a class
- * it will not let pngjs call as a function. Only the server build needs the swap; see the shim.
+ * it will not let pngjs call as a function. Only the server needs the swap; see the shim.
  */
+function swapSyncInflate(source: string, importer: string | undefined): string | null {
+  if (!importer?.includes("pngjs")) return null;
+  const wrapper = source === "./sync-inflate" || source === "./sync-inflate.js";
+  return wrapper ? SYNC_INFLATE : null;
+}
+
+/** The build resolves pngjs through this plugin. */
 const pngjsSyncInflate: Plugin = {
   name: "pngjs-sync-inflate",
   enforce: "pre",
-  resolveId(source, importer) {
-    if (!importer?.includes("pngjs")) return null;
-    const wrapper = source === "./sync-inflate" || source === "./sync-inflate.js";
-    return wrapper ? SYNC_INFLATE : null;
-  },
+  resolveId: swapSyncInflate,
 };
 
 export default defineConfig({
   resolve: { tsconfigPaths: true },
+  // `vite dev` pre-bundles pngjs, and that bundling does not run Vite's resolver plugins: it needs
+  // the same swap of its own (ob 1625).
+  environments: {
+    ssr: {
+      optimizeDeps: {
+        rolldownOptions: {
+          plugins: [{ name: "pngjs-sync-inflate", resolveId: swapSyncInflate }],
+        },
+      },
+    },
+  },
   plugins: [
     pngjsSyncInflate,
     cloudflare({

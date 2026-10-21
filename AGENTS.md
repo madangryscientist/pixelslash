@@ -106,6 +106,7 @@ A change to `apps/web` also runs the standard's web gate (from the worktree root
 ```bash
 bunx nx build web
 bunx nx test:e2e web              # Playwright: a local build on a fresh local D1, GitHub stubbed
+(cd apps/web && bun run test:e2e:dev)   # the same specs against `vite dev` (after the build run: same ports)
 (cd apps/web && bunx wrangler deploy --dry-run --outdir /tmp/ps-web-dry)
 ```
 

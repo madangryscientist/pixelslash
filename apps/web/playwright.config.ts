@@ -5,6 +5,10 @@ import { defineConfig, devices } from "@playwright/test";
 // which the next run clears: miniflare and wrangler leave nothing in /tmp.
 const SERVER_TMP = fileURLToPath(new URL(".wrangler/e2e/tmp", import.meta.url));
 
+// `PIXELSLASH_E2E_DEV=1` serves with `vite dev` instead of a production build, so the server diff
+// (pngjs in workerd) is also run through the dev module graph (ob 1625).
+const dev = process.env["PIXELSLASH_E2E_DEV"] === "1";
+
 // Happy paths only, against a local production build signing in through a GitHub stub.
 // Each run starts from an empty local D1 (`.wrangler/e2e`).
 export default defineConfig({
@@ -26,11 +30,11 @@ export default defineConfig({
       command: [
         "rm -rf .wrangler/e2e",
         "mkdir -p .wrangler/e2e/tmp",
-        "CLOUDFLARE_ENV=e2e bun run build",
+        ...(dev ? [] : ["bun run build"]),
         "wrangler d1 migrations apply DB --local --env e2e --persist-to .wrangler/e2e",
-        "vite preview --port 4173 --strictPort",
+        `vite ${dev ? "dev" : "preview"} --port 4173 --strictPort`,
       ].join(" && "),
-      env: { PIXELSLASH_E2E: "1", TMPDIR: SERVER_TMP },
+      env: { PIXELSLASH_E2E: "1", CLOUDFLARE_ENV: "e2e", TMPDIR: SERVER_TMP },
       url: "http://localhost:4173",
       reuseExistingServer: false,
       timeout: 300_000,

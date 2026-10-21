@@ -22,13 +22,13 @@ bunx wrangler d1 migrations apply DB --local --env e2e
 # 2. The GitHub stand-in, on :4174. Leave it running.
 bun e2e/github-stub.ts &
 
-# 3. Build with the e2e vars and serve the build on :3000.
-CLOUDFLARE_ENV=e2e bun run build
-bunx vite preview --host 127.0.0.1 --port 3000 --strictPort
+# 3. Serve the app with the e2e vars on :3000.
+CLOUDFLARE_ENV=e2e bun run dev -- --host 127.0.0.1 --strictPort
 ```
 
-Build and preview, not `bun run dev`: under `vite dev` the server diff fails every changed shot
-(PixelSlash web: the server diff errors under vite dev). Rebuild after changing the app.
+This is the dev server, so changes to the app reload without a rebuild. The server diff runs under
+it as it does in a build; to serve the production build instead, `CLOUDFLARE_ENV=e2e bun run build`
+then `bunx vite preview --host 127.0.0.1 --port 3000 --strictPort`.
 
 Stop the stand-in before `bunx nx test:e2e web`: the suite starts its own on :4174 and fails if the
 port is taken.

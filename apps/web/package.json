@@ -12,6 +12,7 @@
     "typecheck": "tsr generate && tsc --noEmit",
     "test": "bun --bun vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:dev": "PIXELSLASH_E2E_DEV=1 playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "deploy": "bun run build && wrangler deploy",
