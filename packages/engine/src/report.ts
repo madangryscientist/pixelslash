@@ -2,6 +2,7 @@ import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { describeDiffOptions } from "./diff-options.ts";
 import { stem, type Violation } from "./judge.ts";
 import type { Region, Specks } from "./regions.ts";
+import { changeCrop, CROP_CSS, CROP_PADDING, cropFigure } from "./report-crop.ts";
 
 export type RouteRow = {
   path: string;
@@ -113,6 +114,43 @@ function headerNotes(input: {
   };
 }
 
+/** The figures of a pixel report: the changed region zoomed with the full frame behind a click, or just the full frame. */
+function reportBody(input: Parameters<typeof renderPixelReport>[0], ignored: IgnoreRect[]): string {
+  const { main, branch } = input;
+  const diff = {
+    width: Math.max(main.width, branch.width),
+    height: Math.max(main.height, branch.height),
+  };
+  const fullFrame = `<div class="row">
+      <figure><figcaption>Main</figcaption><div class="frame"><img src="main.png" alt="Main">${ignoreBoxes(ignored, main.width, main.height)}</div></figure>
+      <figure><figcaption>Branch</figcaption><div class="frame"><img src="branch.png" alt="Branch">${ignoreBoxes(ignored, branch.width, branch.height)}</div></figure>
+      <figure><figcaption>Diff</figcaption><div class="frame"><img src="diff.png" alt="Diff">${ignoreBoxes(ignored, diff.width, diff.height)}${regionBoxes(input.regions, diff.width, diff.height)}</div></figure>
+    </div>`;
+  const list = regionList(input.regions);
+  const crop = changeCrop(
+    input.regions,
+    Math.min(main.width, branch.width),
+    Math.min(main.height, branch.height),
+  );
+  if (!crop) return fullFrame + list;
+  const mainShot = { label: "Main", src: "main.png", ...main } as const;
+  const branchShot = { label: "Branch", src: "branch.png", ...branch } as const;
+  const diffShot = { label: "Diff", src: "diff.png", ...diff } as const;
+  const diffOver =
+    ignoreBoxes(ignored, diff.width, diff.height) +
+    regionBoxes(input.regions, diff.width, diff.height);
+  return `<p class="cropnote">Changed region ${crop.x},${crop.y} ${crop.w}x${crop.h} (changed regions plus ${CROP_PADDING}px), scaled up. Click a crop for the full image.</p>
+    <div class="row">
+      ${cropFigure(mainShot, crop, ignoreBoxes(ignored, main.width, main.height))}
+      ${cropFigure(branchShot, crop, ignoreBoxes(ignored, branch.width, branch.height))}
+      ${cropFigure(diffShot, crop, diffOver)}
+    </div>
+    ${list}
+    <details><summary>Full frame</summary>
+    ${fullFrame}
+    </details>`;
+}
+
 export function renderPixelReport(input: {
   path?: string | undefined;
   changedPixels: number;
@@ -134,9 +172,8 @@ export function renderPixelReport(input: {
     : `${input.changedPixels} changed pixels`;
   const ignored = input.ignored ?? [];
   const notes = headerNotes(input);
-  const diffWidth = Math.max(input.main.width, input.branch.width);
-  const diffHeight = Math.max(input.main.height, input.branch.height);
   const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
+  const body = reportBody(input, ignored);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -159,6 +196,7 @@ export function renderPixelReport(input: {
     .box.change { border: 2px solid #ffd400; }
     .box.noise { border: 1px dashed #8a8a8a; }
     .box.shift { border: 2px dotted #4dd0e1; }
+    ${CROP_CSS}
     .regions { margin: 12px 0 0; padding: 0 0 0 20px; color: #ccc; font-size: 12px; }
     .regions .noise { color: #888; }
     .regions .shift { color: #4dd0e1; }
@@ -174,12 +212,7 @@ export function renderPixelReport(input: {
     ${notes.ignoredLine}
   </header>
   <section>
-    <div class="row">
-      <figure><figcaption>Main</figcaption><div class="frame"><img src="main.png" alt="Main">${ignoreBoxes(ignored, input.main.width, input.main.height)}</div></figure>
-      <figure><figcaption>Branch</figcaption><div class="frame"><img src="branch.png" alt="Branch">${ignoreBoxes(ignored, input.branch.width, input.branch.height)}</div></figure>
-      <figure><figcaption>Diff</figcaption><div class="frame"><img src="diff.png" alt="Diff">${ignoreBoxes(ignored, diffWidth, diffHeight)}${regionBoxes(input.regions, diffWidth, diffHeight)}</div></figure>
-    </div>
-    ${regionList(input.regions)}
+    ${body}
   </section>
 </body>
 </html>

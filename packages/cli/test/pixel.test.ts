@@ -131,6 +131,8 @@ describe("pixel run", () => {
     expect(html).toContain("Main 120x40");
     expect(html).toContain("Branch 160x80");
     expect(html).toContain('class="box change"');
+    expect(html).toContain('class="crop"');
+    expect(html).toContain("<details><summary>Full frame</summary>");
     expect(html).toMatch(/\d+ changed regions?/);
     const overlay = PNG.sync.read(Buffer.from(await Bun.file(join(out, "diff.png")).arrayBuffer()));
     const gutter = (79 * overlay.width + 159) << 2;
