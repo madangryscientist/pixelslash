@@ -64,6 +64,21 @@ describe("org isolation", () => {
       expect.objectContaining({ id: org.id, projects: [{ ...project, latest: null }] }),
     ]);
   });
+
+  test("orgs and projects sort by name ignoring case", async () => {
+    const db = testDb();
+    const alice = await signInGithubUser(db, profile(1, "alice"));
+    const zed = await createOrg(db, alice.id, "Zed Studio");
+    const hack = await createOrg(db, alice.id, "hackcove");
+    const pixel = await createOrg(db, alice.id, "Pixel Labs");
+    const web = await createProject(db, alice.id, hack.id, "Web");
+    const api = await createProject(db, alice.id, hack.id, "api");
+
+    const orgs = await listOrgs(db, alice.id);
+
+    expect(orgs.map((o) => o.id)).toEqual([hack.id, pixel.id, zed.id]);
+    expect(orgs[0]?.projects.map((p) => p.id)).toEqual([api.id, web.id]);
+  });
 });
 
 type Seed = { diffStatus: "changed" | "new" | "unchanged" | null; reviewState?: "accepted" };

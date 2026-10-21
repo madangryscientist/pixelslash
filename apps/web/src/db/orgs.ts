@@ -96,7 +96,13 @@ export async function listOrgs(db: Db, userId: string): Promise<OrgOverview[]> {
     .innerJoin(orgs, eq(orgs.id, members.orgId))
     .leftJoin(projects, eq(projects.orgId, orgs.id))
     .where(eq(members.userId, userId))
-    .orderBy(asc(orgs.name), asc(projects.name));
+    .orderBy(
+      // Case-folded so 'hackcove' sits with 'Pixel Labs' and 'Zed Studio' in name order; the exact name breaks ties.
+      asc(sql`lower(${orgs.name})`),
+      asc(orgs.name),
+      asc(sql`lower(${projects.name})`),
+      asc(projects.name),
+    );
   const orgIds = [...new Set(rows.map(({ org }) => org.id))];
   if (orgIds.length === 0) return [];
   const [latest, memberRows, inviteRows] = await Promise.all([
