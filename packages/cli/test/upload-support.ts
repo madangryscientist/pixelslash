@@ -39,7 +39,7 @@ export function fakeUploadApi(refuse?: number) {
       auth: new Headers(init?.headers).get("authorization"),
     });
     if (refuse) return Response.json({ error: "no" }, { status: refuse });
-    return Response.json({ id: "build-1", status: "processing" });
+    return Response.json({ id: "build-1", status: "passed" });
   };
   return { calls, fetch };
 }

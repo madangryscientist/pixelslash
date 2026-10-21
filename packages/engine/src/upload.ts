@@ -153,49 +153,94 @@ export type UploadDeps = {
   /** Where the git checkout and the config are looked for. Default: the process's. */
   cwd?: string;
   warn?: (message: string) => void;
+  /** How a retry waits. Default: a real timer. */
+  sleep?: (ms: number) => Promise<void>;
 };
 
 export type UploadResult = { buildId: string; snapshots: number; git: GitContext };
 
-type Client = { fetch: FetchLike; base: string; token: string };
-type Call = { method: string; path: string; body: string | FormData };
+/** Tries per request, and the wait before each retry: bounded, never a loop. */
+const TRIES = 3;
+const RETRY_DELAYS_MS = [1000, 2000];
 
-async function failure(res: Response, call: Call): Promise<UploadError> {
-  const text = await res.text().catch(() => "");
-  let detail = text;
+type Client = {
+  fetch: FetchLike;
+  base: string;
+  token: string;
+  warn: (message: string) => void;
+  sleep: (ms: number) => Promise<void>;
+};
+/** `step` is what the CLI says failed: "open build", "upload <snapshot>", "finalize". */
+type Call = { step: string; method: string; path: string; body: string | FormData };
+
+/** One attempt's outcome: the reply, or why there is none and whether another try may get one. */
+type Attempt = { ok: true; body: unknown } | { ok: false; message: string; transient: boolean };
+
+/**
+ * The server's answer in one line: the API's `{"error"}`, else the first line of the text (an
+ * HTML error page from a proxy in front of the API is cut down to its text).
+ */
+function answer(text: string): { detail: string; fromApi: boolean } {
   try {
     const parsed: unknown = JSON.parse(text);
-    if (isObj(parsed) && typeof parsed.error === "string") detail = parsed.error;
+    if (isObj(parsed) && typeof parsed.error === "string")
+      return { detail: parsed.error, fromApi: true };
   } catch {
-    // Not JSON: keep the raw text.
+    // Not JSON: not the API's own answer.
   }
-  return new UploadError(
-    `upload failed: ${call.method} ${call.path} -> ${res.status} ${detail}`.trim(),
-  );
+  const plain = text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<(head|style|script)[^]*?<\/\1>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l !== "");
+  return { detail: (plain ?? "").slice(0, 200), fromApi: false };
 }
 
-/** One request to the API; anything but 2xx is an UploadError carrying the server's reason. */
-async function send(client: Client, call: Call): Promise<unknown> {
+async function attempt(client: Client, call: Call): Promise<Attempt> {
+  const { body } = call;
   const headers: Record<string, string> = { authorization: `Bearer ${client.token}` };
-  if (typeof call.body === "string") headers["content-type"] = "application/json";
+  if (typeof body === "string") headers["content-type"] = "application/json";
   let res: Response;
   try {
-    res = await client.fetch(`${client.base}${call.path}`, {
-      method: call.method,
-      body: call.body,
-      headers,
-    });
+    res = await client.fetch(`${client.base}${call.path}`, { method: call.method, body, headers });
   } catch (e) {
-    throw new UploadError(
-      `upload failed: ${call.method} ${client.base}${call.path}: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    const message = `${call.method} ${client.base}${call.path}: ${e instanceof Error ? e.message : String(e)}`;
+    return { ok: false, message, transient: true };
   }
-  if (!res.ok) throw await failure(res, call);
-  return res.json();
+  if (res.ok) return { ok: true, body: await res.json() };
+  const { detail, fromApi } = answer(await res.text().catch(() => ""));
+  // The API answers every error it means with JSON. A 5xx without it, or a gateway status, came
+  // from in front of the API (a proxy, a dev server) or from a Worker that died mid-request, so no
+  // answer was given and another try may get one.
+  const transient = [502, 503, 504].includes(res.status) || (res.status >= 500 && !fromApi);
+  const message = `${call.method} ${call.path} -> ${res.status} ${detail}`.trim();
+  return { ok: false, message, transient };
+}
+
+/**
+ * One request to the API; anything but 2xx is an UploadError naming the step and carrying the
+ * server's answer. A failure the API never answered is tried again, up to TRIES in all: every
+ * step is safe to repeat (a snapshot sent again replaces itself, a finalise again with the same
+ * count is a no-op), and a repeated open at worst leaves an empty, unfinalised build behind.
+ */
+async function send(client: Client, call: Call): Promise<unknown> {
+  for (let n = 1; ; n++) {
+    const result = await attempt(client, call);
+    if (result.ok) return result.body;
+    const tries = n === 1 ? "" : ` (after ${n} tries)`;
+    if (!result.transient || n === TRIES)
+      throw new UploadError(`upload failed: ${call.step}: ${result.message}${tries}`);
+    client.warn(`upload: ${call.step}: ${result.message}; trying again (${n + 1}/${TRIES})`);
+    await client.sleep(RETRY_DELAYS_MS[n - 1] ?? 0);
+  }
 }
 
 async function openBuild(client: Client, ctx: GitContext): Promise<string> {
   const body = await send(client, {
+    step: "open build",
     method: "POST",
     path: "/api/v1/builds",
     body: JSON.stringify(ctx),
@@ -220,12 +265,15 @@ export async function uploadSnapshots(
   const base = opts.server.replace(/\/+$/, "");
   const fetcher = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const manifest = await readManifest(opts.dir);
-  const ctx = await gitContext({
-    ...opts.git,
-    env,
-    warn: deps.warn ?? (() => {}),
-  });
-  const client: Client = { fetch: fetcher, base, token: opts.token };
+  const warn = deps.warn ?? (() => {});
+  const ctx = await gitContext({ ...opts.git, env, warn });
+  const client: Client = {
+    fetch: fetcher,
+    base,
+    token: opts.token,
+    warn,
+    sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
+  };
   const id = await openBuild(client, ctx);
   const queue = [...manifest.snapshots];
   const worker = async () => {
@@ -233,15 +281,25 @@ export async function uploadSnapshots(
       const form = new FormData();
       form.set("meta", JSON.stringify(snapshotMeta(e)));
       form.set("file", new File([await Bun.file(pngPath(opts.dir, e)).arrayBuffer()], "shot.png"));
-      await send(client, { method: "PUT", path: `/api/v1/builds/${id}/snapshots`, body: form });
+      await send(client, {
+        step: `upload ${identity(e)}`,
+        method: "PUT",
+        path: `/api/v1/builds/${id}/snapshots`,
+        body: form,
+      });
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  await send(client, {
+  const done = await send(client, {
+    step: "finalize",
     method: "POST",
     path: `/api/v1/builds/${id}/finalize`,
     body: JSON.stringify({ snapshots: manifest.snapshots.length }),
   });
+  // A finalise runs the diff in the request, so its reply is the outcome. `processing` means a
+  // retry met an earlier try's run that has not ended (or was killed): nothing was measured yet.
+  if (isObj(done) && done.status === "processing")
+    throw new UploadError(`upload failed: finalize: build ${id} is still processing on the server`);
   return { buildId: id, snapshots: manifest.snapshots.length, git: ctx };
 }
 
