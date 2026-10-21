@@ -6,6 +6,7 @@ import { ReviewChip } from "#/components/ui";
 import { formatNumber } from "#/lib/format";
 import { groupOf } from "#/lib/snapshot-groups";
 import { type ShotLabel, shotChips } from "#/lib/shot-label";
+import { coversMostOfShot } from "#/lib/thumb-crop";
 
 const THUMB_BOX = "w-full overflow-hidden rounded-md bg-slate-100";
 
@@ -32,6 +33,21 @@ function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | undefined 
     return (
       <div className={THUMB_BOX} style={thumbAspect(1.5)} data-testid="shot-thumb">
         <img src={src} alt="" loading="lazy" className="size-full object-cover object-top" />
+      </div>
+    );
+  }
+  if (coversMostOfShot(result.regions, result)) {
+    // The change spans the page: a tint over all of it hides the shot, so show it plainly with a badge.
+    return (
+      <div className={`${THUMB_BOX} relative`} style={thumbAspect(1.5)} data-testid="shot-thumb">
+        <img src={src} alt="" loading="lazy" className="size-full object-cover object-top" />
+        {/* Fixed colours, not the theme's: the badge sits on a screenshot, which has its own theme. */}
+        <span
+          className="absolute right-1.5 top-1.5 rounded bg-[rgba(15,23,42,0.85)] px-1.5 py-0.5 text-xs font-medium text-[#fff]"
+          data-testid="shot-thumb-badge"
+        >
+          Most of the page changed
+        </span>
       </div>
     );
   }
