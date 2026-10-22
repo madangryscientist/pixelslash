@@ -6,6 +6,7 @@ import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
+import { USER_AGENT } from "./version.ts";
 
 /** The pinned capture image is Linux; the manifest carries no platform of its own. */
 const PLATFORM = "linux";
@@ -193,7 +194,10 @@ function answer(text: string): { detail: string; fromApi: boolean } {
 
 async function attempt(client: Client, call: Call): Promise<Attempt> {
   const { body } = call;
-  const headers: Record<string, string> = { authorization: `Bearer ${client.token}` };
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${client.token}`,
+    "user-agent": USER_AGENT,
+  };
   if (typeof body === "string") headers["content-type"] = "application/json";
   let res: Response;
   try {

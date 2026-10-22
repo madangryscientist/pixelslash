@@ -174,7 +174,7 @@ describe("upload API", () => {
 
   test("a failed blob write leaves no snapshot row", async () => {
     const { db, acme } = await setup();
-    const deps: ApiDeps = { db, store: memoryStore(true).store };
+    const deps: ApiDeps = { db, store: memoryStore(true).store, imageSecret: () => "s" };
     const id = await openBuild(deps, acme.token);
     await expect(
       call(deps, `PUT /api/v1/builds/${id}/snapshots`, acme.token, snapshotForm()),
@@ -244,6 +244,8 @@ describe("upload API", () => {
     expect((await call(deps, `GET /api/v1/builds/${id}/snapshots`, acme.token)).status).toBe(405);
     expect((await call(deps, `GET /api/v1/nope`, acme.token)).status).toBe(404);
     expect((await call(deps, `GET /api/v1/builds/${id}/other`, acme.token)).status).toBe(404);
-    expect((await call(deps, `GET /api/v1/builds/missing/snapshots`, acme.token)).status).toBe(404);
+    // The method is checked by path alone (ob 1729), so a wrong one is a 405 for any build id.
+    expect((await call(deps, `GET /api/v1/builds/missing/snapshots`, acme.token)).status).toBe(405);
+    expect((await call(deps, `PUT /api/v1/builds/missing/snapshots`, acme.token)).status).toBe(404);
   });
 });

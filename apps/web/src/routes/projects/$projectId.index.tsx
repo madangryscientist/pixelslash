@@ -6,7 +6,7 @@ import { orgCrumb } from "#/components/crumbs";
 import { ProjectFlags } from "#/components/detection-flag";
 import { Step } from "#/components/org-empty";
 import { Page, StatusBadge, useHydrated } from "#/components/ui";
-import type { BuildSummary } from "#/db/review";
+import type { BuildSummary } from "#/db/build-list";
 import { formatRelative } from "#/lib/format";
 import { getProjectPage } from "#/server/fns";
 

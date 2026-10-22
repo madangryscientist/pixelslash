@@ -256,3 +256,9 @@ The honesty rules are the same as the report's:
    capture image may start the app from a command named in its config.*
 6. **Figma dogfood is out of scope** (decision #62). Do not reopen 770, 771,
    772, 773, 781, 782 or 783.
+7. **`/api/v1` is a stable contract** (decided 2026-10-22). Changes are
+   additive only: a new endpoint, or a new field on a reply. Nothing is
+   renamed, retyped or removed, and an error `code` keeps its meaning. A
+   breaking change is `/api/v2`. Every endpoint is in `ENDPOINTS`
+   (`apps/web/src/api/handler.ts`) and in the README's "API" table; a test
+   fails when the two differ.

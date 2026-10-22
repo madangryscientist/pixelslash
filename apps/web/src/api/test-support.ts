@@ -52,7 +52,7 @@ export async function setup() {
   const acme = await tokenFor("Acme");
   const other = await tokenFor("Other");
   const blobs = memoryStore();
-  const deps: ApiDeps = { db, store: blobs.store };
+  const deps: ApiDeps = { db, store: blobs.store, imageSecret: () => "test-image-secret" };
   return { db, deps, blobs, acme, other };
 }
 

@@ -1,8 +1,8 @@
-import { type SQL, and, eq, inArray } from "drizzle-orm";
+import { type SQL, and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Build } from "./builds";
 import { type Db, NotFoundError } from "./db";
 import type { Project } from "./orgs";
-import { builds, members, projects, users } from "./schema";
+import { builds, members, orgs, projects, snapshots, users } from "./schema";
 
 /**
  * Who an API request acts for (ob 1728): a CI token holds one project and can upload to it; a
@@ -51,5 +51,33 @@ export async function actorUser(db: Db, userId: string) {
     .from(users)
     .where(eq(users.id, userId));
   if (!row) throw new NotFoundError("user");
+  return row;
+}
+
+/** Every project the actor may reach, with its org: a CI token's one, or all of its user's orgs'. */
+export async function actorProjects(db: Db, actor: Actor) {
+  return db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      defaultBranch: projects.defaultBranch,
+      createdAt: projects.createdAt,
+      org: { id: orgs.id, name: orgs.name },
+    })
+    .from(projects)
+    .innerJoin(orgs, eq(orgs.id, projects.orgId))
+    .where(visible(db, actor))
+    .orderBy(asc(sql`lower(${orgs.name})`), asc(sql`lower(${projects.name})`), asc(projects.id));
+}
+
+/** A shot of a project the actor may reach, with its build, project and org. */
+export async function actorSnapshot(db: Db, actor: Actor, snapshotId: string) {
+  const [row] = await db
+    .select({ buildId: snapshots.buildId, projectId: projects.id, orgId: projects.orgId })
+    .from(snapshots)
+    .innerJoin(builds, eq(builds.id, snapshots.buildId))
+    .innerJoin(projects, eq(projects.id, builds.projectId))
+    .where(and(eq(snapshots.id, snapshotId), visible(db, actor)));
+  if (!row) throw new NotFoundError("snapshot");
   return row;
 }

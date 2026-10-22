@@ -550,7 +550,7 @@
       "label": "Documented upload API",
       "ps": {
         "v": "y",
-        "note": "upload and capture --upload"
+        "note": "upload and capture --upload; read API for projects, builds, shots, image URLs"
       },
       "t": {
         "argos": "y",

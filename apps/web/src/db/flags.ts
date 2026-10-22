@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, lt, or } from "drizzle-orm";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
 import { type FlagKind, type IgnoreRect, builds, detectionFlags, snapshots, users } from "./schema";
@@ -106,7 +106,23 @@ export async function snapshotFlags(
  */
 export async function listFlags(db: Db, userId: string, projectId: string) {
   await getProject(db, userId, projectId);
-  const rows = await db
+  return (await projectFlags(db, projectId)).flags;
+}
+
+/** Where a page of flags stopped: the last flag's position in newest-first order. */
+type FlagCursor = { createdAt: Date; id: string };
+
+/**
+ * The project's flags, newest first, a page at a time when `page` is given (the API, ob 1729). The
+ * caller has checked the project is reachable: here a project id is trusted.
+ */
+export async function projectFlags(
+  db: Db,
+  projectId: string,
+  page?: { after?: FlagCursor | undefined; limit: number },
+) {
+  const after = page?.after;
+  const query = db
     .select({
       id: detectionFlags.id,
       kind: detectionFlags.kind,
@@ -137,12 +153,28 @@ export async function listFlags(db: Db, userId: string, projectId: string) {
     .innerJoin(snapshots, eq(snapshots.id, detectionFlags.snapshotId))
     .innerJoin(builds, eq(builds.id, snapshots.buildId))
     .innerJoin(users, eq(users.id, detectionFlags.createdBy))
-    .where(eq(detectionFlags.projectId, projectId))
+    .where(
+      and(
+        eq(detectionFlags.projectId, projectId),
+        after &&
+          or(
+            lt(detectionFlags.createdAt, after.createdAt),
+            and(eq(detectionFlags.createdAt, after.createdAt), lt(detectionFlags.id, after.id)),
+          ),
+      ),
+    )
     .orderBy(desc(detectionFlags.createdAt), desc(detectionFlags.id));
-  return rows.map(({ diffStatus, diffResult, diffOptions, ...row }) => ({
-    ...row,
-    measured: { diffStatus, changedPixels: diffResult?.changedPixels ?? null, diffOptions },
-  }));
+  const rows = page ? await query.limit(page.limit + 1) : await query;
+  const more = page !== undefined && rows.length > page.limit;
+  const shown = page ? rows.slice(0, page.limit) : rows;
+  const last = shown.at(-1);
+  return {
+    flags: shown.map(({ diffStatus, diffResult, diffOptions, ...row }) => ({
+      ...row,
+      measured: { diffStatus, changedPixels: diffResult?.changedPixels ?? null, diffOptions },
+    })),
+    next: more && last ? { createdAt: last.createdAt, id: last.id } : null,
+  };
 }
 
 export type ProjectFlag = Awaited<ReturnType<typeof listFlags>>[number];

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { UploadError, UsageError } from "../src/errors.ts";
 import { gitContext } from "../src/git.ts";
 import { readManifest, uploadSnapshots } from "../src/upload.ts";
+import { CLIENT_VERSION } from "../src/version.ts";
 import { fakeServer, metaOf } from "./fake-server.ts";
 import { FP, cleanup, entry, git, gitOpts, repo, snapshotDir, tmp } from "./upload-fixtures.ts";
 
@@ -124,6 +125,7 @@ describe("uploadSnapshots", () => {
 
     expect(result).toMatchObject({ buildId: "b1", snapshots: 2 });
     expect(server.calls.every((c) => c.auth === "Bearer psci_t")).toBe(true);
+    expect(server.calls.every((c) => c.userAgent === `pixelslash/${CLIENT_VERSION}`)).toBe(true);
     const [create, ...rest] = server.calls;
     expect(create).toMatchObject({ method: "POST", url: "https://ps.example/api/v1/builds" });
     expect(create?.body).toMatchObject({ branch: "feat", mergeBaseSha: fork, prNumber: null });

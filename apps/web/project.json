@@ -11,7 +11,16 @@
     "lint": {
       "command": "oxlint --type-aware --deny-warnings apps/web && bun scripts/check-slop.ts apps/web"
     },
-    "test": { "command": "bun --bun vitest run", "options": { "cwd": "apps/web" } },
+    "test": {
+      "command": "bun --bun vitest run",
+      "options": { "cwd": "apps/web" },
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/fixtures/**/*",
+        "{workspaceRoot}/README.md"
+      ]
+    },
     "build": {
       "command": "vite build",
       "options": { "cwd": "apps/web" },

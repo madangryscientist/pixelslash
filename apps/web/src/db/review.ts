@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
 import {
   SNAPSHOT_GROUPS,
   type SnapshotGroup,
@@ -189,19 +189,10 @@ export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): P
 
 export type BuildCounts = Record<SnapshotGroup, number> & {
   pending: number;
+  accepted: number;
+  rejected: number;
   /** Shots that wait for a decision (`awaitsDecision`): what the build page calls "to review". */
   toReview: number;
-};
-
-export type BuildSummary = {
-  id: string;
-  branch: string;
-  commitSha: string;
-  prNumber: number | null;
-  status: (typeof builds.$inferSelect)["status"];
-  error: string | null;
-  createdAt: Date;
-  counts: BuildCounts;
 };
 
 export const emptyCounts = (): BuildCounts => ({
@@ -212,6 +203,8 @@ export const emptyCounts = (): BuildCounts => ({
   rebaseline: 0,
   unmeasured: 0,
   pending: 0,
+  accepted: 0,
+  rejected: 0,
   toReview: 0,
 });
 
@@ -240,34 +233,11 @@ export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<strin
   for (const stat of stats) {
     const held = counts.get(stat.buildId) ?? emptyCounts();
     held[groupOf(stat)] += stat.n;
-    if (stat.reviewState === "pending") held.pending += stat.n;
+    held[stat.reviewState] += stat.n;
     if (awaitsDecision({ ...stat, carriedFrom: stat.carried ? "" : null })) held.toReview += stat.n;
     counts.set(stat.buildId, held);
   }
   return counts;
-}
-
-/** Every build of a project, newest first, with the counts the project page prints. */
-export async function listBuilds(db: Db, projectId: string): Promise<BuildSummary[]> {
-  const rows = await db
-    .select({
-      id: builds.id,
-      branch: builds.branch,
-      commitSha: builds.commitSha,
-      prNumber: builds.prNumber,
-      status: builds.status,
-      error: builds.error,
-      createdAt: builds.createdAt,
-    })
-    .from(builds)
-    .where(eq(builds.projectId, projectId))
-    .orderBy(desc(builds.createdAt), desc(builds.id));
-  if (rows.length === 0) return [];
-  const counts = await countBuilds(
-    db,
-    rows.map((row) => row.id),
-  );
-  return rows.map((row) => ({ ...row, counts: counts.get(row.id) ?? emptyCounts() }));
 }
 
 async function reviewableBuildId(db: Db, projectId: string, buildId: string): Promise<string> {

@@ -180,14 +180,7 @@ pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-
 
 What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (`WxH`), `theme`, `tags`, the resolved diff options (`diff`, stored as JSON in `snapshots.diff_options`; a client that sends none stores `{}`), the ignore boxes (`ignore`, JSON in `snapshots.ignore`, image px; a client that sends none stores `[]`), the environment fingerprint, and the PNG under the org's prefix in the blob store (R2 on Cloudflare). The manifest's `path` and the variant's `name` are not uploaded: a snapshot is identified by name + browser + viewport + theme, so two manifest entries that differ only by variant name are refused. The manifest carries no platform; `upload` sends `linux`, which is what the pinned capture image is.
 
-The API, for other CI integrations (`Authorization: Bearer <token>`; errors are `{"error": "…"}`):
-
-| Request | Body | Reply |
-| --- | --- | --- |
-| `GET /api/v1/me` | — | `200 { kind: "user", user: { id, login, name } }` or `200 { kind: "ci", projectId }` |
-| `POST /api/v1/builds` | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId? }`; `projectId` is required with a personal token | `201 { id }` |
-| `PUT /api/v1/builds/:id/snapshots` | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint }`), `file` (PNG, ≤32 MiB) | `200 { id }` |
-| `POST /api/v1/builds/:id/finalize` | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
+The endpoints `upload` calls (`POST /api/v1/builds`, `PUT /api/v1/builds/:id/snapshots`, `POST /api/v1/builds/:id/finalize`), with their bodies and replies, are in [API](#api).
 
 **The server diff has a ceiling.** It runs inline in the finalise request, on a Worker with a 30 s CPU limit and a 128 MB isolate (decided 2026-10-20; no Queue for beta). Measured at 1280×4000: a typical shot takes about 0.8 s, a shot where every pixel differs about 15 s. One whole-page change fits; several do not. When the diff stops itself before the limit, the build ends `errored` and `error` names the limit (`diff ceiling: measured N of M shots…`); no shot is downscaled or cropped to fit. The finalise reply still carries `200`, so read `status` and `error`. A build too big for one run is resumed: finalise again and the server keeps what it measured and diffs the rest under the same budget, so repeated runs reach the end. The finalise reply carries `unmeasured`, the count still to measure, and `pixelslash upload` finalises again by itself while that falls (a warning on stderr for each); if it stops with shots left it warns that the build is `errored` and exits 0 as before. A hard kill by the runtime (one shot alone passing 30 s, or the isolate limit) cannot be caught in the request and can leave the build at `processing`; recovering a build stuck that way is a separate ticket.
 
@@ -218,6 +211,148 @@ PIXELSLASH_SERVER=https://<server> PIXELSLASH_TOKEN_FILE=<path to a project's CI
 - Both variables are required (use an absolute token path; a `~` in the value is not expanded) and nothing is hard-coded: the shots go only to the server named, and the token file is given to the CLI as `--token-path` (nothing here reads it, and it is never in git). The script is one `package.json` line over `pixelslash capture --upload`; the snapshot dir `.wrangler/dogfood-snapshots` is cleared on every run.
 - The capture is `apps/web/e2e/dogfood-review.config.ts`: the same `start` and `setup` as the organizations-page dogfood (`dogfood-orgs.config.ts`), over the fixed seed in `dogfood-seed.ts`, whose shots now have real PNGs (`dogfood-images.ts`, written to the local bucket by the setup) so the build and snapshot pages render. Six shots: three pages × two themes. It shares `.wrangler/e2e` and `dist/` with the e2e suite, so do not run it while `nx test:e2e web` runs.
 - Upload once from the commit you compare against with `--branch main`, then from the branch: the server's baseline rules above apply, and only the pages a change touched land in Changed. Capture outside the pinned image records a `bare` fingerprint, so compare like with like: shots from the same machine, or the pinned image on both sides.
+
+## API
+
+Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any other integration. Send the token as `Authorization: Bearer <token>`:
+
+- A **CI token** (`psci_…`) reaches its one project.
+- A **personal token** (`psu_…`) acts as its user and reaches every project of that user's orgs.
+- A project, build or snapshot the token cannot reach is a **404**, never a 403, so a 404 does not tell you whether the id exists.
+
+**`/api/v1` is a stable contract.** A field or an endpoint may be added; nothing is renamed, retyped or removed. A breaking change is `/api/v2`. Clients should ignore fields they do not know.
+
+| Request | Auth | Query or body | Reply |
+| --- | --- | --- | --- |
+| `GET /api/v1/me` | CI or personal | — | `200 { kind: "user", user: { id, login, name } }` or `200 { kind: "ci", projectId }` |
+| `POST /api/v1/builds` | CI or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId? }`; `projectId` is required with a personal token | `201 { id }` |
+| `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint }`), `file` (PNG, ≤32 MiB) | `200 { id }` |
+| `POST /api/v1/builds/:id/finalize` | CI or personal | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
+| `GET /api/v1/projects` | CI or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; a CI token's one project |
+| `GET /api/v1/projects/:id/builds` | CI or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
+| `GET /api/v1/builds/:id` | CI or personal | — | `200 { build: { …build, snapshots: [snapshot] } }`, snapshots in review order |
+| `GET /api/v1/snapshots/:id` | CI or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
+| `GET /api/v1/projects/:id/detection-flags` | CI or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
+
+There are no write endpoints besides the four upload ones: accepting and rejecting stay in the web app.
+
+**The upload endpoints** (`me`, `builds`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`.
+
+**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`) use snake_case keys, and every reply carries `"api_version": 1`. An error is:
+
+```json
+{ "api_version": 1, "error": { "code": "not_found", "message": "build not found" } }
+```
+
+| Status | `code` | When |
+| --- | --- | --- |
+| 400 | `bad_request` | a bad `status`, `limit` or `cursor` |
+| 401 | `unauthorized` | a missing, wrong, expired or revoked token |
+| 404 | `not_found` | an unknown path, or an id the token cannot reach |
+| 405 | `method_not_allowed` | a path that exists, with another method |
+| 426 | `cli_outdated` | the CLI is older than the server takes (below) |
+
+The upload endpoints also answer 409 (a write to a finalised build, or a finalise whose count is wrong) and 413 (a PNG over 32 MiB); their codes are `conflict` and `too_large` if a read endpoint ever needs them.
+
+**Pagination.** A list that can grow (`builds`, `detection-flags`) returns at most `limit` rows (default 50, at most 100) and a `next_cursor`. Pass it back as `cursor` with the same filters for the next page. `next_cursor` is `null` on the last page. A cursor is opaque: a malformed one is a 400. `projects` is not paginated yet: its length is the projects of your orgs, and its `next_cursor` is always `null`, so a client that follows it keeps working when it is.
+
+**The CLI version.** The CLI sends `User-Agent: pixelslash/<version>`. A server whose `MIN_CLI_VERSION` var is set (`x.y.z`, in `wrangler.jsonc`; empty takes any) refuses an older CLI on every endpoint with **426**, before it checks the token. The message is `upgrade the CLI: this server needs pixelslash <x.y.z> or newer`. On a read endpoint the code is `cli_outdated`; on an upload endpoint the message is the plain-string error. Any other client is never refused for its User-Agent, and neither is a CLI from before the User-Agent was sent (it reads as another client).
+
+A **project**:
+
+```json
+{
+  "id": "…",
+  "name": "web",
+  "org": { "id": "…", "name": "Acme" },
+  "default_branch": "main",
+  "created_at": "2026-10-22T09:00:00.000Z",
+  "web_url": "https://<server>/projects/…"
+}
+```
+
+A **build**. `counts` has one count per group (`changed`, `new`, `removed`, `unchanged`, `rebaseline`, `unmeasured`), one per review state (`pending`, `accepted`, `rejected`), and `to_review`: the shots still waiting for a decision. Builds have no sequence number; `id` and `created_at` identify one.
+
+```json
+{
+  "id": "…",
+  "project_id": "…",
+  "branch": "feature",
+  "commit_sha": "4f2c…",
+  "pr_number": 42,
+  "status": "changes",
+  "error": null,
+  "counts": {
+    "changed": 1, "new": 1, "removed": 1, "unchanged": 1, "rebaseline": 0, "unmeasured": 0,
+    "pending": 4, "accepted": 0, "rejected": 0, "to_review": 1
+  },
+  "created_at": "2026-10-22T09:00:00.000Z",
+  "web_url": "https://<server>/projects/…/builds/…"
+}
+```
+
+A **snapshot**:
+
+- `group` is the section the build page shows it under.
+- `awaits_decision` is whether it still counts toward `to_review`.
+- `carried_from` is set on an unchanged shot that carries an open change from an earlier build (see "What a shot is compared against" above).
+- `approved_earlier` is set on an unchanged shot whose change was already accepted on this branch.
+- `diff_result` is `null` until the diff has measured it. Its regions are in image px.
+
+```json
+{
+  "id": "…",
+  "build_id": "…",
+  "name": "about",
+  "platform": "linux",
+  "browser": "chromium",
+  "viewport": "1280x720",
+  "theme": "light",
+  "tags": [],
+  "group": "changed",
+  "diff_status": "changed",
+  "diff_result": {
+    "changed_pixels": 144, "antialiased_pixels": 0, "ignored_pixels": 0, "ignored": [], "specks": 0,
+    "regions": [{ "x": 8, "y": 8, "w": 12, "h": 12, "changed_pixels": 144, "antialiased_pixels": 0, "kind": "change", "why": null }],
+    "width": 1280, "height": 720, "main_width": 1280, "main_height": 720,
+    "branch_width": 1280, "branch_height": 720, "size_changed": false
+  },
+  "rebaseline_needed": false,
+  "review_state": "accepted",
+  "reviewed_by": "ada",
+  "reviewed_at": "2026-10-22T09:05:00.000Z",
+  "awaits_decision": false,
+  "carried_from": null,
+  "approved_earlier": null,
+  "created_at": "2026-10-22T09:00:00.000Z",
+  "web_url": "https://<server>/projects/…/builds/…/snapshots/…"
+}
+```
+
+`carried_from` is `{ snapshot_id, build_id }`. `approved_earlier` is `{ snapshot_id, build_id, commit_sha, reviewed_by, reviewed_at, default_branch }`.
+
+`GET /api/v1/snapshots/:id` adds `images`: absolute URLs to the head shot, the baseline it was compared against, and the diff overlay. They go through the app's signed image route, need no token, and **expire after 5 minutes**: read the snapshot again for fresh ones. `baseline` and `diff` are `null` when there is none (a new shot, or one not yet measured).
+
+A **detection flag**:
+
+```json
+{
+  "id": "…",
+  "kind": "missed",
+  "note": "button moved",
+  "rect": { "x": 1, "y": 2, "w": 3, "h": 4 },
+  "by": "ada",
+  "snapshot": { "id": "…", "name": "home", "platform": "linux", "browser": "chromium", "viewport": "1280x720", "theme": "light" },
+  "build": { "id": "…", "branch": "feature", "commit_sha": "4f2c…" },
+  "measured": { "diff_status": "unchanged", "changed_pixels": 0 },
+  "images": { "head": "https://<server>/images/…", "baseline": "…", "diff": null },
+  "created_at": "2026-10-22T09:00:00.000Z",
+  "updated_at": "2026-10-22T09:00:00.000Z",
+  "web_url": "https://<server>/projects/…/builds/…/snapshots/…"
+}
+```
+
+`kind` is `missed` (a change the diff did not mark) or `false_positive` (one it marked that is not a change). `rect` is the box drawn on the shot, or `null`.
 
 ## Local-screenshot dogfood (GTK windows)
 

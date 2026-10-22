@@ -6,12 +6,12 @@ import { groupOf } from "#/lib/snapshot-groups";
 import { createBuild } from "./builds";
 import { NotFoundError } from "./db";
 import { builds as buildRows } from "./schema";
+import { listBuilds } from "./build-list";
 import {
   NotReviewableError,
   acceptAllSnapshots,
   buildView,
   isFirstBuild,
-  listBuilds,
   reviewSnapshot,
 } from "./review";
 

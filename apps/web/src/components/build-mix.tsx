@@ -1,4 +1,5 @@
-import type { BuildCounts, BuildSummary } from "#/db/review";
+import type { BuildSummary } from "#/db/build-list";
+import type { BuildCounts } from "#/db/review";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
 import { formatNumber } from "#/lib/format";
 

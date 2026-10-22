@@ -13,12 +13,12 @@ import {
   setDefaultBranch,
   withdrawInvite,
 } from "#/db/orgs";
+import { listBuilds } from "#/db/build-list";
 import {
   NotReviewableError,
   acceptAllSnapshots,
   buildView,
   isFirstBuild,
-  listBuilds,
   reviewSnapshot,
 } from "#/db/review";
 import { FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";

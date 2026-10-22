@@ -16,6 +16,9 @@ export function imageSigningSecret(): string {
   return secret;
 }
 
+/** The oldest CLI the API takes (`x.y.z`, ob 1729); empty takes any. Set in `vars`. */
+export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || undefined;
+
 export function githubConfig(): GithubConfig {
   const clientSecret = env.GITHUB_CLIENT_SECRET;
   if (!env.GITHUB_CLIENT_ID || !clientSecret)

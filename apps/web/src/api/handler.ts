@@ -12,6 +12,15 @@ import { processBuild } from "#/diff/process";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { authorize } from "./authorize";
 import {
+  API_VERSION,
+  type ReadCtx,
+  getBuild,
+  getSnapshot,
+  listBuilds,
+  listDetectionFlags,
+  listProjects,
+} from "./read";
+import {
   BadRequest,
   isPng,
   object,
@@ -20,7 +29,14 @@ import {
   parseSnapshotInput,
 } from "./validate";
 
-export type ApiDeps = { db: Db; store: BlobStore };
+export type ApiDeps = {
+  db: Db;
+  store: BlobStore;
+  /** Signs the image URLs the read API returns; read only when one is. */
+  imageSecret: () => string;
+  /** The oldest CLI (`x.y.z`) this server takes; unset takes any. */
+  minCliVersion?: string | undefined;
+};
 
 /** A PNG over this is refused before it is read; a full-page shot is a few MB. */
 export const MAX_PNG_BYTES = 32 * 1024 * 1024;
@@ -114,53 +130,167 @@ async function me(ctx: Ctx): Promise<Response> {
   return json({ kind: "user", user: await actorUser(ctx.db, ctx.actor.userId) });
 }
 
-async function route(ctx: Ctx, parts: string[]): Promise<Response> {
-  const [resource, ...rest] = parts;
-  if (resource === "me" && rest.length === 0)
-    return ctx.request.method === "GET" ? me(ctx) : fail(405, "method not allowed");
-  if (resource === "builds" && rest.length <= 2) return routeBuilds(ctx, rest);
-  return fail(404, "not found");
-}
+/**
+ * One endpoint. `upload` marks the endpoints from before the read API (ob 1729): their errors stay
+ * `{error: "…"}`, which the shipped CLI reads, and their replies carry no `api_version`. Every
+ * other endpoint answers errors as `{error: {code, message}}`.
+ */
+type Endpoint = {
+  method: "GET" | "POST" | "PUT";
+  path: string;
+  upload?: true;
+  run: (ctx: Ctx, params: string[]) => Promise<Response>;
+};
 
-async function routeBuilds(ctx: Ctx, [buildId, action]: string[]): Promise<Response> {
-  const is = (method: string) => ctx.request.method === method;
-  if (!buildId) return is("POST") ? startBuild(ctx) : fail(405, "method not allowed");
+const reads = (ctx: Ctx): ReadCtx => ({
+  db: ctx.db,
+  actor: ctx.actor,
+  origin: new URL(ctx.request.url).origin,
+  imageSecret: ctx.imageSecret,
+  query: new URL(ctx.request.url).searchParams,
+});
+
+const at = (params: string[], i: number) => params[i] ?? "";
+
+async function withBuild(
+  ctx: Ctx,
+  buildId: string,
+  run: (build: Build, orgId: string) => Promise<Response>,
+): Promise<Response> {
   const { build, orgId } = await actorBuild(ctx.db, ctx.actor, buildId);
-  if (action === "snapshots")
-    return is("PUT") ? addSnapshot(ctx, build, orgId) : fail(405, "method not allowed");
-  if (action === "finalize")
-    return is("POST") ? closeBuild(ctx, build, orgId) : fail(405, "method not allowed");
-  return fail(404, "not found");
+  return run(build, orgId);
 }
 
-function errorResponse(e: unknown): Response {
-  if (e instanceof BadRequest) return fail(400, e.message);
-  if (e instanceof NotFoundError) return fail(404, e.message);
+/** Every endpoint the API has. The README's API table is checked against this list. */
+export const ENDPOINTS: readonly Endpoint[] = [
+  { method: "GET", path: "/api/v1/me", upload: true, run: (ctx) => me(ctx) },
+  { method: "POST", path: "/api/v1/builds", upload: true, run: (ctx) => startBuild(ctx) },
+  {
+    method: "PUT",
+    path: "/api/v1/builds/:id/snapshots",
+    upload: true,
+    run: (ctx, p) => withBuild(ctx, at(p, 0), (build, orgId) => addSnapshot(ctx, build, orgId)),
+  },
+  {
+    method: "POST",
+    path: "/api/v1/builds/:id/finalize",
+    upload: true,
+    run: (ctx, p) => withBuild(ctx, at(p, 0), (build, orgId) => closeBuild(ctx, build, orgId)),
+  },
+  { method: "GET", path: "/api/v1/projects", run: (ctx) => listProjects(reads(ctx)) },
+  {
+    method: "GET",
+    path: "/api/v1/projects/:id/builds",
+    run: (ctx, p) => listBuilds(reads(ctx), at(p, 0)),
+  },
+  {
+    method: "GET",
+    path: "/api/v1/projects/:id/detection-flags",
+    run: (ctx, p) => listDetectionFlags(reads(ctx), at(p, 0)),
+  },
+  { method: "GET", path: "/api/v1/builds/:id", run: (ctx, p) => getBuild(reads(ctx), at(p, 0)) },
+  {
+    method: "GET",
+    path: "/api/v1/snapshots/:id",
+    run: (ctx, p) => getSnapshot(reads(ctx), at(p, 0)),
+  },
+];
+
+/** The `:param` values when `path` fits the pattern, else null. */
+function match(pattern: string, path: string[]): string[] | null {
+  const want = pattern.split("/").filter(Boolean);
+  if (want.length !== path.length) return null;
+  const params: string[] = [];
+  for (const [i, part] of want.entries()) {
+    const got = path[i] ?? "";
+    if (part.startsWith(":")) {
+      if (!got) return null;
+      try {
+        params.push(decodeURIComponent(got));
+      } catch {
+        return null;
+      }
+    } else if (part !== got) return null;
+  }
+  return params;
+}
+
+type ApiError = { status: number; code: string; message: string };
+
+function errorOf(e: unknown): ApiError {
+  if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };
+  if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
   if (e instanceof BuildFinalisedError || e instanceof SnapshotCountError)
-    return fail(409, e.message);
-  if (e instanceof TooLarge) return fail(413, `PNG over ${MAX_PNG_BYTES} bytes`);
+    return { status: 409, code: "conflict", message: e.message };
+  if (e instanceof TooLarge)
+    return { status: 413, code: "too_large", message: `PNG over ${MAX_PNG_BYTES} bytes` };
   throw e;
 }
 
+/** An upload endpoint's error is the string it always was; every other carries a code. */
+function failWith(upload: boolean, { status, code, message }: ApiError): Response {
+  if (upload) return fail(status, message);
+  return json({ api_version: API_VERSION, error: { code, message } }, status);
+}
+
+/** `pixelslash/<x.y.z>`, the CLI's User-Agent; null for any other client. */
+function cliVersion(request: Request): number[] | null {
+  const found = /^pixelslash\/(\d+)\.(\d+)\.(\d+)/.exec(request.headers.get("user-agent") ?? "");
+  return found ? found.slice(1).map(Number) : null;
+}
+
+/** True when the request is from a CLI older than `min` (`x.y.z`); other clients are never refused. */
+function belowMinimum(request: Request, min: string | undefined): boolean {
+  const have = cliVersion(request);
+  const want = min?.split(".").map(Number);
+  if (!have || !want || want.some((n) => !Number.isInteger(n))) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const diff = (have[i] ?? 0) - (want[i] ?? 0);
+    if (diff !== 0) return diff < 0;
+  }
+  return false;
+}
+
 /**
- * The upload API, `/api/v1/…`, as a plain Request → Response so tests and the Worker route
- * share it. `authorize` turns the token into an actor: a CI token reaches its one project, a
- * personal (`psu_`) token every project of its user's orgs. A build of a project the actor
- * cannot reach is a 404, never a 403, and nothing it writes leaves that project's org.
- *
- *   GET  /api/v1/me                         → {kind: "user", user: {id, login, name}} | {kind: "ci", projectId}
- *   POST /api/v1/builds                     {commitSha, branch, mergeBaseSha?, ancestorShas?, prNumber?, projectId?} → {id}
- *                                           (`projectId` is required with a personal token)
- *   PUT  /api/v1/builds/:id/snapshots       multipart: meta (JSON), file (PNG) → {id}
- *   POST /api/v1/builds/:id/finalize        {snapshots: N} → {id, status, error, unmeasured}: diffs, then the build status
+ * The API, `/api/v1/…`, as a plain Request → Response so tests and the Worker route share it.
+ * `authorize` turns the token into an actor: a CI token reaches its one project, a personal
+ * (`psu_`) token every project of its user's orgs. A project, build or shot the actor cannot reach
+ * is a 404, never a 403, and nothing an upload writes leaves that project's org. The endpoints and
+ * their replies are in `ENDPOINTS` and the README's "API" section.
  */
 export async function handleApi(request: Request, deps: ApiDeps): Promise<Response> {
-  const parts = new URL(request.url).pathname.split("/").filter(Boolean).slice(2);
+  const path = new URL(request.url).pathname.split("/").filter(Boolean);
+  const fits = ENDPOINTS.flatMap((e) => {
+    const params = match(e.path, path);
+    return params ? [{ endpoint: e, params }] : [];
+  });
+  const hit = fits.find(({ endpoint }) => endpoint.method === request.method);
+  const upload = (hit ?? fits[0])?.endpoint.upload === true;
+  if (belowMinimum(request, deps.minCliVersion))
+    return failWith(upload, {
+      status: 426,
+      code: "cli_outdated",
+      message: `upgrade the CLI: this server needs pixelslash ${deps.minCliVersion} or newer`,
+    });
   const actor = await authorize({ db: deps.db, request });
-  if (!actor) return fail(401, "missing, wrong, expired or revoked token");
+  if (!actor)
+    return failWith(upload, {
+      status: 401,
+      code: "unauthorized",
+      message: "missing, wrong, expired or revoked token",
+    });
+  if (!hit) {
+    if (fits.length > 0)
+      return failWith(upload, {
+        status: 405,
+        code: "method_not_allowed",
+        message: "method not allowed",
+      });
+    return failWith(false, { status: 404, code: "not_found", message: "not found" });
+  }
   try {
-    return await route({ ...deps, actor, request }, parts);
+    return await hit.endpoint.run({ ...deps, actor, request }, hit.params);
   } catch (e) {
-    return errorResponse(e);
+    return failWith(upload, errorOf(e));
   }
 }

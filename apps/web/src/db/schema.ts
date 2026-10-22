@@ -132,6 +132,7 @@ export const BUILD_STATUSES = [
   "failed",
   "errored",
 ] as const;
+export type BuildStatus = (typeof BUILD_STATUSES)[number];
 
 /**
  * One upload for one project at one commit. `ancestorShas` feed the baseline pick.

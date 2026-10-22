@@ -1,14 +1,22 @@
 /** A stand-in for the PixelSlash API: records every request, answers 200 (or what `failOn` says). */
-export type Call = { method: string; url: string; auth: string | null; body: unknown };
+export type Call = {
+  method: string;
+  url: string;
+  auth: string | null;
+  userAgent: string | null;
+  body: unknown;
+};
 
 export function fakeServer(failOn?: (call: Call) => Response | undefined) {
   const calls: Call[] = [];
   const fetch = async (url: string, init?: RequestInit) => {
     const body = init?.body;
+    const headers = new Headers(init?.headers);
     const call: Call = {
       method: init?.method ?? "GET",
       url,
-      auth: new Headers(init?.headers).get("authorization"),
+      auth: headers.get("authorization"),
+      userAgent: headers.get("user-agent"),
       body: typeof body === "string" ? JSON.parse(body) : body,
     };
     calls.push(call);
