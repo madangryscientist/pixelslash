@@ -87,7 +87,7 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
       </div>
       <BuildCell project={project} />
       {latest ? <MixBar counts={latest.counts} /> : <span className="text-slate-400">—</span>}
-      <ToReview build={latest} />
+      <ToReview build={latest} defaultBranch={project.defaultBranch} />
       <Updated project={project} now={now} />
       <Link
         to="/projects/$projectId/settings"

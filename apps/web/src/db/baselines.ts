@@ -15,8 +15,8 @@ import { builds, type IgnoreRect, snapshots } from "./schema";
  * A previous shot whose change is still undecided is not an accepted image, so it is a baseline
  * only for an unchanged shot, which then carries the open change (`carried_from`). A shot that
  * differs from it is measured against rule 2's accepted shot instead, so accepting it never
- * approves a change nobody was shown. A build that was rejected never feeds a baseline. On main
- * every shot is accepted, so rule 1 there is the rule main always had.
+ * approves a change nobody was shown. A build that was rejected never feeds a baseline. On the
+ * project's default branch every shot is accepted, so rule 1 there is the rule it always had.
  */
 
 /** The fields of a snapshot this module reads; a whole row would drag the blobs' JSON along. */
@@ -103,8 +103,8 @@ const baselineOf = ({
 });
 
 /**
- * Every shot that may be a baseline, newest first: an accepted one (see `acceptedRow`; main
- * auto-accepts, so a squash-merged main build counts), or any shot of this branch. Only from a
+ * Every shot that may be a baseline, newest first: an accepted one (see `acceptedRow`; the default
+ * branch auto-accepts, so a squash-merged build there counts), or any shot of this branch. Only from a
  * build that was not rejected.
  */
 function queryCandidates(db: Db, build: Build) {

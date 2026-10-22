@@ -52,7 +52,13 @@ function ProjectPage() {
           </div>
           <ul>
             {builds.map((build) => (
-              <BuildRow key={build.id} projectId={project.id} build={build} now={now} />
+              <BuildRow
+                key={build.id}
+                projectId={project.id}
+                defaultBranch={project.defaultBranch}
+                build={build}
+                now={now}
+              />
             ))}
           </ul>
         </div>
@@ -63,10 +69,12 @@ function ProjectPage() {
 
 function BuildRow({
   projectId,
+  defaultBranch,
   build,
   now,
 }: {
   projectId: string;
+  defaultBranch: string;
   build: BuildSummary;
   now: Date;
 }) {
@@ -97,7 +105,7 @@ function BuildRow({
         <StatusBadge status={build.status} />
       </div>
       <MixBar counts={build.counts} />
-      <ToReview build={build} />
+      <ToReview build={build} defaultBranch={defaultBranch} />
       <span
         data-testid="rel-time"
         className="text-sm text-slate-400"

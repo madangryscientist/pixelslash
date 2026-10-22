@@ -51,5 +51,13 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
   await expect(page.getByTestId("issued-token")).toHaveCount(0);
   await row.getByRole("button", { name: "Revoke" }).click();
   await expect(row).toContainText("revoked");
+
+  // The default branch starts at main and is what auto-accepts (ob 1559); a save survives a reload.
+  const branch = page.getByLabel("Default branch, e.g. main");
+  await expect(branch).toHaveValue("main");
+  await branch.fill("master");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.reload();
+  await expect(page.getByLabel("Default branch, e.g. main")).toHaveValue("master");
   expect(hydrationErrors).toEqual([]);
 });

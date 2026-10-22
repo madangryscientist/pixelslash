@@ -431,7 +431,7 @@
       "label": "Main auto-accepted",
       "ps": {
         "v": "y",
-        "note": "acceptMainBuild on finalise"
+        "note": "acceptDefaultBranchBuild on finalise; the branch is the project's, set in settings (default main)"
       },
       "t": {
         "argos": "y",

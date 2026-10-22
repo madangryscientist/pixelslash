@@ -195,7 +195,7 @@ Sending a snapshot again (same name, platform, browser, viewport, theme) replace
 **What a shot is compared against (its baseline).** Each shot is matched by name, platform, browser, viewport and theme, and the server picks one earlier shot for it:
 
 1. **The branch's last build.** The same shot from the newest earlier build on the same branch whose build was not rejected, reviewed or not. A second build of an unchanged commit therefore shows 0 changed: a re-run shows only what moved since the last one. A shot accepted on build 1 and unchanged on build 2 passes on build 2.
-2. **Otherwise, the accepted shot on the base.** The newest accepted shot from a build at the merge-base or one of the ancestor SHAs (nearest first). A main build is auto-accepted, so on `main` rule 1 and rule 2 pick the same shot, and main's baselining is as before.
+2. **Otherwise, the accepted shot on the base.** The newest accepted shot from a build at the merge-base or one of the ancestor SHAs (nearest first). A build on the project's default branch (`main` unless changed on the project's settings page) is auto-accepted, so on that branch rule 1 and rule 2 pick the same shot. A build on any other branch, `main` included when it is not the default, waits for review.
 
 A change that is still open on the branch's last build (pending, never accepted or rejected) is not dropped by rule 1:
 

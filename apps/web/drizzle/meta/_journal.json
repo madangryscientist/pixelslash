@@ -50,6 +50,13 @@
       "when": 1792631270768,
       "tag": "0006_boring_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792634394521,
+      "tag": "0007_cold_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }

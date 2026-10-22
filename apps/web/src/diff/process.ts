@@ -11,7 +11,7 @@ import {
 import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
 import { refreshBuildStatus } from "#/db/review";
-import { type DiffResult, builds, snapshots } from "#/db/schema";
+import { type DiffResult, builds, projects, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
 
 /**
@@ -20,9 +20,6 @@ import type { BlobStore } from "#/storage/blobs";
  * server adds only the things the engine does not know about: which baseline, which stored
  * options and ignore areas, and the build status.
  */
-
-/** A build on this branch is auto-accepted: there is no reviewer to ask. */
-export const MAIN_BRANCH = "main";
 
 /**
  * The Worker's CPU limit is 30 s and the diff runs inline in the finalise request (decided
@@ -227,8 +224,13 @@ async function markRemoved(deps: ProcessDeps, build: Build, removed: BaselineSna
   }
 }
 
-async function acceptMainBuild(db: Db, build: Build): Promise<void> {
-  if (build.branch !== MAIN_BRANCH) return;
+/** A build on the project's default branch is auto-accepted: there is no reviewer to ask (ob 1559). */
+async function acceptDefaultBranchBuild(db: Db, build: Build): Promise<void> {
+  const [project] = await db
+    .select({ defaultBranch: projects.defaultBranch })
+    .from(projects)
+    .where(eq(projects.id, build.projectId));
+  if (build.branch !== project?.defaultBranch) return;
   await db
     .update(snapshots)
     .set({ reviewState: "accepted", reviewedAt: new Date() })
@@ -380,7 +382,7 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     );
     await measure(deps, rows, baselines);
     await markRemoved(deps, build, baselines.removed);
-    await acceptMainBuild(deps.db, build);
+    await acceptDefaultBranchBuild(deps.db, build);
     const status = await refreshBuildStatus(deps.db, build.id);
     return { status, error: null, unmeasured: 0 };
   } catch (e) {

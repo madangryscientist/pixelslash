@@ -70,8 +70,14 @@ export function stripeOf(build: MixBuild): string {
 /** A build in one of these statuses was never diffed, so "nothing to review" would claim a result. */
 const UNMEASURED = new Set<MixBuild["status"]>(["uploading", "processing", "errored"]);
 
-/** "7 to review" in amber, "auto-accepted" for a build on main (`MAIN_BRANCH` in diff/process.ts accepts those), else a dash. */
-export function ToReview({ build }: { build: MixBuild | null }) {
+/** "7 to review" in amber, "auto-accepted" for a build on the project's default branch (diff/process.ts accepts those), else a dash. */
+export function ToReview({
+  build,
+  defaultBranch,
+}: {
+  build: MixBuild | null;
+  defaultBranch: string;
+}) {
   if (!build) return <span className="text-slate-400">—</span>;
   if (UNMEASURED.has(build.status)) {
     return (
@@ -89,7 +95,9 @@ export function ToReview({ build }: { build: MixBuild | null }) {
   }
   return (
     <span data-testid="to-review" className="text-sm text-slate-400">
-      {build.branch === "main" && build.status === "passed" ? "auto-accepted" : "nothing to review"}
+      {build.branch === defaultBranch && build.status === "passed"
+        ? "auto-accepted"
+        : "nothing to review"}
     </span>
   );
 }

@@ -73,6 +73,8 @@ export const projects = sqliteTable(
       .notNull()
       .references(() => orgs.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /** Builds on this branch are auto-accepted and become the next baselines (ob 1559). Set on the settings page. */
+    defaultBranch: text("default_branch").notNull().default("main"),
     createdAt: createdAt(),
   },
   (t) => [unique().on(t.orgId, t.name)],

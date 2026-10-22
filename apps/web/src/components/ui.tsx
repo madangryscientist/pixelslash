@@ -81,6 +81,7 @@ export function InlineForm({
   button,
   busyLabel,
   emptyReason,
+  initialValue,
   onSubmit,
 }: {
   label: string;
@@ -88,10 +89,12 @@ export function InlineForm({
   busyLabel: string;
   /** Why the button is grey while the field is empty: its `title` and the line under the field. */
   emptyReason: string;
+  /** A field that edits a stored value starts at it and keeps what was saved; one that adds a thing starts empty and clears. */
+  initialValue?: string;
   onSubmit: (value: string) => Promise<unknown>;
 }) {
   const hydrated = useHydrated();
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const empty = value.trim().length === 0;
@@ -102,7 +105,7 @@ export function InlineForm({
     setBusy(true);
     onSubmit(value.trim())
       .then(
-        () => setValue(""),
+        () => setValue(initialValue === undefined ? "" : value.trim()),
         (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
       )
       .finally(() => setBusy(false));

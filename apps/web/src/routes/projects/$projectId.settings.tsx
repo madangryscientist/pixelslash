@@ -6,7 +6,7 @@ import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
-import { getProjectSettings, issueToken, revokeToken } from "#/server/fns";
+import { getProjectSettings, issueToken, revokeToken, saveDefaultBranch } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/settings")({
   loader: ({ params }) => getProjectSettings({ data: { projectId: params.projectId } }),
@@ -53,6 +53,24 @@ function ProjectSettings() {
           onSubmit={issue}
         />
         <TokenTable tokens={tokens} hydrated={hydrated} />
+      </section>
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
+        <SectionHeading className="mb-1.5">Default branch</SectionHeading>
+        <Body as="p" className="mb-4">
+          Builds on this branch are accepted without review and become the baseline for branch
+          builds. Builds on other branches wait for review.
+        </Body>
+        <InlineForm
+          label="Default branch, e.g. main"
+          button="Save"
+          busyLabel="Saving…"
+          emptyReason="Name the branch: the one you merge into."
+          initialValue={project.defaultBranch}
+          onSubmit={async (branch) => {
+            await saveDefaultBranch({ data: { projectId: project.id, branch } });
+            await router.invalidate();
+          }}
+        />
       </section>
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
         <SectionHeading className="mb-1.5">Upload a build</SectionHeading>

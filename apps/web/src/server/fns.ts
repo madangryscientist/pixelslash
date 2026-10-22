@@ -9,6 +9,7 @@ import {
   getProjectWithOrg,
   inviteMember,
   listOrgs,
+  setDefaultBranch,
   withdrawInvite,
 } from "#/db/orgs";
 import {
@@ -135,6 +136,13 @@ export const getProjectSettings = createServerFn()
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const tokens = await listCiTokens(db, user.id, project.id);
     return { org, project, tokens, serverUrl: getRequestUrl().origin };
+  });
+
+export const saveDefaultBranch = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({ projectId: field(d, "projectId"), branch: field(d, "branch") }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(setDefaultBranch(database(), user.id, data.projectId, data.branch));
   });
 
 export const issueToken = createServerFn({ method: "POST" })

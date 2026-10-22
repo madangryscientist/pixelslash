@@ -224,6 +224,17 @@ export async function createProject(
   return project;
 }
 
+/** Which branch auto-accepts (ob 1559). Any member may change it, as any member may issue a token. */
+export async function setDefaultBranch(
+  db: Db,
+  userId: string,
+  projectId: string,
+  branch: string,
+): Promise<void> {
+  await getProject(db, userId, projectId);
+  await db.update(projects).set({ defaultBranch: branch }).where(eq(projects.id, projectId));
+}
+
 /** A project the user can see, or NotFoundError: another org's project does not exist to them. */
 export async function getProject(db: Db, userId: string, projectId: string): Promise<Project> {
   const [row] = await db
