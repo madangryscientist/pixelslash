@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { UsageError, compareSnapshots } from "@pixelslash/engine";
+import { UsageError, changeLines, compareSnapshots } from "@pixelslash/engine";
 import type { Io } from "./run.ts";
 import { readFlagPairs } from "./args.ts";
 
@@ -19,6 +19,7 @@ export async function runCompare(argv: string[], io: Io): Promise<number> {
   io.stdout.write(
     `pixelslash: ${r.changed.length} changed, ${r.unchanged.length} unchanged, ${r.added.length} new, ${r.removed.length} removed\n`,
   );
+  for (const line of changeLines(r)) io.stdout.write(`${line}\n`);
   if (r.mismatched.length > 0)
     io.stdout.write(`fingerprint: ${r.mismatched.length} differ (diffed anyway)\n`);
   io.stdout.write(`report: file://${r.indexPath}\n`);

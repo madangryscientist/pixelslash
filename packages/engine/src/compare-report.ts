@@ -19,13 +19,94 @@ export type CompareRow = {
   flaky?: { runs: number; differed: number } | undefined;
 };
 
-function compareList(title: string, rows: CompareRow[], detail: (r: CompareRow) => string) {
+type Rows = {
+  changed: CompareRow[];
+  unchanged: CompareRow[];
+  added: CompareRow[];
+  removed: CompareRow[];
+};
+
+/** One name in a group: what the CLI prints and the report shows, and the entry's anchor on the page. */
+type ChangeName = { label: string; anchor: string };
+
+/** The snapshots that moved, in three groups; a group with nothing in it is left out. */
+type ChangeGroup = { group: "changed" | "new" | "removed"; names: ChangeName[] };
+
+/** `home (chromium 1280x720 prefers: dark)`: the snapshot name plus the rest of its identity. */
+export function rowLabel(r: CompareRow): string {
+  return `${r.name} (${r.shot})`;
+}
+
+/**
+ * Anchor ids for every row on the index, unique even when two identities slug alike. Changed, new,
+ * removed and unchanged rows each get an entry in a section below, so each one is linkable.
+ */
+function anchorsOf(input: Rows): Map<CompareRow, string> {
+  const taken = new Set<string>();
+  const anchors = new Map<CompareRow, string>();
+  for (const r of [...input.changed, ...input.added, ...input.removed, ...input.unchanged]) {
+    const base = `shot-${r.key.replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+    taken.add(id);
+    anchors.set(r, id);
+  }
+  return anchors;
+}
+
+/**
+ * Which snapshots changed, are new or were removed, by name. The CLI's summary and the report's
+ * top list both read this, so they cannot disagree. Unchanged snapshots are not listed.
+ */
+function changeGroups(input: Rows): ChangeGroup[] {
+  const anchors = anchorsOf(input);
+  const named = (rows: CompareRow[]) =>
+    rows.map((r) => ({ label: rowLabel(r), anchor: anchors.get(r) ?? "" }));
+  const groups: ChangeGroup[] = [
+    { group: "changed", names: named(input.changed) },
+    { group: "new", names: named(input.added) },
+    { group: "removed", names: named(input.removed) },
+  ];
+  return groups.filter((g) => g.names.length > 0);
+}
+
+/** How many names a group prints in the terminal before `+N more`. */
+const NAMES_PER_GROUP = 10;
+
+/** The lines that follow the counts line: `changed:` and the names under it, one group each, capped. */
+export function changeLines(input: Rows): string[] {
+  const cap = NAMES_PER_GROUP;
+  return changeGroups(input).flatMap(({ group, names }) => [
+    `${group}:`,
+    ...names.slice(0, cap).map((n) => `  ${n.label}`),
+    ...(names.length > cap ? [`  +${names.length - cap} more`] : []),
+  ]);
+}
+
+function topList(groups: ChangeGroup[]): string {
+  if (groups.length === 0) return "";
+  const titles = { changed: "Changed", new: "New", removed: "Removed" };
+  const blocks = groups
+    .map(
+      ({ group, names }) =>
+        `<h3>${titles[group]}</h3>\n    <ul>\n      ${names.map((n) => `<li><a href="#${esc(n.anchor)}">${esc(n.label)}</a></li>`).join("\n")}\n    </ul>`,
+    )
+    .join("\n    ");
+  return `<nav class="names">\n    ${blocks}\n  </nav>`;
+}
+
+function compareList(
+  title: string,
+  rows: CompareRow[],
+  anchors: Map<CompareRow, string>,
+  detail: (r: CompareRow) => string,
+) {
   if (rows.length === 0) return "";
   const items = rows
     .map((r) => {
       const label = `${esc(r.name)} <span class="shot">${esc(r.shot)}</span>`;
       const link = r.report ? `<a href="${esc(r.report)}">${label}</a>` : label;
-      return `<li>${link}${detail(r)}</li>`;
+      return `<li id="${esc(anchors.get(r) ?? "")}">${link}${detail(r)}</li>`;
     })
     .join("\n");
   return `<section><h2>${esc(title)} (${rows.length})</h2>\n    <ul>\n      ${items}\n    </ul></section>`;
@@ -62,11 +143,12 @@ export function renderCompareIndex(input: {
       ? ` — <span class="warn">flaky: ${r.flaky.differed} of ${r.flaky.runs} captures differed</span>`
       : "";
   const px = (r: CompareRow) => ` — ${r.changedPixels} changed pixels${flaky(r)}`;
+  const anchors = anchorsOf(input);
   const lists = [
-    compareList("Changed", changed, px),
-    compareList("New on Branch", added, () => ""),
-    compareList("Removed from Branch", removed, () => ""),
-    compareList("Unchanged", unchanged, () => ""),
+    compareList("Changed", changed, anchors, px),
+    compareList("New on Branch", added, anchors, () => ""),
+    compareList("Removed from Branch", removed, anchors, () => ""),
+    compareList("Unchanged", unchanged, anchors, () => ""),
   ].join("\n  ");
   return `<!doctype html>
 <html lang="en">
@@ -81,7 +163,10 @@ export function renderCompareIndex(input: {
     h2 { font-size: 14px; margin: 0 0 12px; }
     p { margin: 8px 0 0; color: #aaa; }
     .warn { color: #ffd400; }
-    section { padding: 24px; border-bottom: 1px solid #333; }
+    section, nav { padding: 24px; border-bottom: 1px solid #333; }
+    h3 { font-size: 14px; margin: 0 0 12px; }
+    nav h3:not(:first-child) { margin-top: 20px; }
+    li:target { background: #223; outline: 1px solid #9cf; }
     ul { margin: 0; padding: 0 0 0 20px; }
     li { margin: 0 0 8px; }
     .shot { color: #888; }
@@ -96,6 +181,7 @@ export function renderCompareIndex(input: {
     <p>${counts}</p>
     ${flakes}
   </header>
+  ${topList(changeGroups(input))}
   ${lists}
 </body>
 </html>

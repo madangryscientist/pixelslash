@@ -6,6 +6,7 @@ import {
   type SnapshotDeps,
   type UploadDeps,
   UploadError,
+  changeLines,
   checkAgainstServer,
   findConfig,
   loadConfig,
@@ -38,6 +39,7 @@ function summary(result: CheckResult): string {
   lines.push(
     `pixelslash: ${changed.length} changed, ${unchanged.length} unchanged, ${added.length} new, ${removed.length} removed`,
   );
+  lines.push(...changeLines(result));
   if (mismatched.length > 0)
     lines.push(
       `fingerprint: ${mismatched.length} shots rendered by a different environment than their baseline (diffed anyway)`,

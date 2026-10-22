@@ -5,6 +5,7 @@ export {
   type CompareResult,
   type Deps,
 } from "./compare.ts";
+export { changeLines } from "./compare-report.ts";
 export {
   compareSnapshots,
   type SnapshotCompareDeps,

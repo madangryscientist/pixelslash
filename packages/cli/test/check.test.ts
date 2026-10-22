@@ -80,6 +80,21 @@ describe("pixelslash check", () => {
     );
   }, 60_000);
 
+  test("the summary names the changed shot under the counts line", async () => {
+    const [cwd, api, cap] = [await project(), server(), capture()];
+    const code = await run(["check", "--server", SERVER, "--flake-retries", "0"], cap.io, {
+      fetch: api.fetch,
+      cwd,
+      env: pinned,
+      listFonts: async () => [],
+    });
+    expect(code).toBe(0);
+    const lines = cap.stdout.split("\n");
+    const at = lines.findIndex((l) => l.startsWith("pixelslash: "));
+    expect(lines[at]).toBe("pixelslash: 1 changed, 0 unchanged, 0 new, 0 removed");
+    expect(lines.slice(at + 1, at + 3)).toEqual(["changed:", "  index (chromium 400x300)"]);
+  }, 60_000);
+
   test("a refused token is exit 3, after nothing was written to the server", async () => {
     const [cwd, api, cap] = [await project(), server(401), capture()];
     const code = await run(["check", "--server", SERVER], cap.io, {
