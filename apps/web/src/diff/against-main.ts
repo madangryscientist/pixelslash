@@ -108,13 +108,15 @@ export async function diffAgainstMain(
  */
 export async function measureAgainstMain(
   deps: { db: Db; blobs: BlobStore; diff?: typeof diffPngs | undefined },
-  buildId: string,
+  { buildId, only }: { buildId: string; only?: Set<string> | undefined },
   baselines: Baselines,
   budget: Budget | null,
 ) {
   const compare = budget ? serverComparer(deps, mainDiffKeyOf) : ciComparer(deps.blobs);
   const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, buildId));
   for (const shot of rows) {
+    // A partial re-run (ob 1738) measures only the shots it was given.
+    if (only && !only.has(shot.id)) continue;
     const main = baselines.main.get(snapshotKeyOf(shot));
     if (mainStands(shot, main)) continue;
     if (budget && !budget.fits()) return;

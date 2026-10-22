@@ -1,7 +1,5 @@
-import { type Locator, type Page, expect, test } from "@playwright/test";
-import { createOrg, createProject, openSettings } from "./orgs-page";
-import { png } from "./png";
-import { SERVER } from "./ports";
+import { expect, test } from "@playwright/test";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
 
 /**
  * Flakes on the server (ob 1724): a flaky shot under each policy, uploaded as the CLI sends it,
@@ -9,101 +7,6 @@ import { SERVER } from "./ports";
  * Flakes list resolves and reopens. The uploads go straight to the API: the CLI's re-capture
  * needs a browser, and what the server stores is the same form either way.
  */
-
-const SHA_MAIN = "a".repeat(40);
-const SHA_WORK = "b".repeat(40);
-const WHITE = png(40, 40);
-const CHANGED = png(40, 40, [{ x: 10, y: 10, w: 10, h: 10, rgb: [220, 30, 30] }]);
-
-async function submit(input: Locator, value: string, button: Locator) {
-  await input.fill(value);
-  await button.click();
-}
-
-/** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
-async function provision(page: Page) {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs$/);
-  await createOrg(page, "Flake Co");
-  await createProject(page, "flaky");
-  await openSettings(page, "flaky");
-  await submit(
-    page.getByLabel("Token name, e.g. github-actions"),
-    "ci",
-    page.getByRole("button", { name: "Issue token" }),
-  );
-  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
-  const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1] ?? "";
-  expect(projectId).not.toBe("");
-  return { token, projectId };
-}
-
-/** `png()`'s buffer may sit on a shared buffer, which `Blob` does not take: copy it out. */
-const pngBlob = (buf: Buffer) => new Blob([new Uint8Array(buf)], { type: "image/png" });
-
-type Shot = { name: string; png: Buffer; flaky?: "review" | "skip" };
-
-/** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
-function shotForm(shot: Shot): FormData {
-  const form = new FormData();
-  const meta: Record<string, unknown> = {
-    name: shot.name,
-    platform: "linux",
-    browser: "chromium",
-    viewport: "40x40",
-    theme: "light",
-    tags: ["web"],
-    fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
-  };
-  if (shot.flaky) {
-    meta["flaky"] = shot.flaky;
-    meta["flake"] = {
-      runs: 3,
-      differed: [2],
-      regions: [],
-      engineVersion: "e2e",
-      policy: shot.flaky,
-    };
-    form.set("flake:2", pngBlob(WHITE), "run2.png");
-    form.set("flake:3", pngBlob(shot.png), "run3.png");
-  }
-  form.set("meta", JSON.stringify(meta));
-  form.set("file", pngBlob(shot.png), "shot.png");
-  return form;
-}
-
-/** Open a build, put each shot, finalise: the server diffs in the finalise request. */
-async function uploadBuild(token: string, build: object, shots: Shot[]) {
-  const headers = { authorization: `Bearer ${token}` };
-  const opened = await fetch(`${SERVER}/api/v1/builds`, {
-    method: "POST",
-    headers: { ...headers, "content-type": "application/json" },
-    body: JSON.stringify(build),
-  });
-  expect(opened.status).toBe(201);
-  const { id }: { id: string } = await opened.json();
-  for (const shot of shots) {
-    const put = await fetch(`${SERVER}/api/v1/builds/${id}/snapshots`, {
-      method: "PUT",
-      headers,
-      body: shotForm(shot),
-    });
-    expect(put.status).toBe(200);
-  }
-  const done = await fetch(`${SERVER}/api/v1/builds/${id}/finalize`, {
-    method: "POST",
-    headers: { ...headers, "content-type": "application/json" },
-    body: JSON.stringify({ snapshots: shots.length }),
-  });
-  expect(done.status).toBe(200);
-  return id;
-}
-
-async function open(page: Page, url: string) {
-  await page.goto(url);
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-}
 
 test("a flaky shot under each policy: badge, summary line, config line, resolve and reopen", async ({
   page,

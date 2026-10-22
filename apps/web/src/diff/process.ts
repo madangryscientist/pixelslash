@@ -1,5 +1,5 @@
 import type { diffPngs } from "@pixelslash/engine/diff";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   type Baseline,
   type Baselines,
@@ -10,7 +10,7 @@ import {
 import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
 import { refreshBuildStatus } from "#/db/review";
-import { type DiffLocation, builds, projects, snapshots } from "#/db/schema";
+import { snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
 import { CiResultError } from "./ci-result";
 import { NoRecoveryError, claim, dead } from "./claim";
@@ -24,6 +24,14 @@ import {
 } from "./compare";
 import { measureAgainstMain } from "./against-main";
 import { Budget } from "./budget";
+import {
+  type ProjectOfBuild,
+  acceptDefaultBranchBuild,
+  clearMarkers,
+  markErrored,
+  markRemoved,
+  projectOf,
+} from "./build-writes";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
@@ -177,76 +185,12 @@ async function diffOne(
   await measureAgainst(deps, compare, shot, baseline.accepted);
 }
 
-/** A shot the baseline build had and this one does not: a marker row, so reviewers can see it. */
-async function markRemoved(deps: ProcessDeps, build: Build, removed: BaselineSnapshot[]) {
-  for (const shot of removed) {
-    await deps.db
-      .insert(snapshots)
-      .values({
-        id: crypto.randomUUID(),
-        buildId: build.id,
-        name: shot.name,
-        platform: shot.platform,
-        browser: shot.browser,
-        viewport: shot.viewport,
-        theme: shot.theme,
-        envFingerprint: shot.envFingerprint,
-        ignore: shot.ignore,
-        imageKey: shot.imageKey,
-        baselineKey: shot.imageKey,
-        diffStatus: "removed",
-      })
-      .onConflictDoNothing();
-  }
-}
-
-type ProjectOfBuild = { defaultBranch: string; diffLocation: DiffLocation };
-
-async function projectOf(db: Db, build: Build): Promise<ProjectOfBuild> {
-  const [project] = await db
-    .select({ defaultBranch: projects.defaultBranch, diffLocation: projects.diffLocation })
-    .from(projects)
-    .where(eq(projects.id, build.projectId));
-  if (!project) throw new Error("the build's project is gone");
-  return project;
-}
-
-/** A build on the project's default branch is auto-accepted: there is no reviewer to ask (ob 1559). */
-async function acceptDefaultBranchBuild(
-  db: Db,
-  build: Build,
-  project: ProjectOfBuild,
-): Promise<void> {
-  if (build.branch !== project.defaultBranch) return;
-  // A flaky shot is never auto-accepted (ob 1724): under `review` it waits, under `skip` it is left.
-  await db
-    .update(snapshots)
-    .set({ reviewState: "accepted", reviewedAt: new Date() })
-    .where(and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId)));
-}
-
-async function markErrored(db: Db, build: Build, e: unknown): Promise<void> {
-  const error = e instanceof Error ? e.message : String(e);
-  await db.update(builds).set({ status: "errored", error }).where(eq(builds.id, build.id));
-}
-
 export type ProcessResult = {
   status: Build["status"];
   error: string | null;
   /** Shots a finalise sent again would still measure; non-zero only when the budget stopped the run. */
   unmeasured: number;
 };
-
-/**
- * Drop the removed markers an earlier run wrote; the run writes the ones the baseline calls for.
- * Everything else an earlier run stored stays, so a re-run resumes instead of starting over
- * (ob 1645). The uploaded shots are what usage counts and are never touched.
- */
-async function clearMarkers(deps: ProcessDeps, build: Build): Promise<void> {
-  await deps.db
-    .delete(snapshots)
-    .where(and(eq(snapshots.buildId, build.id), eq(snapshots.diffStatus, "removed")));
-}
 
 /**
  * Whether a shot's stored result still stands. It does when it was measured (a status, or a
@@ -280,15 +224,52 @@ async function measure(
   budget: Budget,
 ) {
   const compare = serverComparer(deps);
+  const failed: string[] = [];
   let done = 0;
   for (const shot of rows) {
     const baseline = baselines.byKey.get(snapshotKeyOf(shot));
     if (!stands(shot, baseline)) {
       if (!budget.fits())
         throw new DiffCeilingError(done, rows.length, budget.used(), budget.slowest);
-      await budget.spend(() => diffOne(deps, compare, shot, baseline));
+      await budget.spend(async () => {
+        const reason = await diffOrRecord(deps, compare, shot, baseline);
+        if (reason) failed.push(reason);
+      });
     }
     done++;
+  }
+  if (failed.length > 0)
+    throw new Error(
+      `${failed.length} of ${rows.length} shots could not be measured; re-run them from the build ` +
+        `page. ${failed.join("; ")}`,
+    );
+}
+
+const shotLabel = (shot: SnapshotRow) => `${shot.name} (${shot.viewport}, ${shot.theme})`;
+
+/**
+ * Measure one shot on the server; one whose diff throws (its baseline missing from storage, a PNG
+ * that does not decode) keeps the reason in `diff_error` and is left unmeasured, and the others are
+ * still measured (ob 1738). The build errors naming it, and a re-run measures only what is left.
+ */
+async function diffOrRecord(
+  deps: ProcessDeps,
+  compare: Comparer,
+  shot: SnapshotRow,
+  baseline: Baseline | undefined,
+): Promise<string | null> {
+  try {
+    await diffOne(deps, compare, shot, baseline);
+    return null;
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    await storeSnapshot(deps.db, shot.id, {
+      diffStatus: null,
+      diffResult: null,
+      rebaselineNeeded: false,
+      diffError: reason,
+    });
+    return `${shotLabel(shot)}: ${reason}`;
   }
 }
 
@@ -307,7 +288,7 @@ async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: 
     } catch (e) {
       if (!(e instanceof CiResultError)) throw e;
       await storeSnapshot(deps.db, shot.id, { diffStatus: null, diffError: e.message });
-      refused.push(`${shot.name} (${shot.viewport}, ${shot.theme}): ${e.message}`);
+      refused.push(`${shotLabel(shot)}: ${e.message}`);
     }
   }
   if (refused.length > 0)
@@ -321,9 +302,9 @@ async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: 
  * Measure every shot against its own baseline, in CI's results or here under the run's budget,
  * then a branch build's against main with what that budget leaves (ob 1723).
  */
-async function measureAll(
+export async function measureAll(
   deps: ProcessDeps,
-  { build, project }: { build: Build; project: ProjectOfBuild },
+  { build, project, only }: { build: Build; project: ProjectOfBuild; only?: Set<string> },
   rows: SnapshotRow[],
   baselines: Baselines,
 ) {
@@ -331,7 +312,7 @@ async function measureAll(
   if (budget) await measure(deps, rows, baselines, budget);
   else await measureFromCi(deps, rows, baselines);
   if (build.branch !== project.defaultBranch)
-    await measureAgainstMain(deps, build.id, baselines, budget);
+    await measureAgainstMain(deps, { buildId: build.id, only }, baselines, budget);
 }
 
 /**

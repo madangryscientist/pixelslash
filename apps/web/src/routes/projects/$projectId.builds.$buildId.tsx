@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
 import { TabBody, Tabs } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { RerunErrored } from "#/components/rerun";
 import { Page } from "#/components/ui";
 import { BUILD_TABS, type BuildTab, defaultTab, setsBaseline, tabCounts } from "#/lib/build-tabs";
 import { awaitsDecision } from "#/lib/snapshot-groups";
@@ -56,14 +57,17 @@ function BuildPage() {
         baseline={baseline}
       />
       {build.error && (
-        <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+        <div role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
           {build.error}
           {project.diffLocation === "ci" && build.status === "errored" && (
             <span data-testid="rerun-ci" className="mt-1 block font-medium">
               This project diffs in CI, so the server cannot measure it again: re-run the CI job.
             </span>
           )}
-        </p>
+          {project.diffLocation === "server" && build.status === "errored" && (
+            <RerunErrored projectId={project.id} buildId={build.id} />
+          )}
+        </div>
       )}
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">

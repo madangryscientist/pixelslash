@@ -1,3 +1,4 @@
+import type { diffPngs } from "@pixelslash/engine/diff";
 import { eq } from "drizzle-orm";
 import { setup } from "#/api/test-support";
 import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#/db/builds";
@@ -85,15 +86,20 @@ async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
  * front of the diff only, so a failure there is not the store the assertions read back from;
- * `blobs` does the same for the images.
+ * `blobs` does the same for the images; `diff` stands in for the engine's diff.
  */
 export async function upload(
   ctx: Ctx,
   spec: BuildSpec,
-  { now, db = ctx.db, blobs = ctx.scoped }: { now?: () => number; db?: Db; blobs?: BlobStore } = {},
+  {
+    now,
+    db = ctx.db,
+    blobs = ctx.scoped,
+    diff,
+  }: { now?: () => number; db?: Db; blobs?: BlobStore; diff?: typeof diffPngs | undefined } = {},
 ): Promise<Build> {
   const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
-  await processBuild({ db, blobs, now }, done);
+  await processBuild({ db, blobs, now, diff }, done);
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

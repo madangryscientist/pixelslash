@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { useCallback, useMemo, useState } from "react";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
+import { RerunShot } from "#/components/rerun";
 import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer } from "#/components/snapshot-viewer";
@@ -145,6 +146,7 @@ function SnapshotPage() {
             flake={data.flake}
             skipped={skippedFlaky(snapshot)}
           />
+          <RerunShot project={project} build={build} snapshot={snapshot} />
         </SidePanel>
       </div>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}

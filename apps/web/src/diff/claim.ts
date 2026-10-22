@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
 import { builds } from "#/db/schema";
@@ -77,3 +77,16 @@ export const dead = (build: Build) =>
   build.status === "processing" &&
   build.processingStartedAt !== null &&
   build.processingStartedAt.getTime() < Date.now() - STALE_PROCESSING_MS;
+
+/**
+ * Take a build with a verdict (`changes`, `passed`, `failed`) to re-diff a shot a reviewer picked
+ * (ob 1738). One conditional UPDATE, like `claim`, so a re-run never races another run.
+ */
+export async function claimForRerun(db: Db, build: Build): Promise<boolean> {
+  const claimed = await db
+    .update(builds)
+    .set({ status: "processing", error: null, processingStartedAt: new Date() })
+    .where(and(eq(builds.id, build.id), inArray(builds.status, ["changes", "passed", "failed"])))
+    .returning({ id: builds.id });
+  return claimed.length > 0;
+}

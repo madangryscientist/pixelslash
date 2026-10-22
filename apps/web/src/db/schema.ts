@@ -258,7 +258,10 @@ export const snapshots = sqliteTable(
      * per baseline it measured against. Finalise validates the one for the server's pick (ob 1727).
      */
     ciResults: text("ci_results", { mode: "json" }).$type<unknown>(),
-    /** Why a CI result was refused: the shot was not measured, and its build errored naming it. */
+    /**
+     * Why the shot was not measured: a CI result was refused, or the server's diff of it threw (ob
+     * 1738). Its build errored naming it, and a re-run measures it again.
+     */
     diffError: text("diff_error"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
