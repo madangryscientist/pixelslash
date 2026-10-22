@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
 import { type FlagKind, type IgnoreRect, builds, detectionFlags, snapshots, users } from "./schema";
@@ -36,7 +36,14 @@ export async function flagSnapshot(
 ): Promise<void> {
   await getProject(db, input.userId, input.projectId);
   await snapshotInProject(db, input.projectId, input.snapshotId);
-  const fields = { kind: input.kind, note: input.note, rect: input.rect, updatedAt: new Date() };
+  // An edited flag is new work: whatever was exported from the old one no longer stands for it.
+  const fields = {
+    kind: input.kind,
+    note: input.note,
+    rect: input.rect,
+    updatedAt: new Date(),
+    exportedAt: null,
+  };
   await db
     .insert(detectionFlags)
     .values({
@@ -120,6 +127,7 @@ export async function projectFlags(
   db: Db,
   projectId: string,
   page?: { after?: FlagCursor | undefined; limit: number },
+  flagId?: string,
 ) {
   const after = page?.after;
   const query = db
@@ -148,6 +156,7 @@ export async function projectFlags(
       by: users.login,
       createdAt: detectionFlags.createdAt,
       updatedAt: detectionFlags.updatedAt,
+      exportedAt: detectionFlags.exportedAt,
     })
     .from(detectionFlags)
     .innerJoin(snapshots, eq(snapshots.id, detectionFlags.snapshotId))
@@ -156,6 +165,7 @@ export async function projectFlags(
     .where(
       and(
         eq(detectionFlags.projectId, projectId),
+        flagId === undefined ? undefined : eq(detectionFlags.id, flagId),
         after &&
           or(
             lt(detectionFlags.createdAt, after.createdAt),
@@ -178,3 +188,37 @@ export async function projectFlags(
 }
 
 export type ProjectFlag = Awaited<ReturnType<typeof listFlags>>[number];
+
+/** The project a flag belongs to; a missing flag is a 404. */
+export async function flagProjectId(db: Db, flagId: string): Promise<string> {
+  const [row] = await db
+    .select({ projectId: detectionFlags.projectId })
+    .from(detectionFlags)
+    .where(eq(detectionFlags.id, flagId));
+  if (!row) throw new NotFoundError("detection flag");
+  return row.projectId;
+}
+
+/**
+ * Mark a flag as turned into a bench case (ob 1734) and return it. The caller has checked the
+ * project is reachable. Marking it again keeps the first time.
+ */
+export async function markFlagExported(
+  db: Db,
+  projectId: string,
+  flagId: string,
+): Promise<ProjectFlag> {
+  await db
+    .update(detectionFlags)
+    .set({ exportedAt: new Date() })
+    .where(
+      and(
+        eq(detectionFlags.projectId, projectId),
+        eq(detectionFlags.id, flagId),
+        isNull(detectionFlags.exportedAt),
+      ),
+    );
+  const [flag] = (await projectFlags(db, projectId, undefined, flagId)).flags;
+  if (!flag) throw new NotFoundError("detection flag");
+  return flag;
+}

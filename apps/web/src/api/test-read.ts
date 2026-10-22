@@ -74,6 +74,7 @@ export type Reply = {
   build: ApiBuild & { snapshots: ApiSnapshot[] };
   snapshot: ApiSnapshot & { images: ApiImages };
   detection_flags: ApiFlag[];
+  detection_flag: ApiFlag;
   next_cursor: string | null;
 };
 

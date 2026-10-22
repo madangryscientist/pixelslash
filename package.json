@@ -15,7 +15,8 @@
     "format:check": "oxfmt --check",
     "test": "nx run-many -t test",
     "bench": "nx run bench:bench --output-style=stream",
-    "bench:check": "nx run bench:check --output-style=stream"
+    "bench:check": "nx run bench:check --output-style=stream",
+    "bench:import-flags": "bun bench/src/import-flags.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.3",

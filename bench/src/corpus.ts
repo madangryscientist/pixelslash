@@ -65,8 +65,8 @@ function parseRect(raw: unknown): Rect {
   return { x, y, w, h };
 }
 
-export function loadCorpus(corpus: CorpusId): CorpusCase[] {
-  const root = CORPORA[corpus];
+/** `root` defaults to the corpus's own directory; another is a case dir outside it (an import). */
+export function loadCorpus(corpus: CorpusId, root = CORPORA[corpus]): CorpusCase[] {
   return readdirSync(root, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)

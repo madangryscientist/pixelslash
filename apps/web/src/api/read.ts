@@ -1,7 +1,7 @@
 import { pageBuilds } from "#/db/build-list";
 import { type Actor, actorBuild, actorProject, actorProjects, actorSnapshot } from "#/db/actor";
-import type { Db } from "#/db/db";
-import { type ProjectFlag, projectFlags } from "#/db/flags";
+import { type Db, NotFoundError } from "#/db/db";
+import { type ProjectFlag, flagProjectId, markFlagExported, projectFlags } from "#/db/flags";
 import {
   type BuildCounts,
   type SnapshotView,
@@ -18,7 +18,7 @@ import {
 } from "#/db/schema";
 import { awaitsDecision, groupOf, skippedFlaky } from "#/lib/snapshot-groups";
 import { signedImagePath } from "#/storage/signed";
-import { BadRequest } from "./validate";
+import { BadRequest, Forbidden } from "./validate";
 
 /**
  * The read API (ob 1729): what the CLI and the MCP server read builds and shots with. Every
@@ -290,6 +290,7 @@ async function flag(ctx: ReadCtx, projectId: string, orgId: string, f: ProjectFl
     },
     created_at: iso(f.createdAt),
     updated_at: iso(f.updatedAt),
+    exported_at: iso(f.exportedAt),
     web_url: snapshotUrl(ctx, projectId, f.build.id, f.snapshot.id),
   };
 }
@@ -306,4 +307,20 @@ export async function listDetectionFlags(ctx: ReadCtx, projectId: string): Promi
     ),
     next_cursor: encodeCursor(page.next),
   });
+}
+
+/**
+ * `POST /api/v1/detection-flags/:id/exported` (ob 1734): the bench's import marks a flag it turned
+ * into a case, so the list shows what is still unworked. A person's token only; a CI token is 403.
+ */
+export async function markDetectionFlagExported(ctx: ReadCtx, flagId: string): Promise<Response> {
+  if (ctx.actor.kind !== "user") throw new Forbidden("a CI token cannot mark a flag exported");
+  const project = await actorProject(ctx.db, ctx.actor, await flagProjectId(ctx.db, flagId)).catch(
+    (e: unknown) => {
+      // Another org's flag is the same 404 as a missing one.
+      throw e instanceof NotFoundError ? new NotFoundError("detection flag") : e;
+    },
+  );
+  const marked = await markFlagExported(ctx.db, project.id, flagId);
+  return reply({ detection_flag: await flag(ctx, project.id, project.orgId, marked) });
 }

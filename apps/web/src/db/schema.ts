@@ -329,6 +329,8 @@ export const detectionFlags = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    /** When the flag was turned into a bench case (ob 1734); an edit to the flag clears it. */
+    exportedAt: integer("exported_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     unique().on(t.snapshotId, t.createdBy),

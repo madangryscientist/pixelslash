@@ -22,6 +22,7 @@ import {
   listBuilds,
   listDetectionFlags,
   listProjects,
+  markDetectionFlagExported,
 } from "./read";
 import {
   BadRequest,
@@ -194,6 +195,12 @@ const reads = (ctx: Ctx): ReadCtx => ({
 
 const at = (params: string[], i: number) => params[i] ?? "";
 
+/** A route whose one `:id` goes to a read with the token's actor. */
+const byId =
+  (read: (ctx: ReadCtx, id: string) => Promise<Response>): Endpoint["run"] =>
+  (ctx, p) =>
+    read(reads(ctx), at(p, 0));
+
 const picks = (ctx: Ctx): BaselinesCtx => ({
   db: ctx.db,
   actor: ctx.actor,
@@ -242,32 +249,21 @@ export const ENDPOINTS: readonly Endpoint[] = [
   },
   { method: "POST", path: "/api/v1/baselines", run: (ctx) => preview(ctx) },
   { method: "GET", path: "/api/v1/projects", run: (ctx) => listProjects(reads(ctx)) },
+  { method: "GET", path: "/api/v1/projects/:id/builds", run: byId(listBuilds) },
+  { method: "GET", path: "/api/v1/projects/:id/detection-flags", run: byId(listDetectionFlags) },
   {
-    method: "GET",
-    path: "/api/v1/projects/:id/builds",
-    run: (ctx, p) => listBuilds(reads(ctx), at(p, 0)),
+    method: "POST",
+    path: "/api/v1/detection-flags/:id/exported",
+    run: byId(markDetectionFlagExported),
   },
-  {
-    method: "GET",
-    path: "/api/v1/projects/:id/detection-flags",
-    run: (ctx, p) => listDetectionFlags(reads(ctx), at(p, 0)),
-  },
-  {
-    method: "GET",
-    path: "/api/v1/projects/:id/flakes",
-    run: (ctx, p) => listFlakes(reads(ctx), at(p, 0)),
-  },
+  { method: "GET", path: "/api/v1/projects/:id/flakes", run: byId(listFlakes) },
   {
     method: "POST",
     path: "/api/v1/flakes/:id/resolve",
     run: async (ctx, p) => resolveProjectFlake(reads(ctx), at(p, 0), await jsonBody(ctx.request)),
   },
-  { method: "GET", path: "/api/v1/builds/:id", run: (ctx, p) => getBuild(reads(ctx), at(p, 0)) },
-  {
-    method: "GET",
-    path: "/api/v1/snapshots/:id",
-    run: (ctx, p) => getSnapshot(reads(ctx), at(p, 0)),
-  },
+  { method: "GET", path: "/api/v1/builds/:id", run: byId(getBuild) },
+  { method: "GET", path: "/api/v1/snapshots/:id", run: byId(getSnapshot) },
 ];
 
 /** The `:param` values when `path` fits the pattern, else null. */

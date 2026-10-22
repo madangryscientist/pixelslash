@@ -226,4 +226,39 @@ describe("the read API (ob 1729)", () => {
     expect((await get(w.deps, other, w.acme.token)).status).toBe(404);
     expect((await get(w.deps, path, w.eve)).status).toBe(404);
   });
+
+  test("detection flags: a person marks one exported, once; an edit clears it (ob 1734)", async () => {
+    const w = await world();
+    const home = await w.shotOf(w.feature.id, "home");
+    const input = {
+      userId: w.userId,
+      projectId: w.projectId,
+      snapshotId: home.id,
+      kind: "missed" as const,
+      note: null,
+      rect: null,
+    };
+    await flagSnapshot(w.db, input);
+    const list = `/api/v1/projects/${w.projectId}/detection-flags`;
+    const [listed] = (await get(w.deps, list, w.ada)).body.detection_flags;
+    expect(listed?.exported_at).toBeNull();
+    const mark = `/api/v1/detection-flags/${listed?.id}/exported`;
+    const post = { method: "POST" };
+    const ci = await get(w.deps, mark, w.acme.token, post);
+    expect(ci.status).toBe(403);
+    expect(ci.body.error.code).toBe("forbidden");
+    expect((await get(w.deps, mark, w.eve, post)).status).toBe(404);
+    expect((await get(w.deps, "/api/v1/detection-flags/nope/exported", w.ada, post)).status).toBe(
+      404,
+    );
+    const first = await get(w.deps, mark, w.ada, post);
+    expect(first.status).toBe(200);
+    expect(first.body.detection_flag).toMatchObject({ id: listed?.id, kind: "missed" });
+    const at = first.body.detection_flag.exported_at;
+    expect(at).toEqual(expect.any(String));
+    expect((await get(w.deps, mark, w.ada, post)).body.detection_flag.exported_at).toBe(at);
+    expect((await get(w.deps, list, w.ada)).body.detection_flags[0]?.exported_at).toBe(at);
+    await flagSnapshot(w.db, { ...input, note: "button moved" });
+    expect((await get(w.deps, list, w.ada)).body.detection_flags[0]?.exported_at).toBeNull();
+  });
 });

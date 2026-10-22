@@ -124,6 +124,46 @@ A `real` case carries a ground-truth box: the union of the rects of the elements
 from the DOM in both renders. The caret is a 1px bar, because headless Chromium does not paint the
 real one.
 
+## Imported cases
+
+`bun run bench:import-flags` (ob 1734) turns the detection flags reviewers leave on the snapshot
+page into cases, so the diff is fixed against real misses and stays fixed. It is our tooling for
+tuning the diff, not a `pixelslash` command.
+
+```bash
+bun run bench:import-flags [--server URL] [--project ID|NAME]   # the flags not yet exported
+bun run bench:import-flags [--server URL] [--to DIR] <flag-id>...   # import them
+```
+
+The server is `--server`, else `PIXELSLASH_SERVER`, else the one server `pixelslash login` stored a
+token for. The token is `PIXELSLASH_TOKEN`, else that stored one, and it must be a personal token
+(`psu_…`): each imported flag is marked exported on the server
+(`POST /api/v1/detection-flags/:id/exported`), and only a person does that. The list then shows only
+what is still unworked; a reviewer editing a flag clears the mark.
+
+Each flag becomes `<to>/flag-<kind>-<shot>-<id>/{base.png,head.png,label.json}`, in the corpus's
+format. `<to>` defaults to `bench/imported/`, which git ignores. A `missed` flag is a `real` case whose
+box is the rect the reviewer drew; a missed flag with no rect still imports, with the whole image
+as the box, and the script says so. A `false_positive` flag is a `noise` case: not changed. The
+flag itself (id, note, who, the shot, the source build, what the diff measured, `box_from`) is kept
+under `flag` in `label.json`; the bench ignores it. A flag on a new shot has no baseline and is
+not imported.
+
+Nothing is added to the committed corpus automatically. To keep a case:
+
+1. Look at it: the two PNGs, and whether the label is right. A reviewer's rect is the area they
+   meant, not a measured box; tighten it if the IoU should mean something.
+2. Choose a corpus. A case you are about to tune against goes in `bench/corpus/`. One that should
+   tell whether a fix generalises goes in `bench/corpus-holdout/`, and is then read only through
+   its numbers (above).
+3. `git mv`, or `mv bench/imported/<case> bench/corpus/` and `git add` it. The case is loaded by
+   directory; it needs no entry in `src/cases.ts`, and `generate.ts` never re-renders it.
+4. `bun run bench`, then commit the new `bench/results/<date>.json` with the case (a new case
+   moves the counts). The Argos cache has no entry for it, so `bun run bench` stops until
+   `--refresh-argos` asks VM 101; `--no-argos` scores PixelSlash alone and writes nothing.
+
+From then on `bench:check` guards it: a later change that loses it on the case's corpus fails the gate.
+
 ## How it is scored
 
 - **Verdict.** PixelSlash: `changed` from `diffPngs` at its defaults (perceptual threshold, anti-aliased edges not counted, a size mismatch always changed). Argos: score above 0

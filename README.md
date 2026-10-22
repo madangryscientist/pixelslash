@@ -519,14 +519,15 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | `GET /api/v1/builds/:id` | CI or personal | — | `200 { build: { …build, snapshots: [snapshot] } }`, snapshots in review order |
 | `GET /api/v1/snapshots/:id` | CI or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
 | `GET /api/v1/projects/:id/detection-flags` | CI or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
+| `POST /api/v1/detection-flags/:id/exported` | personal | — | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
 | `GET /api/v1/projects/:id/flakes` | CI or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
 | `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
 
-There are no write endpoints besides the four upload ones and resolving a flake: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
+There are no write endpoints besides the four upload ones, resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
 **The upload endpoints** (`me`, `builds`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`.
 
-**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `flakes`, `baselines`) and resolving a flake use snake_case keys, and every reply carries `"api_version": 1`. An error is:
+**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `flakes`, `baselines`), resolving a flake and marking a flag exported use snake_case keys, and every reply carries `"api_version": 1`. An error is:
 
 ```json
 { "api_version": 1, "error": { "code": "not_found", "message": "build not found" } }
@@ -536,7 +537,7 @@ There are no write endpoints besides the four upload ones and resolving a flake:
 | --- | --- | --- |
 | 400 | `bad_request` | a bad `status`, `limit` or `cursor` |
 | 401 | `unauthorized` | a missing, wrong, expired or revoked token |
-| 403 | `forbidden` | a CI token resolving a flake (only a person resolves one) |
+| 403 | `forbidden` | a CI token resolving a flake or marking a flag exported (only a person does) |
 | 404 | `not_found` | an unknown path, or an id the token cannot reach |
 | 405 | `method_not_allowed` | a path that exists, with another method |
 | 426 | `cli_outdated` | the CLI is older than the server takes (below) |
@@ -668,11 +669,12 @@ A **detection flag**:
   "images": { "head": "https://<server>/images/…", "baseline": "…", "diff": null },
   "created_at": "2026-10-22T09:00:00.000Z",
   "updated_at": "2026-10-22T09:00:00.000Z",
+  "exported_at": null,
   "web_url": "https://<server>/projects/…/builds/…/snapshots/…"
 }
 ```
 
-`kind` is `missed` (a change the diff did not mark) or `false_positive` (one it marked that is not a change). `rect` is the box drawn on the shot, or `null`.
+`kind` is `missed` (a change the diff did not mark) or `false_positive` (one it marked that is not a change). `rect` is the box drawn on the shot, or `null`. `exported_at` is when the flag was turned into a bench case, or `null`; a reviewer editing the flag clears it.
 
 A **flake**:
 
