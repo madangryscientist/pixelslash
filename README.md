@@ -177,6 +177,7 @@ pixelslash logout [--server URL] [--config FILE]
 pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash --version
 pixelslash install-browser
 ```
@@ -185,6 +186,7 @@ pixelslash install-browser
 - **The credential file** is `~/.config/pixelslash/credentials.json` (`$XDG_CONFIG_HOME/pixelslash/` when that is set), mode 0600 in a 0700 dir, one token per server: `{ "servers": { "https://ps.example": { "token": "psu_…" } } }`. `logout` removes the server's entry and does not revoke the token; revoke it on the settings page.
 - `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
 - `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
+- `status` prints one build's link and where its review stands (`changes: 2 waiting · 1 accepted · 0 rejected`), then one `skipped flaky: <name> (WxH theme)` line per flaky shot the `skip` policy kept out of review, and exits by the outcome (the table below). The build is `--build ID`; else the newest at a commit `--commit SHA` starts; else the newest on `--branch NAME`; else the one `upload` recorded in `DIR/build.json` (`--dir`, default `pixelslash-snapshots`) for this same server and the checked-out commit; else the newest at the checked-out commit. `--commit` and the commit fallback look among the project's newest 100 builds; an older one is named with `--build`. Picking more than one is exit 2, and no build at the commit or on the branch is exit 3. `--json` prints the build read (`GET /api/v1/builds/:id`) as sent. See [Block CI on review](#block-ci-on-review) for `--wait`.
 - `--version` prints `pixelslash <version>`, the version the User-Agent sends. `install-browser` runs the Playwright that `capture` uses to install `chromium-headless-shell`.
 
 **Resolution order**, the same for every remote command, `upload` included:
@@ -193,14 +195,25 @@ pixelslash install-browser
 2. **Server:** `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`--config`, or a `pixelslash.config.*` in the working dir).
 3. **Project** (`builds`, `build latest`, `upload` with a personal token): `--project` (an id, or a name the token sees once), else `upload.project` in the config, else the only project the token sees. More than one and none named is exit 2, listing them.
 
-**Exit codes:** 0 ok; 2 a usage error (a bad flag, no server, not logged in, no project picked); **3 the server did not give what was asked**: a refused, expired or revoked token (401), an id the token cannot reach (404), a server error, or a server that cannot be reached; `install-browser` also exits 3 when the install fails. Exit 1 stays the new-violations code, and `upload` keeps its own exit 1 for a refused upload. The client sends `User-Agent: pixelslash/<version>`.
+**Exit codes.** They are a contract: CI reads them, and none changes meaning.
+
+| Code | Meaning |
+| --- | --- |
+| 0 | ok. For `status`: every changed shot accepted, or nothing changed. |
+| 1 | **Reserved for NEW design-system violations on Branch** (invariant 3); no remote command uses it, except `upload`'s older exit 1 for a refused upload. |
+| 2 | A usage error: a bad flag or duration, no server, not logged in, no project picked, more than one build picked. |
+| 3 | **The server did not give what was asked**: a refused, expired or revoked token (401), an id the token cannot reach (404), a server error, or a server that cannot be reached. For `status`, also a build that `errored` and no build at the commit or branch. `install-browser` also exits 3 when the install fails. |
+| 4 | `status`: a reviewer rejected a shot, so the build `failed`. |
+| 5 | `status`: the build still waits, for processing or for review. Under `--wait`, still waiting at `--timeout`. |
+
+The client sends `User-Agent: pixelslash/<version>`.
 
 ## Uploading to a server
 
 Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots, and they send them only to the server you name. The same CLI talks to the hosted app and to a self-hosted one.
 
 ```
-pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N]
+pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N] [--wait [--timeout 30m] [--interval 15s]]
 pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N]
 ```
 
@@ -209,6 +222,7 @@ pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-
 - The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main", "project": "web" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
 - From the local git checkout it sends the commit, the branch, the **merge-base** with the base branch (`--base`, else `upload.baseBranch`, else `main`; `origin/<base>` is tried first) and up to **20 ancestor SHAs**, nearest first. Without the base branch in the checkout (a shallow clone) it warns and sends no merge-base: fetch full history in CI. The branch is `--branch`, else `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`, else the checked-out branch; a detached `HEAD` with none of those is a usage error. The PR number is `--pr`, else read from `GITHUB_REF` (`refs/pull/N/…`).
 - It opens a build, uploads each PNG, then finalises with the snapshot count; the server diffs inside that request. Exit 0 on success. Exit 1 when the server refuses (wrong or revoked token, 4xx/5xx) or cannot be reached; the build is then left open on the server, unfinalised, and its snapshots are not counted. The message names the step (`open build`, `upload <snapshot>`, `finalize`) and the server's answer in one line. A request the API never answered (the connection failed, a 502/503/504, or a 5xx that is not the API's `{"error"}` JSON, such as `vite preview`'s proxy page) is tried again after 1 s and 2 s, three tries in all, with a warning on stderr for each retry; an error the API itself answered is not retried. Every step is safe to repeat, and a repeated open at worst leaves an empty unfinalised build behind. A finalise whose answer is `processing` (a retry that met an earlier try's diff still running, or one the runtime killed) is exit 1: nothing has been measured yet. Exit 2 on a bad flag, a missing token or server, or a bad manifest. Re-running makes a new build.
+- A finalised upload records its build in `DIR/build.json` (`{ "server", "build", "commit" }`), so `pixelslash status` in the same working dir, at the same commit, reads that build; a record from another commit is ignored. `upload --wait` is `upload` then `status --wait` on that build, and exits as `status` does (see [Block CI on review](#block-ci-on-review)); a failed upload exits as before, without waiting.
 
 What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (`WxH`), `theme`, `tags`, the resolved diff options (`diff`, stored as JSON in `snapshots.diff_options`; a client that sends none stores `{}`), the ignore boxes (`ignore`, JSON in `snapshots.ignore`, image px; a client that sends none stores `[]`), the environment fingerprint, and the PNG under the org's prefix in the blob store (R2 on Cloudflare). The manifest's `path` and the variant's `name` are not uploaded: a snapshot is identified by name + browser + viewport + theme, so two manifest entries that differ only by variant name are refused. The manifest carries no platform; `upload` sends `linux`, which is what the pinned capture image is.
 
@@ -269,6 +283,23 @@ A change that is still open on the branch's last build (pending, never accepted 
 - A decision on any shot of a carried change (the one that measured it or any carrier) is the decision on all of them, in every build that is `changes` or `passed`, and each of those builds moves to its new verdict. Accepting the earliest build passes the later ones; rejecting a carrier fails every build of the change.
 - A rejected build is never a baseline, so the next build on its branch is measured against rule 2.
 - Known gap: a carrier whose build is still diffing when the change is decided is not moved with it. It stays "to review" until someone decides it there; that decision changes nothing on the builds already decided. An `errored` build is not affected: a resumed finalise picks its baselines again, so its carrier follows the decision (passes after an accept, is measured again against rule 2 after a reject).
+
+### Block CI on review
+
+`pixelslash status --wait` holds a CI job until the build is decided. It reads the build every `--interval` (default 15s) until the server has finished processing it and no shot waits for review, then exits 0 (all accepted, or nothing changed) or 4 (a shot rejected). Still waiting at `--timeout` (default 30m) is exit 5, and a build that `errored` is exit 3. While it waits it writes the counts to stderr each time they move. A flaky shot under `"flaky": "skip"` never waits: it is listed on its own `skipped flaky:` line and does not hold the job. `--timeout` or `--interval` without `--wait` is exit 2; durations are `500ms`, `15s`, `30m` or `1h`, and a bare number is seconds.
+
+Plain shell steps, the same on any CI. The job needs the full history for the merge-base, and the project's CI token in `PIXELSLASH_TOKEN`:
+
+```sh
+export PIXELSLASH_SERVER=https://<server>
+export PIXELSLASH_TOKEN="$PIXELSLASH_CI_TOKEN"   # the CI's secret store, never git
+
+pixelslash capture --config pixelslash.config.ts     # or `pixelslash import PNG_DIR`
+pixelslash upload pixelslash-snapshots --wait --timeout 30m
+# exit 0 accepted or unchanged · 4 rejected · 5 still waiting · 3 server or build error · 2 usage
+```
+
+To keep the upload and the wait in separate steps (a separate job, or a retry of the wait alone), run `pixelslash upload pixelslash-snapshots`, then `pixelslash status --wait` from the same working dir: it reads the build from `pixelslash-snapshots/build.json`. A job with no snapshot dir names the build with `--build`, `--commit "$COMMIT_SHA"` or `--branch NAME`. This calls no GitHub or GitLab API and comments on no PR; the job's own pass or fail is the signal.
 
 ### Reviewing the review app with itself
 

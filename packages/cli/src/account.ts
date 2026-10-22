@@ -9,9 +9,8 @@ import {
   uploadConfig,
   type RemoteDeps,
 } from "./remote.ts";
-import { takeJson } from "./args.ts";
 import type { Io } from "./run.ts";
-import { readFlagPairs } from "./upload.ts";
+import { readFlagPairs, takeJson } from "./args.ts";
 
 export const LOGIN_USAGE =
   "pixelslash login [--server URL] [--config FILE]\nPaste a personal token (psu_…) when asked, or pipe it on stdin. It is stored for that server in ~/.config/pixelslash/credentials.json.";

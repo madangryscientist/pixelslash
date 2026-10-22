@@ -19,12 +19,13 @@ import {
   type UploadDeps,
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
-import { readFlags } from "./args.ts";
+import { readFlagPairs } from "./args.ts";
 import { connect, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
+import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N]\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.";
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N] [--wait [--timeout 30m] [--interval 15s]]\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.";
 
 /** The flags `upload` and `capture --upload` share. */
 export const UPLOAD_FLAGS = [
@@ -38,7 +39,10 @@ export const UPLOAD_FLAGS = [
   "flake-retries",
 ] as const;
 
-export type UploadFlags = Partial<Record<(typeof UPLOAD_FLAGS)[number], string>>;
+/** `wait` is `upload --wait`'s: follow the build once it is sent. */
+export type UploadFlags = Partial<Record<(typeof UPLOAD_FLAGS)[number], string>> & {
+  wait?: WaitOptions | undefined;
+};
 
 function prNumber(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
@@ -151,8 +155,9 @@ function printFlakes(result: UploadResult, io: Io): void {
 }
 
 /**
- * Send `dir` to the server the flags, env or config name. Returns the exit code (0): a flaky
- * shot is said and sent, and what it does to the build is the server's call. `deps.recapture` is
+ * Send `dir` to the server the flags, env or config name, and record the build in `dir` for
+ * `status`. Returns the exit code (0): a flaky shot is said and sent, and what it does to the
+ * build is the server's call. With `wait`, the build is then followed as `status --wait` does. `deps.recapture` is
  * the caller's own re-capture (`capture --upload`); without one, the config found is opened when
  * a shot needs it. `--flake-retries 0` opens nothing.
  */
@@ -167,6 +172,7 @@ export async function uploadDir(
   const retries = flakeRetries(flags["flake-retries"]);
   const target = await resolveTarget(flags, deps, cwd);
   const own = await chooseRecapture(flags, deps, warn);
+  let id: string;
   try {
     const result = await uploadSnapshots(
       {
@@ -188,29 +194,28 @@ export async function uploadDir(
     io.stdout.write(`pixelslash: uploaded ${result.snapshots} snapshots\n`);
     io.stdout.write(`build: ${result.buildId} (${commitSha.slice(0, 7)} on ${branch})\n`);
     printFlakes(result, io);
-    return 0;
+    await recordBuild(resolve(dir), {
+      server: target.server,
+      build: result.buildId,
+      commit: commitSha,
+    });
+    id = result.buildId;
   } finally {
     await own?.close();
   }
-}
-
-/** `--flag value` pairs for exactly the flags in `keys`. */
-export function readFlagPairs<K extends string>(
-  argv: string[],
-  keys: readonly K[],
-): Partial<Record<K, string>> {
-  const flags: Partial<Record<K, string>> = {};
-  for (const [name, val] of readFlags(argv)) {
-    const key = keys.find((k) => k === name);
-    if (!key) throw new UsageError(`unexpected argument: --${name}`);
-    flags[key] = val;
-  }
-  return flags;
+  if (!flags.wait) return 0;
+  const remote = await connect(flags, { ...deps, cwd });
+  return follow({ remote, id, wait: flags.wait, json: false }, io, deps);
 }
 
 /** `pixelslash upload DIR`. */
 export async function runUpload(argv: string[], io: Io, deps: UploadDeps = {}): Promise<number> {
   const [dir, ...rest] = argv;
   if (!dir || dir.startsWith("--")) throw new UsageError("need a snapshot DIR");
-  return uploadDir(dir, readFlagPairs(rest, UPLOAD_FLAGS), io, deps);
+  const { timeout, interval, ...flags } = readFlagPairs(
+    rest.filter((a) => a !== "--wait"),
+    [...UPLOAD_FLAGS, "timeout", "interval"],
+  );
+  const wait = waitOptions(rest.includes("--wait"), { timeout, interval });
+  return uploadDir(dir, { ...flags, wait }, io, deps);
 }

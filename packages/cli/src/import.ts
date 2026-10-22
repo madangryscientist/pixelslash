@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { UsageError, importPngs } from "@pixelslash/engine";
 import type { Io } from "./run.ts";
-import { readFlagPairs } from "./upload.ts";
+import { readFlagPairs } from "./args.ts";
 
 export const IMPORT_USAGE =
   "pixelslash import PNG_DIR [--out DIR] [--viewport WxH] [--theme light|dark] [--renderer LABEL]\nPNG_DIR holds PNGs from any screenshot tool; the result is a snapshot dir for `pixelslash upload`.";

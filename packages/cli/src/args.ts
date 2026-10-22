@@ -31,6 +31,20 @@ export function readFlags(argv: string[]): Map<string, string> {
   return flags;
 }
 
+/** `--flag value` pairs for exactly the flags in `keys`. */
+export function readFlagPairs<K extends string>(
+  argv: string[],
+  keys: readonly K[],
+): Partial<Record<K, string>> {
+  const flags: Partial<Record<K, string>> = {};
+  for (const [name, val] of readFlags(argv)) {
+    const key = keys.find((k) => k === name);
+    if (!key) throw new UsageError(`unexpected argument: --${name}`);
+    flags[key] = val;
+  }
+  return flags;
+}
+
 /** `--ignore x,y,w,h` may repeat, which a flag map cannot hold: pull the pairs out first. */
 function takeIgnore(argv: string[]): { rects: IgnoreRect[]; rest: string[] } {
   const rects: IgnoreRect[] = [];

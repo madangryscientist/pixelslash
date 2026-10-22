@@ -481,8 +481,8 @@
       "k": "checks",
       "label": "PR status blocked on review",
       "ps": {
-        "v": "n",
-        "note": "no check run"
+        "v": "p",
+        "note": "no check run; a CI job blocks on review by exit code with `pixelslash status --wait` or `upload --wait` (ob 1731)"
       },
       "t": {
         "argos": "y",

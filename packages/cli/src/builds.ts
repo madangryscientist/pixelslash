@@ -1,6 +1,6 @@
 import { UsageError } from "@pixelslash/engine";
 import { RemoteError, isObj, objects, str } from "./api.ts";
-import { takeJson } from "./args.ts";
+import { readFlagPairs, takeJson } from "./args.ts";
 import {
   REMOTE_FLAGS,
   connect,
@@ -10,7 +10,6 @@ import {
   type RemoteFlags,
 } from "./remote.ts";
 import type { Io } from "./run.ts";
-import { readFlagPairs } from "./upload.ts";
 
 const REMOTE = "[--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]";
 export const BUILDS_USAGE = `pixelslash builds [--branch NAME] [--limit N] ${REMOTE}`;

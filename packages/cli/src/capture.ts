@@ -10,7 +10,8 @@ import {
   type UploadDeps,
 } from "@pixelslash/engine";
 import type { Io } from "./run.ts";
-import { UPLOAD_FLAGS, type UploadFlags, readFlagPairs, uploadDir } from "./upload.ts";
+import { readFlagPairs } from "./args.ts";
+import { UPLOAD_FLAGS, type UploadFlags, uploadDir } from "./upload.ts";
 
 export const CAPTURE_USAGE =
   "pixelslash capture [--config FILE] [--out DIR] [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N]]";

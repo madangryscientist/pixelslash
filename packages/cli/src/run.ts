@@ -35,6 +35,7 @@ import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
+import { STATUS_USAGE, runStatus } from "./status.ts";
 import { UPLOAD_USAGE, runUpload } from "./upload.ts";
 
 export type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
@@ -129,6 +130,7 @@ const COMMANDS: Record<
   whoami: { usage: WHOAMI_USAGE, run: runWhoami },
   builds: { usage: BUILDS_USAGE, run: runBuilds },
   build: { usage: BUILD_USAGE, run: runBuild },
+  status: { usage: STATUS_USAGE, run: runStatus },
 };
 
 export async function run(argv: string[], io: Io = process, deps: CliDeps = {}): Promise<number> {

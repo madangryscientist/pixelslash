@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { UsageError, compareSnapshots } from "@pixelslash/engine";
 import type { Io } from "./run.ts";
-import { readFlagPairs } from "./upload.ts";
+import { readFlagPairs } from "./args.ts";
 
 export const COMPARE_USAGE =
   "pixelslash compare MAIN_DIR BRANCH_DIR [--out DIR]\nBoth are `pixelslash capture` snapshot dirs. No design system, no server.";
