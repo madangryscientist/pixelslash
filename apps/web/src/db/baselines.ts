@@ -60,6 +60,12 @@ export type Baselines = {
   byKey: Map<string, Baseline>;
   /** Shots the baseline build had and this one does not: removed, and never blocking. */
   removed: BaselineSnapshot[];
+  /**
+   * Snapshot key → the shot the branch is measured against for its final review (ob 1723): the
+   * newest accepted shot of another branch in reach, so of main at the merge-base. Unlike `byKey`
+   * it never takes this branch's own shots, accepted or not. A missing key is `new` against main.
+   */
+  main: Map<string, BaselineSnapshot>;
 };
 
 /** What the pick reads of the build it picks for; the read-only baselines endpoint makes one up. */
@@ -68,7 +74,7 @@ export type PickFor = Pick<
   "id" | "projectId" | "createdAt" | "branch" | "mergeBaseSha" | "ancestorShas"
 >;
 
-const emptyBaselines = (): Baselines => ({ byKey: new Map(), removed: [] });
+const emptyBaselines = (): Baselines => ({ byKey: new Map(), removed: [], main: new Map() });
 
 type Candidate = BaselineSnapshot & {
   branch: string;
@@ -180,6 +186,17 @@ function pickAccepted(candidates: Candidate[], build: PickFor): Map<string, Cand
   return picked;
 }
 
+/** Newest first, from other branches only: what the branch changes against main (see `Baselines.main`). */
+function pickMain(candidates: Candidate[], build: PickFor): Map<string, BaselineSnapshot> {
+  const picked = new Map<string, BaselineSnapshot>();
+  for (const row of candidates) {
+    const key = snapshotKeyOf(row);
+    if (row.branch !== build.branch && acceptedRow(row) && !picked.has(key))
+      picked.set(key, baselineOf(row));
+  }
+  return picked;
+}
+
 function pick(candidates: Candidate[], build: PickFor): Map<string, Baseline> {
   const accepted = pickAccepted(candidates, build);
   const previous = new Map<string, Candidate>();
@@ -240,5 +257,6 @@ export async function selectBaselines(
   return {
     byKey: pick(candidates, build),
     removed: await removedSince(db, baselineBuildId, keys),
+    main: pickMain(candidates, build),
   };
 }

@@ -21,6 +21,7 @@ import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$p
 import { Route as ProjectsProjectIdFlagsDotjsonRouteImport } from './routes/projects/$projectId.flags[.]json'
 import { Route as ProjectsProjectIdFlakesRouteImport } from './routes/projects/$projectId.flakes'
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects/$projectId.settings'
+import { Route as ProjectsProjectIdBranchesBranchRouteImport } from './routes/projects/$projectId.branches.$branch'
 import { Route as ProjectsProjectIdBuildsBuildIdRouteImport } from './routes/projects/$projectId.builds.$buildId'
 import { Route as ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRouteImport } from './routes/projects/$projectId.builds.$buildId_.snapshots.$snapshotId'
 
@@ -86,6 +87,12 @@ const ProjectsProjectIdSettingsRoute =
     path: '/projects/$projectId/settings',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ProjectsProjectIdBranchesBranchRoute =
+  ProjectsProjectIdBranchesBranchRouteImport.update({
+    id: '/projects/$projectId/branches/$branch',
+    path: '/projects/$projectId/branches/$branch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProjectsProjectIdBuildsBuildIdRoute =
   ProjectsProjectIdBuildsBuildIdRouteImport.update({
     id: '/projects/$projectId/builds/$buildId',
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/branches/$branch': typeof ProjectsProjectIdBranchesBranchRoute
   '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
   '/projects/$projectId/builds/$buildId/snapshots/$snapshotId': typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
@@ -128,6 +136,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/branches/$branch': typeof ProjectsProjectIdBranchesBranchRoute
   '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
   '/projects/$projectId/builds/$buildId/snapshots/$snapshotId': typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
@@ -145,6 +154,7 @@ export interface FileRoutesById {
   '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/branches/$branch': typeof ProjectsProjectIdBranchesBranchRoute
   '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
   '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId': typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
+    | '/projects/$projectId/branches/$branch'
     | '/projects/$projectId/builds/$buildId'
     | '/projects/$projectId/builds/$buildId/snapshots/$snapshotId'
   fileRoutesByTo: FileRoutesByTo
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
     | '/projects/$projectId'
+    | '/projects/$projectId/branches/$branch'
     | '/projects/$projectId/builds/$buildId'
     | '/projects/$projectId/builds/$buildId/snapshots/$snapshotId'
   id:
@@ -195,6 +207,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
+    | '/projects/$projectId/branches/$branch'
     | '/projects/$projectId/builds/$buildId'
     | '/projects/$projectId/builds/$buildId_/snapshots/$snapshotId'
   fileRoutesById: FileRoutesById
@@ -211,6 +224,7 @@ export interface RootRouteChildren {
   ProjectsProjectIdFlakesRoute: typeof ProjectsProjectIdFlakesRoute
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdBranchesBranchRoute: typeof ProjectsProjectIdBranchesBranchRoute
   ProjectsProjectIdBuildsBuildIdRoute: typeof ProjectsProjectIdBuildsBuildIdRoute
   ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute: typeof ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute
 }
@@ -301,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$projectId/branches/$branch': {
+      id: '/projects/$projectId/branches/$branch'
+      path: '/projects/$projectId/branches/$branch'
+      fullPath: '/projects/$projectId/branches/$branch'
+      preLoaderRoute: typeof ProjectsProjectIdBranchesBranchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId/builds/$buildId': {
       id: '/projects/$projectId/builds/$buildId'
       path: '/projects/$projectId/builds/$buildId'
@@ -342,6 +363,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsProjectIdFlakesRoute: ProjectsProjectIdFlakesRoute,
   ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+  ProjectsProjectIdBranchesBranchRoute: ProjectsProjectIdBranchesBranchRoute,
   ProjectsProjectIdBuildsBuildIdRoute: ProjectsProjectIdBuildsBuildIdRoute,
   ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute:
     ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute,

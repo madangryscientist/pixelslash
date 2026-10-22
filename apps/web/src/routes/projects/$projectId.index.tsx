@@ -110,6 +110,17 @@ function BuildRow({
         <p className="mt-px flex gap-2 text-[12.5px] text-slate-400">
           <span className="font-mono">{build.commitSha.slice(0, 7)}</span>
           {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
+          {build.branch !== defaultBranch && (
+            // Above the row's covering link, so it is a link of its own.
+            <Link
+              to="/projects/$projectId/branches/$branch"
+              params={{ projectId, branch: build.branch }}
+              className="relative z-10 hover:text-slate-700 hover:underline"
+              data-testid="branch-link"
+            >
+              whole branch
+            </Link>
+          )}
         </p>
       </div>
       <div>

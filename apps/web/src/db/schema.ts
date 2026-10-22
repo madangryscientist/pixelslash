@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import type { DiffOptions, DiffRegion, DiffResult, IgnoreRect } from "./diff-json";
 import { isSmoke } from "./synthetic";
 
 const createdAt = () =>
@@ -175,58 +176,7 @@ export const builds = sqliteTable(
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],
 );
 
-/** The diff tolerance a snapshot is compared with; the same keys as the engine's `DiffOptions`. */
-export type DiffOptions = {
-  threshold?: number;
-  minChangedPixels?: number;
-  minChangedRatio?: number;
-  mergeDistance?: number;
-  minRegionArea?: number;
-  noiseAmplitude?: number;
-  maxShift?: number;
-};
-
-/** A rectangle in image px that the diff skips; the same shape as the engine's `IgnoreRect`. */
-export type IgnoreRect = { x: number; y: number; width: number; height: number };
-
-export type RegionKind = "change" | "noise" | "shift";
-
-/** A box of differing pixels, the same shape as the engine's `Region` (ob 1486, 1487). */
-export type DiffRegion = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  changedPixels: number;
-  antialiasedPixels: number;
-  /** Only `change` blocks a build; a `noise` or `shift` box is kept for the reviewer. */
-  kind: RegionKind;
-  why?: string;
-};
-
-/**
- * What the diff measured for one snapshot, as stored. `null` means it was not compared: no
- * baseline (`new`), a removed shot, or a fingerprint that needs a re-baseline.
- */
-export type DiffResult = {
-  changedPixels: number;
-  antialiasedPixels: number;
-  /** Pixels of the overlap inside an ignore area: skipped, so neither changed nor unchanged. */
-  ignoredPixels: number;
-  ignored: IgnoreRect[];
-  /** Boxes dropped below `minRegionArea`: counted, never silently lost. */
-  specks: { count: number; pixels: number };
-  regions: DiffRegion[];
-  /** The overlap that was measured; `main*` and `branch*` are both shots, which may differ. */
-  width: number;
-  height: number;
-  mainWidth: number;
-  mainHeight: number;
-  branchWidth: number;
-  branchHeight: number;
-  /** The shots are different sizes: `changed`, and only the overlap was measured. */
-  sizeChanged: boolean;
-};
+export type { DiffOptions, DiffRegion, DiffResult, IgnoreRect, RegionKind } from "./diff-json";
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
@@ -323,6 +273,24 @@ export const snapshots = sqliteTable(
      * key, like `carried_from`.
      */
     flakeId: text("flake_id"),
+    /**
+     * The shot against main (ob 1723), for the branch page's final review: measured once by the diff,
+     * only on a non-default branch, against the newest accepted shot of another branch at the
+     * merge-base. `main_baseline_key` is that shot's image, null when there is none (`new`).
+     * `main_diff_status` null means not measured against main: a default-branch build, a row older
+     * than these columns, a changed environment, or a CI project whose run sent no result for it.
+     * The columns mirror `baseline_key`, `diff_key`, `diff_status` and `diff_result`, and reuse
+     * them when the shot's own baseline already is that shot.
+     */
+    mainBaselineKey: text("main_baseline_key"),
+    mainDiffKey: text("main_diff_key"),
+    mainDiffStatus: text("main_diff_status", { enum: DIFF_STATUSES }),
+    mainDiffResult: text("main_diff_result", { mode: "json" }).$type<DiffResult>(),
+    /**
+     * A sentence describing the change in words (ob 1723), for the change summary. Nothing writes it
+     * yet; when something does it is the judge (a local model), and the page says so.
+     */
+    changeNote: text("change_note"),
     createdAt: createdAt(),
   },
   (t) => [

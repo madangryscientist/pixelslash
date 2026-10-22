@@ -22,6 +22,8 @@ import {
   diffKeyOf,
   serverComparer,
 } from "./compare";
+import { measureAgainstMain } from "./against-main";
+import { Budget } from "./budget";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
@@ -38,14 +40,7 @@ export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
  * diffed here instead.
  */
 
-/**
- * The Worker's CPU limit is 30 s and the diff runs inline in the finalise request (decided
- * 2026-10-20: inline for beta). A kill by the runtime cannot be caught, so the build stops itself
- * first: this is the share of that limit the shots may use, which leaves the rest for the baseline
- * pick, the removed markers and the verdict. Wall time stands in for CPU time, so it only errs
- * early.
- */
-export const DIFF_BUDGET_MS = 25_000;
+export { DIFF_BUDGET_MS } from "./budget";
 
 export type ProcessDeps = {
   db: Db;
@@ -277,29 +272,23 @@ function measuredPastCarry(shot: SnapshotRow, baseline: Baseline | undefined): b
 /**
  * Measure the shots whose stored result no longer stands, under this run's budget. Throws
  * `DiffCeilingError` when the budget stops it with shots left; what it measured stays stored.
- * The budget is per run and its first shot always goes, so every run makes progress.
  */
-async function measure(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baselines) {
+async function measure(
+  deps: ProcessDeps,
+  rows: SnapshotRow[],
+  baselines: Baselines,
+  budget: Budget,
+) {
   const compare = serverComparer(deps);
-  const now = deps.now ?? Date.now;
-  const started = now();
-  let slowest = 0;
-  let diffed = 0;
-  let kept = 0;
+  let done = 0;
   for (const shot of rows) {
     const baseline = baselines.byKey.get(snapshotKeyOf(shot));
-    if (stands(shot, baseline)) {
-      kept++;
-      continue;
+    if (!stands(shot, baseline)) {
+      if (!budget.fits())
+        throw new DiffCeilingError(done, rows.length, budget.used(), budget.slowest);
+      await budget.spend(() => diffOne(deps, compare, shot, baseline));
     }
-    // Stop before a shot that, if it costs as much as the slowest so far, would pass the limit.
-    const used = now() - started;
-    if (diffed > 0 && used + slowest > DIFF_BUDGET_MS)
-      throw new DiffCeilingError(kept + diffed, rows.length, used, slowest);
-    const began = now();
-    await diffOne(deps, compare, shot, baseline);
-    diffed++;
-    slowest = Math.max(slowest, now() - began);
+    done++;
   }
 }
 
@@ -326,6 +315,23 @@ async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: 
       `this project diffs in CI and ${refused.length} of ${rows.length} shots have no usable result; ` +
         `re-run the CI job. ${refused.join("; ")}`,
     );
+}
+
+/**
+ * Measure every shot against its own baseline, in CI's results or here under the run's budget,
+ * then a branch build's against main with what that budget leaves (ob 1723).
+ */
+async function measureAll(
+  deps: ProcessDeps,
+  { build, project }: { build: Build; project: ProjectOfBuild },
+  rows: SnapshotRow[],
+  baselines: Baselines,
+) {
+  const budget = project.diffLocation === "ci" ? null : new Budget(deps.now ?? Date.now);
+  if (budget) await measure(deps, rows, baselines, budget);
+  else await measureFromCi(deps, rows, baselines);
+  if (build.branch !== project.defaultBranch)
+    await measureAgainstMain(deps, build.id, baselines, budget);
 }
 
 /**
@@ -373,8 +379,7 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
       build,
       new Set(rows.map(snapshotKeyOf)),
     );
-    if (ci) await measureFromCi(deps, rows, baselines);
-    else await measure(deps, rows, baselines);
+    await measureAll(deps, { build, project }, rows, baselines);
     await markRemoved(deps, build, baselines.removed);
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);

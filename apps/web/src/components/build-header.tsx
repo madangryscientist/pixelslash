@@ -75,8 +75,23 @@ function SkippedFlaky({ projectId, count }: { projectId: string; count: number }
   );
 }
 
+/** Every branch but the default one has a branch page: the whole branch against main (ob 1723). */
+function BranchLink({ projectId, branch }: { projectId: string; branch: string }) {
+  return (
+    <Link
+      to="/projects/$projectId/branches/$branch"
+      params={{ projectId, branch }}
+      className="text-violet-700 hover:underline"
+      data-testid="branch-link"
+    >
+      Review the whole branch
+    </Link>
+  );
+}
+
 export function BuildHeader({
   projectId,
+  defaultBranch,
   build,
   snapshots,
   toReview,
@@ -85,6 +100,7 @@ export function BuildHeader({
   baseline,
 }: {
   projectId: string;
+  defaultBranch: string;
   build: BuildView["build"];
   snapshots: SnapshotView[];
   toReview: number;
@@ -105,6 +121,9 @@ export function BuildHeader({
         <span className="font-medium" data-testid="build-branch">
           {build.branch}
         </span>
+        {build.branch !== defaultBranch && (
+          <BranchLink projectId={projectId} branch={build.branch} />
+        )}
         <span className="font-mono text-slate-700">{build.commitSha.slice(0, 7)}</span>
         {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
         <StatusBadge status={build.status} />

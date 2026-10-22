@@ -23,6 +23,11 @@ export function diffKeyOf(imageKey: string): string {
   return `${imageKey.replace(/\.png$/, "")}.diff.png`;
 }
 
+/** The overlay against main (ob 1723) sits beside the one against the shot's own baseline. */
+export function mainDiffKeyOf(imageKey: string): string {
+  return `${imageKey.replace(/\.png$/, "")}.main.diff.png`;
+}
+
 /** One comparison of a shot with one baseline, before it is stored. */
 export type Measured = {
   changed: boolean;
@@ -36,10 +41,10 @@ export type Measured = {
 export type Comparer = (shot: SnapshotRow, baseline: BaselineSnapshot) => Promise<Measured>;
 
 /** The server diff: both PNGs read and measured here. */
-export function serverComparer(deps: {
-  blobs: BlobStore;
-  diff?: typeof diffPngs | undefined;
-}): Comparer {
+export function serverComparer(
+  deps: { blobs: BlobStore; diff?: typeof diffPngs | undefined },
+  overlayKeyOf: (imageKey: string) => string = diffKeyOf,
+): Comparer {
   const diff = deps.diff ?? diffPngs;
   return async (shot, baseline) => {
     const [main, branch] = await Promise.all([
@@ -58,7 +63,7 @@ export function serverComparer(deps: {
       measuredBy: "server",
       engineVersion: ENGINE_VERSION,
       diffKey: async () => {
-        const key = diffKeyOf(shot.imageKey);
+        const key = overlayKeyOf(shot.imageKey);
         // One bulk copy, not a view: a blob store takes an ArrayBuffer, and a Buffer may be a view
         // into a pooled one. The overlay of a full-page shot is ~20 MB against a Worker's 128 MB.
         const png = new Uint8Array(result.overlay);

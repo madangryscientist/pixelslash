@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
 import { expectApprovedEarlier } from "./approved-earlier";
+import { expectBranchPage } from "./branch-page";
 import { png } from "./png";
 import { expectBaselineBuild, expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
@@ -108,11 +109,14 @@ async function submit(input: Locator, value: string, button: Locator) {
 }
 
 /** Sign in through the GitHub stub and make one org with one project and one CI token. */
-async function provision(page: Page): Promise<{ token: string; projectId: string }> {
+async function provision(
+  page: Page,
+  orgName = "Review Co",
+): Promise<{ token: string; projectId: string }> {
   await page.goto("/");
   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
   await expect(page).toHaveURL(/\/orgs$/);
-  const orgId = await createOrg(page, "Review Co");
+  const orgId = await createOrg(page, orgName);
   await createProject(page, "shop");
   await openSettings(page, "shop");
   await submit(
@@ -311,4 +315,15 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expectApprovedEarlier(page, () => reupload(page, token, projectId), capture);
 
   await rivalGets404(browser, projectId, buildId);
+});
+
+test("the branch page: against main, since last build, and an accept the build page agrees with", async ({
+  page,
+}) => {
+  const { token, projectId } = await provision(page, "Branch Co");
+  upload(await snapshotDir(BASE), token, "main");
+  await page.waitForTimeout(1100);
+  upload(await snapshotDir(REVIEW), token, "feature");
+  await open(page, `/projects/${projectId}`);
+  await expectBranchPage(page, projectId, "feature", capture);
 });

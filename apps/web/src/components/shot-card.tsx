@@ -20,7 +20,7 @@ const thumbAspect = (ratio: number) => ({ aspectRatio: String(Math.min(3, Math.m
  * report's own maths, over the stored regions), so nothing new is written. The inner `<svg>` is
  * the window that clips; the outer one only fits it to the card.
  */
-function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | undefined }) {
+export function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | undefined }) {
   if (!src) {
     return <div className={THUMB_BOX} style={thumbAspect(1.5)} data-testid="shot-thumb-missing" />;
   }

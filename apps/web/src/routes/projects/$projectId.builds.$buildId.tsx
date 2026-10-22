@@ -47,6 +47,7 @@ function BuildPage() {
     >
       <BuildHeader
         projectId={project.id}
+        defaultBranch={project.defaultBranch}
         build={build}
         snapshots={snapshots}
         toReview={toReview}
