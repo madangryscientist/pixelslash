@@ -232,6 +232,7 @@ pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
 pixelslash --version
 pixelslash install-browser
 ```
@@ -261,6 +262,37 @@ pixelslash install-browser
 | 5 | `status`: the build still waits, for processing or for review. Under `--wait`, still waiting at `--timeout`. |
 
 The client sends `User-Agent: pixelslash/<version>`.
+
+## Your coding agent: `pixelslash mcp`
+
+`pixelslash mcp` is a stdio [MCP](https://modelcontextprotocol.io) server, so the coding agent you already run can read PixelSlash: which builds have changes, what changed in a shot, which shots are flaky, what reviewers flagged. Add it to Claude Code with:
+
+```
+claude mcp add pixelslash -- pixelslash mcp
+```
+
+```
+pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
+```
+
+It resolves the server, the token and the default project as every remote command does ([Resolution order](#signing-in-and-reading-builds)): run `pixelslash login` first, or give it `PIXELSLASH_TOKEN`. The server is resolved on each tool call, so a missing token or a server that is down is an error the agent reads in the tool's answer, not a server that fails to start. Each tool is one `/api/v1` read, and its text is the API's reply as sent:
+
+| Tool | Arguments | Reads |
+| --- | --- | --- |
+| `whoami` | — | `GET /api/v1/me`, with the server and where the token came from |
+| `list_projects` | — | `GET /api/v1/projects` |
+| `list_builds` | `project?`, `branch?`, `status?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/builds` |
+| `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier` |
+| `get_snapshot` | `snapshot_id` | `GET /api/v1/snapshots/:id`, with image URLs but no pixels |
+| `get_snapshot_images` | `snapshot_id`, `which?` (`head`, `baseline`, `diff`) | the snapshot's PNGs, as images |
+| `list_flakes` | `project?` | `GET /api/v1/projects/:id/flakes` |
+| `list_detection_flags` | `project?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/detection-flags` |
+
+`project` is an id or a name; without it, `--project`, then `upload.project`, then the only project the token sees.
+
+- **It only reads.** There is no tool to accept or reject a shot, upload, resolve a flake or manage tokens: a review decision is a person's, in the web app.
+- **`get_snapshot_images` hands page shots to whatever model your agent uses.** The PNGs are fetched from the configured server only when that tool is called, and go back to the agent, which sends them to its model wherever that model runs. No other tool returns pixels. An image URL that is not on the configured server is not fetched.
+- Nothing is sent anywhere but the configured server. Stdout is the MCP channel; the server logs one line to stderr.
 
 ## Uploading to a server
 

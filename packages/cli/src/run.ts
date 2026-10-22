@@ -38,6 +38,7 @@ import { COMPARE_USAGE, runCompare } from "./compare.ts";
 import { DEV_USAGE, runDev } from "./dev.ts";
 import type { KeyInput } from "./dev-loop.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
+import { MCP_USAGE, runMcp } from "./mcp.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
 import { UPLOAD_USAGE, runUpload } from "./upload.ts";
 
@@ -141,6 +142,7 @@ const COMMANDS: Record<
   builds: { usage: BUILDS_USAGE, run: runBuilds },
   build: { usage: BUILD_USAGE, run: runBuild },
   status: { usage: STATUS_USAGE, run: runStatus },
+  mcp: { usage: MCP_USAGE, run: runMcp },
 };
 
 export async function run(argv: string[], io: Io = process, deps: CliDeps = {}): Promise<number> {
