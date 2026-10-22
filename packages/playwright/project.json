@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "playwright",
+  "sourceRoot": "packages/playwright/src",
+  "projectType": "library",
+  "targets": {
+    "typecheck": { "command": "tsc -p packages/playwright/tsconfig.json" },
+    "lint": {
+      "command": "oxlint --type-aware --deny-warnings packages/playwright && bun scripts/check-slop.ts packages/playwright"
+    },
+    "test": { "command": "bun --bun playwright test", "options": { "cwd": "packages/playwright" } }
+  }
+}

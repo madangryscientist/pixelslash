@@ -26,6 +26,7 @@ import {
   type Fingerprint,
   type ListFonts,
 } from "./fingerprint.ts";
+import { maskLocators, measureIgnore, toImageRects } from "./page-areas.ts";
 import { joinOrigin } from "./routes.ts";
 import { signIn, type Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
@@ -74,53 +75,10 @@ export type SnapshotDeps = {
 
 export type SnapshotResult = { manifest: SnapshotManifest; manifestPath: string };
 
+export { toImageRects };
+
 /** Launch flags that take host-specific rendering choices out of the picture. */
 const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];
-
-/** The attribute that marks an element as an ignore area without a config entry. */
-const IGNORE_ATTRIBUTE = "data-pixelslash-ignore";
-
-/**
- * Browser globals the box measure touches (the tsconfig has no DOM lib). Type-only: the callback in
- * `boxesOf` is serialized and runs in the page, where these are the real globals.
- */
-declare const window: { scrollX: number; scrollY: number };
-type Measured = {
-  getBoundingClientRect(): { left: number; top: number; width: number; height: number };
-};
-
-/** Each element's box in full-page CSS px (viewport box plus the scroll offset). Runs in the page. */
-function boxesOf(elements: Measured[]): MaskRect[] {
-  return elements.map((el) => {
-    const r = el.getBoundingClientRect();
-    return {
-      x: r.left + window.scrollX,
-      y: r.top + window.scrollY,
-      width: r.width,
-      height: r.height,
-    };
-  });
-}
-
-/**
- * CSS-px boxes to image px: scaled by `scale`, grown outward to whole pixels, clipped to the image.
- * Boxes that end up empty (zero-size elements, boxes wholly off the image) are dropped.
- */
-export function toImageRects(
-  boxes: { x: number; y: number; width: number; height: number }[],
-  scale: number,
-  image: { width: number; height: number },
-): IgnoreRect[] {
-  const out: IgnoreRect[] = [];
-  for (const b of boxes) {
-    const x0 = Math.max(0, Math.floor(b.x * scale));
-    const y0 = Math.max(0, Math.floor(b.y * scale));
-    const x1 = Math.min(image.width, Math.ceil((b.x + b.width) * scale));
-    const y1 = Math.min(image.height, Math.ceil((b.y + b.height) * scale));
-    if (x1 > x0 && y1 > y0) out.push({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
-  }
-  return out;
-}
 
 /**
  * Resolve ignore areas on the live page to image-px boxes: every match of every selector, every
@@ -133,17 +91,10 @@ async function resolveIgnoreBoxes(
   shot: Pick<Shot, "route" | "stabilise" | "warn">,
   image: { width: number; height: number },
 ): Promise<IgnoreRect[]> {
-  const boxes: MaskRect[] = [];
-  const selectors = [...areas.filter((a) => typeof a === "string"), `[${IGNORE_ATTRIBUTE}]`];
-  for (const selector of selectors) {
-    const loc = page.locator(selector);
-    if ((await loc.count()) === 0) {
-      if (!selector.startsWith(`[${IGNORE_ATTRIBUTE}`))
-        shot.warn(`warning: ignore "${selector}" matched nothing on ${shot.route.path}`);
-      continue;
-    }
-    boxes.push(...(await loc.evaluateAll(boxesOf)));
-  }
+  const selectors = areas.filter((a) => typeof a === "string");
+  const boxes = await measureIgnore(page, selectors, true, (selector) =>
+    shot.warn(`warning: ignore "${selector}" matched nothing on ${shot.route.path}`),
+  );
   boxes.push(...areas.filter((a) => typeof a !== "string"));
   return toImageRects(boxes, shot.stabilise.deviceScaleFactor, image);
 }
@@ -219,11 +170,9 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
     const page = await context.newPage();
     const settleMs = await open(page, url, route, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");
-    const locators = selectors.map((s) => page.locator(s));
-    for (const [i, loc] of locators.entries()) {
-      if ((await loc.count()) === 0)
-        shot.warn(`warning: mask "${selectors[i]}" matched nothing on ${route.path}`);
-    }
+    const locators = await maskLocators(page, selectors, (selector) =>
+      shot.warn(`warning: mask "${selector}" matched nothing on ${route.path}`),
+    );
     const png = await page.screenshot({
       fullPage: true,
       animations: stabilise.animations ? "disabled" : "allow",

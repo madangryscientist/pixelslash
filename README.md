@@ -151,6 +151,44 @@ The fingerprint says what rendered the snapshot; only snapshots with equal finge
 
 Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
 
+## Snapshots from your own Playwright tests
+
+`@pixelslash/playwright` (`packages/playwright`, not on npm yet) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a snapshot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
+
+```ts
+import { test } from "@playwright/test";
+import { snapshot } from "@pixelslash/playwright";
+
+test("watch page", async ({ page }) => {
+  await page.goto("/watch/42");
+  await snapshot(page, "watch", { ignore: [".player", ".live-count"], redact: [".email"], tags: ["video"] });
+});
+```
+
+```
+bun --bun playwright test
+pixelslash upload pixelslash-snapshots --server URL
+```
+
+- Options: `ignore` and `redact` (selectors), `variant` (default `<width>x<height>-<theme>`), `tags`, `fullPage` (default `true`), `dir` (default `PIXELSLASH_SNAPSHOT_DIR`, else `pixelslash-snapshots` in the working dir) and `timeoutMs` (default 8000). It returns the manifest entry it wrote.
+- Before the shot it waits for the same settle as `capture` (fonts, every image, network idle, two frames), bounded by `timeoutMs`; a page that never settles fails the test. The shot is taken with animations disabled and the caret hidden.
+- `ignore` is measured as `capture` measures it: every match of every selector, plus every `[data-pixelslash-ignore]` element, as boxes in image px (scaled by the page's device pixel ratio, from the top of the document for a full-page shot and from the viewport otherwise, clipped to the image). The pixels stay in the PNG. A selector that matches nothing warns. `redact` is painted over in `#FF00FF` before the PNG is written, so what it covered never leaves the machine.
+- Each call writes `<name>/<variant>.png` and adds its entry to `manifest.json` (version 1, the format in [Snapshot capture](#snapshot-capture-the-pinned-image)); a rerun of the same shot replaces its entry. Two variants with the same name, viewport and theme are the same shot to the server, so the second is refused: give them different names. Parallel workers share the dir: the manifest is written under a lock. The dir is not cleared, so remove it before a run, or a test you deleted still uploads its last shot.
+- The browser must be a launched chromium with a fixed viewport; anything else throws. The theme is what the page reports for `prefers-color-scheme`.
+- The fingerprint is `bare` outside our image (its digest inside it), the chromium version and the font-set hash. Only equal fingerprints are compared, so keep baselines and branches on the same machine image.
+- What it cannot do from inside your test, and `capture` does: launch chromium with `--force-color-profile=srgb --font-render-hinting=none`, pin the clock and stop page timers, and fix the fonts. The flags go in your config's `launchOptions.args`; the fonts are the image's job. To pin the clock as `capture` does, before `goto`:
+
+  ```ts
+  import { keepNativeRaf } from "@pixelslash/playwright";
+
+  await page.addInitScript(keepNativeRaf); // the settle waits on real frames; a paused clock has none
+  await page.clock.install({ time });
+  await page.clock.pauseAt(time);
+  ```
+
+  Skip `keepNativeRaf` and a paused clock fails every `snapshot` on its settle. `page.clock.setFixedTime(time)` instead pins only `Date` and leaves timers running.
+- It needs the Bun runtime (`bun --bun playwright test`): the engine it imports reads files and hashes fonts through Bun.
+
 ## Snapshots from PNGs you already have
 
 `pixelslash import` turns a dir of PNGs from any screenshot tool (Cypress, a Playwright script, a native app) into a snapshot dir that `pixelslash upload` and `pixelslash compare` take, so the server does not have to be fed by `capture`.

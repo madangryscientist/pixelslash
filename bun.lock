@@ -86,6 +86,21 @@
         "vitest": "5.0.5",
       },
     },
+    "packages/playwright": {
+      "name": "@pixelslash/playwright",
+      "version": "0.1.0",
+      "dependencies": {
+        "@pixelslash/engine": "workspace:*",
+        "playwright": "1.60.0",
+      },
+      "devDependencies": {
+        "@pixelslash/cli": "workspace:*",
+        "@playwright/test": "1.60.0",
+        "@types/bun": "1.4.3",
+        "@types/pngjs": "^6.0.5",
+        "pngjs": "^7.0.0",
+      },
+    },
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
@@ -405,6 +420,8 @@
     "@pixelslash/cli": ["@pixelslash/cli@workspace:packages/cli"],
 
     "@pixelslash/engine": ["@pixelslash/engine@workspace:packages/engine"],
+
+    "@pixelslash/playwright": ["@pixelslash/playwright@workspace:packages/playwright"],
 
     "@pixelslash/web": ["@pixelslash/web@workspace:apps/web"],
 

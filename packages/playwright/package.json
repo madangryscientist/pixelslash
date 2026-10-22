@@ -1,0 +1,20 @@
+{
+  "name": "@pixelslash/playwright",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pixelslash/engine": "workspace:*",
+    "playwright": "1.60.0"
+  },
+  "devDependencies": {
+    "@pixelslash/cli": "workspace:*",
+    "@playwright/test": "1.60.0",
+    "@types/bun": "1.4.3",
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0"
+  }
+}

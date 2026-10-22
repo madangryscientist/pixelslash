@@ -11,7 +11,13 @@ export {
   type SnapshotCompareOptions,
   type SnapshotCompareResult,
 } from "./compare-snapshots.ts";
-export { CAPTURE_BROWSER, playwrightCli, type CapturePage } from "./capture.ts";
+export {
+  CAPTURE_BROWSER,
+  keepNativeRaf,
+  playwrightCli,
+  settleCapture,
+  type CapturePage,
+} from "./capture.ts";
 export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
 export type { ProcLike, SpawnProc } from "./judge.ts";
@@ -32,14 +38,18 @@ export {
   type Route,
   type Variant,
 } from "./config.ts";
+export { maskLocators, measureIgnore } from "./page-areas.ts";
 export { parseDiffOption } from "./diff-options.ts";
 export type { Fingerprint } from "./fingerprint.ts";
 export { fontSetHash, imageId } from "./fingerprint.ts";
+export { identity, pngPath, readManifest } from "./manifest.ts";
 export {
+  MASK_COLOR,
   captureInto,
   captureSnapshots,
   openCaptureSession,
   recapture,
+  toImageRects,
   type CaptureSession,
   type Shoot,
   type SnapshotDeps,
