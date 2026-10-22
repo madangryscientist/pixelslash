@@ -59,3 +59,20 @@ export async function decideGroup(
   if (moved.length > 0) await db.update(snapshots).set(decision).where(where);
   return moved.map((row) => row.buildId);
 }
+
+/** The build that holds each shot a shot of this build carries from, keyed by that shot's id. */
+export async function carriedRootBuilds(db: Db, buildId: string): Promise<Map<string, string>> {
+  const roots = await db
+    .select({ id: snapshots.id, buildId: snapshots.buildId })
+    .from(snapshots)
+    .where(
+      inArray(
+        snapshots.id,
+        db
+          .select({ id: snapshots.carriedFrom })
+          .from(snapshots)
+          .where(and(eq(snapshots.buildId, buildId), isNotNull(snapshots.carriedFrom))),
+      ),
+    );
+  return new Map(roots.map((root) => [root.id, root.buildId]));
+}

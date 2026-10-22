@@ -253,6 +253,12 @@ export const snapshots = sqliteTable(
      * treats a missing one as gone.
      */
     carriedFrom: text("carried_from"),
+    /**
+     * The shot this one was compared against (ob 1722): set by the diff from the baseline pick, null
+     * when it was compared against nothing and on rows diffed before it existed. Provenance only,
+     * read for display (`approvedEarlier` in `review.ts`); no foreign key, like `carried_from`.
+     */
+    baselineSnapshotId: text("baseline_snapshot_id"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),

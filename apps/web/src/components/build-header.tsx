@@ -79,6 +79,9 @@ export function BuildHeader({
   baseline: boolean;
 }) {
   const changed = snapshots.filter(holdsChange);
+  // Unchanged here, yet still different from the default branch (ob 1722): an all-"no change"
+  // build is not "identical to main".
+  const approvedEarlier = snapshots.filter((shot) => shot.approvedEarlier).length;
   const next = firstToReview(snapshots);
   return (
     <header className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
@@ -93,6 +96,11 @@ export function BuildHeader({
         <span className="font-medium text-slate-700" data-testid="to-review">
           {toReviewText(baseline, toReview)}
         </span>
+        {approvedEarlier > 0 && (
+          <span className="text-slate-600" data-testid="approved-earlier-count">
+            {approvedEarlier} approved earlier on this branch
+          </span>
+        )}
       </div>
       {baseline ? (
         <p className="mt-4 text-sm text-slate-700" data-testid="build-baseline">

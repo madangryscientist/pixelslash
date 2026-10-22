@@ -5,8 +5,9 @@ import {
   awaitsDecision,
   groupOf,
 } from "#/lib/snapshot-groups";
+import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { heldShot } from "./markers";
-import { decideGroup, groupOfShot, groupsOfBuild } from "./carried";
+import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
   type DiffOptions,
@@ -87,6 +88,8 @@ export type SnapshotView = {
   carriedFrom: string | null;
   /** The build that holds `carriedFrom`; null when that shot is gone. */
   carriedFromBuild: string | null;
+  /** Set on an unchanged shot whose difference from the default branch was accepted on an earlier build of this branch. */
+  approvedEarlier: ApprovedEarlier | null;
   createdAt: Date;
 };
 
@@ -132,27 +135,14 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
     .from(snapshots)
     .leftJoin(users, eq(users.id, snapshots.reviewedBy))
     .where(eq(snapshots.buildId, buildId));
-  const roots = new Map(
-    (
-      await db
-        .select({ id: snapshots.id, buildId: snapshots.buildId })
-        .from(snapshots)
-        .where(
-          inArray(
-            snapshots.id,
-            db
-              .select({ id: snapshots.carriedFrom })
-              .from(snapshots)
-              .where(and(eq(snapshots.buildId, buildId), isNotNull(snapshots.carriedFrom))),
-          ),
-        )
-    ).map((root) => [root.id, root.buildId]),
-  );
+  const approved = await approvedEarlier(db, build);
+  const roots = await carriedRootBuilds(db, buildId);
   const ordered = rows
     .map(({ reviewer, ...row }) => ({
       ...row,
       reviewedBy: reviewer,
       carriedFromBuild: (row.carriedFrom && roots.get(row.carriedFrom)) ?? null,
+      approvedEarlier: approved.get(row.id) ?? null,
     }))
     .toSorted(
       (a, b) =>

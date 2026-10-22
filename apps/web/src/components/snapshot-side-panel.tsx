@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions } from "#/db/schema";
-import { formatNumber } from "#/lib/format";
+import { formatDateTime, formatNumber } from "#/lib/format";
+import { awaitsDecision } from "#/lib/snapshot-groups";
 
 const OPTION_KEYS: (keyof DiffOptions)[] = [
   "threshold",
@@ -139,12 +140,17 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
   );
 }
 
+/** The shot card's rule: a shot still awaiting a decision reads as carried, never as approved earlier. */
+const approvedNow = (snapshot: SnapshotView) =>
+  snapshot.approvedEarlier !== null && !awaitsDecision(snapshot);
+
 /**
  * An unchanged shot that carries the branch's open change (ob 1712): it was compared with the
  * branch's previous shot, which holds the change; a decision here is a decision there too.
  */
 function Carried({ projectId, snapshot }: { projectId: string; snapshot: SnapshotView }) {
-  if (!snapshot.carriedFrom) return null;
+  // A carried change that was accepted since reads as approved earlier instead (ob 1722).
+  if (!snapshot.carriedFrom || approvedNow(snapshot)) return null;
   return (
     <section data-testid="carried">
       <Heading>Carried change</Heading>
@@ -165,6 +171,35 @@ function Carried({ projectId, snapshot }: { projectId: string; snapshot: Snapsho
           See the change
         </Link>
       )}
+    </section>
+  );
+}
+
+/**
+ * An unchanged shot whose change from the default branch was accepted on an earlier build of the
+ * branch (ob 1722): the diff here is against that shot, so the change itself is shown there.
+ */
+function ApprovedEarlier({ projectId, snapshot }: { projectId: string; snapshot: SnapshotView }) {
+  const approved = snapshot.approvedEarlier;
+  if (!approved || !approvedNow(snapshot)) return null;
+  return (
+    <section data-testid="approved-earlier">
+      <Heading>Approved earlier</Heading>
+      <p className="text-sm text-slate-700">
+        Approved on build{" "}
+        <span className="font-mono text-xs">{approved.commitSha.slice(0, 7)}</span>
+        {approved.reviewedBy && <> by {approved.reviewedBy}</>}
+        {approved.reviewedAt && <>, {formatDateTime(approved.reviewedAt)}</>}. No change since, but
+        this shot still differs from {approved.defaultBranch}.
+      </p>
+      <Link
+        to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+        params={{ projectId, buildId: approved.buildId, snapshotId: approved.snapshotId }}
+        className="mt-1 inline-block text-sm text-violet-700 underline"
+        data-testid="approved-earlier-link"
+      >
+        See the change against {approved.defaultBranch}
+      </Link>
     </section>
   );
 }
@@ -194,6 +229,7 @@ export function SidePanel({
       )}
       {children}
       <Carried projectId={projectId} snapshot={snapshot} />
+      <ApprovedEarlier projectId={projectId} snapshot={snapshot} />
       <Measured snapshot={snapshot} />
       <Environment snapshot={snapshot} />
       <Options snapshot={snapshot} options={options} />

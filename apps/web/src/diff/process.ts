@@ -119,6 +119,7 @@ async function storeUncompared(
           diffKey: null,
           rebaselineNeeded: true,
           baselineKey: baseline.imageKey,
+          baselineSnapshotId: baseline.id,
           carriedFrom: null,
         }
       : {
@@ -126,6 +127,7 @@ async function storeUncompared(
           diffResult: null,
           diffKey: null,
           baselineKey: null,
+          baselineSnapshotId: null,
           rebaselineNeeded: false,
           carriedFrom: null,
         },
@@ -161,6 +163,7 @@ async function storeDiff(
   await deps.blobs.put(diffKey, png.buffer, "image/png");
   await storeSnapshot(deps.db, shot.id, {
     baselineKey: baseline.imageKey,
+    baselineSnapshotId: baseline.id,
     diffKey,
     diffStatus: result.changed ? "changed" : "unchanged",
     diffResult: summarize(result),

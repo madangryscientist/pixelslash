@@ -4,7 +4,7 @@ import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { SnapshotView } from "#/db/review";
 import { ReviewChip } from "#/components/ui";
 import { formatNumber } from "#/lib/format";
-import { groupOf, holdsChange } from "#/lib/snapshot-groups";
+import { awaitsDecision, groupOf, holdsChange } from "#/lib/snapshot-groups";
 import { type ShotLabel, shotChips } from "#/lib/shot-label";
 import { coversMostOfShot } from "#/lib/thumb-crop";
 
@@ -98,7 +98,21 @@ const newLine = (baseline: boolean) =>
 /** An unchanged shot that carries the branch's open change (ob 1712): no change here, one to decide. */
 const CARRIED = "no change since the branch's last build; its change is still open";
 
-const unchangedLine = (shot: SnapshotView) => (shot.carriedFrom ? CARRIED : "no change");
+/**
+ * An unchanged shot whose change from the default branch was accepted on an earlier build of this
+ * branch (ob 1722): "no change" alone would read as identical to the default branch.
+ */
+function approvedEarlierLine(shot: SnapshotView): string | null {
+  const approved = shot.approvedEarlier;
+  if (!approved) return null;
+  const by = approved.reviewedBy ? ` by ${approved.reviewedBy}` : "";
+  return `no change since build ${approved.commitSha.slice(0, 7)} · change from ${approved.defaultBranch} approved${by}`;
+}
+
+const unchangedLine = (shot: SnapshotView) => {
+  if (awaitsDecision(shot)) return CARRIED;
+  return approvedEarlierLine(shot) ?? (shot.carriedFrom ? CARRIED : "no change");
+};
 
 /** The measured change, in the words the reviewer needs; nothing invented. */
 export function measured(shot: SnapshotView, baseline: boolean): string {
