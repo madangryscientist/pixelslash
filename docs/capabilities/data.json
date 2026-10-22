@@ -114,7 +114,7 @@
       "ps": {
         "v": "p",
         "note": "Playwright only: @pixelslash/playwright snapshot() writes a dir `pixelslash upload` takes; not on npm yet (ob 1461) and needs the Bun runtime (ob 1498)",
-        "commit": "06a2472"
+        "commit": "645a80d"
       },
       "t": {
         "argos": "y",
@@ -132,7 +132,7 @@
       "ps": {
         "v": "p",
         "note": "snapshot(page, name, { ignore, redact }) settles, shoots and measures ignore boxes in image px; unpublished, runs under bun --bun playwright test (ob 1498)",
-        "commit": "06a2472"
+        "commit": "645a80d"
       },
       "t": {
         "argos": "y",
