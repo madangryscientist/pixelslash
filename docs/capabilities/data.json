@@ -397,7 +397,7 @@
       "label": "Baseline from merge-base / ancestors",
       "ps": {
         "v": "y",
-        "note": "server diff picks it per snapshot (ob 1470)"
+        "note": "server diff picks it per snapshot (ob 1470); `check` previews that pick locally (ob 1732)"
       },
       "t": {
         "argos": "y",
@@ -584,7 +584,7 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; --upload is the only way out"
+        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732)"
       },
       "t": {
         "argos": "n",

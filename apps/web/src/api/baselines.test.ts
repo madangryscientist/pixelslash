@@ -30,13 +30,31 @@ describe("the baselines endpoints", () => {
       }),
     );
     expect(preview.status).toBe(200);
-    const body: { diff_location: string; baselines: BaselinePick[] } = await preview.json();
+    const body: { diff_location: string; baselines: BaselinePick[]; removed: unknown[] } =
+      await preview.json();
     expect(body.diff_location).toBe("ci");
+    expect(body.removed).toEqual([]);
     expect(await held.db.select().from(builds)).toEqual(before);
 
     const built = await run(held, held.acme.token, branch(2, red), deps);
     expect(body.baselines[0]?.baseline?.id).toBe(built.pick.baseline?.id);
     expect(body.baselines[0]?.baseline?.fingerprint).toEqual(META.fingerprint);
+  });
+
+  test("the preview names the baseline build's shots no key asked about as removed", async () => {
+    const held = await ciProject();
+    const deps = { ...held.deps, diff: noDiff };
+    await run(held, held.acme.token, { branch: "main", commit: sha(1), png: white }, deps);
+    const ask = (keys: object[]) =>
+      call(
+        deps,
+        "POST /api/v1/baselines",
+        held.acme.token,
+        JSON.stringify({ commitSha: sha(2), branch: "feat/x", mergeBaseSha: sha(1), keys }),
+      );
+    const asked = await ask([{ ...KEY, name: "other", theme: "light" }]);
+    const reply: { removed: unknown[] } = await asked.json();
+    expect(reply.removed).toEqual([{ ...KEY, theme: "light" }]);
   });
 
   test("another org's build is a 404 and a bad key is a 400", async () => {

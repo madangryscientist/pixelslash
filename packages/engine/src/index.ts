@@ -49,6 +49,13 @@ export {
   type IgnoreRect,
   type PixelDiff,
 } from "./diff.ts";
+export {
+  checkAgainstServer,
+  type CheckDeps,
+  type CheckOptions,
+  type CheckResult,
+  type CheckShot,
+} from "./check.ts";
 export { uploadSnapshots, type UploadDeps, type UploadResult } from "./upload.ts";
 export type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 export type { FlakeRecord } from "./flake.ts";

@@ -301,6 +301,22 @@ pixelslash upload pixelslash-snapshots --wait --timeout 30m
 
 To keep the upload and the wait in separate steps (a separate job, or a retry of the wait alone), run `pixelslash upload pixelslash-snapshots`, then `pixelslash status --wait` from the same working dir: it reads the build from `pixelslash-snapshots/build.json`. A job with no snapshot dir names the build with `--build`, `--commit "$COMMIT_SHA"` or `--branch NAME`. This calls no GitHub or GitLab API and comments on no PR; the job's own pass or fail is the signal.
 
+### Check before you push
+
+`pixelslash check` measures this checkout against the baselines the server would pick for it, and uploads nothing. It is `capture`, then the server's pick, then `compare`, all on this machine:
+
+```
+pixelslash check [--config FILE] [--out DIR] [--base BRANCH] [--only NAME]... [--server URL] [--token-path PATH] [--project ID|NAME] [--flake-retries N] [--json]
+```
+
+- It captures the config's routes into `DIR/branch` (default `DIR` is `pixelslash-check`). The app must already be up: `check` starts no dev server, and a down `baseUrl` fails. `--only NAME` (repeatable) captures just those routes; an unknown name is exit 2.
+- It asks `POST /api/v1/baselines` for each shot's pick, with the commit, branch and local merge-base (`--base`, else `upload.baseBranch`, else `main`). That endpoint creates nothing. The CLI does not pick baselines; it downloads the ones the server names into `DIR/main` and settles a carried change the way finalise does.
+- It diffs `DIR/main` against `DIR/branch` with `compare`'s code and writes the same `DIR/report/index.html` and per-shot reports, headed as a local preview. A shot the baseline build holds and this capture lacks is **removed** (only among the `--only` routes, when given).
+- A shot whose fingerprint differs from its baseline's is named per shot and **diffed anyway**, as `compare` does.
+- A changed shot is captured again `--flake-retries` times (default `flake.retries` in the config, else 2). A shot that differs from itself is marked flaky in the index, with the flake report beside it.
+- stdout is the counts (`N changed, N unchanged, N new, N removed`), a `fingerprint:` line when any differ, one `flaky:` line per flaky shot, `measured locally: a preview, nothing uploaded`, and `report: file://…`. `--json` prints `{ measured: "local", uploaded: false, git, counts, report, flakeReport, dirs, shots }`, where each shot has its `status`, `changedPixels`, `regions`, `mismatch`, `flaky` and absolute file paths.
+- Exit 0 whether or not anything changed. Exit 2 on a usage error, 3 when the server refuses the token or cannot be reached, 1 when the capture fails.
+
 ### Reviewing the review app with itself
 
 `bun run dogfood:upload` (in `apps/web`) captures the review app's own project, build and snapshot pages, light and dark, from a local build, and uploads them, so a UI change to `apps/web` is a build to review in our own workspace. It is a local script: there is no CI file for it.
@@ -329,7 +345,7 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | `GET /api/v1/me` | CI or personal | — | `200 { kind: "user", user: { id, login, name } }` or `200 { kind: "ci", projectId }` |
 | `POST /api/v1/builds` | CI or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId?, clientDiff? }`; `projectId` is required with a personal token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
 | `POST /api/v1/builds/:id/baselines` | CI or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
-| `POST /api/v1/baselines` | CI or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick] }` |
+| `POST /api/v1/baselines` | CI or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick], removed: [{ name, platform, browser, viewport, theme }] }`: `removed` is what the baseline build holds and no key asked about |
 | `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (≤32 MiB each, counted in the request's size cap) | `200 { id }` |
 | `POST /api/v1/builds/:id/finalize` | CI or personal | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
 | `GET /api/v1/projects` | CI or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; a CI token's one project |

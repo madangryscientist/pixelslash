@@ -33,6 +33,7 @@ import { REMOTE_EXIT, RemoteError } from "./api.ts";
 import { USAGE, parseArgs, type Cli } from "./args.ts";
 import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
+import { CHECK_USAGE, runCheck } from "./check.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
@@ -121,6 +122,7 @@ const COMMANDS: Record<
   compare: { usage: COMPARE_USAGE, run: (argv, io) => runCompare(argv, io) },
   import: { usage: IMPORT_USAGE, run: (argv, io) => runImport(argv, io) },
   upload: { usage: UPLOAD_USAGE, run: runUpload },
+  check: { usage: CHECK_USAGE, run: runCheck },
   "install-browser": {
     usage: "pixelslash install-browser",
     run: (_, io, deps) => installBrowser(io, deps),

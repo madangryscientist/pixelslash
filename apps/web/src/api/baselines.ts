@@ -65,7 +65,20 @@ async function reply(
       };
     }),
   );
-  return Response.json({ api_version: API_VERSION, diff_location: owner.diffLocation, baselines });
+  // The baseline build's shots that no key asked about (ob 1732): what this build would remove.
+  const removed = picked.removed.map(({ name, platform, browser, viewport, theme }) => ({
+    name,
+    platform,
+    browser,
+    viewport,
+    theme,
+  }));
+  return Response.json({
+    api_version: API_VERSION,
+    diff_location: owner.diffLocation,
+    baselines,
+    removed,
+  });
 }
 
 /** `POST /api/v1/builds/:id/baselines`: the pick for an open build, the same one its finalise makes. */

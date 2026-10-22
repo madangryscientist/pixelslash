@@ -51,7 +51,7 @@ function prNumber(raw: string | undefined): number | undefined {
   return n;
 }
 
-function flakeRetries(raw: string | undefined): number | undefined {
+export function flakeRetries(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
   const n = Number(raw);
   if (!/^\d+$/.test(raw) || !Number.isSafeInteger(n))

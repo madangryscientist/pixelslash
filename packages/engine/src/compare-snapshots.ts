@@ -68,6 +68,8 @@ function rowOf(e: SnapshotEntry, varied: boolean): CompareRow {
     report: undefined,
     changedPixels: 0,
     mismatch: [],
+    key: identity(e),
+    regions: [],
   };
 }
 
@@ -104,6 +106,7 @@ async function diffMatch(
   }
   row.changedPixels = diff.changedPixels;
   if (!diff.changed) return { row, changed: false };
+  row.regions = diff.regions;
   const dest = join(paths.out, dir);
   await mkdir(dest, { recursive: true });
   await Bun.write(join(dest, "main.png"), mainPng);
