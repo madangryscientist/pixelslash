@@ -2,9 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { Pill } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { SnapshotView } from "#/db/review";
+import { FlakyBadge } from "#/components/flake";
 import { ReviewChip } from "#/components/ui";
 import { formatNumber } from "#/lib/format";
-import { awaitsDecision, groupOf, holdsChange } from "#/lib/snapshot-groups";
+import { awaitsDecision, groupOf, holdsChange, skippedFlaky } from "#/lib/snapshot-groups";
 import { type ShotLabel, shotChips } from "#/lib/shot-label";
 import { coversMostOfShot } from "#/lib/thumb-crop";
 
@@ -151,7 +152,7 @@ export function ShotCard({
 }) {
   const line = measured(shot, baseline);
   return (
-    <li data-testid="snapshot-row">
+    <li data-testid="snapshot-row" className="relative">
       <Link
         to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
         params={{ projectId, buildId, snapshotId: shot.id }}
@@ -182,6 +183,12 @@ export function ShotCard({
         </div>
         <p className="mt-2 text-sm text-slate-600">{line}</p>
       </Link>
+      {/* Beside the card's link, not in it: a link inside a link is not HTML. */}
+      {shot.flakeId && (
+        <span className="absolute top-4 left-4">
+          <FlakyBadge projectId={projectId} flakeId={shot.flakeId} skipped={skippedFlaky(shot)} />
+        </span>
+      )}
     </li>
   );
 }

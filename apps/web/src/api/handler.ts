@@ -12,6 +12,7 @@ import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process"
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { authorize } from "./authorize";
+import { flakeFields, listFlakes, resolveProjectFlake } from "./flakes";
 import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines";
 import {
   API_VERSION,
@@ -24,6 +25,8 @@ import {
 } from "./read";
 import {
   BadRequest,
+  Forbidden,
+  MAX_FLAKE_RUNS,
   isPng,
   object,
   parseCiInput,
@@ -71,9 +74,11 @@ async function pngPart(form: FormData, field: string): Promise<ArrayBuffer> {
 /**
  * Multipart: `meta` (JSON) and `file` (the PNG). In a `ci` project `meta.ci` carries the CLI's
  * results, and each needs its diff mask as `diff:<baselineId>`; the shot, plus at most two masks.
+ * A flaky shot (ob 1737) adds `meta.flake` and its re-captures as `flake:<run>`, at most
+ * MAX_FLAKE_RUNS - 1 of them; `meta.flaky` is the shot's policy (ob 1724).
  */
 async function snapshotForm(request: Request, project: { diffLocation: DiffLocation }) {
-  const pngs = project.diffLocation === "ci" ? 3 : 1;
+  const pngs = (project.diffLocation === "ci" ? 3 : 1) + MAX_FLAKE_RUNS - 1;
   if (Number(request.headers.get("content-length")) > pngs * MAX_PNG_BYTES + 64 * 1024)
     throw new TooLarge();
   let form: FormData;
@@ -90,15 +95,18 @@ async function snapshotForm(request: Request, project: { diffLocation: DiffLocat
   } catch {
     throw new BadRequest("meta must be JSON");
   }
-  const input = parseSnapshotInput(parsed);
+  const fields = object(parsed, "meta");
+  const { flaky, flake } = await flakeFields(form, fields, MAX_PNG_BYTES);
+  const input = { ...parseSnapshotInput(parsed), flaky };
   const png = await pngPart(form, "file");
   // A server project measures at finalise: results sent to it are not stored, so none is trusted.
-  const sent = project.diffLocation === "ci" ? parseCiInput(object(parsed, "meta").ci) : null;
-  if (!sent) return { input, png, ci: null };
+  const sent = project.diffLocation === "ci" ? parseCiInput(fields.ci) : null;
+  if (!sent) return { input, png, ci: null, flake };
   const results = await Promise.all(
     sent.results.map(async (r) => ({ ...r, mask: await pngPart(form, `diff:${r.baselineId}`) })),
   );
-  return { input, png, ci: { engineVersion: sent.engineVersion, image: pngSize(png), results } };
+  const image = pngSize(png);
+  return { input, png, ci: { engineVersion: sent.engineVersion, image, results }, flake };
 }
 
 class TooLarge extends Error {}
@@ -244,6 +252,16 @@ export const ENDPOINTS: readonly Endpoint[] = [
     path: "/api/v1/projects/:id/detection-flags",
     run: (ctx, p) => listDetectionFlags(reads(ctx), at(p, 0)),
   },
+  {
+    method: "GET",
+    path: "/api/v1/projects/:id/flakes",
+    run: (ctx, p) => listFlakes(reads(ctx), at(p, 0)),
+  },
+  {
+    method: "POST",
+    path: "/api/v1/flakes/:id/resolve",
+    run: async (ctx, p) => resolveProjectFlake(reads(ctx), at(p, 0), await jsonBody(ctx.request)),
+  },
   { method: "GET", path: "/api/v1/builds/:id", run: (ctx, p) => getBuild(reads(ctx), at(p, 0)) },
   {
     method: "GET",
@@ -276,6 +294,7 @@ type ApiError = { status: number; code: string; message: string };
 function errorOf(e: unknown): ApiError {
   if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };
   if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
+  if (e instanceof Forbidden) return { status: 403, code: "forbidden", message: e.message };
   if (
     e instanceof BuildFinalisedError ||
     e instanceof SnapshotCountError ||

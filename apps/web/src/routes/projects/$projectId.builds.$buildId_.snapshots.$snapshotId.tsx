@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
+import { FlakePanel } from "#/components/flake";
 import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer } from "#/components/snapshot-viewer";
 import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
 import { shotLabeller } from "#/lib/shot-label";
+import { skippedFlaky } from "#/lib/snapshot-groups";
 import { useReviewKeys } from "#/lib/use-review-keys";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
 
@@ -59,6 +61,15 @@ function useWalk(projectId: string, buildId: string) {
   );
 }
 
+function DecisionError({ error }: { error: string | null }) {
+  if (!error) return null;
+  return (
+    <p role="alert" className="border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700">
+      {error}
+    </p>
+  );
+}
+
 function SnapshotPage() {
   const data = Route.useLoaderData();
   const { project, org, build, snapshot, images, previousId, nextId, names } = data;
@@ -101,14 +112,7 @@ function SnapshotPage() {
           onHelp: openHelp,
         }}
       />
-      {error && (
-        <p
-          role="alert"
-          className="border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700"
-        >
-          {error}
-        </p>
-      )}
+      <DecisionError error={error} />
       <div className="grid lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0 p-4">
           <SnapshotViewer
@@ -134,6 +138,12 @@ function SnapshotPage() {
             snapshotId={snapshot.id}
             flags={data.flags}
             draft={flag}
+          />
+          <FlakePanel
+            projectId={project.id}
+            snapshot={snapshot}
+            flake={data.flake}
+            skipped={skippedFlaky(snapshot)}
           />
         </SidePanel>
       </div>

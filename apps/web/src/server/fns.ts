@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
 import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
+import { projectFlake } from "#/db/flakes";
 import { isMarker } from "#/db/markers";
 import {
   createOrg,
@@ -29,7 +30,8 @@ import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
 import { database, defaultDiffLocation, imageSigningSecret } from "./env";
-import { field, or404 } from "./input";
+import { signFlakeOrNull } from "./flake-images";
+import { field, noteInput, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
 
 /** A shot that is no longer reviewable is a conflict the page states, not a 404. */
@@ -234,6 +236,11 @@ export const getSnapshotPage = createServerFn()
         projectId: project.id,
         snapshotId: snapshot.id,
       }),
+      /** The flake the shot is labelled with (ob 1724), its evidence's images signed. */
+      flake: await signFlakeOrNull(
+        project.orgId,
+        await projectFlake(db, project.id, snapshot.flakeId),
+      ),
       /** The j/k order is the build's order, so a walk visits every shot once. */
       position: index + 1,
       total: view.snapshots.length,
@@ -292,8 +299,6 @@ export const acceptBuild = createServerFn({ method: "POST" })
 
 /* ------------------------------------------------------------ detection flags (ob 1721) */
 
-const MAX_NOTE = 200;
-
 const isFlagKind = (v: unknown): v is FlagKind => FLAG_KINDS.some((kind) => kind === v);
 
 /** The flag's kind, its optional one-line note and its optional rect, from a server-fn payload. */
@@ -301,12 +306,10 @@ function flagInput(d: unknown): { kind: FlagKind; note: string | null; rect: Ign
   const get = (key: string) => (typeof d === "object" && d !== null ? Reflect.get(d, key) : null);
   const kind = get("kind");
   if (!isFlagKind(kind)) throw new Error(`kind is one of ${FLAG_KINDS.join(", ")}`);
-  const raw = get("note");
-  const note = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
-  if (note.length > MAX_NOTE) throw new Error(`note is at most ${MAX_NOTE} chars`);
+  const note = noteInput(d);
   const rect = get("rect");
   try {
-    return { kind, note: note || null, rect: rect == null ? null : parseRect(rect, "rect") };
+    return { kind, note, rect: rect == null ? null : parseRect(rect, "rect") };
   } catch (error) {
     // A server fn has no 400: the message is what the form shows.
     if (error instanceof BadRequest) throw new Error(error.message, { cause: error });

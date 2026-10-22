@@ -634,8 +634,8 @@
       "k": "flake",
       "label": "Flake detection",
       "ps": {
-        "v": "p",
-        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree, with a per-shot review/skip policy and a local report (ob 1737); the server does not store or apply it yet"
+        "v": "y",
+        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724)"
       },
       "t": {
         "argos": "y",
@@ -644,7 +644,7 @@
         "applitools": "p",
         "lost": "p"
       },
-      "plan": "ob 1724"
+      "plan": ""
     },
     {
       "g": "platform",

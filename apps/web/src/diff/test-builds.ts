@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { setup } from "#/api/test-support";
 import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#/db/builds";
 import type { Db } from "#/db/db";
-import { snapshots } from "#/db/schema";
+import type { SentFlake } from "#/db/flakes";
+import { type FlakyPolicy, snapshots } from "#/db/schema";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { processBuild } from "./process";
 
@@ -19,6 +20,8 @@ export type Shot = {
   fingerprint?: { image: string; browser: string; fonts: string };
   diff?: object;
   ignore?: Array<{ x: number; y: number; width: number; height: number }>;
+  flaky?: FlakyPolicy | null;
+  flake?: SentFlake | null;
 };
 
 export type Ctx = Awaited<ReturnType<typeof setup>> & {
@@ -69,8 +72,10 @@ async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
         diff: s.diff ?? {},
         ignore: s.ignore ?? [],
         fingerprint: s.fingerprint ?? FINGERPRINT,
+        flaky: s.flaky ?? null,
       },
       png: s.png.buffer,
+      flake: s.flake ?? null,
     });
   }
   return build;

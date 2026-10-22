@@ -31,11 +31,13 @@ describe("defaultTab", () => {
 });
 
 describe("firstToReview", () => {
+  const steady = { flakeId: null, flakyPolicy: null } as const;
+
   test("skips decided and non-changed shots", () => {
     const rows = [
-      { id: "a", diffStatus: "new", reviewState: "pending", carriedFrom: null },
-      { id: "b", diffStatus: "changed", reviewState: "accepted", carriedFrom: null },
-      { id: "c", diffStatus: "changed", reviewState: "pending", carriedFrom: null },
+      { id: "a", diffStatus: "new", reviewState: "pending", carriedFrom: null, ...steady },
+      { id: "b", diffStatus: "changed", reviewState: "accepted", carriedFrom: null, ...steady },
+      { id: "c", diffStatus: "changed", reviewState: "pending", carriedFrom: null, ...steady },
     ] as const;
     expect(firstToReview(rows)?.id).toBe("c");
     expect(firstToReview(rows.slice(0, 2))).toBeUndefined();
@@ -43,8 +45,30 @@ describe("firstToReview", () => {
 
   test("an unchanged shot that carries an open change is to review (ob 1712)", () => {
     const rows = [
-      { id: "a", diffStatus: "unchanged", reviewState: "pending", carriedFrom: null },
-      { id: "b", diffStatus: "unchanged", reviewState: "pending", carriedFrom: "root" },
+      { id: "a", diffStatus: "unchanged", reviewState: "pending", carriedFrom: null, ...steady },
+      { id: "b", diffStatus: "unchanged", reviewState: "pending", carriedFrom: "root", ...steady },
+    ] as const;
+    expect(firstToReview(rows)?.id).toBe("b");
+  });
+
+  test("a flaky shot its config skips is not to review (ob 1724)", () => {
+    const rows = [
+      {
+        id: "a",
+        diffStatus: "changed",
+        reviewState: "pending",
+        carriedFrom: null,
+        flakeId: "f",
+        flakyPolicy: "skip",
+      },
+      {
+        id: "b",
+        diffStatus: "changed",
+        reviewState: "pending",
+        carriedFrom: null,
+        flakeId: "f",
+        flakyPolicy: "review",
+      },
     ] as const;
     expect(firstToReview(rows)?.id).toBe("b");
   });

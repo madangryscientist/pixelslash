@@ -1,5 +1,5 @@
 import type { diffPngs } from "@pixelslash/engine/diff";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import {
   type Baseline,
   type Baselines,
@@ -223,10 +223,11 @@ async function acceptDefaultBranchBuild(
   project: ProjectOfBuild,
 ): Promise<void> {
   if (build.branch !== project.defaultBranch) return;
+  // A flaky shot is never auto-accepted (ob 1724): under `review` it waits, under `skip` it is left.
   await db
     .update(snapshots)
     .set({ reviewState: "accepted", reviewedAt: new Date() })
-    .where(eq(snapshots.buildId, build.id));
+    .where(and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId)));
 }
 
 async function markErrored(db: Db, build: Build, e: unknown): Promise<void> {

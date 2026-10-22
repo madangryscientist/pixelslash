@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, lte, ne, or } from "drizzle-orm";
 import type { Db } from "./db";
 import type { Build } from "./builds";
-import { heldShot } from "./markers";
+import { heldShot, notSkippedFlaky } from "./markers";
 import { builds, type IgnoreRect, snapshots } from "./schema";
 
 /**
@@ -159,6 +159,8 @@ function queryCandidates(db: Db, build: PickFor) {
         ),
         // A removed row is a marker, not an image of that build: it can never be a baseline.
         heldShot(),
+        // A flaky shot its config skips is never a baseline unless a reviewer accepted it (ob 1724).
+        notSkippedFlaky(),
         inReach,
       ),
     )

@@ -241,7 +241,13 @@ Carries and the default branch's auto-accept work as on the server. A CLI from b
 - A shot is **flaky** when any later capture differs from the first under the shot's own diff options and ignore boxes. Flaky means the captures disagreed with each other. It says nothing about whether the change is wanted.
 - When every capture agrees, the shot is a real change, and nothing else happens.
 - A flaky shot uploads its first capture, as before. The later captures go with it as evidence (form parts `flake:<run>`, runs numbered from 2). `meta.flake` is `{ runs, differed, regions, engineVersion, policy }`: the number of captures, the runs that differed from run 1, the changed regions of each differing run, and the engine version. Every shot sends its resolved policy as `meta.flaky`; a shot that is not flaky sends no `flake` and no `flake:<run>` parts.
-- Today's server ignores `meta.flake` and the `flake:<run>` parts (an additive field it does not read yet). Storing detections and applying the policy is the server's next step (ob 1724).
+- The server stores the detection (ob 1724). Each project keeps one **flake** per shot key (name, platform, browser, viewport, theme), open or resolved, with the evidence of each build that detected it: the runs, the runs that differed, their regions and the re-captures. A second detection appends its evidence; a detection on a resolved flake reopens it. A reviewer can also mark a shot flaky by hand on the snapshot page (with an optional note): that opens the key's flake with no evidence. A malformed `meta.flake` or `meta.flaky` is dropped, never a 400, and a `flake:<run>` part that is missing, too big or not a PNG is left out of the evidence.
+- A shot is **labelled flaky** when its upload carried a flake record, when its key has an open flake as it is uploaded, or when it was marked by hand. Resolving a flake leaves the shots already labelled as they were, as history.
+- What a labelled shot does to its build is its own `meta.flaky` (else the record's `policy`, else `review`). The server keeps no policy of its own; change it in the config and it applies from the next build.
+  - `review`: the shot is badged flaky and is reviewed like any change. It waits for a decision and blocks the build until someone decides.
+  - `skip`: a change on the shot is "skipped: flaky". It does not count toward "to review" and does not block the build. It is not accepted either: it never becomes a baseline, so the next build is still measured against the old one. The build summary counts these shots on their own line. A reviewer may still accept or reject it by hand.
+  - A labelled shot is never auto-accepted, under either policy, so on the default branch a `review` flaky change waits for a decision too.
+- The build page, each card and the snapshot page badge a flaky shot and link to it in the project's **Flakes** list (open flakes first, with their evidence; resolve with a note, or reopen). The snapshot page shows the runs side by side, how many differed, the policy in effect, and the exact config line that sets the other policy (a route's `"flaky": "skip"` or a story's `pixelslash-flaky-skip` tag), to copy.
 - `capture --upload` re-captures in the browser it already has open. `upload DIR` re-captures through the config it finds (`--config`, or a `pixelslash.config.*` in the working dir). Without a config it warns and does not re-capture.
 - A shot captured with a different image, browser or font set than this machine's is not captured again, since its runs would differ for that alone. `upload DIR` checks the image and font set before it opens a browser. The same goes for a route that is no longer in the config. Either case is a warning, and the shot uploads as captured.
 - Each flaky shot prints `flaky: <name> (WxH theme): N of M runs differed; policy P`. The run writes `report.html` into the snapshot dir, plus the later captures under `@flake/` (`@` is outside the name alphabet, so no route's dir collides with it). The report shows each flaky shot as "flaky: N of M runs differed", with its runs side by side, the regions where they differed and its policy, then the shots that changed in every run, then the changed shots that could not be captured again and why. With nothing changed it says how many shots were measured against a baseline. It is written whenever a re-capture was possible, and is local only; each upload and each capture first removes the dir's earlier `report.html` and `@flake/`, and a report that cannot be written is a warning.
@@ -293,19 +299,21 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | `POST /api/v1/builds` | CI or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId?, clientDiff? }`; `projectId` is required with a personal token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
 | `POST /api/v1/builds/:id/baselines` | CI or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
 | `POST /api/v1/baselines` | CI or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick] }` |
-| `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (not read by the server yet) | `200 { id }` |
+| `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (≤32 MiB each, counted in the request's size cap) | `200 { id }` |
 | `POST /api/v1/builds/:id/finalize` | CI or personal | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
 | `GET /api/v1/projects` | CI or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; a CI token's one project |
 | `GET /api/v1/projects/:id/builds` | CI or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
 | `GET /api/v1/builds/:id` | CI or personal | — | `200 { build: { …build, snapshots: [snapshot] } }`, snapshots in review order |
 | `GET /api/v1/snapshots/:id` | CI or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
 | `GET /api/v1/projects/:id/detection-flags` | CI or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
+| `GET /api/v1/projects/:id/flakes` | CI or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
+| `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
 
-There are no write endpoints besides the four upload ones: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
+There are no write endpoints besides the four upload ones and resolving a flake: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
 **The upload endpoints** (`me`, `builds`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`.
 
-**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `baselines`) use snake_case keys, and every reply carries `"api_version": 1`. An error is:
+**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `flakes`, `baselines`) and resolving a flake use snake_case keys, and every reply carries `"api_version": 1`. An error is:
 
 ```json
 { "api_version": 1, "error": { "code": "not_found", "message": "build not found" } }
@@ -315,6 +323,7 @@ There are no write endpoints besides the four upload ones: accepting and rejecti
 | --- | --- | --- |
 | 400 | `bad_request` | a bad `status`, `limit` or `cursor` |
 | 401 | `unauthorized` | a missing, wrong, expired or revoked token |
+| 403 | `forbidden` | a CI token resolving a flake (only a person resolves one) |
 | 404 | `not_found` | an unknown path, or an id the token cannot reach |
 | 405 | `method_not_allowed` | a path that exists, with another method |
 | 426 | `cli_outdated` | the CLI is older than the server takes (below) |
@@ -338,7 +347,7 @@ A **project**:
 }
 ```
 
-A **build**. `counts` has one count per group (`changed`, `new`, `removed`, `unchanged`, `rebaseline`, `unmeasured`), one per review state (`pending`, `accepted`, `rejected`), and `to_review`: the shots still waiting for a decision. Builds have no sequence number; `id` and `created_at` identify one.
+A **build**. `counts` has one count per group (`changed`, `new`, `removed`, `unchanged`, `rebaseline`, `unmeasured`), one per review state (`pending`, `accepted`, `rejected`), `to_review`: the shots still waiting for a decision, and `skipped_flaky`: the changes on flaky shots whose policy is `skip`, which wait for no one. Builds have no sequence number; `id` and `created_at` identify one.
 
 ```json
 {
@@ -351,7 +360,7 @@ A **build**. `counts` has one count per group (`changed`, `new`, `removed`, `unc
   "error": null,
   "counts": {
     "changed": 1, "new": 1, "removed": 1, "unchanged": 1, "rebaseline": 0, "unmeasured": 0,
-    "pending": 4, "accepted": 0, "rejected": 0, "to_review": 1
+    "pending": 4, "accepted": 0, "rejected": 0, "to_review": 1, "skipped_flaky": 0
   },
   "created_at": "2026-10-22T09:00:00.000Z",
   "web_url": "https://<server>/projects/…/builds/…"
@@ -364,6 +373,7 @@ A **snapshot**:
 - `awaits_decision` is whether it still counts toward `to_review`.
 - `carried_from` is set on an unchanged shot that carries an open change from an earlier build (see "What a shot is compared against" above).
 - `approved_earlier` is set on an unchanged shot whose change was already accepted on this branch.
+- `flake_id` is the flake the shot is labelled with, or `null`; `flaky_policy` is the policy it was sent with (`review`, `skip`, or `null` for none, which is `review`); `skipped_flaky` is whether its change is skipped as flaky (see "Flaky shots").
 - `diff_result` is `null` until the diff has measured it. Its regions are in image px.
 
 ```json
@@ -391,6 +401,9 @@ A **snapshot**:
   "awaits_decision": false,
   "carried_from": null,
   "approved_earlier": null,
+  "flake_id": null,
+  "flaky_policy": "review",
+  "skipped_flaky": false,
   "measured_by": "ci",
   "engine_version": "0.1.0",
   "diff_error": null,
@@ -447,6 +460,33 @@ A **detection flag**:
 ```
 
 `kind` is `missed` (a change the diff did not mark) or `false_positive` (one it marked that is not a change). `rect` is the box drawn on the shot, or `null`.
+
+A **flake**:
+
+```json
+{
+  "id": "…",
+  "name": "home", "platform": "linux", "browser": "chromium", "viewport": "1280x720", "theme": "light",
+  "status": "open",
+  "note": null,
+  "created_by": null,
+  "created_at": "2026-10-22T09:00:00.000Z",
+  "resolved_by": null,
+  "resolved_at": null,
+  "resolution_note": null,
+  "updated_at": "2026-10-22T09:00:00.000Z",
+  "evidence": [{
+    "build_id": "…", "snapshot_id": "…",
+    "runs": 3, "differed": [2], "regions": [{ "run": 2, "regions": [{ "x": 8, "y": 8, "w": 12, "h": 12, "changed_pixels": 144, "antialiased_pixels": 0, "kind": "change", "why": null }] }],
+    "engine_version": "0.1.0", "policy": "review",
+    "at": "2026-10-22T09:00:00.000Z",
+    "images": { "head": "https://<server>/images/…", "runs": [{ "run": 2, "url": "https://<server>/images/…" }, { "run": 3, "url": "…" }] },
+    "web_url": "https://<server>/projects/…/builds/…/snapshots/…"
+  }]
+}
+```
+
+`status` is `open` or `resolved`. `created_by` is the reviewer who marked it flaky by hand, or `null` when the CLI detected it; a hand mark has no evidence. `evidence` is one entry per build that detected it, oldest first. `images.head` is the run-1 capture the build stored as the shot; `runs` are the re-captures, with the same 5-minute expiry as the snapshot images.
 
 ## Local-screenshot dogfood (GTK windows)
 

@@ -155,7 +155,7 @@ function AreaPicker({ draft }: { draft: FlagDraft }) {
 }
 
 /** Run a flag write, reload the page's data, and close the form; a failure stays on screen. */
-function useFlagWrite(onDone: () => void) {
+export function useFlagWrite(onDone: () => void) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

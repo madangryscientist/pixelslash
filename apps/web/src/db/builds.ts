@@ -3,8 +3,9 @@ import type { CiUpload } from "#/diff/ci-result";
 import { sha256Hex } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
+import { type SentFlake, labelFlake } from "./flakes";
 import { heldShot } from "./markers";
-import { type DiffOptions, type IgnoreRect, builds, snapshots } from "./schema";
+import { type DiffOptions, type FlakyPolicy, type IgnoreRect, builds, snapshots } from "./schema";
 
 export type Build = typeof builds.$inferSelect;
 
@@ -27,6 +28,8 @@ export type SnapshotInput = {
   diff: DiffOptions;
   ignore: IgnoreRect[];
   fingerprint: { image: string; browser: string; fonts: string };
+  /** The flaky policy the shot's config gives it (ob 1724); absent or null is `review`. */
+  flaky?: FlakyPolicy | null;
 };
 
 /** The build exists but can no longer change. */
@@ -85,7 +88,13 @@ async function putMasks(blobs: BlobStore, stem: string, ci: CiShot): Promise<CiU
 }
 
 /** One upload: the shot's meta, its PNG and, from a CI project's CLI, what it measured (ob 1727). */
-export type SentSnapshot = { input: SnapshotInput; png: ArrayBuffer; ci?: CiShot | null };
+export type SentSnapshot = {
+  input: SnapshotInput;
+  png: ArrayBuffer;
+  ci?: CiShot | null;
+  /** The CLI found the shot flaky (ob 1737): its record and re-captures. */
+  flake?: SentFlake | null;
+};
 
 /**
  * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
@@ -95,7 +104,7 @@ export type SentSnapshot = { input: SnapshotInput; png: ArrayBuffer; ci?: CiShot
 export async function putSnapshot(
   { db, blobs }: { db: Db; blobs: BlobStore },
   build: Build,
-  { input, png, ci = null }: SentSnapshot,
+  { input, png, ci = null, flake = null }: SentSnapshot,
 ): Promise<{ id: string }> {
   if (build.status !== "uploading") throw new BuildFinalisedError();
   const { name, platform, browser, viewport, theme } = input;
@@ -110,6 +119,7 @@ export async function putSnapshot(
     envFingerprint: JSON.stringify(input.fingerprint),
     imageKey,
     ciResults: ci && (await putMasks(blobs, stem, ci)),
+    flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
   };
   const [row] = await db
     .insert(snapshots)
@@ -136,6 +146,12 @@ export async function putSnapshot(
     })
     .returning({ id: snapshots.id });
   if (!row) throw new Error("snapshot upsert returned nothing");
+  const key = { name, platform, browser, viewport, theme };
+  await labelFlake(
+    { db, blobs },
+    { id: row.id, buildId: build.id, projectId: build.projectId, key, imageKey, stem },
+    flake,
+  );
   return row;
 }
 

@@ -53,6 +53,7 @@ describe("the read API (ob 1729)", () => {
         accepted: 0,
         rejected: 0,
         to_review: 1,
+        skipped_flaky: 0,
       },
       created_at: expect.any(String),
       web_url: `http://app.test/projects/${w.projectId}/builds/${w.feature.id}`,

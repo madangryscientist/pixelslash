@@ -234,6 +234,10 @@ export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
 export type DiffStatus = (typeof DIFF_STATUSES)[number];
 export type ReviewState = (typeof REVIEW_STATES)[number];
 
+/** What a flaky shot does to its build (ob 1724): wait for approval like any change, or be skipped. */
+export const FLAKY_POLICIES = ["review", "skip"] as const;
+export type FlakyPolicy = (typeof FLAKY_POLICIES)[number];
+
 /**
  * A name + a fixed variant (platform, browser, viewport, theme). Images live in the blob
  * store under the org's prefix; these are their keys. `diffStatus` is null until diffed.
@@ -308,6 +312,17 @@ export const snapshots = sqliteTable(
     diffError: text("diff_error"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
+    /**
+     * The shot's flaky policy from its uploaded config (`meta.flaky`, ob 1724): the config is the
+     * source of truth, and nothing on the server overrides it. Null when none was sent: `review`.
+     */
+    flakyPolicy: text("flaky_policy", { enum: FLAKY_POLICIES }),
+    /**
+     * The open flake this shot was labelled with (ob 1724): detected in this run, marked by hand, or
+     * already open for its key when it was uploaded. Null when the shot is not flaky. No foreign
+     * key, like `carried_from`.
+     */
+    flakeId: text("flake_id"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -349,5 +364,66 @@ export const detectionFlags = sqliteTable(
   (t) => [
     unique().on(t.snapshotId, t.createdBy),
     index("detection_flags_project_idx").on(t.projectId, t.createdAt),
+  ],
+);
+
+export const FLAKE_STATUSES = ["open", "resolved"] as const;
+export type FlakeStatus = (typeof FLAKE_STATUSES)[number];
+
+/**
+ * One build's evidence that a shot is flaky (ob 1724): the CLI captured it again and the captures
+ * disagreed. Run 1 is the shot itself (`imageKey`); `captures` are the re-captures, run 2 onwards,
+ * stored beside it. `regions` are where each differing run differed from run 1.
+ */
+export type FlakeEvidence = {
+  buildId: string;
+  snapshotId: string;
+  imageKey: string;
+  /** The re-captures that were stored, by run number; a part that was not a PNG is not. */
+  captures: { run: number; key: string }[];
+  runs: number;
+  differed: number[];
+  regions: { run: number; regions: DiffRegion[] }[];
+  engineVersion: string;
+  policy: FlakyPolicy;
+  at: number;
+};
+
+/**
+ * A snapshot key (name + variant) whose captures disagreed within one run, or that a reviewer
+ * marked flaky by hand (ob 1724). Not a detection flag: a flag says the diff was wrong, a flake
+ * says the page is. One row per key: a detection on another build appends to its evidence, and a
+ * detection on a resolved one reopens it.
+ */
+export const flakes = sqliteTable(
+  "flakes",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    platform: text("platform").notNull(),
+    browser: text("browser").notNull(),
+    viewport: text("viewport").notNull(),
+    theme: text("theme").notNull(),
+    status: text("status", { enum: FLAKE_STATUSES }).notNull().default("open"),
+    evidence: text("evidence", { mode: "json" })
+      .$type<FlakeEvidence[]>()
+      .notNull()
+      .default(sql`'[]'`),
+    /** The note a reviewer marked it with by hand; null when the CLI detected it. */
+    note: text("note"),
+    /** The reviewer who marked it by hand; null when the CLI detected it. */
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    resolvedBy: text("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+    resolutionNote: text("resolution_note"),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    unique().on(t.projectId, t.name, t.platform, t.browser, t.viewport, t.theme),
+    index("flakes_project_idx").on(t.projectId, t.status),
   ],
 );

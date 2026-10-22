@@ -5,6 +5,7 @@ import { builds, snapshots } from "#/db/schema";
 import { revokeCiToken } from "#/db/tokens";
 import { usageCounts } from "#/db/usage";
 import { type ApiDeps, MAX_PNG_BYTES, handleApi } from "./handler";
+import { MAX_FLAKE_RUNS } from "./validate";
 import {
   META,
   PNG,
@@ -229,7 +230,8 @@ describe("upload API", () => {
         body: "x",
         headers: {
           authorization: `Bearer ${acme.token}`,
-          "content-length": String(MAX_PNG_BYTES + 1_000_000),
+          // The cap counts the shot and every flake:<run> re-capture it may carry (ob 1724).
+          "content-length": String(MAX_FLAKE_RUNS * MAX_PNG_BYTES + 1_000_000),
         },
       }),
       deps,

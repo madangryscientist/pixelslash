@@ -241,7 +241,7 @@ export function SidePanel({
   options: DiffOptions;
   reviewable: boolean;
   status: string;
-  /** The detection flags, first: a second reviewer reads them before deciding. */
+  /** The detection flags and the flake, first: a second reviewer reads them before deciding. */
   children?: ReactNode;
 }) {
   return (

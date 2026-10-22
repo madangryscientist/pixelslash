@@ -1,4 +1,4 @@
-import type { DiffStatus } from "#/db/schema";
+import type { DiffStatus, FlakyPolicy } from "#/db/schema";
 
 /** The order the review walks in: what needs a decision first, what needs none last. */
 export const SNAPSHOT_GROUPS = [
@@ -31,9 +31,26 @@ export function holdsChange(row: Decidable): boolean {
   return row.diffStatus === "changed" || row.carriedFrom !== null;
 }
 
-/** A shot that waits for a reviewer: it holds a change nobody has decided yet. */
-export function awaitsDecision(row: Decidable & { reviewState: string }): boolean {
-  return row.reviewState === "pending" && holdsChange(row);
+type Flaky = { flakeId: string | null; flakyPolicy: FlakyPolicy | null };
+type Review = Decidable & Flaky & { reviewState: string };
+
+/**
+ * A flaky shot whose config says `skip` (ob 1724), holding a change nobody decided: labelled
+ * "skipped: flaky", it waits for nobody and never blocks its build. It is not accepted either: its
+ * baseline stays where it was. With no policy sent the shot is `review`, and waits like any change.
+ */
+export function skippedFlaky(row: Review): boolean {
+  return (
+    row.flakeId !== null &&
+    row.flakyPolicy === "skip" &&
+    row.reviewState === "pending" &&
+    holdsChange(row)
+  );
+}
+
+/** A shot that waits for a reviewer: it holds a change nobody has decided yet, and is not skipped as flaky. */
+export function awaitsDecision(row: Review): boolean {
+  return row.reviewState === "pending" && holdsChange(row) && !skippedFlaky(row);
 }
 
 /**

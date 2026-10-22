@@ -9,8 +9,14 @@ import {
   countBuilds,
   emptyCounts,
 } from "#/db/review";
-import { BUILD_STATUSES, type BuildStatus, type DiffResult, type builds } from "#/db/schema";
-import { awaitsDecision, groupOf } from "#/lib/snapshot-groups";
+import {
+  BUILD_STATUSES,
+  type BuildStatus,
+  type DiffRegion,
+  type DiffResult,
+  type builds,
+} from "#/db/schema";
+import { awaitsDecision, groupOf, skippedFlaky } from "#/lib/snapshot-groups";
 import { signedImagePath } from "#/storage/signed";
 import { BadRequest } from "./validate";
 
@@ -34,9 +40,9 @@ export type ReadCtx = {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
-const reply = (body: object) => Response.json({ api_version: API_VERSION, ...body });
+export const reply = (body: object) => Response.json({ api_version: API_VERSION, ...body });
 
-const iso = (date: Date | null) => date?.toISOString() ?? null;
+export const iso = (date: Date | null) => date?.toISOString() ?? null;
 
 function limitOf(query: URLSearchParams): number {
   const raw = query.get("limit");
@@ -76,7 +82,7 @@ function statusOf(raw: string | null): BuildStatus | undefined {
 const buildUrl = (ctx: ReadCtx, projectId: string, buildId: string) =>
   `${ctx.origin}/projects/${projectId}/builds/${buildId}`;
 
-const snapshotUrl = (ctx: ReadCtx, projectId: string, buildId: string, snapshotId: string) =>
+export const snapshotUrl = (ctx: ReadCtx, projectId: string, buildId: string, snapshotId: string) =>
   `${buildUrl(ctx, projectId, buildId)}/snapshots/${snapshotId}`;
 
 /** A signed link to one of an org's blobs: the image route serves org-scoped keys only. */
@@ -100,6 +106,7 @@ function counts(c: BuildCounts) {
     accepted: c.accepted,
     rejected: c.rejected,
     to_review: c.toReview,
+    skipped_flaky: c.skippedFlaky,
   };
 }
 
@@ -123,6 +130,19 @@ function build(ctx: ReadCtx, projectId: string, row: BuildRow, c: BuildCounts) {
   };
 }
 
+export function regionOf(r: DiffRegion) {
+  return {
+    x: r.x,
+    y: r.y,
+    w: r.w,
+    h: r.h,
+    changed_pixels: r.changedPixels,
+    antialiased_pixels: r.antialiasedPixels,
+    kind: r.kind,
+    why: r.why ?? null,
+  };
+}
+
 function diffResult(d: DiffResult | null) {
   if (!d) return null;
   return {
@@ -131,16 +151,7 @@ function diffResult(d: DiffResult | null) {
     ignored_pixels: d.ignoredPixels,
     ignored: d.ignored,
     specks: d.specks,
-    regions: d.regions.map((r) => ({
-      x: r.x,
-      y: r.y,
-      w: r.w,
-      h: r.h,
-      changed_pixels: r.changedPixels,
-      antialiased_pixels: r.antialiasedPixels,
-      kind: r.kind,
-      why: r.why ?? null,
-    })),
+    regions: d.regions.map(regionOf),
     width: d.width,
     height: d.height,
     main_width: d.mainWidth,
@@ -169,6 +180,9 @@ function snapshot(ctx: ReadCtx, projectId: string, buildId: string, s: SnapshotV
     reviewed_by: s.reviewedBy,
     reviewed_at: iso(s.reviewedAt),
     awaits_decision: awaitsDecision(s),
+    flake_id: s.flakeId,
+    flaky_policy: s.flakyPolicy,
+    skipped_flaky: skippedFlaky(s),
     carried_from: s.carriedFrom && {
       snapshot_id: s.carriedFrom,
       build_id: s.carriedFromBuild,

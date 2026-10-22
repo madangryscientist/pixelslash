@@ -18,3 +18,13 @@ export function field(input: unknown, key: string): string {
   if (text.length === 0 || text.length > 100) throw new Error(`${key} is required (1-100 chars)`);
   return text;
 }
+
+const MAX_NOTE = 200;
+
+/** An optional one-line note from a server-fn payload: whitespace collapsed, empty is none. */
+export function noteInput(d: unknown): string | null {
+  const raw = typeof d === "object" && d !== null ? Reflect.get(d, "note") : null;
+  const note = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
+  if (note.length > MAX_NOTE) throw new Error(`note is at most ${MAX_NOTE} chars`);
+  return note || null;
+}

@@ -1,9 +1,20 @@
 import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
-import type { DiffOptions, IgnoreRect } from "#/db/schema";
+import type { FlakeInput } from "#/db/flakes";
+import {
+  type DiffOptions,
+  type DiffRegion,
+  FLAKY_POLICIES,
+  type FlakyPolicy,
+  type IgnoreRect,
+  type RegionKind,
+} from "#/db/schema";
 
 /** A request the client got wrong: surfaces as a 400 with this message. */
 export class BadRequest extends Error {}
+
+/** The actor may reach the row but not do this to it (a CI token resolving a flake): a 403. */
+export class Forbidden extends Error {}
 
 type Obj = Record<string, unknown>;
 
@@ -202,4 +213,87 @@ export function parseCiInput(raw: unknown): CiInput | null {
   if (new Set(results.map((r) => r.baselineId)).size !== results.length)
     bad("ci.results", "names a baseline twice");
   return { engineVersion: text(c.engineVersion, "ci.engineVersion", 64, TOKEN), results };
+}
+
+/** The most captures a flake record may name, the first included; a record over it is dropped. */
+export const MAX_FLAKE_RUNS = 10;
+const MAX_FLAKE_REGIONS = 200;
+const REGION_KINDS: readonly RegionKind[] = ["change", "noise", "shift"];
+
+function isFlakyPolicy(v: unknown): v is FlakyPolicy {
+  return FLAKY_POLICIES.some((p) => p === v);
+}
+
+/**
+ * `meta.flaky`, the policy the shot's config gives it (ob 1724). Anything that is not a policy is
+ * no policy, never an error: the CLI sends it for every shot, and an older one sends none.
+ */
+export function parseFlaky(raw: unknown): FlakyPolicy | null {
+  return isFlakyPolicy(raw) ? raw : null;
+}
+
+function int(v: unknown, where: string, min: number, max = Number.MAX_SAFE_INTEGER): number {
+  if (typeof v !== "number" || !Number.isSafeInteger(v) || v < min || v > max)
+    bad(where, `must be an integer from ${min} to ${max}`);
+  return v;
+}
+
+function parseRegion(v: unknown, where: string): DiffRegion {
+  const r = object(v, where);
+  const kind = REGION_KINDS.find((k) => k === r.kind);
+  if (!kind) bad(`${where}.kind`, "is not a region kind");
+  const region: DiffRegion = {
+    x: int(r.x, `${where}.x`, 0),
+    y: int(r.y, `${where}.y`, 0),
+    w: int(r.w, `${where}.w`, 0),
+    h: int(r.h, `${where}.h`, 0),
+    changedPixels: int(r.changedPixels, `${where}.changedPixels`, 0),
+    antialiasedPixels: int(r.antialiasedPixels, `${where}.antialiasedPixels`, 0),
+    kind,
+  };
+  if (r.why !== undefined) region.why = text(r.why, `${where}.why`, 200);
+  return region;
+}
+
+function strictFlake(raw: unknown): FlakeInput {
+  const f = object(raw, "flake");
+  const runs = int(f.runs, "flake.runs", 2, MAX_FLAKE_RUNS);
+  if (!Array.isArray(f.differed) || f.differed.length === 0)
+    bad("flake.differed", "must name at least one run");
+  const differed = f.differed.map((r, i) => int(r, `flake.differed[${i}]`, 2, runs));
+  if (new Set(differed).size !== differed.length) bad("flake.differed", "names a run twice");
+  if (!Array.isArray(f.regions) || f.regions.length > runs)
+    bad("flake.regions", "must be an array of one entry per run at most");
+  const regions = f.regions.map((e, i) => {
+    const o = object(e, `flake.regions[${i}]`);
+    if (!Array.isArray(o.regions) || o.regions.length > MAX_FLAKE_REGIONS)
+      bad(`flake.regions[${i}].regions`, `must be an array of at most ${MAX_FLAKE_REGIONS}`);
+    return {
+      run: int(o.run, `flake.regions[${i}].run`, 2, runs),
+      regions: o.regions.map((r, j) => parseRegion(r, `flake.regions[${i}].regions[${j}]`)),
+    };
+  });
+  const policy = f.policy;
+  if (!isFlakyPolicy(policy)) bad("flake.policy", "is not a flaky policy");
+  return {
+    runs,
+    differed: differed.toSorted((a, b) => a - b),
+    regions,
+    engineVersion: text(f.engineVersion, "flake.engineVersion", 64, TOKEN),
+    policy,
+  };
+}
+
+/**
+ * `meta.flake`, the CLI's record of a shot whose captures disagreed (ob 1737). A record that does
+ * not check out is dropped, not refused: the shot itself is still a good upload.
+ */
+export function parseFlake(raw: unknown): FlakeInput | null {
+  if (raw === undefined || raw === null) return null;
+  try {
+    return strictFlake(raw);
+  } catch (e) {
+    if (e instanceof BadRequest) return null;
+    throw e;
+  }
 }

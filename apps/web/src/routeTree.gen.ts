@@ -19,6 +19,7 @@ import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AuthGithubCallbackRouteImport } from './routes/auth/github.callback'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId.index'
 import { Route as ProjectsProjectIdFlagsDotjsonRouteImport } from './routes/projects/$projectId.flags[.]json'
+import { Route as ProjectsProjectIdFlakesRouteImport } from './routes/projects/$projectId.flakes'
 import { Route as ProjectsProjectIdSettingsRouteImport } from './routes/projects/$projectId.settings'
 import { Route as ProjectsProjectIdBuildsBuildIdRouteImport } from './routes/projects/$projectId.builds.$buildId'
 import { Route as ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRouteImport } from './routes/projects/$projectId.builds.$buildId_.snapshots.$snapshotId'
@@ -74,6 +75,11 @@ const ProjectsProjectIdFlagsDotjsonRoute =
     path: '/projects/$projectId/flags.json',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ProjectsProjectIdFlakesRoute = ProjectsProjectIdFlakesRouteImport.update({
+  id: '/projects/$projectId/flakes',
+  path: '/projects/$projectId/flakes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsProjectIdSettingsRoute =
   ProjectsProjectIdSettingsRouteImport.update({
     id: '/projects/$projectId/settings',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/flags.json': typeof ProjectsProjectIdFlagsDotjsonRoute
+  '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/flags.json': typeof ProjectsProjectIdFlagsDotjsonRoute
+  '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
   '/projects/$projectId/flags.json': typeof ProjectsProjectIdFlagsDotjsonRoute
+  '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/builds/$buildId': typeof ProjectsProjectIdBuildsBuildIdRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/flags.json'
+    | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
     | '/projects/$projectId/builds/$buildId'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/flags.json'
+    | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
     | '/projects/$projectId'
     | '/projects/$projectId/builds/$buildId'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/auth/github/callback'
     | '/projects/$projectId/flags.json'
+    | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/'
     | '/projects/$projectId/builds/$buildId'
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   ImagesSplatRoute: typeof ImagesSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ProjectsProjectIdFlagsDotjsonRoute: typeof ProjectsProjectIdFlagsDotjsonRoute
+  ProjectsProjectIdFlakesRoute: typeof ProjectsProjectIdFlakesRoute
   ProjectsProjectIdSettingsRoute: typeof ProjectsProjectIdSettingsRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdBuildsBuildIdRoute: typeof ProjectsProjectIdBuildsBuildIdRoute
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdFlagsDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$projectId/flakes': {
+      id: '/projects/$projectId/flakes'
+      path: '/projects/$projectId/flakes'
+      fullPath: '/projects/$projectId/flakes'
+      preLoaderRoute: typeof ProjectsProjectIdFlakesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId/settings': {
       id: '/projects/$projectId/settings'
       path: '/projects/$projectId/settings'
@@ -319,6 +339,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImagesSplatRoute: ImagesSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ProjectsProjectIdFlagsDotjsonRoute: ProjectsProjectIdFlagsDotjsonRoute,
+  ProjectsProjectIdFlakesRoute: ProjectsProjectIdFlakesRoute,
   ProjectsProjectIdSettingsRoute: ProjectsProjectIdSettingsRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
   ProjectsProjectIdBuildsBuildIdRoute: ProjectsProjectIdBuildsBuildIdRoute,

@@ -71,6 +71,23 @@ export function stripeOf(build: MixBuild): string {
 /** A build in one of these statuses was never diffed, so "nothing to review" would claim a result. */
 const UNMEASURED = new Set<MixBuild["status"]>(["uploading", "processing", "errored"]);
 
+function ToReviewCount({ build, defaultBranch }: { build: MixBuild; defaultBranch: string }) {
+  if (build.counts.toReview > 0) {
+    return (
+      <span data-testid="to-review" className="font-bold text-(--ps-warn)">
+        {build.counts.toReview} to review
+      </span>
+    );
+  }
+  return (
+    <span data-testid="to-review" className="text-sm text-slate-400">
+      {build.branch === defaultBranch && build.status === "passed"
+        ? "auto-accepted"
+        : "nothing to review"}
+    </span>
+  );
+}
+
 /** "7 to review" in amber, "auto-accepted" for a build on the project's default branch (diff/process.ts accepts those), else a dash. */
 export function ToReview({
   build,
@@ -87,18 +104,14 @@ export function ToReview({
       </span>
     );
   }
-  if (build.counts.toReview > 0) {
-    return (
-      <span data-testid="to-review" className="font-bold text-(--ps-warn)">
-        {build.counts.toReview} to review
-      </span>
-    );
-  }
   return (
-    <span data-testid="to-review" className="text-sm text-slate-400">
-      {build.branch === defaultBranch && build.status === "passed"
-        ? "auto-accepted"
-        : "nothing to review"}
+    <span className="flex flex-col">
+      <ToReviewCount build={build} defaultBranch={defaultBranch} />
+      {build.counts.skippedFlaky > 0 && (
+        <span data-testid="skipped-flaky-count" className="text-xs text-amber-700">
+          {build.counts.skippedFlaky} skipped: flaky
+        </span>
+      )}
     </span>
   );
 }

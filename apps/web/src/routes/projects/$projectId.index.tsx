@@ -29,13 +29,22 @@ function ProjectPage() {
             ? "No builds yet."
             : `Builds newest first. ${builds.length} in this project.`}
         </Body>
-        <Link
-          to="/projects/$projectId/settings"
-          params={{ projectId: project.id }}
-          className={buttonClass("outline")}
-        >
-          Settings
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to="/projects/$projectId/flakes"
+            params={{ projectId: project.id }}
+            className={buttonClass("outline")}
+          >
+            Flakes
+          </Link>
+          <Link
+            to="/projects/$projectId/settings"
+            params={{ projectId: project.id }}
+            className={buttonClass("outline")}
+          >
+            Settings
+          </Link>
+        </div>
       </div>
       {builds.length === 0 ? (
         <EmptyProject projectId={project.id} serverUrl={serverUrl} hydrated={hydrated} />

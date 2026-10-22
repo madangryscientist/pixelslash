@@ -4,9 +4,10 @@ import {
   type SnapshotGroup,
   awaitsDecision,
   groupOf,
+  skippedFlaky,
 } from "#/lib/snapshot-groups";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
-import { heldShot } from "./markers";
+import { heldShot, notSkippedFlaky } from "./markers";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
@@ -14,6 +15,7 @@ import {
   type DiffOptions,
   type DiffResult,
   type DiffStatus,
+  type FlakyPolicy,
   type IgnoreRect,
   type ReviewState,
   builds,
@@ -42,6 +44,8 @@ export async function refreshBuildStatus(db: Db, buildId: string): Promise<Verdi
       diffStatus: snapshots.diffStatus,
       reviewState: snapshots.reviewState,
       carriedFrom: snapshots.carriedFrom,
+      flakeId: snapshots.flakeId,
+      flakyPolicy: snapshots.flakyPolicy,
     })
     .from(snapshots)
     .where(eq(snapshots.buildId, buildId));
@@ -97,6 +101,10 @@ export type SnapshotView = {
   engineVersion: string | null;
   /** Why the shot could not be measured, when it could not. */
   diffError: string | null;
+  /** The flake it is labelled with (ob 1724): detected on upload, open for its key, or marked. */
+  flakeId: string | null;
+  /** The flaky policy its config sent; null is `review`. */
+  flakyPolicy: FlakyPolicy | null;
   createdAt: Date;
 };
 
@@ -140,6 +148,8 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       measuredBy: snapshots.measuredBy,
       engineVersion: snapshots.engineVersion,
       diffError: snapshots.diffError,
+      flakeId: snapshots.flakeId,
+      flakyPolicy: snapshots.flakyPolicy,
       createdAt: snapshots.createdAt,
     })
     .from(snapshots)
@@ -191,6 +201,7 @@ export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): P
           eq(builds.branch, build.branch),
         ),
         heldShot(),
+        notSkippedFlaky(),
       ),
     )
     .limit(1);
@@ -203,6 +214,8 @@ export type BuildCounts = Record<SnapshotGroup, number> & {
   rejected: number;
   /** Shots that wait for a decision (`awaitsDecision`): what the build page calls "to review". */
   toReview: number;
+  /** Flaky shots their config skips (`skippedFlaky`, ob 1724): counted on a line of their own. */
+  skippedFlaky: number;
 };
 
 export const emptyCounts = (): BuildCounts => ({
@@ -216,6 +229,7 @@ export const emptyCounts = (): BuildCounts => ({
   accepted: 0,
   rejected: 0,
   toReview: 0,
+  skippedFlaky: 0,
 });
 
 /** The per-group counts of each build's shots, in one grouped read. A build with no shots is absent. */
@@ -229,6 +243,8 @@ export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<strin
       rebaselineNeeded: snapshots.rebaselineNeeded,
       reviewState: snapshots.reviewState,
       carried: isNotNull(snapshots.carriedFrom),
+      flaky: isNotNull(snapshots.flakeId),
+      flakyPolicy: snapshots.flakyPolicy,
       n: count(),
     })
     .from(snapshots)
@@ -239,12 +255,16 @@ export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<strin
       snapshots.rebaselineNeeded,
       snapshots.reviewState,
       isNotNull(snapshots.carriedFrom),
+      isNotNull(snapshots.flakeId),
+      snapshots.flakyPolicy,
     );
   for (const stat of stats) {
     const held = counts.get(stat.buildId) ?? emptyCounts();
     held[groupOf(stat)] += stat.n;
     held[stat.reviewState] += stat.n;
-    if (awaitsDecision({ ...stat, carriedFrom: stat.carried ? "" : null })) held.toReview += stat.n;
+    const row = { ...stat, carriedFrom: stat.carried ? "" : null, flakeId: stat.flaky ? "" : null };
+    if (awaitsDecision(row)) held.toReview += stat.n;
+    if (skippedFlaky(row)) held.skippedFlaky += stat.n;
     counts.set(stat.buildId, held);
   }
   return counts;
@@ -316,7 +336,10 @@ export async function acceptAllSnapshots(
   await db
     .update(snapshots)
     .set(decision)
-    .where(and(eq(snapshots.buildId, buildId), ne(snapshots.reviewState, "accepted")));
+    // A skipped flaky shot is never accepted in bulk (ob 1724): its baseline does not move.
+    .where(
+      and(eq(snapshots.buildId, buildId), ne(snapshots.reviewState, "accepted"), notSkippedFlaky()),
+    );
   const group = groupsOfBuild(db, buildId);
   await refreshBuilds(db, await decideGroup(db, input.projectId, group, decision));
   return refreshBuildStatus(db, buildId);

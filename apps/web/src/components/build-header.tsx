@@ -5,7 +5,7 @@ import { StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { firstToReview } from "#/lib/build-tabs";
 import { formatDateTime } from "#/lib/format";
-import { holdsChange } from "#/lib/snapshot-groups";
+import { holdsChange, skippedFlaky } from "#/lib/snapshot-groups";
 
 function toReviewText(baseline: boolean, toReview: number): string {
   if (baseline) return "baseline set";
@@ -60,6 +60,21 @@ function AcceptAll({
   );
 }
 
+/** Shots skipped as flaky (ob 1724) hold a change nobody reviews: counted here, not as reviewed. */
+function SkippedFlaky({ projectId, count }: { projectId: string; count: number }) {
+  if (count === 0) return null;
+  return (
+    <Link
+      to="/projects/$projectId/flakes"
+      params={{ projectId }}
+      className="text-amber-700 hover:underline"
+      data-testid="skipped-flaky-count"
+    >
+      {count} skipped: flaky
+    </Link>
+  );
+}
+
 export function BuildHeader({
   projectId,
   build,
@@ -78,7 +93,8 @@ export function BuildHeader({
   /** The project's first build: it sets the baseline, so there is nothing to review or accept. */
   baseline: boolean;
 }) {
-  const changed = snapshots.filter(holdsChange);
+  const skipped = snapshots.filter(skippedFlaky).length;
+  const changed = snapshots.filter((shot) => holdsChange(shot) && !skippedFlaky(shot));
   // Unchanged here, yet still different from the default branch (ob 1722): an all-"no change"
   // build is not "identical to main".
   const approvedEarlier = snapshots.filter((shot) => shot.approvedEarlier).length;
@@ -96,6 +112,7 @@ export function BuildHeader({
         <span className="font-medium text-slate-700" data-testid="to-review">
           {toReviewText(baseline, toReview)}
         </span>
+        <SkippedFlaky projectId={projectId} count={skipped} />
         {approvedEarlier > 0 && (
           <span className="text-slate-600" data-testid="approved-earlier-count">
             {approvedEarlier} approved earlier on this branch
