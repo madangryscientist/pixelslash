@@ -19,6 +19,7 @@ import {
 import { USAGE, parseArgs, type Cli } from "./args.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
+import { IMPORT_USAGE, runImport } from "./import.ts";
 import { UPLOAD_USAGE, runUpload } from "./upload.ts";
 
 export type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
@@ -72,6 +73,7 @@ export async function run(
   if (argv[0] === "capture")
     return guarded(() => runCapture(argv.slice(1), io, deps), io, CAPTURE_USAGE);
   if (argv[0] === "compare") return guarded(() => runCompare(argv.slice(1), io), io, COMPARE_USAGE);
+  if (argv[0] === "import") return guarded(() => runImport(argv.slice(1), io), io, IMPORT_USAGE);
   if (argv[0] === "upload")
     return guarded(() => runUpload(argv.slice(1), io, deps), io, UPLOAD_USAGE);
   return guarded(

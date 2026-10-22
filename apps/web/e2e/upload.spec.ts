@@ -212,3 +212,39 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
   expect(revoked.code).toBe(1);
   expect(revoked.stderr).toContain("401");
 });
+
+test("a dir of loose PNGs goes through `import` and `upload`, and the server diffs it", async ({
+  page,
+}) => {
+  const token = await provision(page, "Import Co", "shots", true);
+  const pngs = await tempDir("ps-e2e-pngs-");
+  await mkdir(join(pngs, "billing"));
+  await writeFile(join(pngs, "billing/invoice.png"), PNG);
+  const out = join(await tempDir("ps-e2e-import-"), "snaps");
+  const made = spawnSync(
+    "bun",
+    [CLI, "import", pngs, "--out", out, "--viewport", "1x1", "--renderer", "e2e-tool"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  expect(made.stderr).toBe("");
+  expect(made.status).toBe(0);
+
+  const first = upload(out, token);
+  expect(first.stderr).toBe("");
+  expect(first.code).toBe(0);
+  const second = upload(out, token);
+  expect(second.code).toBe(0);
+  const secondId = /build: (\S+)/.exec(second.stdout)?.[1] ?? "";
+  const [row] = await rows(
+    `SELECT b.status, s.name, s.viewport, s.theme, s.diff_status, s.env_fingerprint
+     FROM builds b JOIN snapshots s ON s.build_id = b.id WHERE b.id = '${secondId}'`,
+  );
+  expect(row).toMatchObject({
+    status: "passed",
+    name: "billing/invoice",
+    viewport: "1x1",
+    theme: "light",
+    diff_status: "unchanged",
+  });
+  expect(row?.env_fingerprint).toContain("e2e-tool");
+});

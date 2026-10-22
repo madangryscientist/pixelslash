@@ -110,6 +110,21 @@ The fingerprint says what rendered the snapshot; only snapshots with equal finge
 
 Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
 
+## Snapshots from PNGs you already have
+
+`pixelslash import` turns a dir of PNGs from any screenshot tool (Cypress, a Playwright script, a native app) into a snapshot dir that `pixelslash upload` and `pixelslash compare` take, so the server does not have to be fed by `capture`.
+
+```
+pixelslash import PNG_DIR [--out DIR] [--viewport WxH] [--theme light|dark] [--renderer LABEL]
+pixelslash upload DIR --server URL
+```
+
+- Every `.png` under `PNG_DIR`, at any depth, is one snapshot. Its **name** is its path under `PNG_DIR` without the extension, `/`-separated: `home.png` is `home`, `billing/invoice.png` is `billing/invoice`. Other files are ignored. A file that is not a PNG, an empty dir and two PNGs with the same name are exit 2 with nothing written.
+- The PNGs are copied into `--out` (default `pixelslash-snapshots`, like `capture`) next to a version 1 `manifest.json`. An `--out` that is, holds or sits inside `PNG_DIR` is refused. stdout is `pixelslash: N snapshots` and `manifest: PATH`; exit 0.
+- Nothing is read from the shots, so the identity half that a screenshot tool knows and we do not is yours to give. `--viewport` (default `1280x720`) and `--theme` (default `light`) apply to **every** PNG: a snapshot is identified by name + browser + viewport + theme, and the viewport is the setting the page was shot at, not the image size (a full-page shot's height changes with the page, and must not turn every change into a new and a removed snapshot). A dir with both themes is two imports into two dirs. The browser is `chromium`, the only value `upload` accepts.
+- The fingerprint says the renderer is not ours: `{ "image": "external", "browser": LABEL, "fonts": "unknown" }`, where `--renderer` is the label (default `external`). Only snapshots with equal fingerprints are compared, so **change the label when you change the tool or its version**: the server then asks for a re-baseline instead of showing a wall of diffs that are the new renderer's. Keep the label stable otherwise.
+- Each entry has the engine's default diff options, no ignore areas and no tags. `path` holds the file's path; it is not uploaded.
+
 ## Comparing two snapshot dirs
 
 `pixelslash compare` is pair mode for two `capture` outputs: Main's snapshot dir against Branch's, on this machine, with no design system and no server.

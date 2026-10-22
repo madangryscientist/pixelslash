@@ -107,7 +107,7 @@ function parseManifest(raw: unknown): SnapshotManifest {
   return { version: 1, snapshots };
 }
 
-async function checkPng(dir: string, e: SnapshotEntry): Promise<void> {
+export async function checkPng(dir: string, e: SnapshotEntry): Promise<void> {
   const png = Bun.file(pngPath(dir, e));
   if (!(await png.exists())) throw new UsageError(`manifest: ${e.file} does not exist`);
   const head = Buffer.from(await png.slice(0, 8).arrayBuffer());
