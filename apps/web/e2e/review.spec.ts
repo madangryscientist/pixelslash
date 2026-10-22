@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
 import { expectApprovedEarlier } from "./approved-earlier";
-import { expectBranchPage } from "./branch-page";
+import { JUDGE_SAYS, expectBranchPage } from "./branch-page";
 import { png } from "./png";
 import { expectBaselineBuild, expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
@@ -72,18 +72,35 @@ async function snapshotDir(shots: Fixture[]): Promise<string> {
  * worktree: the server only takes a baseline at the branch build's merge-base or an ancestor, so a
  * worktree HEAD ahead of `origin/main` would make every shot `new`.
  */
-function upload(dir: string, token: string, branch: string, pr?: number): string {
+/** `pr` is sent as `--pr`; `judge`, a dir holding a stub judge, runs the upload with `--judge`. */
+function upload(
+  dir: string,
+  token: string,
+  branch: string,
+  { pr, judge }: { pr?: number; judge?: string } = {},
+): string {
   const repo = checkout(branch === "main" ? "main" : "work");
   const args = [CLI, "upload", dir, "--server", SERVER, "--branch", branch];
   if (pr !== undefined) args.push("--pr", String(pr));
+  if (judge) args.push("--judge");
+  // A judge dir first on PATH holds a stub `mlx_vlm.generate`, found before any real model.
+  const PATH = judge ? `${judge}:${process.env["PATH"]}` : process.env["PATH"];
   const res = spawnSync("bun", args, {
     cwd: repo,
-    env: { ...process.env, PIXELSLASH_TOKEN: token },
+    env: { ...process.env, PATH, PIXELSLASH_TOKEN: token },
     encoding: "utf8",
   });
   const id = /build: (\S+)/.exec(res.stdout)?.[1];
   if (res.status !== 0 || !id) throw new Error(`upload failed: ${res.stdout}${res.stderr}`);
   return id;
+}
+
+/** A dir holding a stub local judge that says `JUDGE_SAYS` of every shot it is shown. */
+async function stubJudge(): Promise<string> {
+  const dir = await tempDir("ps-judge-");
+  const bin = join(dir, "mlx_vlm.generate");
+  await writeFile(bin, `#!/bin/sh\necho "CHANGE ${JUDGE_SAYS}."\n`, { mode: 0o755 });
+  return dir;
 }
 
 const RED: [number, number, number] = [220, 30, 30];
@@ -224,7 +241,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   upload(await snapshotDir(BASE), token, "main");
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
   await page.waitForTimeout(1100);
-  upload(await snapshotDir(REVIEW), token, "review", 7);
+  upload(await snapshotDir(REVIEW), token, "review", { pr: 7 });
 
   // The project page: newest first, with the counts the build measured.
   await open(page, `/projects/${projectId}`);
@@ -323,7 +340,7 @@ test("the branch page: against main, since last build, and an accept the build p
   const { token, projectId } = await provision(page, "Branch Co");
   upload(await snapshotDir(BASE), token, "main");
   await page.waitForTimeout(1100);
-  upload(await snapshotDir(REVIEW), token, "feature");
+  upload(await snapshotDir(REVIEW), token, "feature", { judge: await stubJudge() });
   await open(page, `/projects/${projectId}`);
   await expectBranchPage(page, projectId, "feature", capture);
 });

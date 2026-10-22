@@ -181,6 +181,13 @@ export function ShotCard({
             </Pill>
           ))}
         </div>
+        {/* The judge's sentence (ob 1745) above the measured line, which always follows it. */}
+        {shot.changeNote && (
+          <p className="mt-2 text-sm text-slate-800" data-testid="shot-change-note">
+            <span className="text-slate-500">Judge (local model): </span>
+            {shot.changeNote}.
+          </p>
+        )}
         <p className="mt-2 text-sm text-slate-600">{line}</p>
       </Link>
       {/* Beside the card's link, not in it: a link inside a link is not HTML. */}

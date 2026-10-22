@@ -601,7 +601,7 @@
       "label": "AI judgement against a design system",
       "ps": {
         "v": "y",
-        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741)"
+        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745)"
       },
       "t": {
         "argos": "n",

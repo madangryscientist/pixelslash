@@ -8,28 +8,32 @@ import {
   recapture,
   type SnapshotDeps,
   type UploadDeps,
+  type DevJudgeDeps,
 } from "@pixelslash/engine";
 import type { Io } from "./run.ts";
 import { readFlagPairs } from "./args.ts";
 import { UPLOAD_FLAGS, type UploadFlags, uploadDir } from "./upload.ts";
 
 export const CAPTURE_USAGE =
-  "pixelslash capture [--config FILE] [--out DIR] [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N]]";
+  "pixelslash capture [--config FILE] [--out DIR] [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
 
 type CaptureFlags = { out: string; upload: boolean; uploadFlags: UploadFlags };
 
+const SWITCHES = new Set(["--upload", "--judge"]);
+
 function captureFlags(argv: string[]): CaptureFlags {
   const upload = argv.includes("--upload");
+  const judge = argv.includes("--judge");
   const { out = "pixelslash-snapshots", ...uploadFlags } = readFlagPairs(
-    argv.filter((a) => a !== "--upload"),
+    argv.filter((a) => !SWITCHES.has(a)),
     [...UPLOAD_FLAGS, "out"],
   );
   const { config: _config, ...uploadOnly } = uploadFlags;
-  if (!upload && Object.keys(uploadOnly).length > 0)
+  if (!upload && (judge || Object.keys(uploadOnly).length > 0))
     throw new UsageError(
-      "--server, --token-path, --base, --branch, --pr and --flake-retries need --upload",
+      "--server, --token-path, --base, --branch, --pr, --flake-retries and --judge need --upload",
     );
-  return { out: resolve(out), upload, uploadFlags };
+  return { out: resolve(out), upload, uploadFlags: { ...uploadFlags, judge } };
 }
 
 /**
@@ -40,7 +44,7 @@ function captureFlags(argv: string[]): CaptureFlags {
 export async function runCapture(
   argv: string[],
   io: Io,
-  deps: SnapshotDeps & UploadDeps = {},
+  deps: SnapshotDeps & UploadDeps & DevJudgeDeps = {},
 ): Promise<number> {
   const flags = captureFlags(argv);
   const config = await loadConfig(findConfig(flags.uploadFlags.config, process.cwd()));

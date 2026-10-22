@@ -75,6 +75,27 @@ describe("upload API", () => {
     expect(snap?.diffOptions).toEqual({});
   });
 
+  test("the judge's sentence is stored as sent; a malformed one is dropped, not refused (ob 1745)", async () => {
+    const { db, deps, acme } = await setup();
+    const id = await openBuild(deps, acme.token);
+    const path = `PUT /api/v1/builds/${id}/snapshots`;
+    const noteOf = async (name: string) => {
+      const rows = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
+      return rows.find((r) => r.name === name)?.changeNote;
+    };
+    const sent = snapshotForm({ ...META, changeNote: "  The button\nturned red. " });
+    expect((await call(deps, path, acme.token, sent)).status).toBe(200);
+    expect(await noteOf("pricing")).toBe("The button turned red");
+    const long = snapshotForm({ ...META, name: "long", changeNote: "a".repeat(500) });
+    expect((await call(deps, path, acme.token, long)).status).toBe(200);
+    expect(await noteOf("long")).toHaveLength(300);
+    for (const changeNote of [42, "   ", null]) {
+      const form = snapshotForm({ ...META, name: "odd", changeNote });
+      expect((await call(deps, path, acme.token, form)).status).toBe(200);
+      expect(await noteOf("odd")).toBeNull();
+    }
+  });
+
   test("a missing, wrong or revoked token is refused before anything is written", async () => {
     const { db, deps, blobs, acme } = await setup();
     for (const token of [null, "psci_nope", "not-a-token"]) {

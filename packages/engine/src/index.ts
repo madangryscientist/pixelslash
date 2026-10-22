@@ -86,6 +86,7 @@ export {
 export { runIteration, type FetchMain } from "./dev-run.ts";
 export { judgeIteration, type DevJudgeDeps } from "./dev-judge.ts";
 export { explainIteration } from "./dev-explain.ts";
+export { type ChangeNoter, changeNoter } from "./change-note.ts";
 export {
   inlinePng,
   loadFeature,

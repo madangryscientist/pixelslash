@@ -7,6 +7,7 @@ import {
   isBaselinePick,
   measureShot,
 } from "./ci-diff.ts";
+import type { ChangeNoter } from "./change-note.ts";
 import { DEFAULT_FLAKE_RETRIES } from "./config-flake.ts";
 import { isHttpUrl } from "./routes.ts";
 import { UploadError, UsageError } from "./errors.ts";
@@ -48,6 +49,12 @@ export type UploadDeps = {
    * longer has its route or variant. Without it, a changed shot is uploaded as captured.
    */
   recapture?: (e: SnapshotEntry) => Promise<Shoot | undefined>;
+  /**
+   * `upload --judge` (ob 1745): a sentence for each shot that changed, sent as its `changeNote`.
+   * Each shot with a baseline is then measured here, whatever the project's diff location, to know
+   * which changed; the sentence is read on the review pages and decides nothing.
+   */
+  describe?: ChangeNoter;
 };
 
 export type UploadResult = { buildId: string; snapshots: number; git: GitContext } & FlakeOutcome;
@@ -154,18 +161,22 @@ function baselinePng(client: Client, picked: PickedShot): Promise<Buffer> {
   });
 }
 
+/** What a shot sends beside its meta and PNG. */
+type ShotExtras = { results: CiResult[]; flake: FlakeCheck | undefined; note: string | null };
+
 /**
  * One shot's upload: its meta and PNG; in a CI project, what it measured against each baseline;
- * and for a flaky shot, the flake record and every re-capture as `flake:<run>` (ob 1737).
+ * for a flaky shot, the flake record and every re-capture as `flake:<run>` (ob 1737); and the
+ * judge's sentence, when it wrote one (ob 1745).
  */
 function snapshotForm(
   e: SnapshotEntry,
   png: Buffer,
-  results: CiResult[],
-  flake: FlakeCheck | undefined,
+  { results, flake, note }: ShotExtras,
 ): FormData {
   const form = new FormData();
   const meta: Record<string, unknown> = snapshotMeta(e);
+  if (note) meta.changeNote = note;
   if (results.length > 0) {
     meta.ci = {
       engineVersion: ENGINE_VERSION,
@@ -229,21 +240,29 @@ export async function uploadSnapshots(
   const worker = async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
       const { e, pick } = next;
-      const png = Buffer.from(await Bun.file(pngPath(opts.dir, e)).arrayBuffer());
-      // A server project measures at finalise; here its diff only decides whether to re-capture,
-      // and is never sent as the shot's result.
+      const file = pngPath(opts.dir, e);
+      const png = Buffer.from(await Bun.file(file).arrayBuffer());
+      // A server project measures at finalise; here its diff only decides whether to re-capture
+      // and what the judge describes, and is never sent as the shot's result.
+      const mains = new Map<string, Buffer>();
+      const fetchMain = async (p: PickedShot) => {
+        const bytes = await baselinePng(client, p);
+        mains.set(p.id, bytes);
+        return bytes;
+      };
       const results =
-        pick && (ci || flakes.retries > 0)
-          ? await measureShot(e, png, pick, (p) => baselinePng(client, p))
+        pick && (ci || flakes.retries > 0 || deps.describe)
+          ? await measureShot(e, png, pick, fetchMain)
           : [];
       if (results.length > 0) flakes.measured();
-      const changed = results.some((r) => r.status === "changed");
+      const changed = results.find((r) => r.status === "changed");
       const flake = changed ? await flakes.check(e, png) : undefined;
+      const note = await changeNote(deps.describe, { e, file, changed, mains }, warn);
       await send(client, {
         step: `upload ${identity(e)}`,
         method: "PUT",
         path: `/api/v1/builds/${id}/snapshots`,
-        body: snapshotForm(e, png, ci ? results : [], flake),
+        body: snapshotForm(e, png, { results: ci ? results : [], flake, note }),
       });
     }
   };
@@ -251,6 +270,28 @@ export async function uploadSnapshots(
   checkOutcome(client, id, await finalise(client, id, manifest.snapshots.length));
   const outcome = await flakes.finish(manifest.snapshots);
   return { buildId: id, snapshots: manifest.snapshots.length, git: ctx, ...outcome };
+}
+
+/** The judge's sentence for a changed shot; a model that fails is said and the shot goes without. */
+async function changeNote(
+  describe: ChangeNoter | undefined,
+  shot: {
+    e: SnapshotEntry;
+    file: string;
+    changed: CiResult | undefined;
+    mains: Map<string, Buffer>;
+  },
+  warn: (m: string) => void,
+): Promise<string | null> {
+  const { e, file, changed, mains } = shot;
+  const main = changed && mains.get(changed.baselineId);
+  if (!describe || !changed || !main) return null;
+  try {
+    return await describe({ file, main, diff: changed.diffResult });
+  } catch (err) {
+    warn(`judge: ${identity(e)}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
 }
 
 function snapshotMeta(e: SnapshotEntry) {

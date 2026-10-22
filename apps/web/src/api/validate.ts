@@ -141,6 +141,20 @@ export function parseSnapshotKey(raw: unknown, at = ""): SnapshotKey {
   };
 }
 
+/** The longest change note kept; a longer one is cut, not refused. */
+const MAX_CHANGE_NOTE = 300;
+
+/**
+ * The judge's sentence for a changed shot (ob 1745). It is only ever shown, so a malformed one is
+ * dropped, never a 400: one sentence, the line breaks folded, without its full stop (the pages
+ * add one), cut to MAX_CHANGE_NOTE.
+ */
+function changeNote(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const note = v.replace(/\s+/g, " ").trim().replace(/\.+$/, "");
+  return note === "" ? null : note.slice(0, MAX_CHANGE_NOTE);
+}
+
 export function parseSnapshotInput(raw: unknown): SnapshotInput {
   const m = object(raw, "meta");
   const tags = m.tags ?? [];
@@ -157,6 +171,7 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
       browser: text(fp.browser, "fingerprint.browser", 300),
       fonts: text(fp.fonts, "fingerprint.fonts", 300),
     },
+    changeNote: changeNote(m.changeNote),
   };
 }
 

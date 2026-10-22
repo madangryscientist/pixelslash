@@ -287,8 +287,9 @@ export const snapshots = sqliteTable(
     mainDiffStatus: text("main_diff_status", { enum: DIFF_STATUSES }),
     mainDiffResult: text("main_diff_result", { mode: "json" }).$type<DiffResult>(),
     /**
-     * A sentence describing the change in words (ob 1723), for the change summary. Nothing writes it
-     * yet; when something does it is the judge (a local model), and the page says so.
+     * A sentence describing the change in words (ob 1723), for the change summary. The CLI's judge
+     * (a local model) writes it with `upload --judge` (ob 1745), and the pages say so. It is shown
+     * only: no review state, threshold or exit code reads it.
      */
     changeNote: text("change_note"),
     createdAt: createdAt(),

@@ -30,6 +30,8 @@ export type SnapshotInput = {
   fingerprint: { image: string; browser: string; fonts: string };
   /** The flaky policy the shot's config gives it (ob 1724); absent or null is `review`. */
   flaky?: FlakyPolicy | null;
+  /** The judge's sentence on what changed (ob 1745); shown, never used to decide anything. */
+  changeNote?: string | null;
 };
 
 /** The build exists but can no longer change. */
@@ -120,6 +122,7 @@ export async function putSnapshot(
     imageKey,
     ciResults: ci && (await putMasks(blobs, stem, ci)),
     flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
+    changeNote: input.changeNote ?? null,
   };
   const [row] = await db
     .insert(snapshots)

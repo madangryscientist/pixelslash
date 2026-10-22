@@ -17,6 +17,8 @@ import {
   recapture,
   uploadSnapshots,
   type UploadDeps,
+  type DevJudgeDeps,
+  changeNoter,
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
@@ -25,7 +27,7 @@ import type { Io } from "./run.ts";
 import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N] [--wait [--timeout 30m] [--interval 15s]]\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.";
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout 30m] [--interval 15s]]\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.";
 
 /** The flags `upload` and `capture --upload` share. */
 export const UPLOAD_FLAGS = [
@@ -42,7 +44,20 @@ export const UPLOAD_FLAGS = [
 /** `wait` is `upload --wait`'s: follow the build once it is sent. */
 export type UploadFlags = Partial<Record<(typeof UPLOAD_FLAGS)[number], string>> & {
   wait?: WaitOptions | undefined;
+  /** `--judge`: the local judge describes each changed shot (ob 1745). */
+  judge?: boolean | undefined;
 };
+
+/** `--judge`'s noter, or none: with no local judge the run says `skip: no judge` and invents nothing. */
+function judgeDeps(flags: UploadFlags, io: Io, deps: UploadDeps & DevJudgeDeps): UploadDeps {
+  if (!flags.judge) return deps;
+  const describe = changeNoter(deps);
+  if (!describe) {
+    io.stdout.write("skip: no judge\n");
+    return deps;
+  }
+  return { ...deps, describe };
+}
 
 function prNumber(raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
@@ -165,8 +180,9 @@ export async function uploadDir(
   dir: string,
   flags: UploadFlags,
   io: Io,
-  deps: UploadDeps = {},
+  given: UploadDeps & DevJudgeDeps = {},
 ): Promise<number> {
+  const deps = judgeDeps(flags, io, given);
   const cwd = deps.cwd ?? process.cwd();
   const warn = (m: string) => io.stderr.write(`${m}\n`);
   const retries = flakeRetries(flags["flake-retries"]);
@@ -209,13 +225,17 @@ export async function uploadDir(
 }
 
 /** `pixelslash upload DIR`. */
-export async function runUpload(argv: string[], io: Io, deps: UploadDeps = {}): Promise<number> {
+export async function runUpload(
+  argv: string[],
+  io: Io,
+  deps: UploadDeps & DevJudgeDeps = {},
+): Promise<number> {
   const [dir, ...rest] = argv;
   if (!dir || dir.startsWith("--")) throw new UsageError("need a snapshot DIR");
   const { timeout, interval, ...flags } = readFlagPairs(
-    rest.filter((a) => a !== "--wait"),
+    rest.filter((a) => a !== "--wait" && a !== "--judge"),
     [...UPLOAD_FLAGS, "timeout", "interval"],
   );
   const wait = waitOptions(rest.includes("--wait"), { timeout, interval });
-  return uploadDir(dir, { ...flags, wait }, io, deps);
+  return uploadDir(dir, { ...flags, wait, judge: rest.includes("--judge") }, io, deps);
 }

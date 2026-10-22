@@ -1,9 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 
+/** What the stub judge says of every changed shot; `upload --judge` puts it on PATH. */
+export const JUDGE_SAYS = "A red block appeared on the page";
+
 /**
  * The branch page (ob 1723), from the project page with one main build and one build on `branch`
  * that changes about and hero and adds pricing. Against main lists the three as waiting; since last
  * build is the build page's view; accepting one here is the same decision the build page shows.
+ * The feature build was uploaded with `--judge`, so each changed shot carries the stub's sentence.
  */
 export async function expectBranchPage(
   page: Page,
@@ -21,7 +25,13 @@ export async function expectBranchPage(
   const lines = page.getByTestId("change-summary").getByTestId("change-line");
   await expect(lines).toHaveCount(3);
   await expect(lines.filter({ hasText: "pricing" })).toContainText("new: nothing to compare with");
-  await expect(page.getByTestId("change-note")).toHaveCount(0);
+  // The judge (a stub on PATH, ob 1745) wrote one sentence per changed shot; the new one has none.
+  for (const name of ["about", "hero"])
+    await expect(lines.filter({ hasText: name }).getByTestId("change-note")).toHaveText(
+      `${JUDGE_SAYS}. `,
+    );
+  await expect(lines.filter({ hasText: "pricing" }).getByTestId("change-note")).toHaveCount(0);
+  await expect(page.getByTestId("change-note-source")).toBeVisible();
   await capture(page, "10-branch-against-main");
 
   // Since last build: the branch's only build, so the same shots as the build page's tabs.
@@ -49,6 +59,9 @@ export async function expectBranchPage(
   await expect(
     page.getByTestId("snapshot-row").filter({ hasText: "about" }).getByTestId("review-state"),
   ).toHaveText(/accepted by e2e-octocat/);
+  await expect(
+    page.getByTestId("snapshot-row").filter({ hasText: "hero" }).getByTestId("shot-change-note"),
+  ).toHaveText(`Judge (local model): ${JUDGE_SAYS}.`);
   // The build header leads back to the branch.
   await page.getByTestId("branch-link").click();
   await expect(page).toHaveURL(new RegExp(`/branches/${branch}$`));

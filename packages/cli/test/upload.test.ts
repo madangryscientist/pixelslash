@@ -94,6 +94,19 @@ describe("pixelslash upload", () => {
     }
     expect(api.calls).toHaveLength(0);
   });
+
+  test("--judge with no local judge says `skip: no judge` and uploads as without it", async () => {
+    const [cwd, dir, api, cap] = [await gitRepo(), await snapshotDir(), fakeUploadApi(), capture()];
+    const code = await run(["upload", dir, "--server", SERVER, "--judge"], cap.io, {
+      fetch: api.fetch,
+      cwd,
+      env: { PIXELSLASH_TOKEN: "psci_env" },
+      which: () => null,
+    });
+    expect(code).toBe(0);
+    expect(cap.stdout).toMatch(/^skip: no judge\n[\s\S]*uploaded 1 snapshots/);
+    expect(api.calls.map((c) => c.method)).toEqual(["POST", "PUT", "POST"]);
+  });
 });
 
 async function captureConfig() {
@@ -143,6 +156,7 @@ describe("capture --upload", () => {
     expect(await run(["capture", "--config", config, "--flake-retries", "0"], cap.io, deps)).toBe(
       2,
     );
+    expect(await run(["capture", "--config", config, "--judge"], cap.io, deps)).toBe(2);
     expect(api.calls).toHaveLength(0);
   }, 60_000);
 });
