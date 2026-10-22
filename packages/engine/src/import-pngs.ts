@@ -2,7 +2,7 @@ import { copyFile, mkdir, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { UsageError } from "./errors.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
-import { checkPng, identity } from "./upload.ts";
+import { checkPng, identity } from "./manifest.ts";
 
 export type ImportOptions = {
   /** A dir of PNGs, any depth. Each PNG's path under it, without `.png`, is the snapshot's name. */
@@ -43,6 +43,7 @@ function entryFor(file: string, o: ImportOptions): SnapshotEntry {
     tags: [],
     diff: {},
     ignore: [],
+    flaky: "review",
     file,
     fingerprint: { image: EXTERNAL, browser: o.renderer, fonts: UNKNOWN_FONTS },
   };

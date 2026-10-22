@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>random</title>
+  <style>
+    body { margin: 24px; font: 16px/1.5 sans-serif; background: #fff; color: #111; }
+    #box { position: absolute; top: 120px; width: 60px; height: 60px; background: #e11d48; }
+  </style>
+</head>
+<body>
+  <h1>A box that lands somewhere new on every load</h1>
+  <div id="box"></div>
+  <script>
+    // Not the page clock: a pinned clock does not pin this, so no two loads agree.
+    const [r] = crypto.getRandomValues(new Uint32Array(1));
+    document.getElementById("box").style.left = `${24 + (r % 600)}px`;
+  </script>
+</body>
+</html>

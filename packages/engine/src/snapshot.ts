@@ -5,8 +5,10 @@ import { PNG } from "pngjs";
 import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
 import {
   resolveDiff,
+  resolveFlaky,
   resolveIgnore,
   type CaptureConfig,
+  type FlakyPolicy,
   type Ignore,
   type MaskRect,
   type Route,
@@ -15,6 +17,7 @@ import {
 } from "./config.ts";
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { CaptureError } from "./errors.ts";
+import { clearFlakeOutput } from "./flake-upload.ts";
 import {
   BARE,
   fcList,
@@ -50,6 +53,11 @@ export type SnapshotEntry = {
    * Real pixels stay in the PNG. Manifests written before this field existed have none, read as `[]`.
    */
   ignore: IgnoreRect[];
+  /**
+   * What the server does if this shot's captures disagree (ob 1737), resolved from the config.
+   * Manifests written before this field existed have none, read as `"review"`.
+   */
+  flaky: FlakyPolicy;
   /** Relative to the manifest's directory. */
   file: string;
   fingerprint: Fingerprint;
@@ -183,7 +191,8 @@ type Shot = {
   warn: (m: string) => void;
 };
 
-type Shoot = { png: Buffer; ignore: IgnoreRect[] };
+/** One capture of a shot: its PNG and its ignore areas in image px. */
+export type Shoot = { png: Buffer; ignore: IgnoreRect[] };
 
 /**
  * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
@@ -243,47 +252,114 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   }
 }
 
-/** The page shots a config asks for, every route (hand-written, then Storybook's) under every variant, sharing one browser. */
-async function shootAll(
+/**
+ * A browser on the config's app, held open: the app started (when the config starts one), signed
+ * in, the routes read. `captureInto` shoots every route through it, and an upload re-captures a
+ * shot through it (ob 1737), with the same route, variant and stabilisation as the first time.
+ */
+export type CaptureSession = {
+  config: CaptureConfig;
+  routes: Route[];
+  fingerprint: Fingerprint;
+  shoot: (route: Route, variant: Variant) => Promise<Shoot>;
+  close: () => Promise<void>;
+};
+
+/** Start the app, launch the browser, sign in and read the routes. The caller closes it. */
+export async function openCaptureSession(
   config: CaptureConfig,
-  routes: Route[],
-  out: string,
-  ctx: {
-    fingerprint: Fingerprint;
-    browser: Browser;
-    session: Session | undefined;
-    warn: (m: string) => void;
-  },
-): Promise<SnapshotEntry[]> {
-  const entries: SnapshotEntry[] = [];
+  deps: SnapshotDeps = {},
+): Promise<CaptureSession> {
+  const warn = deps.warn ?? (() => {});
+  const image = imageId(deps.env ?? process.env);
+  if (image === BARE)
+    warn(
+      "warning: capturing outside the pinned PixelSlash image; local fonts skew rendering. Fingerprint recorded as bare.",
+    );
+  const fonts = await fontSetHash(deps.listFonts ?? fcList);
+  let stopApp: StopApp | undefined;
+  let browser: Browser | undefined;
+  const close = async () => {
+    await browser?.close();
+    await stopApp?.();
+  };
+  try {
+    if (config.start) stopApp = await startApp(config.start);
+    const launched = await launchChromium(LAUNCH_ARGS);
+    browser = launched;
+    const fingerprint: Fingerprint = { image, browser: `chromium ${launched.version()}`, fonts };
+    // The app is up now, so the Storybook's index can be read.
+    const routes = config.storybook
+      ? [
+          ...config.routes,
+          ...(await storybookRoutes(
+            config.storybook,
+            config.routes.map((r) => r.name),
+          )),
+        ]
+      : config.routes;
+    const session = await signIn(launched, config);
+    return {
+      config,
+      routes,
+      fingerprint,
+      shoot: (route, variant) =>
+        shoot(launched, {
+          url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
+          route,
+          variant,
+          stabilise: config.stabilise,
+          ignore: resolveIgnore(config, route, variant),
+          session,
+          warn,
+        }),
+      close,
+    };
+  } catch (e) {
+    await close();
+    throw e;
+  }
+}
+
+/** The shot a manifest entry names, again; `undefined` when the config has no such route or variant. */
+export function recapture(
+  session: CaptureSession,
+  entry: Pick<SnapshotEntry, "name" | "variant">,
+): Promise<Shoot | undefined> {
+  const route = session.routes.find((r) => r.name === entry.name);
+  const variant = session.config.variants.find((v) => v.name === entry.variant.name);
+  return route && variant ? session.shoot(route, variant) : Promise.resolve(undefined);
+}
+
+/** Every route × variant of the session's config into `out`, and `out/manifest.json`. */
+export async function captureInto(session: CaptureSession, out: string): Promise<SnapshotResult> {
+  const { config, routes, fingerprint } = session;
+  await mkdir(out, { recursive: true });
+  await clearFlakeOutput(out);
+  const snapshots: SnapshotEntry[] = [];
   for (const variant of config.variants) {
     for (const route of routes) {
       const file = `${route.name}/${variant.name}.png`;
-      const url = joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path);
-      const { png, ignore } = await shoot(ctx.browser, {
-        url,
-        route,
-        variant,
-        stabilise: config.stabilise,
-        ignore: resolveIgnore(config, route, variant),
-        session: ctx.session,
-        warn: ctx.warn,
-      });
+      const { png, ignore } = await session.shoot(route, variant);
       await mkdir(join(out, route.name), { recursive: true });
       await Bun.write(join(out, file), png);
-      entries.push({
+      snapshots.push({
         name: route.name,
         path: route.path,
         variant,
         tags: route.tags,
         diff: resolveDiff(config, route, variant),
         ignore,
+        flaky: resolveFlaky(config, route),
         file,
-        fingerprint: ctx.fingerprint,
+        fingerprint,
       });
     }
   }
-  return entries;
+  const manifest: SnapshotManifest = { version: 1, snapshots };
+  const manifestPath = join(out, "manifest.json");
+  await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return { manifest, manifestPath };
 }
 
 /**
@@ -297,38 +373,10 @@ export async function captureSnapshots(
   out: string,
   deps: SnapshotDeps = {},
 ): Promise<SnapshotResult> {
-  const warn = deps.warn ?? (() => {});
-  const image = imageId(deps.env ?? process.env);
-  if (image === BARE)
-    warn(
-      "warning: capturing outside the pinned PixelSlash image; local fonts skew rendering. Fingerprint recorded as bare.",
-    );
-  const fonts = await fontSetHash(deps.listFonts ?? fcList);
-  let stopApp: StopApp | undefined;
-  let browser: Browser | undefined;
+  const session = await openCaptureSession(config, deps);
   try {
-    if (config.start) stopApp = await startApp(config.start);
-    browser = await launchChromium(LAUNCH_ARGS);
-    const fingerprint: Fingerprint = { image, browser: `chromium ${browser.version()}`, fonts };
-    await mkdir(out, { recursive: true });
-    // The app is up now, so the Storybook's index can be read.
-    const routes = config.storybook
-      ? [
-          ...config.routes,
-          ...(await storybookRoutes(
-            config.storybook,
-            config.routes.map((r) => r.name),
-          )),
-        ]
-      : config.routes;
-    const session = await signIn(browser, config);
-    const snapshots = await shootAll(config, routes, out, { fingerprint, browser, session, warn });
-    const manifest: SnapshotManifest = { version: 1, snapshots };
-    const manifestPath = join(out, "manifest.json");
-    await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-    return { manifest, manifestPath };
+    return await captureInto(session, out);
   } finally {
-    await browser?.close();
-    await stopApp?.();
+    await session.close();
   }
 }

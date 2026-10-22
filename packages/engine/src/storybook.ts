@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { Route, StorybookConfig } from "./config.ts";
+import { FLAKY_POLICIES, type FlakyPolicy, type Route, type StorybookConfig } from "./config.ts";
 import { CaptureError, UsageError } from "./errors.ts";
 import { joinOrigin } from "./routes.ts";
 
@@ -13,6 +13,25 @@ type Story = { id: string; title: string; name: string; tags: string[] };
  * opens a page.
  */
 export const ONCE_TAG = "pixelslash-once";
+
+/**
+ * The index tags that set one story's flaky policy (ob 1737): `pixelslash-flaky-skip` or
+ * `pixelslash-flaky-review`. Like `ONCE_TAG`, a tag because a story's parameters are not in the index.
+ */
+const FLAKY_TAG = "pixelslash-flaky-";
+
+/** The policy a story's tags set, if any; two that disagree are a config error. */
+function storyFlaky(story: Story): FlakyPolicy | undefined {
+  const set = FLAKY_POLICIES.filter((p) => story.tags.includes(`${FLAKY_TAG}${p}`));
+  const unknown = story.tags.find(
+    (t) => t.startsWith(FLAKY_TAG) && !FLAKY_POLICIES.some((p) => t === `${FLAKY_TAG}${p}`),
+  );
+  const tags = FLAKY_POLICIES.map((p) => `${FLAKY_TAG}${p}`).join(" or ");
+  if (unknown)
+    throw new UsageError(`storybook: story "${story.id}" tag "${unknown}" must be ${tags}`);
+  if (set.length > 1) throw new UsageError(`storybook: story "${story.id}" has both ${tags}`);
+  return set[0];
+}
 
 /** Lower-case, camelCase split, everything outside letters and digits one `-`. */
 function slug(text: string): string {
@@ -118,6 +137,7 @@ export async function storybookRoutes(sb: StorybookConfig, taken: string[]): Pro
   const owner = new Map(taken.map((name) => [name, "a route in routes"]));
   const routes: Route[] = [];
   for (const story of stories) {
+    const flaky = storyFlaky(story);
     for (const combo of story.tags.includes(ONCE_TAG) ? [[]] : globalCombos(sb.globals)) {
       const name = storyName(story, combo);
       const clash = owner.get(name);
@@ -136,6 +156,7 @@ export async function storybookRoutes(sb: StorybookConfig, taken: string[]): Pro
         variantDiff: {},
         variantIgnore: {},
         storybook: { origin: sb.url },
+        ...(flaky && { flaky }),
       });
     }
   }

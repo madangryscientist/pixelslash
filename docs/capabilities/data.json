@@ -634,8 +634,8 @@
       "k": "flake",
       "label": "Flake detection",
       "ps": {
-        "v": "n",
-        "note": "bench labels noise; no product flake signal"
+        "v": "p",
+        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree, with a per-shot review/skip policy and a local report (ob 1737); the server does not store or apply it yet"
       },
       "t": {
         "argos": "y",
@@ -644,7 +644,7 @@
         "applitools": "p",
         "lost": "p"
       },
-      "plan": "not planned"
+      "plan": "ob 1724"
     },
     {
       "g": "platform",

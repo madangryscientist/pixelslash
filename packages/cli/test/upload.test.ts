@@ -81,6 +81,11 @@ describe("pixelslash upload", () => {
         { PIXELSLASH_TOKEN: "t" },
         /--pr must be/,
       ],
+      [
+        ["upload", dir, "--server", SERVER, "--flake-retries", "-1"],
+        { PIXELSLASH_TOKEN: "t" },
+        /--flake-retries must be a non-negative integer/,
+      ],
     ];
     for (const [argv, env, message] of tries) {
       const cap = capture();
@@ -135,6 +140,9 @@ describe("capture --upload", () => {
     expect(api.calls).toHaveLength(0);
     expect(await run(["capture", "--config", config, "--server", SERVER], cap.io, deps)).toBe(2);
     expect(cap.stderr).toMatch(/need --upload/);
+    expect(await run(["capture", "--config", config, "--flake-retries", "0"], cap.io, deps)).toBe(
+      2,
+    );
     expect(api.calls).toHaveLength(0);
   }, 60_000);
 });

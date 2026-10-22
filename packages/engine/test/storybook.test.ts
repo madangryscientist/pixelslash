@@ -68,6 +68,21 @@ afterAll(async () => {
 const pinned = { env: { PIXELSLASH_IMAGE_VERSION: "test" }, listFonts: async () => [] };
 const THEMES = ["none", "catppuccin-mocha", "thrifty-paper"];
 
+/** A Storybook index with a plain story and one carrying `tags`. */
+function stories(tags: string[]) {
+  return Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () =>
+      Response.json({
+        entries: Object.fromEntries([
+          entry("ui-card--default", "UI/Card", "Default"),
+          tagged("ui-clock--live", "UI/Clock", "Live", tags),
+        ]),
+      }),
+  });
+}
+
 function sb(storybook: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   return parseConfig({
     storybook: { url, ...storybook },
@@ -154,6 +169,32 @@ describe("storybookRoutes", () => {
       expect(routes.at(-1)?.path).toBe("/iframe.html?id=overview--all-themes&viewMode=story");
     } finally {
       await overview.stop(true);
+    }
+  });
+
+  test("a pixelslash-flaky-* tag sets the story's flaky policy; an unknown one is refused (ob 1737)", async () => {
+    const ok = stories(["pixelslash-flaky-skip"]);
+    const bad = stories(["pixelslash-flaky-maybe"]);
+    try {
+      const routes = await storybookRoutes(
+        parseConfig({ storybook: { url: `http://127.0.0.1:${ok.port}` } }).storybook!,
+        [],
+      );
+      expect(routes.map((r) => [r.name, r.flaky])).toEqual([
+        ["ui-card-default", undefined],
+        ["ui-clock-live", "skip"],
+      ]);
+      await expect(
+        storybookRoutes(
+          parseConfig({ storybook: { url: `http://127.0.0.1:${bad.port}` } }).storybook!,
+          [],
+        ),
+      ).rejects.toThrow(
+        /story "ui-clock--live" tag "pixelslash-flaky-maybe" must be pixelslash-flaky-review or pixelslash-flaky-skip/,
+      );
+    } finally {
+      await ok.stop(true);
+      await bad.stop(true);
     }
   });
 

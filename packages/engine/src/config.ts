@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { parseArea, type Ignore, type Mask } from "./config-areas.ts";
+import { type FlakyPolicy, parseFlake, parseFlaky } from "./config-flake.ts";
+import { type Stabilise, parseStabilise } from "./config-stabilise.ts";
 import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
 import type { DiffOptions } from "./diff.ts";
 import { mergeDiffOptions, parseDiffOptions } from "./diff-options.ts";
@@ -14,6 +16,9 @@ export type Theme = "light" | "dark";
 
 export type { Ignore, Mask, MaskRect } from "./config-areas.ts";
 export { type StorybookConfig } from "./config-storybook.ts";
+export { DEFAULT_FLAKE_RETRIES, FLAKY_POLICIES, type FlakyPolicy } from "./config-flake.ts";
+export { parseFlaky, resolveFlaky } from "./config-flake.ts";
+export type { Stabilise } from "./config-stabilise.ts";
 
 export type Variant = {
   name: string;
@@ -36,25 +41,10 @@ export type Route = {
   variantDiff: Record<string, DiffOptions>;
   /** Per-variant ignore areas for this route, keyed by variant name. */
   variantIgnore: Record<string, Ignore[]>;
+  /** This route's own flaky policy; unset takes the project's (see `resolveFlaky`). */
+  flaky?: FlakyPolicy;
   /** Set on a route read from a Storybook index: its `path` is on `origin`, and capture waits for the story to render. */
   storybook?: { origin: string };
-};
-
-export type Stabilise = {
-  /** Playwright `animations: "disabled"`: finite animations jump to the end, infinite ones reset. */
-  animations: boolean;
-  /** Hide the text caret. */
-  caret: boolean;
-  /** Freeze `Date.now()` / `new Date()` at this instant, or `false` for the real clock. */
-  clock: string | false;
-  /**
-   * Stop page timers (`setInterval` / `setTimeout`) so carousels and tickers are in the same state on
-   * every capture. Needs a clock to pause, so it follows `clock`: on by default, off when `clock` is `false`.
-   */
-  timers: boolean;
-  deviceScaleFactor: number;
-  /** Bounds navigation and the settle (fonts, images, network idle, two frames). The settle itself is not optional. */
-  timeoutMs: number;
 };
 
 export type StartCommand = { command: string; readyUrl: string; timeoutMs: number };
@@ -76,6 +66,10 @@ export type CaptureConfig = {
   diff: DiffOptions;
   /** The project-wide ignore areas; routes and their variants add to them. */
   ignore: Ignore[];
+  /** The project-wide flaky policy; a route's (or a story's tag) wins. Unset is `"review"`. */
+  flaky: FlakyPolicy | undefined;
+  /** How many more times a shot that differs from its baseline is captured during an upload. */
+  flake: { retries: number };
   /** The hand-written routes. Storybook's are read from the running Storybook at capture time (`storybookRoutes`). */
   routes: Route[];
   variants: Variant[];
@@ -88,15 +82,6 @@ export const CONFIG_NAMES = [
   "pixelslash.config.mjs",
   "pixelslash.config.json",
 ];
-
-const DEFAULT_STABILISE: Stabilise = {
-  animations: true,
-  caret: true,
-  clock: "2026-01-01T00:00:00.000Z",
-  timers: true,
-  deviceScaleFactor: 1,
-  timeoutMs: 8_000,
-};
 
 type Obj = Record<string, unknown>;
 
@@ -143,22 +128,6 @@ function fileName(v: unknown, where: string, fallback: string): string {
   return name;
 }
 
-function clock(v: unknown): string | false {
-  if (v === false) return false;
-  if (v === undefined) return DEFAULT_STABILISE.clock;
-  const iso = str(v, "stabilise.clock");
-  if (Number.isNaN(Date.parse(iso))) bad("stabilise.clock", "must be an ISO date or false");
-  return iso;
-}
-
-function timers(v: unknown, fixedClock: string | false): boolean {
-  if (v === undefined) return fixedClock !== false;
-  if (typeof v !== "boolean") bad("stabilise.timers", "must be true or false");
-  if (v && fixedClock === false)
-    bad("stabilise.timers", "needs a clock to pause: set stabilise.clock, or timers: false");
-  return v;
-}
-
 function diff(v: unknown, where: string): DiffOptions {
   return v === undefined ? {} : parseDiffOptions(v, where, bad);
 }
@@ -190,11 +159,15 @@ function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] })
   const where = `routes[${i}]`;
   const r = typeof v === "string" ? { path: v } : v;
   if (!isObj(r))
-    bad(where, "must be a path or { path, name?, masks?, ignore?, tags?, diff?, variants? }");
+    bad(
+      where,
+      "must be a path or { path, name?, masks?, ignore?, tags?, diff?, variants?, flaky? }",
+    );
   const path = str(r.path, `${where}.path`);
   if (!path.startsWith("/")) bad(`${where}.path`, "must start with /");
   const name = fileName(r.name, `${where}.name`, routeSlug(path));
   const variants = variantLayers(r.variants, `${where}.variants`);
+  const flaky = parseFlaky(r.flaky, `${where}.flaky`, bad);
   return {
     path,
     name,
@@ -207,6 +180,7 @@ function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] })
     diff: diff(r.diff, `${where}.diff`),
     variantDiff: variants.diff,
     variantIgnore: variants.ignore,
+    ...(flaky && { flaky }),
   };
 }
 
@@ -231,24 +205,6 @@ function variant(v: unknown, i: number): Variant {
     viewport,
     theme,
   };
-}
-
-function stabilise(v: unknown): Stabilise {
-  if (v === undefined) return { ...DEFAULT_STABILISE };
-  if (!isObj(v)) bad("stabilise", "must be an object");
-  const s = { ...DEFAULT_STABILISE };
-  for (const key of ["animations", "caret"] as const) {
-    const flag = v[key];
-    if (flag === undefined) continue;
-    if (typeof flag !== "boolean") bad(`stabilise.${key}`, "must be true or false");
-    s[key] = flag;
-  }
-  s.clock = clock(v.clock);
-  s.timers = timers(v.timers, s.clock);
-  if (v.deviceScaleFactor !== undefined)
-    s.deviceScaleFactor = posInt(v.deviceScaleFactor, "stabilise.deviceScaleFactor");
-  if (v.timeoutMs !== undefined) s.timeoutMs = posInt(v.timeoutMs, "stabilise.timeoutMs");
-  return s;
 }
 
 function start(v: unknown, baseUrl: string): StartCommand | undefined {
@@ -313,9 +269,11 @@ export function parseConfig(raw: unknown): CaptureConfig {
     upload: upload(raw.upload),
     diff: diff(raw.diff, "diff"),
     ignore: ignoreAreas(raw.ignore, "ignore"),
+    flaky: parseFlaky(raw.flaky, "flaky", bad),
+    flake: parseFlake(raw.flake, bad),
     routes,
     variants,
-    stabilise: stabilise(raw.stabilise),
+    stabilise: parseStabilise(raw.stabilise, bad),
   };
 }
 

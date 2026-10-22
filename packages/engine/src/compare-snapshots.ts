@@ -6,7 +6,7 @@ import type { Fingerprint } from "./fingerprint.ts";
 import { renderCompareIndex, type CompareRow } from "./compare-report.ts";
 import { renderPixelReport } from "./report.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
-import { identity, readManifest } from "./upload.ts";
+import { identity, readManifest } from "./manifest.ts";
 
 export type SnapshotCompareOptions = {
   mainDir: string;

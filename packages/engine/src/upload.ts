@@ -1,140 +1,26 @@
-import { join, resolve, sep } from "node:path";
 import {
   type BaselinePick,
+  type CiResult,
   type DiffLocation,
   ENGINE_VERSION,
   type PickedShot,
   isBaselinePick,
   measureShot,
 } from "./ci-diff.ts";
-import { type MaskRect, parseArea } from "./config-areas.ts";
+import { DEFAULT_FLAKE_RETRIES } from "./config-flake.ts";
 import { isHttpUrl } from "./routes.ts";
-import { parseDiffOptions } from "./diff-options.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
+import type { FlakeCheck } from "./flake.ts";
+import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
-import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
+import { identity, pngPath, readManifest } from "./manifest.ts";
+import type { Shoot, SnapshotEntry } from "./snapshot.ts";
 import { type Client, isObj, send, sendPng } from "./upload-client.ts";
 
 /** The pinned capture image is Linux; the manifest carries no platform of its own. */
 const PLATFORM = "linux";
 const CONCURRENCY = 4;
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-function bad(where: string, what: string): never {
-  throw new UsageError(`manifest: ${where} ${what}`);
-}
-
-function str(v: unknown, where: string): string {
-  if (typeof v !== "string" || v === "") bad(where, "must be a non-empty string");
-  return v;
-}
-
-function posInt(v: unknown, where: string): number {
-  if (typeof v !== "number" || !Number.isInteger(v) || v <= 0)
-    bad(where, "must be a positive integer");
-  return v;
-}
-
-/** Ignore rects in image px; a manifest from before ignore areas has none. */
-function ignoreRects(v: unknown, where: string): MaskRect[] {
-  if (v === undefined) return [];
-  if (!Array.isArray(v)) bad(where, "must be an array of { x, y, width, height }");
-  return v.map((r, i) => {
-    const at = `${where}[${i}]`;
-    // A selector is a valid area but not a rect, so a string reads like any other non-object.
-    const rect = isObj(r) ? parseArea(r, at, bad) : "";
-    if (typeof rect === "string") bad(at, "must be an object");
-    return rect;
-  });
-}
-
-function entry(v: unknown, i: number): SnapshotEntry {
-  const where = `snapshots[${i}]`;
-  if (!isObj(v)) bad(where, "must be an object");
-  const { variant, fingerprint, tags } = v;
-  if (!isObj(variant) || !isObj(variant.viewport)) bad(`${where}.variant`, "must be an object");
-  if (!isObj(fingerprint)) bad(`${where}.fingerprint`, "must be an object");
-  if (!Array.isArray(tags)) bad(`${where}.tags`, "must be an array of strings");
-  if (variant.theme !== "light" && variant.theme !== "dark")
-    bad(`${where}.variant.theme`, 'must be "light" or "dark"');
-  if (variant.browser !== "chromium") bad(`${where}.variant.browser`, 'must be "chromium"');
-  return {
-    name: str(v.name, `${where}.name`),
-    path: str(v.path, `${where}.path`),
-    variant: {
-      name: str(variant.name, `${where}.variant.name`),
-      browser: "chromium",
-      viewport: {
-        width: posInt(variant.viewport.width, `${where}.variant.viewport.width`),
-        height: posInt(variant.viewport.height, `${where}.variant.viewport.height`),
-      },
-      theme: variant.theme,
-    },
-    tags: tags.map((t, j) => str(t, `${where}.tags[${j}]`)),
-    diff: v.diff === undefined ? {} : parseDiffOptions(v.diff, `${where}.diff`, bad),
-    ignore: ignoreRects(v.ignore, `${where}.ignore`),
-    file: str(v.file, `${where}.file`),
-    fingerprint: {
-      image: str(fingerprint.image, `${where}.fingerprint.image`),
-      browser: str(fingerprint.browser, `${where}.fingerprint.browser`),
-      fonts: str(fingerprint.fonts, `${where}.fingerprint.fonts`),
-    },
-  };
-}
-
-/** The identity the server keeps a snapshot under; two entries sharing it would overwrite each other. */
-export function identity(e: SnapshotEntry): string {
-  const { width, height } = e.variant.viewport;
-  return [e.name, e.variant.browser, `${width}x${height}`, e.variant.theme].join(" / ");
-}
-
-function parseManifest(raw: unknown): SnapshotManifest {
-  if (!isObj(raw) || raw.version !== 1) bad("version", "must be 1");
-  if (!Array.isArray(raw.snapshots)) bad("snapshots", "must be an array");
-  const snapshots = raw.snapshots.map(entry);
-  const seen = new Set<string>();
-  for (const e of snapshots) {
-    const id = identity(e);
-    if (seen.has(id)) bad("snapshots", `has two entries for ${id}`);
-    seen.add(id);
-  }
-  return { version: 1, snapshots };
-}
-
-export async function checkPng(dir: string, e: SnapshotEntry): Promise<void> {
-  const png = Bun.file(pngPath(dir, e));
-  if (!(await png.exists())) throw new UsageError(`manifest: ${e.file} does not exist`);
-  const head = Buffer.from(await png.slice(0, 8).arrayBuffer());
-  if (!head.equals(PNG_SIGNATURE)) throw new UsageError(`manifest: ${e.file} is not a PNG`);
-}
-
-/** Read and validate `dir/manifest.json`, and check every PNG it names is inside `dir` and is a PNG. */
-export async function readManifest(dir: string): Promise<SnapshotManifest> {
-  const path = join(dir, "manifest.json");
-  const file = Bun.file(path);
-  if (!(await file.exists())) throw new UsageError(`no manifest.json in ${dir}`);
-  let raw: unknown;
-  try {
-    raw = JSON.parse(await file.text());
-  } catch (e) {
-    throw new UsageError(
-      `manifest: ${path} is not JSON: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-  const manifest = parseManifest(raw);
-  for (const e of manifest.snapshots) await checkPng(dir, e);
-  return manifest;
-}
-
-/** A manifest names files relative to its dir; one that climbs out of it is refused. */
-function pngPath(dir: string, e: SnapshotEntry): string {
-  const root = resolve(dir);
-  const path = resolve(root, e.file);
-  if (!path.startsWith(root + sep)) throw new UsageError(`manifest: ${e.file} is outside ${dir}`);
-  return path;
-}
-
 export type UploadOptions = {
   dir: string;
   server: string;
@@ -142,6 +28,11 @@ export type UploadOptions = {
   git: Omit<GitOptions, "env" | "warn">;
   /** The project to open the build in: required with a personal token, which reaches several. */
   projectId?: string | undefined;
+  /**
+   * How many more times a shot that differs from its baseline is captured (ob 1737); 0 turns it
+   * off. Default 2. It needs `recapture`: without one nothing is captured again.
+   */
+  flakeRetries?: number | undefined;
 };
 
 export type UploadDeps = {
@@ -152,9 +43,14 @@ export type UploadDeps = {
   warn?: (message: string) => void;
   /** How a retry waits. Default: a real timer. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Capture a manifest entry again, the same way it was captured; `undefined` when the config no
+   * longer has its route or variant. Without it, a changed shot is uploaded as captured.
+   */
+  recapture?: (e: SnapshotEntry) => Promise<Shoot | undefined>;
 };
 
-export type UploadResult = { buildId: string; snapshots: number; git: GitContext };
+export type UploadResult = { buildId: string; snapshots: number; git: GitContext } & FlakeOutcome;
 
 /**
  * Finalise, and again while the server's diff runs out of budget with shots left (ob 1645). The
@@ -258,16 +154,18 @@ function baselinePng(client: Client, picked: PickedShot): Promise<Buffer> {
   });
 }
 
-/** One shot's upload: its meta and PNG and, in a CI project, what it measured against each baseline. */
-async function snapshotForm(
-  client: Client,
+/**
+ * One shot's upload: its meta and PNG; in a CI project, what it measured against each baseline;
+ * and for a flaky shot, the flake record and every re-capture as `flake:<run>` (ob 1737).
+ */
+function snapshotForm(
   e: SnapshotEntry,
   png: Buffer,
-  pick: BaselinePick | undefined,
-): Promise<FormData> {
+  results: CiResult[],
+  flake: FlakeCheck | undefined,
+): FormData {
   const form = new FormData();
   const meta: Record<string, unknown> = snapshotMeta(e);
-  const results = pick ? await measureShot(e, png, pick, (p) => baselinePng(client, p)) : [];
   if (results.length > 0) {
     meta.ci = {
       engineVersion: ENGINE_VERSION,
@@ -279,6 +177,11 @@ async function snapshotForm(
     };
     for (const r of results)
       form.set(`diff:${r.baselineId}`, new File([new Uint8Array(r.mask)], "diff.png"));
+  }
+  if (flake?.flaky) {
+    meta.flake = flake.record;
+    for (const r of flake.retries)
+      form.set(`flake:${r.run}`, new File([new Uint8Array(r.png)], `run${r.run}.png`));
   }
   form.set("meta", JSON.stringify(meta));
   form.set("file", new File([new Uint8Array(png)], "shot.png"));
@@ -314,24 +217,40 @@ export async function uploadSnapshots(
   const picked = diffLocation
     ? await fetchBaselines(client, id, manifest.snapshots)
     : { diffLocation: "server", picks: [] };
+  const ci = picked.diffLocation === "ci";
+  const flakes = flakePass({
+    dir: opts.dir,
+    retries: opts.flakeRetries ?? DEFAULT_FLAKE_RETRIES,
+    recapture: deps.recapture,
+    warn,
+  });
+  await clearFlakeOutput(opts.dir);
   const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
   const worker = async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
-      const { e } = next;
+      const { e, pick } = next;
       const png = Buffer.from(await Bun.file(pngPath(opts.dir, e)).arrayBuffer());
-      // A server project measures at finalise: nothing is diffed here for it.
-      const pick = picked.diffLocation === "ci" ? next.pick : undefined;
+      // A server project measures at finalise; here its diff only decides whether to re-capture,
+      // and is never sent as the shot's result.
+      const results =
+        pick && (ci || flakes.retries > 0)
+          ? await measureShot(e, png, pick, (p) => baselinePng(client, p))
+          : [];
+      if (results.length > 0) flakes.measured();
+      const changed = results.some((r) => r.status === "changed");
+      const flake = changed ? await flakes.check(e, png) : undefined;
       await send(client, {
         step: `upload ${identity(e)}`,
         method: "PUT",
         path: `/api/v1/builds/${id}/snapshots`,
-        body: await snapshotForm(client, e, png, pick),
+        body: snapshotForm(e, png, ci ? results : [], flake),
       });
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   checkOutcome(client, id, await finalise(client, id, manifest.snapshots.length));
-  return { buildId: id, snapshots: manifest.snapshots.length, git: ctx };
+  const outcome = await flakes.finish(manifest.snapshots);
+  return { buildId: id, snapshots: manifest.snapshots.length, git: ctx, ...outcome };
 }
 
 function snapshotMeta(e: SnapshotEntry) {
@@ -345,5 +264,6 @@ function snapshotMeta(e: SnapshotEntry) {
     diff: e.diff,
     ignore: e.ignore,
     fingerprint: e.fingerprint,
+    flaky: e.flaky,
   };
 }
