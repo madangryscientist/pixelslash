@@ -21,6 +21,9 @@ export type DevShot = {
   status: "changed" | "unchanged" | "new" | "removed";
   changedPixels: number;
   regions: Region[];
+  /** The variant it was shot in, and its pixel size (ob 1741); absent on iterations from before. */
+  variant?: string | undefined;
+  size?: { width: number; height: number } | undefined;
   /** Absolute paths: this run's shot, the one it was compared with, and the diff when it changed. */
   files: {
     shot?: string | undefined;
@@ -37,6 +40,27 @@ export type DevJudge =
   | { status: "done"; notes: JudgeNote[] }
   | { status: "skipped"; reason: string; notes: [] }
   | { status: "failed"; reason: string; notes: [] };
+
+/** One thing the judge says differs from the spec or reference, boxed on the shot in its pixels. */
+export type Difference = {
+  /** 1-based, the number on its box. */
+  n: number;
+  name: string;
+  shot: string;
+  /** The reference it was told about (a path or Figma URL); null when it had the spec alone. */
+  ref: string | null;
+  area: { x: number; y: number; width: number; height: number };
+  what: string;
+};
+
+/**
+ * The judge's account of how the shots differ from the feature's spec and references (ob 1741).
+ * A list of descriptions, never a verdict or a score.
+ */
+export type DevDifferences =
+  | { status: "done"; items: Difference[] }
+  | { status: "skipped"; reason: string; items: [] }
+  | { status: "failed"; reason: string; items: [] };
 
 /** What a run was compared with: the previous run, a pinned one, main's baselines, or nothing yet. */
 export type DevAgainst = { kind: "previous" | "pin" | "main" | "none"; iteration: string | null };
@@ -58,6 +82,8 @@ export type DevIteration = {
   report: string;
   shots: DevShot[];
   judge: DevJudge | null;
+  /** Set when `--judge` ran on a target with a spec or refs (ob 1741). */
+  differences?: DevDifferences | null | undefined;
 };
 
 export function devStore(worktree: string): DevStore {

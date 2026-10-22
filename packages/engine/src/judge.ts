@@ -22,7 +22,7 @@ export type SpawnProc = (cmd: string[], opts: SpawnOptions) => ProcLike;
 
 export type Violation = { component: string; reason: string };
 
-type JudgeKind = "mlx" | "ollama";
+export type JudgeKind = "mlx" | "ollama";
 
 type JudgeDeps = {
   spawn?: SpawnProc;
@@ -40,8 +40,8 @@ export function resolveJudge(deps: JudgeDeps): JudgeKind | null {
   return null;
 }
 
-function judgeArgv(kind: JudgeKind, pageShot: string, dsPath: string, component: string): string[] {
-  const prompt = judgePrompt(component);
+/** The vision model's command line for `prompt` over `images`, in order. */
+function visionArgv(kind: JudgeKind, prompt: string, images: string[]): string[] {
   if (kind === "mlx") {
     return [
       MLX_BIN,
@@ -50,13 +50,27 @@ function judgeArgv(kind: JudgeKind, pageShot: string, dsPath: string, component:
       "--prompt",
       prompt,
       "--image",
-      pageShot,
-      dsPath,
+      ...images,
       "--max-tokens",
       String(VISION_MAX_TOKENS),
     ];
   }
-  return [OLLAMA_BIN, "run", OLLAMA_MODEL, pageShot, dsPath, prompt];
+  return [OLLAMA_BIN, "run", OLLAMA_MODEL, ...images, prompt];
+}
+
+function judgeArgv(kind: JudgeKind, pageShot: string, dsPath: string, component: string): string[] {
+  return visionArgv(kind, judgePrompt(component), [pageShot, dsPath]);
+}
+
+/** Ask the local vision model `prompt` about `images`; its answer without the generate banner. */
+export async function askVision(
+  prompt: string,
+  images: string[],
+  input: { spawn: SpawnProc; kind: JudgeKind },
+): Promise<string> {
+  return stripGenerateBanner(
+    await runVision(visionArgv(input.kind, prompt, images), input.spawn, input.kind),
+  );
 }
 
 type JudgeInput = { dsDir: string; components: string[]; spawn: SpawnProc; kind: JudgeKind };

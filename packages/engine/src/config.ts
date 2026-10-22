@@ -1,6 +1,12 @@
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { parseArea, type Ignore, type Mask } from "./config-areas.ts";
+import {
+  type Feature,
+  checkFeatureFiles,
+  featuresBeside,
+  parseFeatures,
+} from "./config-feature.ts";
 import { type FlakyPolicy, parseFlake, parseFlaky } from "./config-flake.ts";
 import { type Stabilise, parseStabilise } from "./config-stabilise.ts";
 import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
@@ -19,6 +25,7 @@ export { type StorybookConfig } from "./config-storybook.ts";
 export { DEFAULT_FLAKE_RETRIES, FLAKY_POLICIES, type FlakyPolicy } from "./config-flake.ts";
 export { parseFlaky, resolveFlaky } from "./config-flake.ts";
 export type { Stabilise } from "./config-stabilise.ts";
+export type { Feature, FeatureRef } from "./config-feature.ts";
 
 export type Variant = {
   name: string;
@@ -74,6 +81,8 @@ export type CaptureConfig = {
   routes: Route[];
   variants: Variant[];
   stabilise: Stabilise;
+  /** What `pixelslash dev` builds a target against (ob 1741), keyed by route or story name. */
+  features: Record<string, Feature>;
 };
 
 export const CONFIG_NAMES = [
@@ -274,6 +283,11 @@ export function parseConfig(raw: unknown): CaptureConfig {
     routes,
     variants,
     stabilise: parseStabilise(raw.stabilise, bad),
+    features: parseFeatures(
+      raw.features,
+      variants.map((vr) => vr.name),
+      bad,
+    ),
   };
 }
 
@@ -313,6 +327,13 @@ export function findConfig(explicit: string | undefined, cwd: string): string {
   return found;
 }
 
+/** `loadConfig` for `dev`: the features' spec and PNG ref files must exist too, naming the config. */
+export async function loadFeatureConfig(path: string): Promise<CaptureConfig> {
+  const c = await loadConfig(path);
+  checkFeatureFiles(c.features, (where, what) => bad(where, `${what} (config ${path})`));
+  return c;
+}
+
 /** Read a JSON config, or import a JS/TS one (its default export). */
 export async function loadConfig(path: string): Promise<CaptureConfig> {
   if (extname(path) === ".json") {
@@ -330,6 +351,11 @@ export async function loadConfig(path: string): Promise<CaptureConfig> {
   return besideConfig(parseConfig(isObj(mod) ? mod.default : undefined), path);
 }
 
-/** A relative `setup` is relative to the config file, not to wherever capture was run from. */
-const besideConfig = (c: CaptureConfig, path: string): CaptureConfig =>
-  c.setup === undefined ? c : { ...c, setup: resolve(dirname(path), c.setup) };
+/** A relative `setup`, spec or ref is relative to the config file, not to wherever capture was run from. */
+function besideConfig(c: CaptureConfig, path: string): CaptureConfig {
+  return {
+    ...c,
+    features: featuresBeside(c.features, dirname(path)),
+    ...(c.setup !== undefined && { setup: resolve(dirname(path), c.setup) }),
+  };
+}

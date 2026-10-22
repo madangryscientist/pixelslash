@@ -70,6 +70,7 @@ export {
   pinIteration,
   readPins,
   unpinIteration,
+  type DevDifferences,
   type DevIteration,
   type DevJudge,
   type DevStore,
@@ -84,6 +85,14 @@ export {
 } from "./dev-target.ts";
 export { runIteration, type FetchMain } from "./dev-run.ts";
 export { judgeIteration, type DevJudgeDeps } from "./dev-judge.ts";
+export { explainIteration } from "./dev-explain.ts";
+export {
+  inlinePng,
+  loadFeature,
+  type DevFeature,
+  type DevRef,
+  type FeatureSource,
+} from "./dev-refs.ts";
 export { DEFAULT_QUIET_MS, debounce, notIgnored, watchTree, type Debouncer } from "./dev-watch.ts";
 export {
   claimSession,

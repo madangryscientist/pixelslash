@@ -79,6 +79,7 @@ function follow(url: string, io: Io, deps: DevDeps): Promise<void> {
       p: "/api/pin",
       u: "/api/unpin",
       m: "/api/against",
+      f: "/api/refs",
     };
     const undo = onKeys(deps.keys ?? process.stdin, (key) => {
       const path = routes[key];
@@ -108,7 +109,7 @@ export async function attachTo(
     );
   if (args.once) return onceThrough(url, args, io);
   io.stdout.write(
-    `pixelslash dev: attached to the session on ${owner.target} (pid ${owner.pid})\nlive page: ${url}\nkeys: r run · p pin · u unpin · m main/previous · q detach\n`,
+    `pixelslash dev: attached to the session on ${owner.target} (pid ${owner.pid})\nlive page: ${url}\nkeys: r run · p pin · u unpin · m main/previous · f refetch refs · q detach\n`,
   );
   const latest = (await state(url))?.latest;
   if (latest) io.stdout.write(`${lineOf(latest, url)}\n`);

@@ -28,7 +28,15 @@ async function git(cwd: string, ...args: string[]): Promise<void> {
 }
 
 const noop = () => {};
-const silent = { onRun: () => {}, onJudge: () => {}, onError: () => {} };
+const silent = {
+  onRun: () => {},
+  onJudge: () => {},
+  onExplain: () => {},
+  onRefs: () => {},
+  onError: () => {},
+  feature: undefined,
+  refreshRefs: false,
+};
 
 describe("dev trigger", () => {
   test("a burst of saves is one run with every path; a save during a run is one more", async () => {

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { shotsOf } from "./check-rows.ts";
 import { compareSnapshots } from "./compare-snapshots.ts";
+import { pngSize } from "./dev-refs.ts";
 import {
   type DevAgainst,
   type DevIteration,
@@ -90,14 +91,19 @@ export async function runIteration(opts: DevRunOptions): Promise<DevIteration> {
   const report = join(dir, "report");
   const result = await compareSnapshots({ mainDir: side.dir, branchDir: shots, out: report });
   const rows = shotsOf(result, manifest.snapshots, { branch: shots, main: side.dir, report });
-  const devShots: DevShot[] = rows.map(({ files, ...row }) => ({
-    name: row.name,
-    shot: row.shot,
-    status: row.status,
-    changedPixels: row.changedPixels,
-    regions: row.regions,
-    files: { shot: files.branch, against: files.main, diff: files.diff, report: files.report },
-  }));
+  const variantOf = new Map(manifest.snapshots.map((e) => [join(shots, e.file), e.variant.name]));
+  const devShots: DevShot[] = [];
+  for (const { files, ...row } of rows)
+    devShots.push({
+      name: row.name,
+      shot: row.shot,
+      status: row.status,
+      changedPixels: row.changedPixels,
+      regions: row.regions,
+      variant: files.branch ? variantOf.get(files.branch) : undefined,
+      size: files.branch ? ((await pngSize(files.branch)) ?? undefined) : undefined,
+      files: { shot: files.branch, against: files.main, diff: files.diff, report: files.report },
+    });
   const totalMs = performance.now() - started;
   const settleMs = timed.settled();
   const it: DevIteration = {

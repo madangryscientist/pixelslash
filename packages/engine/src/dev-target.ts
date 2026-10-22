@@ -1,4 +1,4 @@
-import { type CaptureConfig, type Variant, loadConfig, parseConfig } from "./config.ts";
+import { type CaptureConfig, type Variant, loadFeatureConfig, parseConfig } from "./config.ts";
 import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import { isHttpUrl, joinOrigin, routeSlug } from "./routes.ts";
@@ -80,7 +80,7 @@ export async function loadDevConfig(
   path: string | undefined,
   url: string | undefined,
 ): Promise<CaptureConfig> {
-  if (path) return loadConfig(path);
+  if (path) return loadFeatureConfig(path);
   if (url === undefined || !isHttpUrl(url))
     throw new UsageError("no pixelslash config here: pass --config FILE, or --url URL");
   return parseConfig({ baseUrl: new URL(url).origin, routes: ["/"] });

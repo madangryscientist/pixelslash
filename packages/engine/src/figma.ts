@@ -104,3 +104,49 @@ export async function fetchFigmaRasters(opts: {
     await Bun.write(join(opts.dest, pngFile(c.name)), new Uint8Array(await pngRes.arrayBuffer()));
   }
 }
+
+/** A frame's width in Figma's own units, from `/files/:key/nodes`. */
+async function frameWidth(
+  fileKey: string,
+  nodeId: string,
+  headers: Record<string, string>,
+  fetch: FetchLike,
+): Promise<number> {
+  const url = new URL(`${FIGMA_API}/files/${fileKey}/nodes`);
+  url.searchParams.set("ids", nodeId);
+  const res = await fetch(url.href, { headers });
+  if (!res.ok) throw new FigmaError(`figma nodes ${res.status}`);
+  let width: unknown = await res.json();
+  for (const key of ["nodes", nodeId, "document", "absoluteBoundingBox", "width"])
+    width = width && typeof width === "object" ? Reflect.get(width, key) : undefined;
+  if (typeof width !== "number" || width <= 0)
+    throw new FigmaError(`no frame ${nodeId} in Figma file ${fileKey}`);
+  return width;
+}
+
+/**
+ * One Figma frame as a PNG `width` pixels wide (ob 1741): the viewport width times the device
+ * scale factor, so it sits beside the shot at the same scale. Figma scales between 0.01 and 4.
+ */
+export async function fetchFigmaFrame(opts: {
+  fileKey: string;
+  nodeId: string;
+  token: string;
+  width: number;
+  fetch: FetchLike;
+}): Promise<Uint8Array> {
+  const headers = { "X-Figma-Token": opts.token };
+  const frame = await frameWidth(opts.fileKey, opts.nodeId, headers, opts.fetch);
+  const scale = Math.min(4, Math.max(0.01, opts.width / frame));
+  const imgUrl = new URL(`${FIGMA_API}/images/${opts.fileKey}`);
+  imgUrl.searchParams.set("ids", opts.nodeId);
+  imgUrl.searchParams.set("format", "png");
+  imgUrl.searchParams.set("scale", String(scale));
+  const imgRes = await opts.fetch(imgUrl.href, { headers });
+  if (!imgRes.ok) throw new FigmaError(`figma images ${imgRes.status}`);
+  const pngUrl = imageUrls(await imgRes.json()).get(opts.nodeId);
+  if (!pngUrl) throw new FigmaError(`figma rendered nothing for ${opts.nodeId}`);
+  const pngRes = await opts.fetch(pngUrl);
+  if (!pngRes.ok) throw new FigmaError(`figma raster ${pngRes.status} for ${opts.nodeId}`);
+  return new Uint8Array(await pngRes.arrayBuffer());
+}

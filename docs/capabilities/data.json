@@ -601,7 +601,7 @@
       "label": "AI judgement against a design system",
       "ps": {
         "v": "y",
-        "note": "local mlx or ollama, DS rasters, violations"
+        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741)"
       },
       "t": {
         "argos": "n",

@@ -1,5 +1,6 @@
 import { resolve, sep } from "node:path";
 import { DEV_PAGE_HTML } from "./dev-page-html.ts";
+import { type DevFeature, type FeaturePair, featurePairs } from "./dev-refs.ts";
 import {
   type DevIteration,
   type DevStore,
@@ -23,6 +24,10 @@ export type DevActions = {
   unpin: () => Promise<string | undefined>;
   toggleMain: () => Promise<DevMode>;
   mode: () => DevMode;
+  /** The target's spec and refs; null when the config has no `features` entry for it. */
+  feature: () => Promise<DevFeature | null>;
+  /** Fetch the Figma refs again (`f`). */
+  refreshRefs: () => Promise<DevFeature | null>;
 };
 
 /** A timeline entry: enough to draw the strip without every shot. */
@@ -37,6 +42,9 @@ export type DevState = DevMode & {
   latest: DevIteration | null;
   timeline: Step[];
   pins: string[];
+  feature: DevFeature | null;
+  /** The latest shots beside their refs: shown side by side and overlaid, never scored. */
+  pairs: FeaturePair[];
 };
 
 /** The newest `limit` iterations of `target`, newest first, plus every pin whatever its age. */
@@ -58,15 +66,23 @@ async function timeline(
   return steps;
 }
 
-export async function devState(store: DevStore, target: string, mode: DevMode): Promise<DevState> {
+export async function devState(
+  store: DevStore,
+  target: string,
+  mode: DevMode,
+  feature: DevFeature | null = null,
+): Promise<DevState> {
   const pins = await readPins(store);
+  const latest = (await latestIteration(store, target)) ?? null;
   return {
     ...mode,
     target,
     root: store.root,
-    latest: (await latestIteration(store, target)) ?? null,
+    latest,
     timeline: await timeline(store, target, pins),
     pins,
+    feature,
+    pairs: latest && feature ? featurePairs(latest, feature) : [],
   };
 }
 
@@ -97,6 +113,14 @@ async function post(req: Request, path: string, actions: DevActions): Promise<Re
   if (path === "/api/pin") return json({ pinned: (await actions.pin()) ?? null });
   if (path === "/api/unpin") return json({ unpinned: (await actions.unpin()) ?? null });
   if (path === "/api/against") return json(await actions.toggleMain());
+  if (path === "/api/refs") return json({ feature: await actions.refreshRefs() });
+  return json({ error: "not found" }, 404);
+}
+
+/** A resolved ref by its index: a repo PNG may live anywhere in the worktree, so not by path. */
+async function refFile(index: string, actions: DevActions): Promise<Response> {
+  const ref = (await actions.feature())?.refs[Number(index)];
+  if (ref?.file && (await Bun.file(ref.file).exists())) return new Response(Bun.file(ref.file));
   return json({ error: "not found" }, 404);
 }
 
@@ -108,7 +132,9 @@ async function get(
 ): Promise<Response> {
   if (path === "/")
     return new Response(DEV_PAGE_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
-  if (path === "/api/state") return json(await devState(store, target, actions.mode()));
+  if (path === "/api/state")
+    return json(await devState(store, target, actions.mode(), await actions.feature()));
+  if (path.startsWith("/ref/")) return refFile(path.slice("/ref/".length), actions);
   if (path.startsWith("/files/")) {
     const file = storeFile(store, path.slice("/files/".length));
     if (file && (await Bun.file(file).exists())) return new Response(Bun.file(file));

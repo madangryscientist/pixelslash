@@ -172,9 +172,10 @@ pixelslash compare MAIN_DIR BRANCH_DIR [--out DIR]
 `pixelslash dev` is a fast local loop for one page or component while you build it: every save re-captures the target and diffs it with the previous iteration. Nothing is uploaded, and nothing is written to a server.
 
 ```
-pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge --ds DIR] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
+pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge [--ds DIR]] [--refresh-refs] [--figma-token-path PATH] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
 pixelslash dev latest [TARGET] [--json]
 pixelslash dev pin [ID] [--json] · pixelslash dev unpin [ID] [--json]
+pixelslash dev spec [TARGET] [--json] [--refresh-refs] [--viewport WxH|NAME] [--theme light|dark] [--figma-token-path PATH] [--config FILE]
 ```
 
 - **Target.** `TARGET` is a route or story name in the config; `--url URL` shoots a bare page with the config's variants, or the defaults when there is no config. Every variant runs unless `--viewport` (a `WxH` or a variant name) or `--theme` narrows them. The app must already be up: `dev` ignores the config's `start`, and a URL that does not answer is exit 2 with `is not answering …; pixelslash dev does not start a dev server`.
@@ -185,14 +186,40 @@ pixelslash dev pin [ID] [--json] · pixelslash dev unpin [ID] [--json]
   #3 vs #2: 3 regions changed · 412 px · ours 0.9 s · settle 1.4 s · http://127.0.0.1:PORT
   ```
 
-- **Keys.** `r` run now · `p` pin the latest iteration · `u` unpin · `m` toggle main / previous · `q` quit.
+- **Keys.** `r` run now · `p` pin the latest iteration · `u` unpin · `m` toggle main / previous · `f` refetch the Figma refs · `q` quit.
 - **What a run is compared with.** By default the previous iteration; while an iteration is pinned, the newest pin. `--against main` (or `m`) compares with the baselines the server would pick for this checkout, through the same read-only `POST /api/v1/baselines` that `check` uses, as whoever `pixelslash login` or `PIXELSLASH_TOKEN` is. Without credentials it says `no credentials for main's baselines (…)` and stays on the previous iteration.
-- **Judge.** `--judge --ds DIR` runs the design-system judge on each iteration after its diff is shown. With no judge available it prints `skip: no judge` and invents nothing.
-- **Live page.** `http://127.0.0.1:PORT` (bound to loopback only) shows the shots, the diff, the comparison image, the timeline of iterations, the pins and the judge's notes, and updates itself after each run. Its buttons send a header a page from another origin cannot, so another site cannot pin or run.
+- **Judge.** `--judge --ds DIR` runs the design-system judge on each iteration after its diff is shown. On a target with a spec or refs (below), `--judge` also shows the local vision model the shot, the reference and the spec, and it lists how the shot differs, each with a box on the shot, numbered on the live page; `--ds` is then optional. The list is descriptions, never a pass, a fail or a score. With no judge available it prints `skip: no judge` and invents nothing.
+- **Live page.** `http://127.0.0.1:PORT` (bound to loopback only) shows the shots, the diff, the comparison image, the timeline of iterations, the pins, the judge's notes and the feature section (below), and updates itself after each run. Its buttons send a header a page from another origin cannot, so another site cannot pin or run.
 - **Storage.** Iterations and pins live in `.pixelslash/dev/` at the worktree root, which ignores itself (`dev` writes a `*` into `.pixelslash/dev/.gitignore`; your own `.gitignore` is not touched), and they survive a restart. The store is capped at 200 MB: past it the oldest iterations go first, never a pin, the newest, or what the newest was compared with.
 - **One session per worktree.** A second `pixelslash dev` in the same worktree attaches to the first: it prints the live page and follows its runs, and `q` leaves it without stopping the session. `dev --once` on a different target than the session's is exit 2, rather than returning the other page's result. A lock whose process is gone is taken over.
-- **Without the terminal.** `dev --once --json` runs one iteration and prints `{ uploaded: false, page, id, target, against, note, counts, regions, changedPixels, timings: { totalMs, settleMs, oursMs }, shots, judge }`, where each shot names its PNG and diff files; with a session live it asks that session to run (no second browser) and prints its iteration with the session's `page`. `dev latest [--json]` prints the latest iteration, and `dev pin|unpin [ID] [--json]` pin or unpin one (the latest by default), live session or not.
-- Exit 0 on a run, changed or not. Exit 2 on a usage error or a down URL. Exit 1 when a `--once` run fails (the capture, or main's baselines not reachable), and from `latest`, `pin` or `unpin` when there is nothing to show or change. In the live loop a failed run is printed and the loop carries on.
+- **Without the terminal.** `dev --once --json` runs one iteration and prints `{ uploaded: false, page, id, target, against, note, counts, regions, changedPixels, timings: { totalMs, settleMs, oursMs }, shots, judge, differences }`, where each shot names its PNG and diff files, and `differences` is the judge's list (`{ status, items: [{ n, name, shot, ref, area: { x, y, width, height }, what }] }`) when `--judge` ran on a feature; with a session live it asks that session to run (no second browser) and prints its iteration with the session's `page`. `dev latest [--json]` prints the latest iteration, and `dev pin|unpin [ID] [--json]` pin or unpin one (the latest by default), live session or not.
+- Exit 0 on a run, changed or not, and whatever the judge listed. Exit 2 on a usage error or a down URL. Exit 1 when a `--once` run fails (the capture, or main's baselines not reachable), and from `latest`, `pin` or `unpin` when there is nothing to show or change. In the live loop a failed run is printed and the loop carries on.
+
+### A feature's spec and references
+
+A target can name what it is being built against: a markdown spec, and reference images, each a PNG in the repo or a Figma frame. They go in the config under `features`, keyed by the route or story name:
+
+```json
+{
+  "features": {
+    "cart": {
+      "spec": "docs/cart.md",
+      "refs": [
+        "design/cart.png",
+        { "src": "https://www.figma.com/design/KEY/Shop?node-id=12-34", "viewport": "mobile" },
+        { "src": "design/cart-dark.png", "theme": "dark" }
+      ]
+    }
+  }
+}
+```
+
+- **`spec`** is a `.md` path, and **`refs`** is a list of `.png` paths or Figma frame URLs (with a `node-id`), either bare or as `{ src, viewport?, theme? }`. Paths are relative to the config file. A ref with `viewport` (a `WxH` or a variant name) or `theme` applies only to the shots of that variant; one without applies to every variant. A bad key, path or URL fails at load and names the key (`features.cart.refs[1].src …`), and a file that is not there also names the config it was read from. PixelSlash reads the spec and the PNGs and never writes them; the spec is read again on each run, so editing it shows at once.
+- **Figma refs** are rendered through the Figma API at the variant's width times `deviceScaleFactor`, and cached in `.pixelslash/dev/refs/`. They are fetched once, then again only on `f` or `--refresh-refs`, never on a save. The token comes from `FIGMA_TOKEN` or `--figma-token-path PATH`, never from git. Without one, that ref prints `skip: no figma token (URL)` and everything else carries on; an earlier render in the cache still stands. A Figma ref is the only thing in feature mode that touches the network.
+- **The live page** gets a Feature section: per shot, the reference and the current shot side by side; the two overlaid, with a slider that fades the reference over the shot (onion skin); and the spec text. Both sizes are stated, and when they differ the overlay is only the overlapping rectangle from the top left, and the page says so. With `--judge`, the differences are numbered boxes on the shot with a list beside it.
+- **What it does not claim.** Nothing is measured against a reference: there is no match percentage, no score and no pass or fail, on the page, in the terminal or in the JSON. A mock-up is not a baseline, so the overlay is for looking and the judge's list is for reading. The pixel diff stays between iterations (or main), as above.
+- **`dev spec [TARGET] [--json]`** prints the spec and the refs without a run. `--json` is `{ target, spec: { path, text }, refs: [{ index, kind, source, variant, viewport, theme, file, size, skip, image }] }`, where `image` is the ref inline as a `data:image/png;base64,…` URL, scaled down to at most 1024 px wide, so an agent can look at it without opening a file. `TARGET` may be left out when the config has one feature.
+- The spec and the refs never leave the machine: nothing is uploaded, and the server never sees them.
 
 ## Signing in and reading builds
 

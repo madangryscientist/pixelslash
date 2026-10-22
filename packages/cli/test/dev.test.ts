@@ -221,3 +221,74 @@ describe("pixelslash dev", () => {
     expect(await liveSession(store)).toBeUndefined();
   }, 90_000);
 });
+
+const FIGMA = "https://www.figma.com/design/AbC123/Shop?node-id=1-2";
+
+/** `project()` with `features.index`: a spec, a wide repo PNG, and a Figma frame. */
+async function featureProject() {
+  const p = await project();
+  await writeFile(join(p.cwd, "cart.md"), "# Cart\nThe total sits under the list.");
+  await writeFile(join(p.cwd, "cart.png"), solidPng(2048, 100, [0, 0, 200, 255]));
+  const config = JSON.parse(await readFile(join(p.cwd, "pixelslash.config.json"), "utf8"));
+  config.features = { index: { spec: "cart.md", refs: ["cart.png", FIGMA] } };
+  await writeFile(join(p.cwd, "pixelslash.config.json"), JSON.stringify(config));
+  return p;
+}
+
+describe("pixelslash dev, a feature's spec and refs (ob 1741)", () => {
+  test("dev spec --json is the spec text and the refs, inline images capped at 1024 px", async () => {
+    const { cwd } = await featureProject();
+    const cap = capture();
+    expect(await run(["dev", "spec", "--json"], cap.io, { ...base, cwd, env: pinned })).toBe(0);
+    expect(cap.stderr).toContain(`skip: no figma token (${FIGMA})`);
+    const out = JSON.parse(cap.stdout);
+    expect(out.target).toBe("index");
+    expect(out.spec).toEqual({
+      path: join(cwd, "cart.md"),
+      text: "# Cart\nThe total sits under the list.",
+    });
+    expect(out.refs).toHaveLength(2);
+    expect(out.refs[0]).toMatchObject({
+      kind: "png",
+      file: join(cwd, "cart.png"),
+      size: { width: 2048, height: 100 },
+    });
+    const inline = Buffer.from(out.refs[0].image.replace("data:image/png;base64,", ""), "base64");
+    expect(inline.readUInt32BE(16)).toBe(1024);
+    expect(out.refs[1]).toMatchObject({
+      kind: "figma",
+      file: null,
+      skip: "no figma token",
+      image: null,
+    });
+    expect(cap.stdout).not.toMatch(/score|match/i);
+  });
+
+  test("--judge with a feature and no --ds lists differences, and with no judge says skip", async () => {
+    const { cwd } = await featureProject();
+    const deps = { ...base, cwd, env: pinned };
+    const json = capture();
+    expect(await run(["dev", "index", "--once", "--json", "--judge"], json.io, deps)).toBe(0);
+    const it = JSON.parse(json.stdout);
+    expect(it.differences).toEqual({ status: "skipped", reason: "no judge", items: [] });
+    expect(it.judge).toBeNull();
+    const text = capture();
+    expect(await run(["dev", "index", "--once", "--judge"], text.io, deps)).toBe(0);
+    expect(text.stdout).toContain("skip: no judge");
+    const latest = capture();
+    expect(await run(["dev", "latest", "--json"], latest.io, deps)).toBe(0);
+    expect(JSON.parse(latest.stdout).differences).toMatchObject({ status: "skipped" });
+  }, 60_000);
+
+  test("--judge with neither --ds nor a feature is a usage error", async () => {
+    const { cwd } = await project();
+    const cap = capture();
+    const code = await run(["dev", "index", "--once", "--judge"], cap.io, {
+      ...base,
+      cwd,
+      env: pinned,
+    });
+    expect(code).toBe(2);
+    expect(cap.stderr).toContain("--judge needs --ds DIR");
+  });
+});

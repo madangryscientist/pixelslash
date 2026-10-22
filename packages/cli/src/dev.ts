@@ -13,11 +13,13 @@ import {
 import { readFlagPairs, takeJson } from "./args.ts";
 import { attachTo } from "./dev-attach.ts";
 import { devLoop, devOnce } from "./dev-loop.ts";
+import { devSpec, differencesLine } from "./dev-spec.ts";
 import type { CliDeps, Io } from "./run.ts";
 
-export const DEV_USAGE = `pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge --ds DIR] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
+export const DEV_USAGE = `pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge [--ds DIR]] [--refresh-refs] [--figma-token-path PATH] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
 pixelslash dev latest [TARGET] [--json] | pixelslash dev pin [ID] [--json] | pixelslash dev unpin [ID] [--json]
-Re-captures one route or story of the config (the app must already be up) on every save and diffs it with the previous iteration, a pin, or main's baselines. Keys: r run, p pin, u unpin, m main/previous, q quit. A second dev in the same worktree attaches to the first. Nothing is uploaded.`;
+pixelslash dev spec [TARGET] [--json] [--refresh-refs] [--viewport WxH|NAME] [--theme light|dark] [--figma-token-path PATH] [--config FILE]
+Re-captures one route or story of the config (the app must already be up) on every save and diffs it with the previous iteration, a pin, or main's baselines. A target with features.<target> (a spec, reference PNGs or Figma frames) gets them on the live page beside the shot, and with --judge, a list of how the shot differs; never a score. Keys: r run, p pin, u unpin, m main/previous, f refetch refs, q quit. A second dev in the same worktree attaches to the first. Nothing is uploaded.`;
 
 const FLAGS = [
   "url",
@@ -30,6 +32,7 @@ const FLAGS = [
   "token-path",
   "project",
   "base",
+  "figma-token-path",
 ] as const;
 
 export type DevFlags = Partial<Record<(typeof FLAGS)[number], string>>;
@@ -40,12 +43,13 @@ export type DevArgs = {
   watch: string[];
   once: boolean;
   judge: boolean;
+  refreshRefs: boolean;
   json: boolean;
 };
 
 export type DevDeps = CliDeps;
 
-const SWITCHES = new Set(["--once", "--judge"]);
+const SWITCHES = new Set(["--once", "--judge", "--refresh-refs"]);
 
 /** `--watch a,b` or a repeated `--watch a`. */
 function watchValue(v: string | undefined): string[] {
@@ -81,10 +85,10 @@ export function parseDevArgs(argv: string[]): DevArgs {
   const flags = readFlagPairs(pairs, FLAGS);
   if (flags.against !== undefined && flags.against !== "main" && flags.against !== "previous")
     throw new UsageError(`--against must be main or previous, not ${flags.against}`);
+  // Whether --judge has a --ds or a feature to judge against is known once the config is read.
   const judge = on.has("--judge");
-  if (judge && !flags.ds)
-    throw new UsageError("--judge needs --ds DIR, the design system's rasters");
-  return { flags, target, watch, once: on.has("--once"), judge, json };
+  const refreshRefs = on.has("--refresh-refs");
+  return { flags, target, watch, once: on.has("--once"), judge, refreshRefs, json };
 }
 
 const secs = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
@@ -134,6 +138,7 @@ async function latest(argv: string[], io: Io, deps: DevDeps): Promise<number> {
   }
   const url = (await liveSession(store))?.url ?? null;
   io.stdout.write(`${json ? jsonOf(it, url) : lineOf(it, url)}\n`);
+  if (!json && it.differences) io.stdout.write(`${differencesLine(it.differences)}\n`);
   return 0;
 }
 
@@ -163,6 +168,7 @@ export async function runDev(argv: string[], io: Io, deps: DevDeps = {}): Promis
   const [sub, ...rest] = argv;
   if (sub === "latest") return latest(rest, io, deps);
   if (sub === "pin" || sub === "unpin") return pinOrUnpin(sub === "pin", rest, io, deps);
+  if (sub === "spec") return devSpec(rest, (await storeOf(deps)).root, io, deps);
   const args = parseDevArgs(argv);
   const store = await storeOf(deps);
   const owner = await liveSession(store);
