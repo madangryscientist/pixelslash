@@ -223,7 +223,7 @@ A target can name what it is being built against: a markdown spec, and reference
 
 ## Signing in and reading builds
 
-The remote commands talk to a server's [API](#api) as one token. They read; only `upload` sends page shots.
+The remote commands talk to a server's [API](#api) as one token. They read; only `upload` sends page shots, and only `flake --resolve` changes anything else.
 
 ```
 pixelslash login [--server URL] [--config FILE]
@@ -232,6 +232,8 @@ pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash flake ID [--runs N] [--out DIR] [--write] [--resolve [--note TEXT]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
 pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
 pixelslash --version
 pixelslash install-browser
@@ -248,7 +250,7 @@ pixelslash install-browser
 
 1. **Token:** `--token-path` (a file), else `PIXELSLASH_TOKEN` (CI), else the credential `login` stored for the resolved server.
 2. **Server:** `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`--config`, or a `pixelslash.config.*` in the working dir).
-3. **Project** (`builds`, `build latest`, `upload` with a personal token): `--project` (an id, or a name the token sees once), else `upload.project` in the config, else the only project the token sees. More than one and none named is exit 2, listing them.
+3. **Project** (`builds`, `build latest`, `flakes`, `flake`, `upload` with a personal token): `--project` (an id, or a name the token sees once), else `upload.project` in the config, else the only project the token sees. More than one and none named is exit 2, listing them.
 
 **Exit codes.** They are a contract: CI reads them, and none changes meaning.
 
@@ -260,6 +262,7 @@ pixelslash install-browser
 | 3 | **The server did not give what was asked**: a refused, expired or revoked token (401), an id the token cannot reach (404), a server error, or a server that cannot be reached. For `status`, also a build that `errored` and no build at the commit or branch. `install-browser` also exits 3 when the install fails. |
 | 4 | `status`: a reviewer rejected a shot, so the build `failed`. |
 | 5 | `status`: the build still waits, for processing or for review. Under `--wait`, still waiting at `--timeout`. |
+| 6 | `flake`: the shot is still unstable here, some run differed from the first. Not 1: 1 stays reserved for new violations. |
 
 The client sends `User-Agent: pixelslash/<version>`.
 
@@ -370,6 +373,20 @@ Carries and the default branch's auto-accept work as on the server. A CLI from b
 - A shot captured with a different image, browser or font set than this machine's is not captured again, since its runs would differ for that alone. `upload DIR` checks the image and font set before it opens a browser. The same goes for a route that is no longer in the config. Either case is a warning, and the shot uploads as captured.
 - Each flaky shot prints `flaky: <name> (WxH theme): N of M runs differed; policy P`. The run writes `report.html` into the snapshot dir, plus the later captures under `@flake/` (`@` is outside the name alphabet, so no route's dir collides with it). The report shows each flaky shot as "flaky: N of M runs differed", with its runs side by side, the regions where they differed and its policy, then the shots that changed in every run, then the changed shots that could not be captured again and why. With nothing changed it says how many shots were measured against a baseline. It is written whenever a re-capture was possible, and is local only; each upload and each capture first removes the dir's earlier `report.html` and `@flake/`, and a report that cannot be written is a warning.
 - Exit codes do not change: a flaky shot is said and sent, and whether it blocks the build is the server's decision.
+
+### Fixing a flake locally
+
+`pixelslash flakes` lists the project's open flakes: id, name, browser, viewport, theme, how many builds detected it, and when it last moved. `--json` prints `GET /api/v1/projects/:id/flakes` as sent.
+
+`pixelslash flake ID` reproduces one on this machine, so a fix can be tried and seen to hold before anyone says it does:
+
+- It finds the flake in the project's list and captures its key **locally** `--runs` times (default 5, 2 to 50): the config's route or story of that name, under the variant with the flake's browser, viewport and theme, through the config's own capture path and stabilisation, one shot after another in one browser. `baseUrl` must already be up. No dev server is started, except the config's own `start` command, as `capture` runs it. A key the config has no route or variant for is exit 2.
+- Each run is diffed against run 1 under the shot's own diff options and ignore areas. It prints each run's regions and what the engine calls them (`real change`, `sub-pixel shift`, `noise`, or `size change` when the page's size differs), then `stable: all N runs rendered the same` or `unstable: X of N-1 runs differed from run 1`. A run differs when the diff calls it changed: noise and shift regions are listed but do not on their own make a shot unstable.
+- When unstable, it says what to change, most specific first: a page size that moves; any stabilisation the config turned off (`animations`, `caret`, `clock`, `timers`); an ignore area around every region that changed, in CSS px, for the flake's variant of the route; and last, `flaky: "skip"` on the route. For a story the ignore area and the policy are said as `data-pixelslash-ignore` and the `pixelslash-flaky-skip` tag, to add by hand.
+- `--write` lists the suggestions that are config changes, each as the exact line it would set (`routes[1].variants.small.ignore += {…}`), and asks on the terminal which one to write. Only the number typed is written; an empty answer, or no terminal, writes nothing. It edits a JSON config only (rewritten as 2-space JSON, after the edited config is validated again); a JS/TS config is left alone and the change is to make by hand.
+- `--resolve` marks the flake resolved on the server (`POST /api/v1/flakes/:id/resolve`, with `--note TEXT`, at most 200 characters) only when this run was stable; an unstable run prints `not resolved` and resolves nothing. Resolving needs a personal token: a CI token is refused (exit 3). `--note` without `--resolve` is exit 2.
+- The runs (`runs/run<N>.png`), each differing run's overlay (`runs/diff<N>.png`) and `report.html` are written to `--out` (default `pixelslash-flake`), whose earlier `runs/` and report are removed first. Nothing is uploaded.
+- Exit 0 stable, 6 unstable, 2 on a usage error, 3 when the server refuses or does not know the flake, 1 when the capture fails.
 
 **What changed, in a sentence (`--judge`).** With `--judge`, the local vision model (the same `mlx_vlm.generate` or `ollama` as the DS judge) writes one plain sentence per changed shot, such as "The Save button moved below the form". It is shown the baseline's PNG, the branch's PNG and the boxes the diff measured, and is told to say only what changed, with no verdict and no score.
 

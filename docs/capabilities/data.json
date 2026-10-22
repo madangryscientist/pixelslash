@@ -635,7 +635,7 @@
       "label": "Flake detection",
       "ps": {
         "v": "y",
-        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724)"
+        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724); `pixelslash flake ID` reproduces one locally N times, names each difference's cause, suggests the config fix (`--write` adds it after a prompt) and resolves it only when stable (ob 1725)"
       },
       "t": {
         "argos": "y",

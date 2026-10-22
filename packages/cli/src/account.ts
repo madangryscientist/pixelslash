@@ -23,7 +23,8 @@ export type ReadSecret = (prompt: string) => Promise<string>;
 
 export type AccountDeps = RemoteDeps & { readSecret?: ReadSecret };
 
-async function firstLine(): Promise<string> {
+/** The first line of stdin. */
+export async function firstLine(): Promise<string> {
   const reader = Bun.stdin.stream().getReader();
   const decoder = new TextDecoder();
   let text = "";

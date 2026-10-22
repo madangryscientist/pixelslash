@@ -19,6 +19,8 @@ export type Reply = { text: string; body: Record<string, unknown> };
 export type ApiClient = {
   server: string;
   get(path: string, query?: Record<string, string | undefined>): Promise<Reply>;
+  /** A JSON body to one of the API's few writes (resolving a flake). */
+  post(path: string, body: unknown): Promise<Reply>;
 };
 
 export function isObj(v: unknown): v is Record<string, unknown> {
@@ -44,39 +46,50 @@ function apiError(text: string): string | undefined {
   return undefined;
 }
 
-function refusal(server: string, path: string, res: Response, text: string): RemoteError {
+function refusal(server: string, call: string, res: Response, text: string): RemoteError {
   const detail = apiError(text) ?? `not the API's answer (${res.statusText || "no JSON"})`;
   const hint = res.status === 401 ? `; run \`pixelslash login --server ${server}\`` : "";
-  return new RemoteError(`GET ${path} -> ${res.status} ${detail}${hint}`);
+  return new RemoteError(`${call} -> ${res.status} ${detail}${hint}`);
 }
 
 export function apiClient(server: string, token: string, fetch: FetchLike): ApiClient {
+  const request = async (method: string, path: string, qs: string, body?: unknown) => {
+    const call = `${method} ${path}`;
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${token}`,
+      "user-agent": USER_AGENT,
+    };
+    if (body !== undefined) headers["content-type"] = "application/json";
+    let res: Response;
+    try {
+      res = await fetch(`${server}${path}${qs}`, {
+        method,
+        headers,
+        ...(body !== undefined && { body: JSON.stringify(body) }),
+      });
+    } catch (e) {
+      throw new RemoteError(
+        `cannot reach ${server}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    const text = await res.text().catch(() => "");
+    if (!res.ok) throw refusal(server, call, res, text);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new RemoteError(`${call}: the server did not answer with JSON`);
+    }
+    if (!isObj(parsed)) throw new RemoteError(`${call}: the server's answer is not an object`);
+    return { text, body: parsed };
+  };
   return {
     server,
-    async get(path, query = {}) {
+    get(path, query = {}) {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(query)) if (v !== undefined) params.set(k, v);
-      const qs = params.size > 0 ? `?${params.toString()}` : "";
-      let res: Response;
-      try {
-        res = await fetch(`${server}${path}${qs}`, {
-          headers: { authorization: `Bearer ${token}`, "user-agent": USER_AGENT },
-        });
-      } catch (e) {
-        throw new RemoteError(
-          `cannot reach ${server}: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-      const text = await res.text().catch(() => "");
-      if (!res.ok) throw refusal(server, path, res, text);
-      let body: unknown;
-      try {
-        body = JSON.parse(text);
-      } catch {
-        throw new RemoteError(`GET ${path}: the server did not answer with JSON`);
-      }
-      if (!isObj(body)) throw new RemoteError(`GET ${path}: the server's answer is not an object`);
-      return { text, body };
+      return request("GET", path, params.size > 0 ? `?${params.toString()}` : "");
     },
+    post: (path, body) => request("POST", path, "", body),
   };
 }

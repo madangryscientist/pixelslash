@@ -24,8 +24,12 @@ export {
   findConfig,
   findConfigIfAny,
   loadConfig,
+  parseConfig,
+  resolveDiff,
   type CaptureConfig,
   type FlakyPolicy,
+  type Route,
+  type Variant,
 } from "./config.ts";
 export { parseDiffOption } from "./diff-options.ts";
 export type { Fingerprint } from "./fingerprint.ts";
@@ -61,6 +65,15 @@ export {
 export { uploadSnapshots, type UploadDeps, type UploadResult } from "./upload.ts";
 export type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 export type { FlakeRecord } from "./flake.ts";
+export {
+  CAUSE_WORDS,
+  measureRepro,
+  renderReproReport,
+  suggestFixes,
+  type ConfigEdit,
+  type Repro,
+  type Suggestion,
+} from "./flake-repro.ts";
 export type { Region, RegionKind, Specks } from "./regions.ts";
 export { CLIENT_VERSION, USER_AGENT } from "./version.ts";
 export {

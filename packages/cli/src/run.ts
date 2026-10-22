@@ -37,6 +37,7 @@ import { CHECK_USAGE, runCheck } from "./check.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
 import { DEV_USAGE, runDev } from "./dev.ts";
 import type { KeyInput } from "./dev-loop.ts";
+import { FLAKE_USAGE, FLAKES_USAGE, runFlake, runFlakes } from "./flake.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
 import { MCP_USAGE, runMcp } from "./mcp.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
@@ -90,6 +91,8 @@ export type CliDeps = Deps &
   UploadDeps & {
     readSecret?: ReadSecret;
     /** `pixelslash dev`'s keys; stdin by default. */ keys?: KeyInput;
+    /** `pixelslash flake --write`'s question; the terminal by default. */
+    ask?: (question: string) => Promise<string>;
   };
 
 /** `pixelslash install-browser`: the Chromium `capture` launches, by the Playwright it launches it with. */
@@ -143,6 +146,8 @@ const COMMANDS: Record<
   build: { usage: BUILD_USAGE, run: runBuild },
   status: { usage: STATUS_USAGE, run: runStatus },
   mcp: { usage: MCP_USAGE, run: runMcp },
+  flakes: { usage: FLAKES_USAGE, run: runFlakes },
+  flake: { usage: FLAKE_USAGE, run: runFlake },
 };
 
 export async function run(argv: string[], io: Io = process, deps: CliDeps = {}): Promise<number> {
