@@ -8,9 +8,11 @@ import {
   putSnapshot,
 } from "#/db/builds";
 import { type Db, NotFoundError } from "#/db/db";
-import { processBuild } from "#/diff/process";
+import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process";
+import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { authorize } from "./authorize";
+import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines";
 import {
   API_VERSION,
   type ReadCtx,
@@ -24,9 +26,11 @@ import {
   BadRequest,
   isPng,
   object,
+  parseCiInput,
   parseFinalise,
   parseNewBuild,
   parseSnapshotInput,
+  pngSize,
 } from "./validate";
 
 export type ApiDeps = {
@@ -36,6 +40,8 @@ export type ApiDeps = {
   imageSecret: () => string;
   /** The oldest CLI (`x.y.z`) this server takes; unset takes any. */
   minCliVersion?: string | undefined;
+  /** The engine's diff for finalise; a test passes one that throws (ob 1727). */
+  diff?: ProcessDeps["diff"];
 };
 
 /** A PNG over this is refused before it is read; a full-page shot is a few MB. */
@@ -52,9 +58,23 @@ async function jsonBody(request: Request): Promise<unknown> {
   }
 }
 
-/** Multipart: `meta` (JSON) and `file` (the PNG). */
-async function snapshotForm(request: Request) {
-  if (Number(request.headers.get("content-length")) > MAX_PNG_BYTES + 64 * 1024)
+/** One part of a snapshot upload: a PNG no larger than MAX_PNG_BYTES. */
+async function pngPart(form: FormData, field: string): Promise<ArrayBuffer> {
+  const file = form.get(field);
+  if (!(file instanceof File)) throw new BadRequest(`${field} must be a PNG upload`);
+  if (file.size > MAX_PNG_BYTES) throw new TooLarge();
+  const png = await file.arrayBuffer();
+  if (!isPng(png)) throw new BadRequest(`${field} is not a PNG`);
+  return png;
+}
+
+/**
+ * Multipart: `meta` (JSON) and `file` (the PNG). In a `ci` project `meta.ci` carries the CLI's
+ * results, and each needs its diff mask as `diff:<baselineId>`; the shot, plus at most two masks.
+ */
+async function snapshotForm(request: Request, project: { diffLocation: DiffLocation }) {
+  const pngs = project.diffLocation === "ci" ? 3 : 1;
+  if (Number(request.headers.get("content-length")) > pngs * MAX_PNG_BYTES + 64 * 1024)
     throw new TooLarge();
   let form: FormData;
   try {
@@ -63,19 +83,22 @@ async function snapshotForm(request: Request) {
     throw new BadRequest("body must be multipart/form-data");
   }
   const meta = form.get("meta");
-  const file = form.get("file");
   if (typeof meta !== "string") throw new BadRequest("meta must be a JSON field");
-  if (!(file instanceof File)) throw new BadRequest("file must be a PNG upload");
-  if (file.size > MAX_PNG_BYTES) throw new TooLarge();
   let parsed: unknown;
   try {
     parsed = JSON.parse(meta);
   } catch {
     throw new BadRequest("meta must be JSON");
   }
-  const png = await file.arrayBuffer();
-  if (!isPng(png)) throw new BadRequest("file is not a PNG");
-  return { input: parseSnapshotInput(parsed), png };
+  const input = parseSnapshotInput(parsed);
+  const png = await pngPart(form, "file");
+  // A server project measures at finalise: results sent to it are not stored, so none is trusted.
+  const sent = project.diffLocation === "ci" ? parseCiInput(object(parsed, "meta").ci) : null;
+  if (!sent) return { input, png, ci: null };
+  const results = await Promise.all(
+    sent.results.map(async (r) => ({ ...r, mask: await pngPart(form, `diff:${r.baselineId}`) })),
+  );
+  return { input, png, ci: { engineVersion: sent.engineVersion, image: pngSize(png), results } };
 }
 
 class TooLarge extends Error {}
@@ -92,20 +115,30 @@ function projectIdOf(body: unknown, actor: Actor): string {
   return named;
 }
 
+/** Refused at the start of a `ci` project's build when the CLI does not diff (ob 1727). */
+const UPGRADE_FOR_CI = "this project diffs in CI; upgrade the CLI";
+
+/**
+ * A CLI that diffs says so with `clientDiff: true`, and is told where its project diffs. One that
+ * does not say so cannot send results, so a `ci` project refuses it before any shot is uploaded.
+ */
 async function startBuild(ctx: Ctx): Promise<Response> {
   const body = await jsonBody(ctx.request);
   const input = parseNewBuild(body);
   const project = await actorProject(ctx.db, ctx.actor, projectIdOf(body, ctx.actor));
-  return json({ id: await createBuild(ctx.db, project.id, input) }, 201);
+  if (project.diffLocation === "ci" && object(body, "body").clientDiff !== true)
+    return fail(426, UPGRADE_FOR_CI);
+  const id = await createBuild(ctx.db, project.id, input);
+  return json({ id, diffLocation: project.diffLocation }, 201);
 }
 
-async function addSnapshot(ctx: Ctx, build: Build, orgId: string): Promise<Response> {
-  const { input, png } = await snapshotForm(ctx.request);
-  const blobs = orgBlobs(ctx.store, orgId);
-  return json(await putSnapshot({ db: ctx.db, blobs }, build, input, png));
+async function addSnapshot(ctx: Ctx, build: Build, owner: BuildOwner): Promise<Response> {
+  const sent = await snapshotForm(ctx.request, owner);
+  const blobs = orgBlobs(ctx.store, owner.orgId);
+  return json(await putSnapshot({ db: ctx.db, blobs }, build, sent));
 }
 
-async function closeBuild(ctx: Ctx, build: Build, orgId: string): Promise<Response> {
+async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promise<Response> {
   const done = await finaliseBuild(ctx.db, build, parseFinalise(await jsonBody(ctx.request)));
   // The diff runs here, in the request: inline for beta, no Queue (the map's server diff). One
   // whole-page change at 1280x4000 fits the 30 s CPU limit; several do not, and processBuild stops
@@ -115,7 +148,8 @@ async function closeBuild(ctx: Ctx, build: Build, orgId: string): Promise<Respon
   // A kill by the runtime itself is not caught here; the build reads `processing` until it is older than
   // STALE_PROCESSING_MS, and a finalise sent again after that re-runs it (ob 1545). So does one sent
   // after `errored`.
-  const result = await processBuild({ db: ctx.db, blobs: orgBlobs(ctx.store, orgId) }, done);
+  const blobs = orgBlobs(ctx.store, orgId);
+  const result = await processBuild({ db: ctx.db, blobs, diff: ctx.diff }, done);
   return json({
     id: done.id,
     status: result.status,
@@ -152,13 +186,29 @@ const reads = (ctx: Ctx): ReadCtx => ({
 
 const at = (params: string[], i: number) => params[i] ?? "";
 
+const picks = (ctx: Ctx): BaselinesCtx => ({
+  db: ctx.db,
+  actor: ctx.actor,
+  origin: new URL(ctx.request.url).origin,
+  imageSecret: ctx.imageSecret,
+});
+
+/** The read-only pick: a CI token's own project, or the one a personal token names. */
+async function preview(ctx: Ctx): Promise<Response> {
+  const body = await jsonBody(ctx.request);
+  return previewBaselines(picks(ctx), projectIdOf(body, ctx.actor), body);
+}
+
+/** The org a build's blobs live in, and where its project diffs. */
+type BuildOwner = { orgId: string; diffLocation: DiffLocation };
+
 async function withBuild(
   ctx: Ctx,
   buildId: string,
-  run: (build: Build, orgId: string) => Promise<Response>,
+  run: (build: Build, owner: BuildOwner) => Promise<Response>,
 ): Promise<Response> {
-  const { build, orgId } = await actorBuild(ctx.db, ctx.actor, buildId);
-  return run(build, orgId);
+  const { build, ...owner } = await actorBuild(ctx.db, ctx.actor, buildId);
+  return run(build, owner);
 }
 
 /** Every endpoint the API has. The README's API table is checked against this list. */
@@ -169,14 +219,20 @@ export const ENDPOINTS: readonly Endpoint[] = [
     method: "PUT",
     path: "/api/v1/builds/:id/snapshots",
     upload: true,
-    run: (ctx, p) => withBuild(ctx, at(p, 0), (build, orgId) => addSnapshot(ctx, build, orgId)),
+    run: (ctx, p) => withBuild(ctx, at(p, 0), (build, owner) => addSnapshot(ctx, build, owner)),
   },
   {
     method: "POST",
     path: "/api/v1/builds/:id/finalize",
     upload: true,
-    run: (ctx, p) => withBuild(ctx, at(p, 0), (build, orgId) => closeBuild(ctx, build, orgId)),
+    run: (ctx, p) => withBuild(ctx, at(p, 0), (build, owner) => closeBuild(ctx, build, owner)),
   },
+  {
+    method: "POST",
+    path: "/api/v1/builds/:id/baselines",
+    run: async (ctx, p) => buildBaselines(picks(ctx), at(p, 0), await jsonBody(ctx.request)),
+  },
+  { method: "POST", path: "/api/v1/baselines", run: (ctx) => preview(ctx) },
   { method: "GET", path: "/api/v1/projects", run: (ctx) => listProjects(reads(ctx)) },
   {
     method: "GET",
@@ -220,7 +276,11 @@ type ApiError = { status: number; code: string; message: string };
 function errorOf(e: unknown): ApiError {
   if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };
   if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
-  if (e instanceof BuildFinalisedError || e instanceof SnapshotCountError)
+  if (
+    e instanceof BuildFinalisedError ||
+    e instanceof SnapshotCountError ||
+    e instanceof NoRecoveryError
+  )
     return { status: 409, code: "conflict", message: e.message };
   if (e instanceof TooLarge)
     return { status: 413, code: "too_large", message: `PNG over ${MAX_PNG_BYTES} bytes` };

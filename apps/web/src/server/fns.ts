@@ -11,6 +11,7 @@ import {
   inviteMember,
   listOrgs,
   setDefaultBranch,
+  setDiffLocation,
   withdrawInvite,
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
@@ -21,13 +22,13 @@ import {
   isFirstBuild,
   reviewSnapshot,
 } from "#/db/review";
-import { FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
+import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
 import { issueCiToken, listCiTokens, revokeCiToken } from "#/db/tokens";
 import { BadRequest, parseRect } from "#/api/validate";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
-import { database, imageSigningSecret } from "./env";
+import { database, defaultDiffLocation, imageSigningSecret } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
 
@@ -96,7 +97,12 @@ export const newProject = createServerFn({ method: "POST" })
   .validator((d: unknown) => ({ orgId: field(d, "orgId"), name: field(d, "name") }))
   .handler(async ({ data }) => {
     const user = await requireViewer();
-    const project = await or404(createProject(database(), user.id, data.orgId, data.name));
+    const project = await or404(
+      createProject(database(), user.id, data.orgId, {
+        name: data.name,
+        diffLocation: defaultDiffLocation(),
+      }),
+    );
     return { id: project.id };
   });
 
@@ -129,6 +135,18 @@ export const saveDefaultBranch = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     await or404(setDefaultBranch(database(), user.id, data.projectId, data.branch));
+  });
+
+export const saveDiffLocation = createServerFn({ method: "POST" })
+  .validator((d: unknown) => {
+    const projectId = field(d, "projectId");
+    const location = DIFF_LOCATIONS.find((l) => l === field(d, "location"));
+    if (!location) throw new Error(`location must be one of ${DIFF_LOCATIONS.join(", ")}`);
+    return { projectId, location };
+  })
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(setDiffLocation(database(), user.id, data.projectId, data.location));
   });
 
 export const issueToken = createServerFn({ method: "POST" })

@@ -10,6 +10,7 @@ import {
   type Specks,
 } from "./regions.ts";
 import { labelShifts, type ShiftOptions } from "./shift.ts";
+import { clearsFloors } from "./summary.ts";
 
 export type DiffOptions = {
   /**
@@ -298,15 +299,8 @@ export function diffPngs(
   const measured = field.width * field.height - ignoredPixels;
   const sizeChanged = a.width !== b.width || a.height !== b.height;
   const regions = labelRegions(found.regions, a, b, options);
-  const surviving = regions
-    .filter((r) => r.kind === "change")
-    .reduce((n, r) => n + r.changedPixels, 0);
-  const clearsFloors =
-    surviving > 0 &&
-    surviving >= (options.minChangedPixels ?? 0) &&
-    surviving / measured >= (options.minChangedRatio ?? 0);
   return {
-    changed: sizeChanged || clearsFloors,
+    changed: sizeChanged || clearsFloors(regions, measured, options),
     ignoredPixels,
     ignored,
     changedPixels,
@@ -322,3 +316,6 @@ export function diffPngs(
     branchHeight: b.height,
   };
 }
+
+export { type DiffSummary, changedOf, summarizeDiff } from "./summary.ts";
+export { CLIENT_VERSION as ENGINE_VERSION } from "./version.ts";

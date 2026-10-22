@@ -2,7 +2,7 @@ import { type SQL, and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Build } from "./builds";
 import { type Db, NotFoundError } from "./db";
 import type { Project } from "./orgs";
-import { builds, members, orgs, projects, snapshots, users } from "./schema";
+import { type DiffLocation, builds, members, orgs, projects, snapshots, users } from "./schema";
 
 /**
  * Who an API request acts for (ob 1728): a CI token holds one project and can upload to it; a
@@ -34,9 +34,9 @@ export async function actorBuild(
   db: Db,
   actor: Actor,
   buildId: string,
-): Promise<{ build: Build; orgId: string }> {
+): Promise<{ build: Build; orgId: string; diffLocation: DiffLocation }> {
   const [row] = await db
-    .select({ build: builds, orgId: projects.orgId })
+    .select({ build: builds, orgId: projects.orgId, diffLocation: projects.diffLocation })
     .from(builds)
     .innerJoin(projects, eq(projects.id, builds.projectId))
     .where(and(eq(builds.id, buildId), visible(db, actor)));

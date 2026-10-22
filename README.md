@@ -208,9 +208,31 @@ pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-
 
 What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (`WxH`), `theme`, `tags`, the resolved diff options (`diff`, stored as JSON in `snapshots.diff_options`; a client that sends none stores `{}`), the ignore boxes (`ignore`, JSON in `snapshots.ignore`, image px; a client that sends none stores `[]`), the environment fingerprint, and the PNG under the org's prefix in the blob store (R2 on Cloudflare). The manifest's `path` and the variant's `name` are not uploaded: a snapshot is identified by name + browser + viewport + theme, so two manifest entries that differ only by variant name are refused. The manifest carries no platform; `upload` sends `linux`, which is what the pinned capture image is.
 
-The endpoints `upload` calls (`POST /api/v1/builds`, `PUT /api/v1/builds/:id/snapshots`, `POST /api/v1/builds/:id/finalize`), with their bodies and replies, are in [API](#api).
+The endpoints `upload` calls (`POST /api/v1/builds`, `POST /api/v1/builds/:id/baselines`, `PUT /api/v1/builds/:id/snapshots`, `POST /api/v1/builds/:id/finalize`), with their bodies and replies, are in [API](#api).
 
-**The server diff has a ceiling.** It runs inline in the finalise request, on a Worker with a 30 s CPU limit and a 128 MB isolate (decided 2026-10-20; no Queue for beta). Measured at 1280×4000: a typical shot takes about 0.8 s, a shot where every pixel differs about 15 s. One whole-page change fits; several do not. When the diff stops itself before the limit, the build ends `errored` and `error` names the limit (`diff ceiling: measured N of M shots…`); no shot is downscaled or cropped to fit. The finalise reply still carries `200`, so read `status` and `error`. A build too big for one run is resumed: finalise again and the server keeps what it measured and diffs the rest under the same budget, so repeated runs reach the end. The finalise reply carries `unmeasured`, the count still to measure, and `pixelslash upload` finalises again by itself while that falls (a warning on stderr for each); if it stops with shots left it warns that the build is `errored` and exits 0 as before. A hard kill by the runtime (one shot alone passing 30 s, or the isolate limit) cannot be caught in the request and can leave the build at `processing`; recovering a build stuck that way is a separate ticket.
+**Where the diff runs (`ci` or `server`).** Each project has a diff location, set on its settings page:
+
+- **`ci`**: the CLI measures each shot in the CI job, with the same engine the server has, and the server only checks and stores what it sent.
+- **`server`**: the server measures every shot when the build is finalised (below).
+
+A new project on the hosted app is `ci`. A new project on a self-hosted server is `server`, unless its `DEFAULT_DIFF_LOCATION` var says `ci`. Projects from before the setting existed are `server`.
+
+Changing the setting applies to the next build. The settings page warns about this: a build measured on one side is not guaranteed to match one measured on the other (the engine version can differ). A build that is open while its project is switched errors at finalise. Run it again.
+
+The CLI does not pick baselines. `upload` and `capture --upload` always ask the server for each shot's baseline (`POST /api/v1/builds/:id/baselines`): the same pick that finalise makes, with the rules below. The reply says where the project diffs.
+
+- **A `server` project:** the CLI uploads the PNGs as before, and the server diffs them. There is no flag to choose the other side: the project decides.
+- **A `ci` project:** the CLI fetches each baseline image and diffs the shot against it, using the shot's own diff options and the ignore boxes of both shots. It sends `diff_result`, the status, the diff mask PNG and its engine version with the shot. When a baseline carries an open change and the shot differs from it, the CLI also measures the shot against the accepted shot, so the server has whichever result its pick needs.
+
+Finalise in a `ci` project runs no diff. Each result is checked for shape and bounds against the shot's PNG header, without decoding a PNG, and its status must follow from its counts under the shot's thresholds. A shot whose result fails these checks is not measured on the server instead. Its `diff_error` names the reason, and the build ends `errored` naming every such shot. The failures are:
+
+- no result;
+- a result that is not a result;
+- a **stale baseline**: the result was measured against a different shot than finalise picked, for example because another build landed in between.
+
+Carries and the default branch's auto-accept work as on the server. A CLI from before this setting sends no results, so a `ci` project refuses it when the build is opened: `426 this project diffs in CI; upgrade the CLI`. A CLI talking to a server from before the setting skips the baselines request and uploads as before. Every snapshot records who measured it (`measured_by`: `ci` or `server`) and the engine version, and the snapshot page shows both.
+
+**The server diff has a ceiling.** It runs inline in the finalise request, on a Worker with a 30 s CPU limit and a 128 MB isolate (decided 2026-10-20; no Queue for beta). Measured at 1280×4000: a typical shot takes about 0.8 s, a shot where every pixel differs about 15 s. One whole-page change fits; several do not. When the diff stops itself before the limit, the build ends `errored` and `error` names the limit (`diff ceiling: measured N of M shots…`); no shot is downscaled or cropped to fit. The finalise reply still carries `200`, so read `status` and `error`. A build too big for one run is resumed: finalise again and the server keeps what it measured and diffs the rest under the same budget, so repeated runs reach the end. The finalise reply carries `unmeasured`, the count still to measure, and `pixelslash upload` finalises again by itself while that falls (a warning on stderr for each); if it stops with shots left it warns that the build is `errored` and exits 0 as before. A hard kill by the runtime (one shot alone passing 30 s, or the isolate limit) cannot be caught in the request and can leave the build at `processing`; recovering a build stuck that way is a separate ticket. None of this applies to a `ci` project: its finalise reads no PNG and has no budget. An errored `ci` build is never measured again: finalising it again is a 409, and the build page says to re-run the CI job.
 
 Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A CI token only reaches its own project's builds, a personal token the projects of its user's orgs; any other project or build id is a 404. 401 is a missing, wrong, expired or revoked token.
 
@@ -253,8 +275,10 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | Request | Auth | Query or body | Reply |
 | --- | --- | --- | --- |
 | `GET /api/v1/me` | CI or personal | — | `200 { kind: "user", user: { id, login, name } }` or `200 { kind: "ci", projectId }` |
-| `POST /api/v1/builds` | CI or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId? }`; `projectId` is required with a personal token | `201 { id }` |
-| `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint }`), `file` (PNG, ≤32 MiB) | `200 { id }` |
+| `POST /api/v1/builds` | CI or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId?, clientDiff? }`; `projectId` is required with a personal token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
+| `POST /api/v1/builds/:id/baselines` | CI or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
+| `POST /api/v1/baselines` | CI or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick] }` |
+| `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, ci? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci` | `200 { id }` |
 | `POST /api/v1/builds/:id/finalize` | CI or personal | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
 | `GET /api/v1/projects` | CI or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; a CI token's one project |
 | `GET /api/v1/projects/:id/builds` | CI or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
@@ -262,11 +286,11 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | `GET /api/v1/snapshots/:id` | CI or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
 | `GET /api/v1/projects/:id/detection-flags` | CI or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
 
-There are no write endpoints besides the four upload ones: accepting and rejecting stay in the web app.
+There are no write endpoints besides the four upload ones: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
 **The upload endpoints** (`me`, `builds`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`.
 
-**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`) use snake_case keys, and every reply carries `"api_version": 1`. An error is:
+**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `baselines`) use snake_case keys, and every reply carries `"api_version": 1`. An error is:
 
 ```json
 { "api_version": 1, "error": { "code": "not_found", "message": "build not found" } }
@@ -352,14 +376,41 @@ A **snapshot**:
   "awaits_decision": false,
   "carried_from": null,
   "approved_earlier": null,
+  "measured_by": "ci",
+  "engine_version": "0.1.0",
+  "diff_error": null,
   "created_at": "2026-10-22T09:00:00.000Z",
   "web_url": "https://<server>/projects/…/builds/…/snapshots/…"
 }
 ```
 
+`measured_by` is `ci` or `server`: who measured `diff_result`. `engine_version` is the engine that measured it. Both are `null` on a shot that was not measured or that was measured before this field existed. `diff_error` names why a `ci` project's result for the shot was refused (see "Where the diff runs"), and is otherwise `null`.
+
 `carried_from` is `{ snapshot_id, build_id }`. `approved_earlier` is `{ snapshot_id, build_id, commit_sha, reviewed_by, reviewed_at, default_branch }`.
 
 `GET /api/v1/snapshots/:id` adds `images`: absolute URLs to the head shot, the baseline it was compared against, and the diff overlay. They go through the app's signed image route, need no token, and **expire after 5 minutes**: read the snapshot again for fresh ones. `baseline` and `diff` are `null` when there is none (a new shot, or one not yet measured).
+
+A **pick** (from either `baselines` endpoint):
+
+```json
+{
+  "key": { "name": "home", "platform": "linux", "browser": "chromium", "viewport": "1280x720", "theme": "light" },
+  "baseline": {
+    "id": "…",
+    "image_url": "https://<server>/images/…",
+    "fingerprint": { "image": "…", "browser": "…", "fonts": "…" },
+    "ignore": [{ "x": 0, "y": 0, "width": 10, "height": 10 }]
+  },
+  "carry": null,
+  "accepted": null
+}
+```
+
+- `baseline` is `null` for a new shot.
+- `image_url` expires after 5 minutes, like the snapshot `images` above.
+- A shot is compared only when its fingerprint matches `fingerprint`.
+- The thresholds are the shot's own diff options as uploaded, so they are not in the reply.
+- `carry` is set when `baseline` holds an open change (ob 1712). A shot identical to `baseline` carries that change. A shot that differs from it is measured against `accepted` instead, which has the same shape as `baseline`, or is `null` when there is none.
 
 A **detection flag**:
 

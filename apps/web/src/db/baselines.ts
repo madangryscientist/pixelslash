@@ -62,6 +62,12 @@ export type Baselines = {
   removed: BaselineSnapshot[];
 };
 
+/** What the pick reads of the build it picks for; the read-only baselines endpoint makes one up. */
+export type PickFor = Pick<
+  Build,
+  "id" | "projectId" | "createdAt" | "branch" | "mergeBaseSha" | "ancestorShas"
+>;
+
 const emptyBaselines = (): Baselines => ({ byKey: new Map(), removed: [] });
 
 type Candidate = BaselineSnapshot & {
@@ -108,7 +114,7 @@ const baselineOf = ({
  * branch auto-accepts, so a squash-merged build there counts), or any shot of this branch. Only from a
  * build that was not rejected.
  */
-function queryCandidates(db: Db, build: Build) {
+function queryCandidates(db: Db, build: PickFor) {
   const commits = [build.mergeBaseSha, ...build.ancestorShas].filter(
     (sha): sha is string => sha !== null,
   );
@@ -160,7 +166,7 @@ function queryCandidates(db: Db, build: Build) {
 }
 
 /** Newest first; a same-branch shot outranks a newer one from another branch. */
-function pickAccepted(candidates: Candidate[], build: Build): Map<string, Candidate> {
+function pickAccepted(candidates: Candidate[], build: PickFor): Map<string, Candidate> {
   const picked = new Map<string, Candidate>();
   for (const row of candidates) {
     if (!acceptedRow(row)) continue;
@@ -172,7 +178,7 @@ function pickAccepted(candidates: Candidate[], build: Build): Map<string, Candid
   return picked;
 }
 
-function pick(candidates: Candidate[], build: Build): Map<string, Baseline> {
+function pick(candidates: Candidate[], build: PickFor): Map<string, Baseline> {
   const accepted = pickAccepted(candidates, build);
   const previous = new Map<string, Candidate>();
   for (const row of candidates) {
@@ -193,7 +199,7 @@ function pick(candidates: Candidate[], build: Build): Map<string, Baseline> {
 }
 
 /** The build whose set of shots decides what was removed: the branch's previous one, else the newest accepted one in reach. */
-function primaryBuild(build: Build, candidates: Candidate[]): string | null {
+function primaryBuild(build: PickFor, candidates: Candidate[]): string | null {
   const onBranch = candidates.find((row) => row.branch === build.branch);
   return (onBranch ?? candidates.find(acceptedRow))?.buildId ?? null;
 }
@@ -221,7 +227,11 @@ async function removedSince(
   return rows.filter((row) => !keys.has(snapshotKeyOf(row)));
 }
 
-export async function selectBaselines(db: Db, build: Build, keys: Set<string>): Promise<Baselines> {
+export async function selectBaselines(
+  db: Db,
+  build: PickFor,
+  keys: Set<string>,
+): Promise<Baselines> {
   const candidates = await queryCandidates(db, build);
   if (candidates.length === 0) return emptyBaselines();
   const baselineBuildId = primaryBuild(build, candidates);

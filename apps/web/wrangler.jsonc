@@ -26,6 +26,8 @@
     "IMAGE_SIGNING_SECRET": "",
     // The oldest `pixelslash` CLI the API takes (`x.y.z`); empty takes any. A CLI below it gets 426 `cli_outdated`.
     "MIN_CLI_VERSION": "",
+    // Where a new project diffs (ob 1727): `ci` here; unset or anything else is `server`, the self-host default.
+    "DEFAULT_DIFF_LOCATION": "ci",
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.

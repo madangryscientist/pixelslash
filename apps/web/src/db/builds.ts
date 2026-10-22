@@ -1,4 +1,5 @@
 import { and, count, eq } from "drizzle-orm";
+import type { CiUpload } from "#/diff/ci-result";
 import { sha256Hex } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
@@ -61,6 +62,32 @@ export async function getBuild(db: Db, projectId: string, buildId: string): Prom
 }
 
 /**
+ * What a CLI in a `ci` project sent with a shot (ob 1727): per baseline it measured against, the
+ * result and its diff mask. Stored unchecked as `CiUpload`; finalise checks the server's pick.
+ */
+export type CiShot = {
+  engineVersion: string;
+  /** The shot's size, from its PNG header. */
+  image: { width: number; height: number };
+  results: { baselineId: string; status: unknown; diffResult: unknown; mask: ArrayBuffer }[];
+};
+
+/** Store each CI mask beside the shot, one per baseline, and return what `ci_results` holds. */
+async function putMasks(blobs: BlobStore, stem: string, ci: CiShot): Promise<CiUpload> {
+  const results = await Promise.all(
+    ci.results.map(async ({ mask, ...result }) => {
+      const diffKey = `${stem}.vs-${result.baselineId}.diff.png`;
+      await blobs.put(diffKey, mask, "image/png");
+      return { ...result, diffKey };
+    }),
+  );
+  return { engineVersion: ci.engineVersion, image: ci.image, results };
+}
+
+/** One upload: the shot's meta, its PNG and, from a CI project's CLI, what it measured (ob 1727). */
+export type SentSnapshot = { input: SnapshotInput; png: ArrayBuffer; ci?: CiShot | null };
+
+/**
  * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
  * the blob key comes from that identity, so the second PNG overwrites the first in place.
  * The blob goes first, so a failed put leaves no row to count.
@@ -68,13 +95,13 @@ export async function getBuild(db: Db, projectId: string, buildId: string): Prom
 export async function putSnapshot(
   { db, blobs }: { db: Db; blobs: BlobStore },
   build: Build,
-  input: SnapshotInput,
-  png: ArrayBuffer,
+  { input, png, ci = null }: SentSnapshot,
 ): Promise<{ id: string }> {
   if (build.status !== "uploading") throw new BuildFinalisedError();
   const { name, platform, browser, viewport, theme } = input;
   const identity = await sha256Hex(JSON.stringify([name, platform, browser, viewport, theme]));
-  const imageKey = `builds/${build.id}/${identity.slice(0, 32)}.png`;
+  const stem = `builds/${build.id}/${identity.slice(0, 32)}`;
+  const imageKey = `${stem}.png`;
   await blobs.put(imageKey, png, "image/png");
   const fields = {
     tags: input.tags,
@@ -82,6 +109,7 @@ export async function putSnapshot(
     ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
     imageKey,
+    ciResults: ci && (await putMasks(blobs, stem, ci)),
   };
   const [row] = await db
     .insert(snapshots)

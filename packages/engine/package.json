@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./diff": "./src/diff.ts"
+    "./diff": "./src/diff.ts",
+    "./ci-diff": "./src/ci-diff.ts"
   },
   "dependencies": {
     "playwright": "1.60.0",

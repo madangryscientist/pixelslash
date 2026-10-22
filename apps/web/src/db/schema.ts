@@ -65,6 +65,13 @@ export const invites = sqliteTable(
   (t) => [unique().on(t.orgId, t.githubLogin), index("invites_login_idx").on(t.githubLogin)],
 );
 
+/**
+ * Where a project's shots are diffed (ob 1727): `ci` runs the engine in the CLI and the server
+ * checks and stores its results; `server` diffs at finalise. One per project, no per-shot fallback.
+ */
+export const DIFF_LOCATIONS = ["ci", "server"] as const;
+export type DiffLocation = (typeof DIFF_LOCATIONS)[number];
+
 export const projects = sqliteTable(
   "projects",
   {
@@ -75,6 +82,11 @@ export const projects = sqliteTable(
     name: text("name").notNull(),
     /** Builds on this branch are auto-accepted and become the next baselines (ob 1559). Set on the settings page. */
     defaultBranch: text("default_branch").notNull().default("main"),
+    /**
+     * Where its shots are diffed (ob 1727). The column default is what projects from before it get;
+     * a new one takes the deployment's `DEFAULT_DIFF_LOCATION`. Set on the settings page.
+     */
+    diffLocation: text("diff_location", { enum: DIFF_LOCATIONS }).notNull().default("server"),
     createdAt: createdAt(),
   },
   (t) => [unique().on(t.orgId, t.name)],
@@ -283,6 +295,17 @@ export const snapshots = sqliteTable(
      * read for display (`approvedEarlier` in `review.ts`); no foreign key, like `carried_from`.
      */
     baselineSnapshotId: text("baseline_snapshot_id"),
+    /** Who measured `diff_result` (ob 1727): the CLI in CI, or the server. Null until measured, and on older rows. */
+    measuredBy: text("measured_by", { enum: DIFF_LOCATIONS }),
+    /** The engine version that measured it, beside `measured_by`. */
+    engineVersion: text("engine_version"),
+    /**
+     * What a CI run sent with the shot, unchecked: one `{baselineId, status, diffResult, diffKey}`
+     * per baseline it measured against. Finalise validates the one for the server's pick (ob 1727).
+     */
+    ciResults: text("ci_results", { mode: "json" }).$type<unknown>(),
+    /** Why a CI result was refused: the shot was not measured, and its build errored naming it. */
+    diffError: text("diff_error"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),

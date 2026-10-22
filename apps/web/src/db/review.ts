@@ -10,6 +10,7 @@ import { heldShot } from "./markers";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
+  type DiffLocation,
   type DiffOptions,
   type DiffResult,
   type DiffStatus,
@@ -90,6 +91,12 @@ export type SnapshotView = {
   carriedFromBuild: string | null;
   /** Set on an unchanged shot whose difference from the default branch was accepted on an earlier build of this branch. */
   approvedEarlier: ApprovedEarlier | null;
+  /** Where the diff ran (ob 1727): the CI job's CLI or this server; null until measured. */
+  measuredBy: DiffLocation | null;
+  /** The engine that measured it; null until measured. */
+  engineVersion: string | null;
+  /** Why the shot could not be measured, when it could not. */
+  diffError: string | null;
   createdAt: Date;
 };
 
@@ -130,6 +137,9 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       diffResult: snapshots.diffResult,
       rebaselineNeeded: snapshots.rebaselineNeeded,
       carriedFrom: snapshots.carriedFrom,
+      measuredBy: snapshots.measuredBy,
+      engineVersion: snapshots.engineVersion,
+      diffError: snapshots.diffError,
       createdAt: snapshots.createdAt,
     })
     .from(snapshots)

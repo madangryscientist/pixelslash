@@ -6,7 +6,14 @@ import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
-import { getProjectSettings, issueToken, revokeToken, saveDefaultBranch } from "#/server/fns";
+import type { DiffLocation } from "#/db/schema";
+import {
+  getProjectSettings,
+  issueToken,
+  revokeToken,
+  saveDefaultBranch,
+  saveDiffLocation,
+} from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/settings")({
   loader: ({ params }) => getProjectSettings({ data: { projectId: params.projectId } }),
@@ -72,6 +79,7 @@ function ProjectSettings() {
           }}
         />
       </section>
+      <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
         <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
         <Body as="p" className="mb-3">
@@ -85,6 +93,86 @@ function ProjectSettings() {
         />
       </section>
     </Page>
+  );
+}
+
+const LOCATIONS: { value: DiffLocation; label: string; detail: string }[] = [
+  {
+    value: "ci",
+    label: "In CI",
+    detail:
+      "The CLI diffs each shot against the baseline the server picks and uploads the result; the server checks it and stores it.",
+  },
+  {
+    value: "server",
+    label: "On the server",
+    detail: "The CLI uploads the shots and the server diffs them when the build is finalised.",
+  },
+];
+
+/** Where the project's shots are diffed (ob 1727): one place per project, from the next build on. */
+function DiffLocationForm({
+  projectId,
+  saved,
+  hydrated,
+}: {
+  projectId: string;
+  saved: DiffLocation;
+  hydrated: boolean;
+}) {
+  const router = useRouter();
+  const [chosen, setChosen] = useState<DiffLocation>(saved);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await saveDiffLocation({ data: { projectId, location: chosen } });
+      await router.invalidate();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section
+      className="mt-6 rounded-xl border border-slate-200 bg-white p-6"
+      data-testid="diff-location"
+    >
+      <SectionHeading className="mb-1.5">Diff location</SectionHeading>
+      <Body as="p" className="mb-4">
+        Where this project&apos;s shots are compared with their baselines. Every shot of a build is
+        measured in the same place; a CI build whose result is missing or wrong errors, and is never
+        diffed on the server instead.
+      </Body>
+      <fieldset className="mb-4 space-y-2">
+        <legend className="sr-only">Diff location</legend>
+        {LOCATIONS.map((l) => (
+          <label key={l.value} className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="diff-location"
+              value={l.value}
+              checked={chosen === l.value}
+              onChange={() => setChosen(l.value)}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">{l.label}</span>
+              <span className="block text-slate-600">{l.detail}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {chosen !== saved && (
+        <Callout tone="warn" role="status" title="Builds will not be comparable" className="mb-4">
+          Builds before and after a switch were measured in different places and may not be
+          consistent: a CI run and the server can disagree at the edges. Compare builds from the
+          same side of the switch.
+        </Callout>
+      )}
+      <ActionButton waiting={!hydrated} busy={busy} busyLabel="Saving…" onClick={() => void save()}>
+        Save diff location
+      </ActionButton>
+    </section>
   );
 }
 

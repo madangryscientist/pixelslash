@@ -1,3 +1,4 @@
+import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
 import type { DiffOptions, IgnoreRect } from "#/db/schema";
 
@@ -115,20 +116,28 @@ export function parseRect(v: unknown, where: string): IgnoreRect {
   };
 }
 
+/** A snapshot's identity: its name and the fixed variant. `at` prefixes each field's name in an error. */
+export function parseSnapshotKey(raw: unknown, at = ""): SnapshotKey {
+  const m = object(raw, at || "meta");
+  const theme = m.theme;
+  if (theme !== "light" && theme !== "dark") bad(`${at}theme`, 'must be "light" or "dark"');
+  return {
+    name: text(m.name, `${at}name`, 200),
+    platform: text(m.platform, `${at}platform`, 40, TOKEN),
+    browser: text(m.browser, `${at}browser`, 40, TOKEN),
+    viewport: text(m.viewport, `${at}viewport`, 11, /^\d{1,5}x\d{1,5}$/),
+    theme,
+  };
+}
+
 export function parseSnapshotInput(raw: unknown): SnapshotInput {
   const m = object(raw, "meta");
   const tags = m.tags ?? [];
   if (!Array.isArray(tags) || tags.length > MAX_TAGS)
     bad("tags", `must be an array of at most ${MAX_TAGS} strings`);
   const fp = object(m.fingerprint, "fingerprint");
-  const theme = m.theme;
-  if (theme !== "light" && theme !== "dark") bad("theme", 'must be "light" or "dark"');
   return {
-    name: text(m.name, "name", 200),
-    platform: text(m.platform, "platform", 40, TOKEN),
-    browser: text(m.browser, "browser", 40, TOKEN),
-    viewport: text(m.viewport, "viewport", 11, /^\d{1,5}x\d{1,5}$/),
-    theme,
+    ...parseSnapshotKey(m),
     tags: tags.map((t, i) => text(t, `tags[${i}]`, 100)),
     diff: parseDiff(m.diff),
     ignore: parseIgnore(m.ignore),
@@ -152,4 +161,45 @@ const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 export function isPng(bytes: ArrayBuffer): boolean {
   const head = new Uint8Array(bytes, 0, Math.min(8, bytes.byteLength));
   return head.length === 8 && PNG_SIGNATURE.every((b, i) => head[i] === b);
+}
+
+/** The width and height in a PNG's IHDR chunk (bytes 16 to 23, big-endian); the caller checked `isPng`. */
+export function pngSize(bytes: ArrayBuffer): { width: number; height: number } {
+  if (bytes.byteLength < 24) bad("file", "is too short to be a PNG");
+  const view = new DataView(bytes);
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  if (width === 0 || height === 0) bad("file", "is a PNG with no pixels");
+  return { width, height };
+}
+
+/** One baseline a CI run measured the shot against, as sent; finalise checks the result itself. */
+export type CiResultInput = { baselineId: string; status: unknown; diffResult: unknown };
+export type CiInput = { engineVersion: string; results: CiResultInput[] };
+
+/** The shot and, when the pick carries, the accepted one it carries from (ob 1712). */
+const MAX_CI_RESULTS = 2;
+const ID = /^[\w-]{1,64}$/;
+
+/**
+ * `meta.ci`, what a CLI in a `ci` project sends with a shot (ob 1727): the engine version and one
+ * result per baseline it measured against. Only the envelope is checked here; a result that is
+ * not a result ends its shot errored at finalise, named, rather than failing the upload.
+ */
+export function parseCiInput(raw: unknown): CiInput | null {
+  if (raw === undefined || raw === null) return null;
+  const c = object(raw, "ci");
+  if (!Array.isArray(c.results) || c.results.length === 0 || c.results.length > MAX_CI_RESULTS)
+    bad("ci.results", `must be an array of 1 to ${MAX_CI_RESULTS} results`);
+  const results = c.results.map((r, i) => {
+    const o = object(r, `ci.results[${i}]`);
+    return {
+      baselineId: text(o.baselineId, `ci.results[${i}].baselineId`, 64, ID),
+      status: o.status,
+      diffResult: o.diffResult,
+    };
+  });
+  if (new Set(results.map((r) => r.baselineId)).size !== results.length)
+    bad("ci.results", "names a baseline twice");
+  return { engineVersion: text(c.engineVersion, "ci.engineVersion", 64, TOKEN), results };
 }

@@ -56,6 +56,21 @@ function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
   );
 }
 
+const MEASURED_BY = { ci: "CI (the CLI)", server: "PixelSlash server" } as const;
+
+/** Where the diff ran and on which engine (ob 1727); nothing for a shot measured before it was recorded. */
+function Provenance({ snapshot }: { snapshot: SnapshotView }) {
+  if (!snapshot.measuredBy) return null;
+  return (
+    <>
+      <Row label="Measured by">
+        <span data-testid="measured-by">{MEASURED_BY[snapshot.measuredBy]}</span>
+      </Row>
+      <Row label="Engine">{snapshot.engineVersion ?? "unknown"}</Row>
+    </>
+  );
+}
+
 /** What the diff measured, or that it measured nothing: an unmeasured shot is never "0 changed". */
 function Measured({ snapshot }: { snapshot: SnapshotView }) {
   const result = snapshot.diffResult;
@@ -64,6 +79,14 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
       <section>
         <Heading>Measured</Heading>
         <p className="text-sm font-medium">Not measured</p>
+        {snapshot.diffError && (
+          <p data-testid="diff-error" className="mt-1 text-sm text-red-700">
+            {snapshot.diffError}
+          </p>
+        )}
+        <dl className="mt-2 space-y-1 text-sm empty:hidden">
+          <Provenance snapshot={snapshot} />
+        </dl>
         <SizeLine snapshot={snapshot} />
       </section>
     );
@@ -83,6 +106,7 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
         <Row label="Compared at">
           {result.width}×{result.height}
         </Row>
+        <Provenance snapshot={snapshot} />
       </dl>
       <SizeLine snapshot={snapshot} />
     </section>

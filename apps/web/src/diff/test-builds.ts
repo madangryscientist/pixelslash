@@ -58,10 +58,8 @@ async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
   });
   const build = await getBuild(ctx.db, ctx.projectId, id);
   for (const s of spec.shots) {
-    await putSnapshot(
-      { db: ctx.db, blobs: ctx.scoped },
-      build,
-      {
+    await putSnapshot({ db: ctx.db, blobs: ctx.scoped }, build, {
+      input: {
         name: s.name ?? "pricing",
         platform: "linux",
         browser: "chromium",
@@ -72,8 +70,8 @@ async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
         ignore: s.ignore ?? [],
         fingerprint: s.fingerprint ?? FINGERPRINT,
       },
-      s.png.buffer,
-    );
+      png: s.png.buffer,
+    });
   }
   return build;
 }

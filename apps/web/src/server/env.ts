@@ -2,6 +2,8 @@ import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import type { GithubConfig } from "#/auth/github";
 import type { Db } from "#/db/db";
+import { diffLocationOf } from "#/db/orgs";
+import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
 
 /** The one place that touches the Worker's bindings; everything below takes plain values. */
@@ -18,6 +20,9 @@ export function imageSigningSecret(): string {
 
 /** The oldest CLI the API takes (`x.y.z`, ob 1729); empty takes any. Set in `vars`. */
 export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || undefined;
+
+/** Where a new project diffs (ob 1727): `DEFAULT_DIFF_LOCATION`, read by `diffLocationOf`. */
+export const defaultDiffLocation = (): DiffLocation => diffLocationOf(env.DEFAULT_DIFF_LOCATION);
 
 export function githubConfig(): GithubConfig {
   const clientSecret = env.GITHUB_CLIENT_SECRET;

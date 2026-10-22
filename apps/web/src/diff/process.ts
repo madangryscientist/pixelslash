@@ -1,6 +1,5 @@
-import { Buffer } from "node:buffer";
-import { diffPngs } from "@pixelslash/engine/diff";
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import type { diffPngs } from "@pixelslash/engine/diff";
+import { and, eq } from "drizzle-orm";
 import {
   type Baseline,
   type Baselines,
@@ -11,14 +10,32 @@ import {
 import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
 import { refreshBuildStatus } from "#/db/review";
-import { type DiffResult, builds, projects, snapshots } from "#/db/schema";
+import { type DiffLocation, builds, projects, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
+import { CiResultError } from "./ci-result";
+import { NoRecoveryError, claim, dead } from "./claim";
+import {
+  type Comparer,
+  type Measured,
+  type SnapshotRow,
+  ciComparer,
+  diffKeyOf,
+  serverComparer,
+} from "./compare";
+
+export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
 /**
  * The server diff (ob 1470): when a build is finalised, pick each shot's baseline and measure it
  * with the engine's diff — the same code the CLI runs, so a run here and a run there agree. The
  * server adds only the things the engine does not know about: which baseline, which stored
  * options and ignore areas, and the build status.
+ *
+ * A project that diffs in CI (ob 1727) runs none of the diff here: the CLI measured each shot
+ * against the baseline this same pick gave it, and the server checks and stores what it sent
+ * (`ci-result.ts`). Every shot of a build is measured in one place; a CI result that is missing,
+ * malformed or measured against another baseline errors the shot and the build, and is never
+ * diffed here instead.
  */
 
 /**
@@ -35,6 +52,8 @@ export type ProcessDeps = {
   blobs: BlobStore;
   /** The clock the budget reads; a test passes a fake one. workerd advances it at I/O, and each shot ends in a blob write. */
   now?: (() => number) | undefined;
+  /** The engine's diff; a test passes one that throws to prove a CI build never calls it. */
+  diff?: typeof diffPngs | undefined;
 };
 
 /**
@@ -52,41 +71,6 @@ export class DiffCeilingError extends Error {
     this.name = "DiffCeilingError";
     this.unmeasured = total - measured;
   }
-}
-
-type SnapshotRow = typeof snapshots.$inferSelect;
-
-async function readBlob(blobs: BlobStore, key: string): Promise<Buffer> {
-  const stream = await blobs.get(key);
-  if (!stream) throw new Error(`image ${key} is missing from storage`);
-  return Buffer.from(await new Response(stream).arrayBuffer());
-}
-
-/** The diff image's key sits beside the shot it belongs to. */
-function diffKeyOf(imageKey: string): string {
-  return `${imageKey.replace(/\.png$/, "")}.diff.png`;
-}
-
-/** The engine's result, minus the overlay (its own blob) and the fields the UI derives. */
-function summarize(result: ReturnType<typeof diffPngs>): DiffResult {
-  return {
-    changedPixels: result.changedPixels,
-    antialiasedPixels: result.antialiased,
-    ignoredPixels: result.ignoredPixels,
-    ignored: result.ignored,
-    specks: result.specks,
-    regions: result.regions,
-    // The engine's `width`/`height` are the overlay canvas (the larger of the two); the overlap
-    // it actually measured is the smaller, and that is what the report must state.
-    width: Math.min(result.mainWidth, result.branchWidth),
-    height: Math.min(result.mainHeight, result.branchHeight),
-    mainWidth: result.mainWidth,
-    mainHeight: result.mainHeight,
-    branchWidth: result.branchWidth,
-    branchHeight: result.branchHeight,
-    sizeChanged:
-      result.mainWidth !== result.branchWidth || result.mainHeight !== result.branchHeight,
-  };
 }
 
 async function storeSnapshot(
@@ -121,6 +105,9 @@ async function storeUncompared(
           baselineKey: baseline.imageKey,
           baselineSnapshotId: baseline.id,
           carriedFrom: null,
+          measuredBy: null,
+          engineVersion: null,
+          diffError: null,
         }
       : {
           diffStatus: "new",
@@ -130,56 +117,46 @@ async function storeUncompared(
           baselineSnapshotId: null,
           rebaselineNeeded: false,
           carriedFrom: null,
+          measuredBy: null,
+          engineVersion: null,
+          diffError: null,
         },
   );
-  if (shot.diffKey) await deps.blobs.delete(shot.diffKey);
-}
-
-async function compare(deps: ProcessDeps, shot: SnapshotRow, baseline: BaselineSnapshot) {
-  const [main, branch] = await Promise.all([
-    readBlob(deps.blobs, baseline.imageKey),
-    readBlob(deps.blobs, shot.imageKey),
-  ]);
-  // The new shot's stored options; the engine's defaults fill any key it left out. The ignore
-  // areas are the union of both shots', so an element that moved is covered at both places.
-  return diffPngs(main, branch, shot.diffOptions, {
-    main: baseline.ignore,
-    branch: shot.ignore,
-  });
+  // Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot.
+  if (shot.diffKey === diffKeyOf(shot.imageKey)) await deps.blobs.delete(shot.diffKey);
 }
 
 /** Store a comparison: the shot it was against, and the open change it carries, if any (ob 1712). */
 async function storeDiff(
   deps: ProcessDeps,
   shot: SnapshotRow,
-  result: ReturnType<typeof diffPngs>,
+  measured: Measured,
   against: { baseline: BaselineSnapshot; carriedFrom: string | null },
 ): Promise<void> {
   const { baseline, carriedFrom } = against;
-  const diffKey = diffKeyOf(shot.imageKey);
-  // One bulk copy, not a view: a blob store takes an ArrayBuffer, and a Buffer may be a view
-  // into a pooled one. The overlay of a full-page shot is ~20 MB against a Worker's 128 MB.
-  const png = new Uint8Array(result.overlay);
-  await deps.blobs.put(diffKey, png.buffer, "image/png");
   await storeSnapshot(deps.db, shot.id, {
     baselineKey: baseline.imageKey,
     baselineSnapshotId: baseline.id,
-    diffKey,
-    diffStatus: result.changed ? "changed" : "unchanged",
-    diffResult: summarize(result),
+    diffKey: await measured.diffKey(),
+    diffStatus: measured.changed ? "changed" : "unchanged",
+    diffResult: measured.diffResult,
     rebaselineNeeded: false,
     carriedFrom,
+    measuredBy: measured.measuredBy,
+    engineVersion: measured.engineVersion,
+    diffError: null,
   });
 }
 
 async function measureAgainst(
   deps: ProcessDeps,
+  compare: Comparer,
   shot: SnapshotRow,
   baseline: BaselineSnapshot | undefined,
 ): Promise<void> {
   if (!baseline || baseline.envFingerprint !== shot.envFingerprint)
     return storeUncompared(deps, shot, baseline);
-  await storeDiff(deps, shot, await compare(deps, shot, baseline), { baseline, carriedFrom: null });
+  await storeDiff(deps, shot, await compare(shot, baseline), { baseline, carriedFrom: null });
 }
 
 /**
@@ -189,19 +166,20 @@ async function measureAgainst(
  */
 async function diffOne(
   deps: ProcessDeps,
+  compare: Comparer,
   shot: SnapshotRow,
   baseline: Baseline | undefined,
 ): Promise<void> {
-  if (!baseline?.carry) return measureAgainst(deps, shot, baseline?.shot);
+  if (!baseline?.carry) return measureAgainst(deps, compare, shot, baseline?.shot);
   if (baseline.shot.envFingerprint === shot.envFingerprint) {
-    const result = await compare(deps, shot, baseline.shot);
-    if (!result.changed)
-      return storeDiff(deps, shot, result, {
+    const measured = await compare(shot, baseline.shot);
+    if (!measured.changed)
+      return storeDiff(deps, shot, measured, {
         baseline: baseline.shot,
         carriedFrom: baseline.carry,
       });
   }
-  await measureAgainst(deps, shot, baseline.accepted);
+  await measureAgainst(deps, compare, shot, baseline.accepted);
 }
 
 /** A shot the baseline build had and this one does not: a marker row, so reviewers can see it. */
@@ -227,13 +205,24 @@ async function markRemoved(deps: ProcessDeps, build: Build, removed: BaselineSna
   }
 }
 
-/** A build on the project's default branch is auto-accepted: there is no reviewer to ask (ob 1559). */
-async function acceptDefaultBranchBuild(db: Db, build: Build): Promise<void> {
+type ProjectOfBuild = { defaultBranch: string; diffLocation: DiffLocation };
+
+async function projectOf(db: Db, build: Build): Promise<ProjectOfBuild> {
   const [project] = await db
-    .select({ defaultBranch: projects.defaultBranch })
+    .select({ defaultBranch: projects.defaultBranch, diffLocation: projects.diffLocation })
     .from(projects)
     .where(eq(projects.id, build.projectId));
-  if (build.branch !== project?.defaultBranch) return;
+  if (!project) throw new Error("the build's project is gone");
+  return project;
+}
+
+/** A build on the project's default branch is auto-accepted: there is no reviewer to ask (ob 1559). */
+async function acceptDefaultBranchBuild(
+  db: Db,
+  build: Build,
+  project: ProjectOfBuild,
+): Promise<void> {
+  if (build.branch !== project.defaultBranch) return;
   await db
     .update(snapshots)
     .set({ reviewState: "accepted", reviewedAt: new Date() })
@@ -251,46 +240,6 @@ export type ProcessResult = {
   /** Shots a finalise sent again would still measure; non-zero only when the budget stopped the run. */
   unmeasured: number;
 };
-
-/**
- * How long a `processing` build is presumed alive. A run killed mid-diff (the isolate hits its
- * 30 s CPU limit on a build of several whole-page changes, or the Worker is evicted) never gets
- * to write `errored`, so its build would read `processing` for ever. Nothing heartbeats, so age
- * is the only evidence of death: a build claimed longer ago than this has no live run, and the
- * next finalise may take it over. It must outlast any run that is still going — the request is
- * capped at 30 s of CPU, and R2 waits add wall time, not CPU — and stay short enough that a
- * client retrying finalise is not left waiting on a corpse. Five minutes is ten times the cap.
- *
- * The claim is a lease without a fence: a run still alive past the bound would be overwritten by
- * its successor's verdict. That is a choice; fencing every write is more than this needs.
- */
-export const STALE_PROCESSING_MS = 5 * 60 * 1000;
-
-/**
- * Take the build for one diff run, or learn that someone else holds it. One conditional UPDATE,
- * so of two concurrent calls only one wins. A build is claimable when it errored, when it was
- * finalised and no run has started (null), or when its run began more than the bound ago.
- */
-async function claim(db: Db, build: Build): Promise<boolean> {
-  const cutoff = new Date(Date.now() - STALE_PROCESSING_MS);
-  const claimed = await db
-    .update(builds)
-    .set({ status: "processing", error: null, processingStartedAt: new Date() })
-    .where(
-      and(
-        eq(builds.id, build.id),
-        or(
-          eq(builds.status, "errored"),
-          and(
-            eq(builds.status, "processing"),
-            or(isNull(builds.processingStartedAt), lt(builds.processingStartedAt, cutoff)),
-          ),
-        ),
-      ),
-    )
-    .returning({ id: builds.id });
-  return claimed.length > 0;
-}
 
 /**
  * Drop the removed markers an earlier run wrote; the run writes the ones the baseline calls for.
@@ -330,6 +279,7 @@ function measuredPastCarry(shot: SnapshotRow, baseline: Baseline | undefined): b
  * The budget is per run and its first shot always goes, so every run makes progress.
  */
 async function measure(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baselines) {
+  const compare = serverComparer(deps);
   const now = deps.now ?? Date.now;
   const started = now();
   let slowest = 0;
@@ -346,10 +296,49 @@ async function measure(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baseli
     if (diffed > 0 && used + slowest > DIFF_BUDGET_MS)
       throw new DiffCeilingError(kept + diffed, rows.length, used, slowest);
     const began = now();
-    await diffOne(deps, shot, baseline);
+    await diffOne(deps, compare, shot, baseline);
     diffed++;
     slowest = Math.max(slowest, now() - began);
   }
+}
+
+/**
+ * Store the results a CI run sent (ob 1727). No PNG is read and no budget applies: each shot is a
+ * check of some JSON. A shot whose result is refused keeps the reason in `diff_error` and is left
+ * unmeasured; the others are stored, and the build errors naming every refused shot.
+ */
+async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baselines) {
+  const refused: string[] = [];
+  for (const shot of rows) {
+    const baseline = baselines.byKey.get(snapshotKeyOf(shot));
+    if (stands(shot, baseline)) continue;
+    try {
+      await diffOne(deps, ciComparer(deps.blobs), shot, baseline);
+    } catch (e) {
+      if (!(e instanceof CiResultError)) throw e;
+      await storeSnapshot(deps.db, shot.id, { diffStatus: null, diffError: e.message });
+      refused.push(`${shot.name} (${shot.viewport}, ${shot.theme}): ${e.message}`);
+    }
+  }
+  if (refused.length > 0)
+    throw new Error(
+      `this project diffs in CI and ${refused.length} of ${rows.length} shots have no usable result; ` +
+        `re-run the CI job. ${refused.join("; ")}`,
+    );
+}
+
+/**
+ * Another run holds the build: its status. A CI project's build whose run died is not run again
+ * (`claim`), so it is ended here, naming what to do.
+ */
+async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<ProcessResult> {
+  const current = await getBuild(db, build.projectId, build.id);
+  if (ci && dead(current)) {
+    const died = "the run measuring this build died; re-run the CI job";
+    await markErrored(db, current, new Error(died));
+    return { status: "errored", error: died, unmeasured: 0 };
+  }
+  return { status: current.status, error: current.error, unmeasured: 0 };
 }
 
 /**
@@ -371,10 +360,10 @@ async function measure(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baseli
 export async function processBuild(deps: ProcessDeps, build: Build): Promise<ProcessResult> {
   if (build.status !== "processing" && build.status !== "errored")
     return { status: build.status, error: build.error, unmeasured: 0 };
-  if (!(await claim(deps.db, build))) {
-    const current = await getBuild(deps.db, build.projectId, build.id);
-    return { status: current.status, error: current.error, unmeasured: 0 };
-  }
+  const project = await projectOf(deps.db, build);
+  const ci = project.diffLocation === "ci";
+  if (ci && build.status === "errored") throw new NoRecoveryError();
+  if (!(await claim(deps.db, build, ci))) return heldElsewhere(deps.db, build, ci);
   try {
     await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
@@ -383,9 +372,10 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
       build,
       new Set(rows.map(snapshotKeyOf)),
     );
-    await measure(deps, rows, baselines);
+    if (ci) await measureFromCi(deps, rows, baselines);
+    else await measure(deps, rows, baselines);
     await markRemoved(deps, build, baselines.removed);
-    await acceptDefaultBranchBuild(deps.db, build);
+    await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
     return { status, error: null, unmeasured: 0 };
   } catch (e) {

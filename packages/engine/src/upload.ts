@@ -1,4 +1,12 @@
 import { join, resolve, sep } from "node:path";
+import {
+  type BaselinePick,
+  type DiffLocation,
+  ENGINE_VERSION,
+  type PickedShot,
+  isBaselinePick,
+  measureShot,
+} from "./ci-diff.ts";
 import { type MaskRect, parseArea } from "./config-areas.ts";
 import { isHttpUrl } from "./routes.ts";
 import { parseDiffOptions } from "./diff-options.ts";
@@ -6,18 +14,12 @@ import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
-import { USER_AGENT } from "./version.ts";
+import { type Client, isObj, send, sendPng } from "./upload-client.ts";
 
 /** The pinned capture image is Linux; the manifest carries no platform of its own. */
 const PLATFORM = "linux";
 const CONCURRENCY = 4;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-type Obj = Record<string, unknown>;
-
-function isObj(v: unknown): v is Obj {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 function bad(where: string, what: string): never {
   throw new UsageError(`manifest: ${where} ${what}`);
@@ -154,88 +156,6 @@ export type UploadDeps = {
 
 export type UploadResult = { buildId: string; snapshots: number; git: GitContext };
 
-/** Tries per request, and the wait before each retry: bounded, never a loop. */
-const TRIES = 3;
-const RETRY_DELAYS_MS = [1000, 2000];
-
-type Client = {
-  fetch: FetchLike;
-  base: string;
-  token: string;
-  warn: (message: string) => void;
-  sleep: (ms: number) => Promise<void>;
-};
-/** `step` is what the CLI says failed: "open build", "upload <snapshot>", "finalize". */
-type Call = { step: string; method: string; path: string; body: string | FormData };
-
-/** One attempt's outcome: the reply, or why there is none and whether another try may get one. */
-type Attempt = { ok: true; body: unknown } | { ok: false; message: string; transient: boolean };
-
-/**
- * The server's answer in one line: the API's `{"error"}`, else the first line of the text (an
- * HTML error page from a proxy in front of the API is cut down to its text).
- */
-function answer(text: string): { detail: string; fromApi: boolean } {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (isObj(parsed) && typeof parsed.error === "string")
-      return { detail: parsed.error, fromApi: true };
-  } catch {
-    // Not JSON: not the API's own answer.
-  }
-  const plain = text
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<(head|style|script)[^]*?<\/\1>/gi, "")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l !== "");
-  return { detail: (plain ?? "").slice(0, 200), fromApi: false };
-}
-
-async function attempt(client: Client, call: Call): Promise<Attempt> {
-  const { body } = call;
-  const headers: Record<string, string> = {
-    authorization: `Bearer ${client.token}`,
-    "user-agent": USER_AGENT,
-  };
-  if (typeof body === "string") headers["content-type"] = "application/json";
-  let res: Response;
-  try {
-    res = await client.fetch(`${client.base}${call.path}`, { method: call.method, body, headers });
-  } catch (e) {
-    const message = `${call.method} ${client.base}${call.path}: ${e instanceof Error ? e.message : String(e)}`;
-    return { ok: false, message, transient: true };
-  }
-  if (res.ok) return { ok: true, body: await res.json() };
-  const { detail, fromApi } = answer(await res.text().catch(() => ""));
-  // The API answers every error it means with JSON. A 5xx without it, or a gateway status, came
-  // from in front of the API (a proxy, a dev server) or from a Worker that died mid-request, so no
-  // answer was given and another try may get one.
-  const transient = [502, 503, 504].includes(res.status) || (res.status >= 500 && !fromApi);
-  const message = `${call.method} ${call.path} -> ${res.status} ${detail}`.trim();
-  return { ok: false, message, transient };
-}
-
-/**
- * One request to the API; anything but 2xx is an UploadError naming the step and carrying the
- * server's answer. A failure the API never answered is tried again, up to TRIES in all: every
- * step is safe to repeat (a snapshot sent again replaces itself, a finalise again with the same
- * count is a no-op), and a repeated open at worst leaves an empty, unfinalised build behind.
- */
-async function send(client: Client, call: Call): Promise<unknown> {
-  for (let n = 1; ; n++) {
-    const result = await attempt(client, call);
-    if (result.ok) return result.body;
-    const tries = n === 1 ? "" : ` (after ${n} tries)`;
-    if (!result.transient || n === TRIES)
-      throw new UploadError(`upload failed: ${call.step}: ${result.message}${tries}`);
-    client.warn(`upload: ${call.step}: ${result.message}; trying again (${n + 1}/${TRIES})`);
-    await client.sleep(RETRY_DELAYS_MS[n - 1] ?? 0);
-  }
-}
-
 /**
  * Finalise, and again while the server's diff runs out of budget with shots left (ob 1645). The
  * server resumes: a finalise sent again measures only what is not yet measured, so this is the
@@ -272,20 +192,97 @@ function checkOutcome(client: Client, id: string, done: unknown): void {
     client.warn(`upload: build ${id} is errored on the server: ${String(done.error)}`);
 }
 
+type OpenBuild = {
+  id: string;
+  /** Where the project diffs; absent from a server from before ob 1727, which always diffs itself. */
+  diffLocation: DiffLocation | undefined;
+};
+
+/** `clientDiff` says this CLI can measure: a project that diffs in CI refuses one that cannot. */
 async function openBuild(
   client: Client,
   ctx: GitContext,
   projectId: string | undefined,
-): Promise<string> {
+): Promise<OpenBuild> {
   const body = await send(client, {
     step: "open build",
     method: "POST",
     path: "/api/v1/builds",
-    body: JSON.stringify(projectId ? { ...ctx, projectId } : ctx),
+    body: JSON.stringify({ ...ctx, ...(projectId ? { projectId } : {}), clientDiff: true }),
   });
   if (!isObj(body) || typeof body.id !== "string")
     throw new UploadError("upload failed: server did not return a build id");
-  return body.id;
+  const at = body.diffLocation;
+  return { id: body.id, diffLocation: at === "ci" || at === "server" ? at : undefined };
+}
+
+/** Keys per baselines request: the server takes up to 2000. */
+const KEYS_PER_REQUEST = 500;
+
+function snapshotKey(e: SnapshotEntry) {
+  const { name, platform, browser, viewport, theme } = snapshotMeta(e);
+  return { name, platform, browser, viewport, theme };
+}
+
+/** The server's pick for every shot, in manifest order. */
+async function fetchBaselines(
+  client: Client,
+  id: string,
+  entries: SnapshotEntry[],
+): Promise<{ diffLocation: DiffLocation; picks: BaselinePick[] }> {
+  const picks: BaselinePick[] = [];
+  let diffLocation: DiffLocation = "server";
+  for (let i = 0; i < entries.length; i += KEYS_PER_REQUEST) {
+    const reply = await send(client, {
+      step: "fetch baselines",
+      method: "POST",
+      path: `/api/v1/builds/${id}/baselines`,
+      body: JSON.stringify({ keys: entries.slice(i, i + KEYS_PER_REQUEST).map(snapshotKey) }),
+    });
+    const sent: unknown[] = isObj(reply) && Array.isArray(reply.baselines) ? reply.baselines : [];
+    if (sent.length === 0 || !sent.every(isBaselinePick))
+      throw new UploadError("upload failed: fetch baselines: the server's reply has no baselines");
+    if (isObj(reply) && reply.diff_location === "ci") diffLocation = "ci";
+    picks.push(...sent);
+  }
+  return { diffLocation, picks };
+}
+
+/** A baseline image, through the signed link the server gave, on the server the CLI was pointed at. */
+function baselinePng(client: Client, picked: PickedShot): Promise<Buffer> {
+  const url = new URL(picked.image_url, client.base);
+  return sendPng(client, {
+    step: `fetch baseline ${picked.id}`,
+    method: "GET",
+    path: `${url.pathname}${url.search}`,
+  });
+}
+
+/** One shot's upload: its meta and PNG and, in a CI project, what it measured against each baseline. */
+async function snapshotForm(
+  client: Client,
+  e: SnapshotEntry,
+  png: Buffer,
+  pick: BaselinePick | undefined,
+): Promise<FormData> {
+  const form = new FormData();
+  const meta: Record<string, unknown> = snapshotMeta(e);
+  const results = pick ? await measureShot(e, png, pick, (p) => baselinePng(client, p)) : [];
+  if (results.length > 0) {
+    meta.ci = {
+      engineVersion: ENGINE_VERSION,
+      results: results.map(({ baselineId, status, diffResult }) => ({
+        baselineId,
+        status,
+        diffResult,
+      })),
+    };
+    for (const r of results)
+      form.set(`diff:${r.baselineId}`, new File([new Uint8Array(r.mask)], "diff.png"));
+  }
+  form.set("meta", JSON.stringify(meta));
+  form.set("file", new File([new Uint8Array(png)], "shot.png"));
+  return form;
 }
 
 /**
@@ -312,18 +309,23 @@ export async function uploadSnapshots(
     warn,
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
   };
-  const id = await openBuild(client, ctx, opts.projectId);
-  const queue = [...manifest.snapshots];
+  const { id, diffLocation } = await openBuild(client, ctx, opts.projectId);
+  // A server from before ob 1727 has no baselines endpoint and diffs every build itself.
+  const picked = diffLocation
+    ? await fetchBaselines(client, id, manifest.snapshots)
+    : { diffLocation: "server", picks: [] };
+  const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
   const worker = async () => {
-    for (let e = queue.shift(); e; e = queue.shift()) {
-      const form = new FormData();
-      form.set("meta", JSON.stringify(snapshotMeta(e)));
-      form.set("file", new File([await Bun.file(pngPath(opts.dir, e)).arrayBuffer()], "shot.png"));
+    for (let next = queue.shift(); next; next = queue.shift()) {
+      const { e } = next;
+      const png = Buffer.from(await Bun.file(pngPath(opts.dir, e)).arrayBuffer());
+      // A server project measures at finalise: nothing is diffed here for it.
+      const pick = picked.diffLocation === "ci" ? next.pick : undefined;
       await send(client, {
         step: `upload ${identity(e)}`,
         method: "PUT",
         path: `/api/v1/builds/${id}/snapshots`,
-        body: form,
+        body: await snapshotForm(client, e, png, pick),
       });
     }
   };

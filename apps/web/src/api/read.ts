@@ -79,8 +79,13 @@ const buildUrl = (ctx: ReadCtx, projectId: string, buildId: string) =>
 const snapshotUrl = (ctx: ReadCtx, projectId: string, buildId: string, snapshotId: string) =>
   `${buildUrl(ctx, projectId, buildId)}/snapshots/${snapshotId}`;
 
-async function imageUrl(ctx: ReadCtx, key: string | null): Promise<string | null> {
-  return key && `${ctx.origin}${await signedImagePath(key, ctx.imageSecret())}`;
+/** A signed link to one of an org's blobs: the image route serves org-scoped keys only. */
+export async function imageUrl(
+  ctx: Pick<ReadCtx, "origin" | "imageSecret">,
+  orgId: string,
+  key: string | null,
+): Promise<string | null> {
+  return key && `${ctx.origin}${await signedImagePath(`orgs/${orgId}/${key}`, ctx.imageSecret())}`;
 }
 
 function counts(c: BuildCounts) {
@@ -176,6 +181,9 @@ function snapshot(ctx: ReadCtx, projectId: string, buildId: string, s: SnapshotV
       reviewed_at: iso(s.approvedEarlier.reviewedAt),
       default_branch: s.approvedEarlier.defaultBranch,
     },
+    measured_by: s.measuredBy,
+    engine_version: s.engineVersion,
+    diff_error: s.diffError,
     created_at: iso(s.createdAt),
     web_url: snapshotUrl(ctx, projectId, buildId, s.id),
   };
@@ -231,7 +239,7 @@ export async function getBuild(ctx: ReadCtx, buildId: string): Promise<Response>
 }
 
 export async function getSnapshot(ctx: ReadCtx, snapshotId: string): Promise<Response> {
-  const { buildId, projectId } = await actorSnapshot(ctx.db, ctx.actor, snapshotId);
+  const { buildId, projectId, orgId } = await actorSnapshot(ctx.db, ctx.actor, snapshotId);
   const view = await buildView(ctx.db, projectId, buildId);
   const shot = view.snapshots.find((s) => s.id === snapshotId);
   // actorSnapshot found it in this build, so buildView holds it.
@@ -240,15 +248,15 @@ export async function getSnapshot(ctx: ReadCtx, snapshotId: string): Promise<Res
     snapshot: {
       ...snapshot(ctx, projectId, buildId, shot),
       images: {
-        head: await imageUrl(ctx, shot.imageKey),
-        baseline: await imageUrl(ctx, shot.baselineKey),
-        diff: await imageUrl(ctx, shot.diffKey),
+        head: await imageUrl(ctx, orgId, shot.imageKey),
+        baseline: await imageUrl(ctx, orgId, shot.baselineKey),
+        diff: await imageUrl(ctx, orgId, shot.diffKey),
       },
     },
   });
 }
 
-async function flag(ctx: ReadCtx, projectId: string, f: ProjectFlag) {
+async function flag(ctx: ReadCtx, projectId: string, orgId: string, f: ProjectFlag) {
   return {
     id: f.id,
     kind: f.kind,
@@ -262,9 +270,9 @@ async function flag(ctx: ReadCtx, projectId: string, f: ProjectFlag) {
       changed_pixels: f.measured.changedPixels,
     },
     images: {
-      head: await imageUrl(ctx, f.keys.image),
-      baseline: await imageUrl(ctx, f.keys.baseline),
-      diff: await imageUrl(ctx, f.keys.diff),
+      head: await imageUrl(ctx, orgId, f.keys.image),
+      baseline: await imageUrl(ctx, orgId, f.keys.baseline),
+      diff: await imageUrl(ctx, orgId, f.keys.diff),
     },
     created_at: iso(f.createdAt),
     updated_at: iso(f.updatedAt),
@@ -279,7 +287,9 @@ export async function listDetectionFlags(ctx: ReadCtx, projectId: string): Promi
     limit: limitOf(ctx.query),
   });
   return reply({
-    detection_flags: await Promise.all(page.flags.map((f) => flag(ctx, project.id, f))),
+    detection_flags: await Promise.all(
+      page.flags.map((f) => flag(ctx, project.id, project.orgId, f)),
+    ),
     next_cursor: encodeCursor(page.next),
   });
 }

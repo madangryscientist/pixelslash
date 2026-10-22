@@ -156,9 +156,9 @@ describe("the read API (ob 1729)", () => {
     ] as const) {
       const url = new URL(snapshot.images[which] ?? "");
       expect(url.origin).toBe("http://app.test");
-      expect(decodeURIComponent(url.pathname)).toBe(`/images/${key}`);
+      expect(decodeURIComponent(url.pathname)).toBe(`/images/orgs/${w.orgId}/${key}`);
       const ok = await verifySignedImagePath({
-        key: key ?? "",
+        key: `orgs/${w.orgId}/${key}`,
         expires: url.searchParams.get("exp"),
         sig: url.searchParams.get("sig"),
         secret: "test-image-secret",

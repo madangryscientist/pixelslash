@@ -248,3 +248,29 @@ test("a dir of loose PNGs goes through `import` and `upload`, and the server dif
   });
   expect(row?.env_fingerprint).toContain("e2e-tool");
 });
+
+test("a project switched to CI diffs in the CLI: the server stores what it measured (ob 1727)", async ({
+  page,
+}) => {
+  const token = await provision(page, "Ci Co", "ci-shots", true);
+  await page.getByLabel(/In CI/).check();
+  const saved = page.waitForResponse(
+    (res) => res.request().method() === "POST" && !!res.request().postData()?.includes('"ci"'),
+  );
+  await page.getByRole("button", { name: "Save diff location" }).click();
+  expect((await saved).ok()).toBe(true);
+
+  const dir = await snapshotDir();
+  expect(upload(dir, token).code).toBe(0);
+  const again = upload(dir, token);
+  expect(again.stderr).toBe("");
+  expect(again.code).toBe(0);
+  const id = /build: (\S+)/.exec(again.stdout)?.[1] ?? "";
+  const [row] = await rows(
+    `SELECT b.status, s.diff_status, s.measured_by, s.engine_version, s.diff_key
+     FROM builds b JOIN snapshots s ON s.build_id = b.id WHERE b.id = '${id}'`,
+  );
+  expect(row).toMatchObject({ status: "passed", diff_status: "unchanged", measured_by: "ci" });
+  expect(row?.engine_version).toMatch(/^\d+\.\d+\.\d+/);
+  expect(row?.diff_key).toMatch(/\.diff\.png$/);
+});

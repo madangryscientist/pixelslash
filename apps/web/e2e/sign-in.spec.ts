@@ -60,7 +60,7 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
   const saved = page.waitForResponse(
     (res) => res.request().method() === "POST" && !!res.request().postData()?.includes("master"),
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   expect((await saved).ok()).toBe(true);
   await page.reload();
   await expect(page.getByLabel("Default branch, e.g. main")).toHaveValue("master");

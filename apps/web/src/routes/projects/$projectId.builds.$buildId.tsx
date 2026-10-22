@@ -57,6 +57,11 @@ function BuildPage() {
       {build.error && (
         <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
           {build.error}
+          {project.diffLocation === "ci" && build.status === "errored" && (
+            <span data-testid="rerun-ci" className="mt-1 block font-medium">
+              This project diffs in CI, so the server cannot measure it again: re-run the CI job.
+            </span>
+          )}
         </p>
       )}
       {error && (

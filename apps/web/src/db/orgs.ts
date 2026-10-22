@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
 import { type Db, NotFoundError } from "./db";
 import { type BuildCounts, countBuilds, emptyCounts } from "./review";
-import { builds, invites, members, orgs, projects, users } from "./schema";
+import { type DiffLocation, builds, invites, members, orgs, projects, users } from "./schema";
 import type { User } from "./users";
 
 export type Org = typeof orgs.$inferSelect;
@@ -209,16 +209,27 @@ export async function withdrawInvite(
   if (gone.length === 0) throw new NotFoundError("invite");
 }
 
+/**
+ * A deployment's default for new projects (ob 1727), from its `DEFAULT_DIFF_LOCATION` var: `ci`
+ * only when it says so (the hosted app), so a self-host that sets nothing diffs on its own server.
+ */
+export const diffLocationOf = (configured: string | undefined): DiffLocation =>
+  configured === "ci" ? "ci" : "server";
+
+/** A new project: its name, and where it diffs (ob 1727); left out, the column's default: `server`. */
+export type NewProject = { name: string; diffLocation?: DiffLocation | undefined };
+
 export async function createProject(
   db: Db,
   userId: string,
   orgId: string,
-  name: string,
+  made: string | NewProject,
 ): Promise<Project> {
   await requireMember(db, userId, orgId);
+  const { name, diffLocation } = typeof made === "string" ? { name: made } : made;
   const [project] = await db
     .insert(projects)
-    .values({ id: crypto.randomUUID(), orgId, name })
+    .values({ id: crypto.randomUUID(), orgId, name, diffLocation })
     .returning();
   if (!project) throw new Error("project insert returned nothing");
   return project;
@@ -233,6 +244,17 @@ export async function setDefaultBranch(
 ): Promise<void> {
   await getProject(db, userId, projectId);
   await db.update(projects).set({ defaultBranch: branch }).where(eq(projects.id, projectId));
+}
+
+/** Where the project's shots are diffed from the next build on (ob 1727); any member may change it. */
+export async function setDiffLocation(
+  db: Db,
+  userId: string,
+  projectId: string,
+  diffLocation: DiffLocation,
+): Promise<void> {
+  await getProject(db, userId, projectId);
+  await db.update(projects).set({ diffLocation }).where(eq(projects.id, projectId));
 }
 
 /** A project the user can see, or NotFoundError: another org's project does not exist to them. */
