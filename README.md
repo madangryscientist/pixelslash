@@ -4,7 +4,7 @@ Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch
 
 ```
 bun install
-bunx playwright install chromium-headless-shell   # once, for URL capture
+bun run pixelslash -- install-browser   # once, for URL capture (Playwright's chromium-headless-shell)
 bun run typecheck   # nx: tsc on every project
 bun run lint        # nx: oxlint (type-aware) + check-slop
 bun run format:check
@@ -163,18 +163,46 @@ pixelslash compare MAIN_DIR BRANCH_DIR [--out DIR]
 - If a pair's fingerprints differ (image, browser or fonts), `compare` warns on stderr by name and **still diffs**; the index says so at the top, since the pixels then mix a real change with a different renderer. A server would instead ask for a re-baseline.
 - stdout is `pixelslash: N changed, N unchanged, N new, N removed`, `fingerprint: N differ (diffed anyway)` when any differ, then `report: file://…/index.html`. Exit 0 whether or not anything changed: this is a viewer, not a gate. Exit 2 on a missing dir or manifest, a bad manifest or PNG, a missing argument, or an overlapping `--out`.
 
+## Signing in and reading builds
+
+The remote commands talk to a server's [API](#api) as one token. They read; only `upload` sends page shots.
+
+```
+pixelslash login [--server URL] [--config FILE]
+pixelslash logout [--server URL] [--config FILE]
+pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
+pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash --version
+pixelslash install-browser
+```
+
+- `login` asks for a personal token (`psu_…`; it prints where to make one: Settings → API tokens on the server, `<server>/settings`). On a terminal the token is read with echo off; otherwise it is the first line of stdin (`pixelslash login --server URL < token-file`). It checks the token with `GET /api/v1/me`, then stores it. A CI token (`psci_…`) is refused: CI passes its token by `PIXELSLASH_TOKEN` or `--token-path` instead. No token is ever printed.
+- **The credential file** is `~/.config/pixelslash/credentials.json` (`$XDG_CONFIG_HOME/pixelslash/` when that is set), mode 0600 in a 0700 dir, one token per server: `{ "servers": { "https://ps.example": { "token": "psu_…" } } }`. `logout` removes the server's entry and does not revoke the token; revoke it on the settings page.
+- `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
+- `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
+- `--version` prints `pixelslash <version>`, the version the User-Agent sends. `install-browser` runs the Playwright that `capture` uses to install `chromium-headless-shell`.
+
+**Resolution order**, the same for every remote command, `upload` included:
+
+1. **Token:** `--token-path` (a file), else `PIXELSLASH_TOKEN` (CI), else the credential `login` stored for the resolved server.
+2. **Server:** `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`--config`, or a `pixelslash.config.*` in the working dir).
+3. **Project** (`builds`, `build latest`, `upload` with a personal token): `--project` (an id, or a name the token sees once), else `upload.project` in the config, else the only project the token sees. More than one and none named is exit 2, listing them.
+
+**Exit codes:** 0 ok; 2 a usage error (a bad flag, no server, not logged in, no project picked); **3 the server did not give what was asked**: a refused, expired or revoked token (401), an id the token cannot reach (404), a server error, or a server that cannot be reached; `install-browser` also exits 3 when the install fails. Exit 1 stays the new-violations code, and `upload` keeps its own exit 1 for a refused upload. The client sends `User-Agent: pixelslash/<version>`.
+
 ## Uploading to a server
 
 Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots, and they send them only to the server you name. The same CLI talks to the hosted app and to a self-hosted one.
 
 ```
-pixelslash upload DIR [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE]
+pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE]
 pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N]
 ```
 
 - `DIR` is a snapshot dir: a `manifest.json` and the PNGs it names (what `capture` writes). The whole manifest and every PNG are checked before anything is sent, so a bad dir never opens a build on the server.
-- The token is a per-project CI token (`psci_…`, issued in the project's settings). A personal token (`psu_…`, issued under Settings → API tokens, with an optional 30-day, 90-day or 1-year expiry) acts as its user and reaches every project of that user's orgs; the API takes it, but `upload` does not yet send the project it would need. It comes from `PIXELSLASH_TOKEN`, or from the file `--token-path` names. Never put it in git.
-- The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
+- The token is a per-project CI token (`psci_…`, issued in the project's settings). A personal token (`psu_…`, issued under Settings → API tokens, with an optional 30-day, 90-day or 1-year expiry) acts as its user and reaches every project of that user's orgs; with one, `upload` names the project it opens the build in, resolved as in [Signing in](#signing-in-and-reading-builds) (`--project`, `upload.project`, or the only one the token sees). It comes from the file `--token-path` names, else `PIXELSLASH_TOKEN`, else the one `pixelslash login` stored for the server. Never put it in git.
+- The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main", "project": "web" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
 - From the local git checkout it sends the commit, the branch, the **merge-base** with the base branch (`--base`, else `upload.baseBranch`, else `main`; `origin/<base>` is tried first) and up to **20 ancestor SHAs**, nearest first. Without the base branch in the checkout (a shallow clone) it warns and sends no merge-base: fetch full history in CI. The branch is `--branch`, else `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`, else the checked-out branch; a detached `HEAD` with none of those is a usage error. The PR number is `--pr`, else read from `GITHUB_REF` (`refs/pull/N/…`).
 - It opens a build, uploads each PNG, then finalises with the snapshot count; the server diffs inside that request. Exit 0 on success. Exit 1 when the server refuses (wrong or revoked token, 4xx/5xx) or cannot be reached; the build is then left open on the server, unfinalised, and its snapshots are not counted. The message names the step (`open build`, `upload <snapshot>`, `finalize`) and the server's answer in one line. A request the API never answered (the connection failed, a 502/503/504, or a 5xx that is not the API's `{"error"}` JSON, such as `vite preview`'s proxy page) is tried again after 1 s and 2 s, three tries in all, with a warning on stderr for each retry; an error the API itself answered is not retried. Every step is safe to repeat, and a repeated open at worst leaves an empty unfinalised build behind. A finalise whose answer is `processing` (a retry that met an earlier try's diff still running, or one the runtime killed) is exit 1: nothing has been measured yet. Exit 2 on a bad flag, a missing token or server, or a bad manifest. Re-running makes a new build.
 

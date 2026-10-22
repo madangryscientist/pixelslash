@@ -2,6 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  CAPTURE_BROWSER,
+  CLIENT_VERSION,
   CaptureError,
   FigmaError,
   UploadError,
@@ -10,13 +12,26 @@ import {
   compareRoutes,
   fetchFigmaRasters,
   loadRoutes,
+  playwrightCli,
   resolveToken,
   type CompareResult,
   type Deps,
   type SnapshotDeps,
+  type SpawnProc,
   type UploadDeps,
 } from "@pixelslash/engine";
+import {
+  LOGIN_USAGE,
+  LOGOUT_USAGE,
+  WHOAMI_USAGE,
+  runLogin,
+  runLogout,
+  runWhoami,
+  type ReadSecret,
+} from "./account.ts";
+import { REMOTE_EXIT, RemoteError } from "./api.ts";
 import { USAGE, parseArgs, type Cli } from "./args.ts";
+import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
@@ -65,17 +80,64 @@ function report(cli: Cli, result: CompareResult, io: Io): number {
   return n === 0 ? 0 : 1;
 }
 
-export async function run(
-  argv: string[],
-  io: Io = process,
-  deps: Deps & SnapshotDeps & UploadDeps = {},
-): Promise<number> {
-  if (argv[0] === "capture")
-    return guarded(() => runCapture(argv.slice(1), io, deps), io, CAPTURE_USAGE);
-  if (argv[0] === "compare") return guarded(() => runCompare(argv.slice(1), io), io, COMPARE_USAGE);
-  if (argv[0] === "import") return guarded(() => runImport(argv.slice(1), io), io, IMPORT_USAGE);
-  if (argv[0] === "upload")
-    return guarded(() => runUpload(argv.slice(1), io, deps), io, UPLOAD_USAGE);
+export type CliDeps = Deps & SnapshotDeps & UploadDeps & { readSecret?: ReadSecret };
+
+/** `pixelslash install-browser`: the Chromium `capture` launches, by the Playwright it launches it with. */
+async function installBrowser(io: Io, deps: CliDeps): Promise<number> {
+  const spawn: SpawnProc = deps.spawn ?? ((cmd, opts) => Bun.spawn(cmd, opts));
+  const proc = spawn([process.execPath, playwrightCli(), "install", CAPTURE_BROWSER], {
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: INSTALL_TIMEOUT_MS,
+  });
+  const [, , code] = await Promise.all([
+    relay(proc.stdout, io.stdout),
+    relay(proc.stderr, io.stderr),
+    proc.exited,
+  ]);
+  if (code === 0) return 0;
+  io.stderr.write(`pixelslash: installing ${CAPTURE_BROWSER} failed (exit ${code})\n`);
+  return REMOTE_EXIT;
+}
+
+const INSTALL_TIMEOUT_MS = 600_000;
+
+/** Pass a child's output on as it comes, so a download shows its progress. */
+async function relay(
+  stream: ReadableStream<Uint8Array> | null,
+  sink: { write(s: string): void },
+): Promise<void> {
+  if (!stream) return;
+  const decoder = new TextDecoder();
+  for await (const chunk of stream) sink.write(decoder.decode(chunk, { stream: true }));
+}
+
+const COMMANDS: Record<
+  string,
+  { usage: string; run: (argv: string[], io: Io, deps: CliDeps) => Promise<number> }
+> = {
+  capture: { usage: CAPTURE_USAGE, run: runCapture },
+  compare: { usage: COMPARE_USAGE, run: (argv, io) => runCompare(argv, io) },
+  import: { usage: IMPORT_USAGE, run: (argv, io) => runImport(argv, io) },
+  upload: { usage: UPLOAD_USAGE, run: runUpload },
+  "install-browser": {
+    usage: "pixelslash install-browser",
+    run: (_, io, deps) => installBrowser(io, deps),
+  },
+  login: { usage: LOGIN_USAGE, run: runLogin },
+  logout: { usage: LOGOUT_USAGE, run: runLogout },
+  whoami: { usage: WHOAMI_USAGE, run: runWhoami },
+  builds: { usage: BUILDS_USAGE, run: runBuilds },
+  build: { usage: BUILD_USAGE, run: runBuild },
+};
+
+export async function run(argv: string[], io: Io = process, deps: CliDeps = {}): Promise<number> {
+  if (argv[0] === "--version") {
+    io.stdout.write(`pixelslash ${CLIENT_VERSION}\n`);
+    return 0;
+  }
+  const command = COMMANDS[argv[0] ?? ""];
+  if (command) return guarded(() => command.run(argv.slice(1), io, deps), io, command.usage);
   return guarded(
     async () => {
       const cli = parseArgs(argv);
@@ -95,7 +157,10 @@ export async function run(
   );
 }
 
-/** Map the known errors to exit codes: usage 2, capture, Figma or upload 1. Anything else is a bug and throws. */
+/**
+ * Map the known errors to exit codes: usage 2, capture, Figma or upload 1, a remote command the
+ * server refused or could not answer 3. Anything else is a bug and throws.
+ */
 async function guarded(work: () => Promise<number>, io: Io, usage: string): Promise<number> {
   try {
     return await work();
@@ -103,6 +168,10 @@ async function guarded(work: () => Promise<number>, io: Io, usage: string): Prom
     if (e instanceof UsageError) {
       io.stderr.write(`${e.message}\n${usage}\n`);
       return 2;
+    }
+    if (e instanceof RemoteError) {
+      io.stderr.write(`${e.message}\n`);
+      return REMOTE_EXIT;
     }
     if (e instanceof CaptureError || e instanceof FigmaError || e instanceof UploadError) {
       io.stderr.write(`${e.message}\n`);

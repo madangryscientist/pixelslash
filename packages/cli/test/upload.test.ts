@@ -65,9 +65,14 @@ describe("pixelslash upload", () => {
 
   test("no token, no server, no dir or a bad flag are usage errors, exit 2, nothing sent", async () => {
     const [cwd, dir, api] = [await gitRepo(), await snapshotDir(), fakeUploadApi()];
-    const deps = (env: NodeJS.ProcessEnv) => ({ fetch: api.fetch, cwd, env });
+    const HOME = await tmp();
+    const deps = (env: NodeJS.ProcessEnv) => ({ fetch: api.fetch, cwd, env: { HOME, ...env } });
     const tries: [string[], NodeJS.ProcessEnv, RegExp][] = [
-      [["upload", dir, "--server", SERVER], {}, /need PIXELSLASH_TOKEN or --token-path/],
+      [
+        ["upload", dir, "--server", SERVER],
+        {},
+        /not logged in to https:\/\/ps.example: run `pixelslash login/,
+      ],
       [["upload", dir], { PIXELSLASH_TOKEN: "t" }, /need --server URL/],
       [["upload"], {}, /need a snapshot DIR/],
       [["upload", dir, "--bogus", "x"], {}, /unexpected argument: --bogus/],

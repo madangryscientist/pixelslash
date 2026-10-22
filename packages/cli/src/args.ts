@@ -161,3 +161,9 @@ export function parseArgs(argv: string[]): Cli {
     ignore,
   };
 }
+
+/** `--json` is a switch, not a `--flag value` pair: take it out before the pairs are read. */
+export function takeJson(argv: string[]): { json: boolean; rest: string[] } {
+  const rest = argv.filter((a) => a !== "--json");
+  return { json: rest.length !== argv.length, rest };
+}

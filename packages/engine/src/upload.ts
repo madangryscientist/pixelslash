@@ -138,6 +138,8 @@ export type UploadOptions = {
   server: string;
   token: string;
   git: Omit<GitOptions, "env" | "warn">;
+  /** The project to open the build in: required with a personal token, which reaches several. */
+  projectId?: string | undefined;
 };
 
 export type UploadDeps = {
@@ -270,12 +272,16 @@ function checkOutcome(client: Client, id: string, done: unknown): void {
     client.warn(`upload: build ${id} is errored on the server: ${String(done.error)}`);
 }
 
-async function openBuild(client: Client, ctx: GitContext): Promise<string> {
+async function openBuild(
+  client: Client,
+  ctx: GitContext,
+  projectId: string | undefined,
+): Promise<string> {
   const body = await send(client, {
     step: "open build",
     method: "POST",
     path: "/api/v1/builds",
-    body: JSON.stringify(ctx),
+    body: JSON.stringify(projectId ? { ...ctx, projectId } : ctx),
   });
   if (!isObj(body) || typeof body.id !== "string")
     throw new UploadError("upload failed: server did not return a build id");
@@ -306,7 +312,7 @@ export async function uploadSnapshots(
     warn,
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
   };
-  const id = await openBuild(client, ctx);
+  const id = await openBuild(client, ctx, opts.projectId);
   const queue = [...manifest.snapshots];
   const worker = async () => {
     for (let e = queue.shift(); e; e = queue.shift()) {

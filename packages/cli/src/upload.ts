@@ -1,20 +1,23 @@
 import { resolve } from "node:path";
-import {
-  UsageError,
-  findConfigIfAny,
-  loadConfig,
-  resolveToken,
-  uploadSnapshots,
-  type UploadDeps,
-} from "@pixelslash/engine";
+import { UploadError, UsageError, uploadSnapshots, type UploadDeps } from "@pixelslash/engine";
+import { RemoteError } from "./api.ts";
 import { readFlags } from "./args.ts";
+import { connect, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE]\nThe token is PIXELSLASH_TOKEN or --token-path. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.";
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE]\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.";
 
 /** The flags `upload` and `capture --upload` share. */
-export const UPLOAD_FLAGS = ["server", "token-path", "base", "branch", "pr", "config"] as const;
+export const UPLOAD_FLAGS = [
+  "server",
+  "token-path",
+  "project",
+  "base",
+  "branch",
+  "pr",
+  "config",
+] as const;
 
 export type UploadFlags = Partial<Record<(typeof UPLOAD_FLAGS)[number], string>>;
 
@@ -25,26 +28,26 @@ function prNumber(raw: string | undefined): number | undefined {
   return n;
 }
 
-type Target = { server: string; token: string; baseBranch: string };
+type Target = { server: string; token: string; baseBranch: string; projectId?: string };
 
-/** Where to send and as whom: flags first, then env, then the config if there is one. */
-async function resolveTarget(
-  flags: UploadFlags,
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-): Promise<Target> {
-  const configPath = findConfigIfAny(flags.config, cwd);
-  const upload = configPath ? (await loadConfig(configPath)).upload : undefined;
-  const server = flags.server ?? env.PIXELSLASH_SERVER ?? upload?.server;
-  if (!server)
-    throw new UsageError("need --server URL, PIXELSLASH_SERVER, or upload.server in the config");
-  const tokenPath = flags["token-path"];
-  const token = await resolveToken(
-    tokenPath ? resolve(tokenPath) : undefined,
-    env,
-    "PIXELSLASH_TOKEN",
-  );
-  return { server, token, baseBranch: flags.base ?? upload?.baseBranch ?? "main" };
+/**
+ * Where to send and as whom, resolved as every remote command does. A personal token reaches
+ * several projects, so it also names one; a CI token's project is its own.
+ */
+async function resolveTarget(flags: UploadFlags, deps: UploadDeps, cwd: string): Promise<Target> {
+  const remote = await connect(flags, { ...deps, cwd });
+  const { server } = remote.client;
+  const { token } = remote;
+  const baseBranch = flags.base ?? remote.upload?.baseBranch ?? "main";
+  if (!token.startsWith("psu_")) return { server, token, baseBranch };
+  try {
+    const project = await resolveProject(remote, flags.project);
+    return { server, token, baseBranch, projectId: project.id };
+  } catch (e) {
+    // `upload` keeps exit 1 for a server that refused it, whichever request it refused.
+    if (e instanceof RemoteError) throw new UploadError(e.message);
+    throw e;
+  }
 }
 
 /** Send `dir` to the server the flags, env or config name. Returns the exit code (0). */
@@ -55,12 +58,13 @@ export async function uploadDir(
   deps: UploadDeps = {},
 ): Promise<number> {
   const cwd = deps.cwd ?? process.cwd();
-  const target = await resolveTarget(flags, deps.env ?? process.env, cwd);
+  const target = await resolveTarget(flags, deps, cwd);
   const result = await uploadSnapshots(
     {
       dir: resolve(dir),
       server: target.server,
       token: target.token,
+      projectId: target.projectId,
       git: {
         cwd,
         baseBranch: target.baseBranch,

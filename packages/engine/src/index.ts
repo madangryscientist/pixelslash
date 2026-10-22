@@ -11,12 +11,12 @@ export {
   type SnapshotCompareOptions,
   type SnapshotCompareResult,
 } from "./compare-snapshots.ts";
-export type { CapturePage } from "./capture.ts";
+export { CAPTURE_BROWSER, playwrightCli, type CapturePage } from "./capture.ts";
 export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
 export type { ProcLike, SpawnProc } from "./judge.ts";
 export { importPngs, type ImportOptions, type ImportResult } from "./import-pngs.ts";
-export { loadRoutes } from "./routes.ts";
+export { isHttpUrl, loadRoutes } from "./routes.ts";
 export type { RunManifest } from "./run.ts";
 export type { CaptureSetup, SetupArgs } from "./setup.ts";
 export { findConfig, findConfigIfAny, loadConfig, type CaptureConfig } from "./config.ts";
@@ -38,3 +38,4 @@ export {
 } from "./diff.ts";
 export { uploadSnapshots, type UploadDeps } from "./upload.ts";
 export type { Region, RegionKind, Specks } from "./regions.ts";
+export { CLIENT_VERSION, USER_AGENT } from "./version.ts";

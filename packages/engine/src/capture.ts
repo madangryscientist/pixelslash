@@ -1,8 +1,18 @@
 import { statfs } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { CaptureError } from "./errors.ts";
 
 const CAPTURE_TIMEOUT_MS = 8_000;
+
+/** The browser `capture` launches: what `pixelslash install-browser` installs. */
+export const CAPTURE_BROWSER = "chromium-headless-shell";
+
+/** The `playwright` CLI of the Playwright this package captures with, so the browser it installs is the one it launches. */
+export function playwrightCli(): string {
+  return join(dirname(fileURLToPath(import.meta.resolve("playwright/package.json"))), "cli.js");
+}
 
 export type CapturePage = (url: string, dest: string, width: number) => Promise<void>;
 

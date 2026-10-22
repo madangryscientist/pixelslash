@@ -90,12 +90,14 @@ describe("parseConfig", () => {
     });
   });
 
-  test("upload names a server and a base branch, both optional", () => {
-    expect(parseConfig(base).upload).toEqual({ server: undefined, baseBranch: undefined });
-    expect(
-      parseConfig({ ...base, upload: { server: "https://ps.example", baseBranch: "develop" } })
-        .upload,
-    ).toEqual({ server: "https://ps.example", baseBranch: "develop" });
+  test("upload names a server, a base branch and a project, all optional", () => {
+    expect(parseConfig(base).upload).toEqual({
+      server: undefined,
+      baseBranch: undefined,
+      project: undefined,
+    });
+    const upload = { server: "https://ps.example", baseBranch: "develop", project: "web" };
+    expect(parseConfig({ ...base, upload }).upload).toEqual(upload);
   });
 
   test("a start command waits on baseUrl unless it names a ready URL", () => {
