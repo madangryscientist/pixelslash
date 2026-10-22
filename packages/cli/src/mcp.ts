@@ -1,29 +1,27 @@
-import { CLIENT_VERSION, UsageError } from "@pixelslash/engine";
+import { CLIENT_VERSION, CaptureError, FigmaError, UsageError } from "@pixelslash/engine";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { RemoteError, isObj, str, type Reply } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
-import {
-  REMOTE_FLAGS,
-  connect,
-  resolveProject,
-  type Remote,
-  type RemoteDeps,
-  type RemoteFlags,
-} from "./remote.ts";
+import type { DevDeps } from "./dev.ts";
+import { MCP_FLAGS, arg, buildToSpec, devTools, text } from "./mcp-dev.ts";
+import { connect, resolveProject, type Remote } from "./remote.ts";
 import type { Io } from "./run.ts";
 
-export const MCP_USAGE = `pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
-A stdio MCP server for a coding agent: it reads builds, snapshots, flakes and detection flags. It
-accepts and rejects nothing. Add it with \`claude mcp add pixelslash -- pixelslash mcp\`.`;
+export const MCP_USAGE = `pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
+A stdio MCP server for a coding agent: it reads builds, snapshots, flakes and detection flags, and
+drives this worktree's \`pixelslash dev\` session (start, run, latest, pin, spec, stop). It accepts,
+rejects and uploads nothing. Add it with \`claude mcp add pixelslash -- pixelslash mcp\`.`;
 
 type Args = Record<string, unknown>;
-type Fetch = NonNullable<RemoteDeps["fetch"]>;
+type Fetch = NonNullable<DevDeps["fetch"]>;
 /** What a tool call runs against: the connection, `--project`, and the fetch for images. */
 type Ctx = { remote: Remote; project: string | undefined; fetch: Fetch };
 type Tool = {
@@ -45,22 +43,12 @@ const SNAPSHOT_ID = { type: "string", description: "A snapshot id, from get_buil
 const STATUSES = ["uploading", "processing", "changes", "passed", "failed", "errored"];
 const IMAGES = ["head", "baseline", "diff"] as const;
 
-/** A string argument, or undefined when absent. Anything else is a usage error. */
-function arg(args: Args, name: string): string | undefined {
-  const v = args[name];
-  if (v === undefined || v === null || v === "") return undefined;
-  if (typeof v === "string") return v;
-  if (typeof v === "number") return String(v);
-  throw new UsageError(`${name} must be a string`);
-}
-
 function need(args: Args, name: string): string {
   const v = arg(args, name);
   if (v === undefined) throw new UsageError(`${name} is required`);
   return v;
 }
 
-const text = (s: string): CallToolResult => ({ content: [{ type: "text", text: s }] });
 const reply = (r: Reply): CallToolResult => text(r.text);
 const id = (v: string) => encodeURIComponent(v);
 
@@ -192,48 +180,98 @@ const TOOLS: Record<string, Tool> = {
   },
 };
 
+const PROMPT = "build-to-spec";
+
+/** A tool's error the agent reads; anything else is a bug and throws. */
+function failed(e: unknown): CallToolResult {
+  const known = [UsageError, RemoteError, CaptureError, FigmaError].some((c) => e instanceof c);
+  if (known && e instanceof Error) return { ...text(e.message), isError: true };
+  throw e;
+}
+
 /**
  * The MCP server over `flags`' server and token. It connects on each call, so a server that is
- * down or a token that is missing is a tool error the agent can read, not a server that will not start.
+ * down or a token that is missing is a tool error the agent can read, not a server that will not
+ * start. The dev tools need no server. `close` ends a dev session the server started.
  */
-export function mcpServer(flags: RemoteFlags, deps: RemoteDeps = {}): Server {
+export function mcpServer(
+  flags: Partial<Record<(typeof MCP_FLAGS)[number], string>>,
+  deps: DevDeps = {},
+  log: Io["stderr"] = process.stderr,
+): { server: Server; close: () => Promise<void> } {
   const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
+  const dev = devTools(flags, deps, log);
   const server = new Server(
     { name: "pixelslash", version: CLIENT_VERSION },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, prompts: {} } },
   );
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: Object.entries(TOOLS).map(([name, t]) => ({
-      name,
-      description: t.description,
-      inputSchema: { type: "object", properties: t.properties, required: t.required },
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    })),
+    tools: [
+      ...Object.entries(TOOLS).map(([name, t]) => ({
+        name,
+        description: t.description,
+        inputSchema: { type: "object" as const, properties: t.properties, required: t.required },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+      })),
+      ...Object.entries(dev.tools).map(([name, t]) => ({
+        name,
+        description: t.description,
+        inputSchema: { type: "object" as const, properties: t.properties },
+        annotations: t.annotations,
+      })),
+    ],
   }));
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const args = req.params.arguments ?? {};
+    const local = dev.tools[req.params.name];
+    if (local) return local.call(args).catch(failed);
     const tool = TOOLS[req.params.name];
     if (!tool) return { ...text(`unknown tool: ${req.params.name}`), isError: true };
     try {
       const remote = await connect(flags, { ...deps, fetch });
-      return await tool.call({ remote, project: flags.project, fetch }, req.params.arguments ?? {});
+      return await tool.call({ remote, project: flags.project, fetch }, args);
     } catch (e) {
-      if (e instanceof UsageError || e instanceof RemoteError)
-        return { ...text(e.message), isError: true };
-      throw e;
+      return failed(e);
     }
   });
-  return server;
+  server.setRequestHandler(ListPromptsRequestSchema, () => ({
+    prompts: [
+      {
+        name: PROMPT,
+        description:
+          "Build a page or component to its spec and references with the dev tools: spec, edit, run, read the differences, repeat, pin.",
+        arguments: [{ name: "target", description: TARGET_HINT, required: false }],
+      },
+    ],
+  }));
+  server.setRequestHandler(GetPromptRequestSchema, (req) => {
+    if (req.params.name !== PROMPT) throw new UsageError(`unknown prompt: ${req.params.name}`);
+    const target = req.params.arguments?.target || undefined;
+    return {
+      description: `Build ${target ?? "the target"} to its spec`,
+      messages: [{ role: "user", content: { type: "text", text: buildToSpec(target) } }],
+    };
+  });
+  return {
+    server,
+    close: async () => {
+      await dev.close();
+      await server.close();
+    },
+  };
 }
 
+const TARGET_HINT = "A route or story name from the config with a features entry.";
+
 /** `pixelslash mcp`: serve on stdin/stdout until the client closes stdin. Nothing else goes to stdout. */
-export async function runMcp(argv: string[], io: Io, deps: RemoteDeps = {}): Promise<number> {
-  const flags = readFlagPairs(argv, [...REMOTE_FLAGS, "project"]);
-  const server = mcpServer(flags, deps);
+export async function runMcp(argv: string[], io: Io, deps: DevDeps = {}): Promise<number> {
+  const flags = readFlagPairs(argv, MCP_FLAGS);
+  const { server, close } = mcpServer(flags, deps, io.stderr);
   // The SDK's stdio transport does not watch for the end of stdin; the client hanging up is it.
   const ended = new Promise((done) => process.stdin.once("end", done));
   await server.connect(new StdioServerTransport());
   io.stderr.write("pixelslash mcp: serving on stdio\n");
   await ended;
-  await server.close();
+  await close();
   return 0;
 }

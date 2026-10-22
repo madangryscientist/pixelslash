@@ -39,10 +39,15 @@ async function state(url: string): Promise<{ latest: DevIteration | null } | und
   }
 }
 
+/** One run through the session's page; null when the run failed (its terminal says why). */
+export async function runThrough(url: string): Promise<DevIteration | null> {
+  const res = await post(url, "/api/run");
+  return iterationIn(await res.json(), "iteration");
+}
+
 /** `--once` with a session up: the session runs it, and its iteration is printed. */
 async function onceThrough(url: string, args: DevArgs, io: Io): Promise<number> {
-  const res = await post(url, "/api/run");
-  const iteration = iterationIn(await res.json(), "iteration");
+  const iteration = await runThrough(url);
   if (!iteration) {
     io.stderr.write("pixelslash dev: the session's run failed; its terminal says why\n");
     return 1;

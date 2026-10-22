@@ -115,11 +115,30 @@ function writeSpecText(feature: DevFeature, io: Io) {
     io.stdout.write(`ref ${r.variant} ${r.viewport} ${r.theme}: ${r.file ?? `skip: ${r.skip}`}\n`);
 }
 
-async function writeSpecJson(target: string, feature: DevFeature, io: Io) {
+/** `dev spec --json`: the refs inline, capped at 1024 px wide, so an agent need not open a file. */
+export async function specJson(target: string, feature: DevFeature) {
   const refs = [];
-  // Inline, capped at 1024 px wide, so an agent can read the picture without opening a file.
   for (const r of feature.refs) refs.push({ ...r, image: r.file ? await inlinePng(r.file) : null });
-  io.stdout.write(`${JSON.stringify({ target, spec: feature.spec, refs }, null, 2)}\n`);
+  return { target, spec: feature.spec, refs };
+}
+
+type SpecFlags = Partial<Record<(typeof SPEC_FLAGS)[number], string | undefined>>;
+
+/** The target's feature as it stands: the spec read now, the refs resolved. */
+export async function specOf(
+  at: { named: string | undefined; flags: SpecFlags; refresh: boolean; root: string },
+  deps: DevDeps,
+): Promise<{ target: string; feature: DevFeature }> {
+  const { named, flags, refresh, root } = at;
+  const base = await loadDevConfig(
+    findConfigIfAny(flags.config, deps.cwd ?? process.cwd()),
+    undefined,
+  );
+  const target = specTarget(base, named);
+  const config = devConfig(base, { name: target, viewport: flags.viewport, theme: flags.theme });
+  const src = await featureSource({ config, target, root }, flags, deps);
+  if (!src) throw new UsageError(`the config has no features.${target} entry`);
+  return { target, feature: await loadFeature(src, refresh) };
 }
 
 /** `pixelslash dev spec [TARGET]`: the spec text and the refs, as files and inline images. */
@@ -130,17 +149,9 @@ export async function devSpec(
   deps: DevDeps,
 ): Promise<number> {
   const { json, refresh, named, flags } = specArgs(argv);
-  const base = await loadDevConfig(
-    findConfigIfAny(flags.config, deps.cwd ?? process.cwd()),
-    undefined,
-  );
-  const target = specTarget(base, named);
-  const config = devConfig(base, { name: target, viewport: flags.viewport, theme: flags.theme });
-  const src = await featureSource({ config, target, root }, flags, deps);
-  if (!src) throw new UsageError(`the config has no features.${target} entry`);
-  const feature = await loadFeature(src, refresh);
+  const { target, feature } = await specOf({ named, flags, refresh, root }, deps);
   for (const line of refLines(feature.refs)) io.stderr.write(`${line}\n`);
-  if (json) await writeSpecJson(target, feature, io);
+  if (json) io.stdout.write(`${JSON.stringify(await specJson(target, feature), null, 2)}\n`);
   else writeSpecText(feature, io);
   return 0;
 }

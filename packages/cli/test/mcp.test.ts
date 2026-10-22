@@ -56,7 +56,11 @@ async function connected(
   env: Record<string, string> = { PIXELSLASH_TOKEN: USER_TOKEN },
 ) {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const server = mcpServer({ server: SERVER }, { env, fetch: fake.fetch, cwd: await tmp() });
+  const { server } = mcpServer(
+    { server: SERVER },
+    { env, fetch: fake.fetch, cwd: await tmp() },
+    { write: () => {} },
+  );
   await server.connect(serverSide);
   const client = new Client({ name: "test", version: "0" });
   await client.connect(clientSide);
@@ -80,10 +84,23 @@ const json = (r: Result): Record<string, unknown> => {
 };
 
 describe("pixelslash mcp", () => {
-  test("lists the read tools only, each marked read-only", async () => {
+  test("lists the server's read tools, each read-only, and the local dev tools", async () => {
     const { client } = await connected();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).toSorted()).toEqual([
+    const dev = tools.filter((t) => t.name.startsWith("dev_"));
+    expect(dev.map((t) => t.name).toSorted()).toEqual([
+      "dev_latest",
+      "dev_pin",
+      "dev_run",
+      "dev_spec",
+      "dev_start",
+      "dev_stop",
+      "dev_unpin",
+    ]);
+    // Nothing that writes to the server: the dev tools touch the worktree's store only.
+    expect(tools.some((t) => /accept|reject|upload/.test(t.name))).toBe(false);
+    const read = tools.filter((t) => !t.name.startsWith("dev_"));
+    expect(read.map((t) => t.name).toSorted()).toEqual([
       "get_build",
       "get_snapshot",
       "get_snapshot_images",
@@ -93,7 +110,7 @@ describe("pixelslash mcp", () => {
       "list_projects",
       "whoami",
     ]);
-    expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
+    expect(read.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
     await client.close();
   });
 

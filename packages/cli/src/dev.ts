@@ -117,26 +117,37 @@ export function lineOf(it: DevIteration, url: string | null): string {
 
 /** `--json`: the iteration as stored (regions, pixels, timings, files, judge) and that nothing left. */
 export function jsonOf(it: DevIteration, url: string | null): string {
-  return JSON.stringify({ uploaded: false, page: url, ...it }, null, 2);
+  return JSON.stringify(iterationJson(it, url), null, 2);
+}
+
+/** What `--json` prints, before it is printed; `pixelslash mcp`'s dev tools answer the same. */
+export function iterationJson(it: DevIteration, url: string | null) {
+  return { uploaded: false, page: url, ...it };
 }
 
 /** `7` or `000007`: the store's six-digit id. */
 const idOf = (raw: string | undefined) => (raw === undefined ? undefined : raw.padStart(6, "0"));
 
-async function storeOf(deps: DevDeps): Promise<DevStore> {
+export async function storeOf(deps: DevDeps): Promise<DevStore> {
   return devStore(await worktreeRoot(deps.cwd ?? process.cwd()));
+}
+
+/** The latest iteration (of `target`, when named) and the live page, if a session is up. */
+export async function latestOf(store: DevStore, target: string | undefined) {
+  const it = await latestIteration(store, target);
+  if (!it) return undefined;
+  return { it, url: (await liveSession(store))?.url ?? null };
 }
 
 async function latest(argv: string[], io: Io, deps: DevDeps): Promise<number> {
   const { json, rest } = takeJson(argv);
   if (rest.length > 1) throw new UsageError(`unexpected argument: ${rest[1]}`);
-  const store = await storeOf(deps);
-  const it = await latestIteration(store, rest[0]);
-  if (!it) {
+  const found = await latestOf(await storeOf(deps), rest[0]);
+  if (!found) {
     io.stderr.write(`pixelslash dev: no iteration yet${rest[0] ? ` of ${rest[0]}` : ""}\n`);
     return 1;
   }
-  const url = (await liveSession(store))?.url ?? null;
+  const { it, url } = found;
   io.stdout.write(`${json ? jsonOf(it, url) : lineOf(it, url)}\n`);
   if (!json && it.differences) io.stdout.write(`${differencesLine(it.differences)}\n`);
   return 0;
@@ -149,16 +160,18 @@ function pinLine(pin: boolean, id: string | undefined, pins: string[], asked: st
   return `pixelslash dev: nothing to ${pin ? "pin" : "unpin"}${asked ? ` (#${asked})` : ""}`;
 }
 
+/** Pin or unpin `raw` (the latest, or the newest pin, when unset); `out` is the `--json`. */
+export async function pinOf(store: DevStore, pin: boolean, raw: string | undefined) {
+  const id = await (pin ? pinIteration : unpinIteration)(store, idOf(raw));
+  const pins = await readPins(store);
+  return { id, pins, out: { [pin ? "pinned" : "unpinned"]: id ?? null, pins } };
+}
+
 async function pinOrUnpin(pin: boolean, argv: string[], io: Io, deps: DevDeps): Promise<number> {
   const { json, rest } = takeJson(argv);
   if (rest.length > 1) throw new UsageError(`unexpected argument: ${rest[1]}`);
-  const store = await storeOf(deps);
-  const id = await (pin ? pinIteration : unpinIteration)(store, idOf(rest[0]));
-  const pins = await readPins(store);
-  if (json)
-    io.stdout.write(
-      `${JSON.stringify({ [pin ? "pinned" : "unpinned"]: id ?? null, pins }, null, 2)}\n`,
-    );
+  const { id, pins, out } = await pinOf(await storeOf(deps), pin, rest[0]);
+  if (json) io.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
   else (id ? io.stdout : io.stderr).write(`${pinLine(pin, id, pins, rest[0])}\n`);
   return id ? 0 : 1;
 }

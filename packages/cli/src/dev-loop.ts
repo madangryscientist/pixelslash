@@ -4,6 +4,7 @@ import {
   type DevController,
   type DevIteration,
   type DevJudge,
+  type DevLock,
   type DevStore,
   type FeatureSource,
   UsageError,
@@ -192,13 +193,28 @@ function keyLoop(input: KeyInput, ctl: DevController, io: Io): Promise<void> {
   });
 }
 
-/** The live loop: serve the page, take the worktree's lock, shoot on every save until `q`. */
-export async function devLoop(
+/** A session this process holds: its live page, the controller, and how to end it. */
+export type LiveSession = {
+  url: string;
+  target: string;
+  /** The URL the target is shot at. */
+  pageUrl: string;
+  ctl: DevController;
+  hasFeature: boolean;
+  stop: () => Promise<void>;
+};
+
+/**
+ * Serve the page, take the worktree's lock and watch for saves. When another process holds the
+ * lock, nothing is left open and its owner is returned instead. `pixelslash mcp` starts its
+ * session through this too (ob 1742).
+ */
+export async function startSession(
   store: DevStore,
   args: DevArgs,
   io: Io,
   deps: DevDeps,
-): Promise<number> {
+): Promise<{ held: true; live: LiveSession } | { held: false; owner: DevLock }> {
   const root = dirname(dirname(store.root));
   await ensureIgnored(root);
   const t = await prepareTarget(args, deps);
@@ -237,26 +253,53 @@ export async function devLoop(
   const claim = await claimSession(store, { pid: process.pid, url, target: t.target });
   if (!claim.held) {
     await Promise.all([page.stop(), session.close()]);
-    return attachTo(claim.owner, args, io, deps);
+    return claim;
   }
   let unwatch = noop;
-  try {
-    unwatch = await watching(root, args, ctl);
-    const where = args.watch.length > 0 ? args.watch.join(", ") : "the working tree";
-    io.stdout.write(
-      `pixelslash dev: ${t.target} at ${t.url}, watching ${where}\nlive page: ${url}\nkeys: r run · p pin · u unpin · m main/previous${feature ? " · f refetch refs" : ""} · q quit\n`,
-    );
-    if (ctl.mode().note) warn(ctl.mode().note ?? "");
-    // Resolve the refs now, so a missing token is said before the first run, not at it.
-    if (feature) await ctl.feature();
-    void ctl.run();
-    await keyLoop(deps.keys ?? process.stdin, ctl, io);
-    return 0;
-  } finally {
+  const stop = async () => {
     unwatch();
     await ctl.idle();
     await Promise.all([page.stop(), session.close()]);
     await claim.release();
+  };
+  try {
+    unwatch = await watching(root, args, ctl);
+  } catch (e) {
+    await stop();
+    throw e;
+  }
+  const live = { url, target: t.target, pageUrl: t.url, ctl, hasFeature: Boolean(feature), stop };
+  return { held: true, live };
+}
+
+/** Say why main is off, resolve the refs (so a missing token is said before the run), then run. */
+export async function firstRun(live: LiveSession, io: Io): Promise<void> {
+  const note = live.ctl.mode().note;
+  if (note) warnTo(io)(note);
+  if (live.hasFeature) await live.ctl.feature();
+  void live.ctl.run();
+}
+
+/** The live loop: a session in this terminal, shooting on every save until `q`. */
+export async function devLoop(
+  store: DevStore,
+  args: DevArgs,
+  io: Io,
+  deps: DevDeps,
+): Promise<number> {
+  const started = await startSession(store, args, io, deps);
+  if (!started.held) return attachTo(started.owner, args, io, deps);
+  const { live } = started;
+  try {
+    const where = args.watch.length > 0 ? args.watch.join(", ") : "the working tree";
+    io.stdout.write(
+      `pixelslash dev: ${live.target} at ${live.pageUrl}, watching ${where}\nlive page: ${live.url}\nkeys: r run · p pin · u unpin · m main/previous${live.hasFeature ? " · f refetch refs" : ""} · q quit\n`,
+    );
+    await firstRun(live, io);
+    await keyLoop(deps.keys ?? process.stdin, live.ctl, io);
+    return 0;
+  } finally {
+    await live.stop();
   }
 }
 

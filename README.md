@@ -232,7 +232,7 @@ pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
-pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
+pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
 pixelslash --version
 pixelslash install-browser
 ```
@@ -265,17 +265,17 @@ The client sends `User-Agent: pixelslash/<version>`.
 
 ## Your coding agent: `pixelslash mcp`
 
-`pixelslash mcp` is a stdio [MCP](https://modelcontextprotocol.io) server, so the coding agent you already run can read PixelSlash: which builds have changes, what changed in a shot, which shots are flaky, what reviewers flagged. Add it to Claude Code with:
+`pixelslash mcp` is a stdio [MCP](https://modelcontextprotocol.io) server, so the coding agent you already run can read PixelSlash (which builds have changes, what changed in a shot, which shots are flaky, what reviewers flagged) and drive feature mode in the worktree it was started in ([below](#feature-mode-from-your-agent)). Add it to Claude Code with:
 
 ```
 claude mcp add pixelslash -- pixelslash mcp
 ```
 
 ```
-pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
+pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
 ```
 
-It resolves the server, the token and the default project as every remote command does ([Resolution order](#signing-in-and-reading-builds)): run `pixelslash login` first, or give it `PIXELSLASH_TOKEN`. The server is resolved on each tool call, so a missing token or a server that is down is an error the agent reads in the tool's answer, not a server that fails to start. Each tool is one `/api/v1` read, and its text is the API's reply as sent:
+It resolves the server, the token and the default project as every remote command does ([Resolution order](#signing-in-and-reading-builds)): run `pixelslash login` first, or give it `PIXELSLASH_TOKEN`. The server is resolved on each tool call, so a missing token or a server that is down is an error the agent reads in the tool's answer, not a server that fails to start. Each read tool is one `/api/v1` read, and its text is the API's reply as sent:
 
 | Tool | Arguments | Reads |
 | --- | --- | --- |
@@ -290,9 +290,27 @@ It resolves the server, the token and the default project as every remote comman
 
 `project` is an id or a name; without it, `--project`, then `upload.project`, then the only project the token sees.
 
-- **It only reads.** There is no tool to accept or reject a shot, upload, resolve a flake or manage tokens: a review decision is a person's, in the web app.
-- **`get_snapshot_images` hands page shots to whatever model your agent uses.** The PNGs are fetched from the configured server only when that tool is called, and go back to the agent, which sends them to its model wherever that model runs. No other tool returns pixels. An image URL that is not on the configured server is not fetched.
+- **It only reads the server.** There is no tool to accept or reject a shot, upload, resolve a flake or manage tokens: a review decision is a person's, in the web app. The `dev_*` tools below write only to the worktree's `.pixelslash/dev/`.
+- **`get_snapshot_images` hands page shots to whatever model your agent uses.** The PNGs are fetched from the configured server only when that tool is called, and go back to the agent, which sends them to its model wherever that model runs. No other read tool returns pixels; the `dev_*` tools return the local shots, diffs and refs the same way. An image URL that is not on the configured server is not fetched.
 - Nothing is sent anywhere but the configured server. Stdout is the MCP channel; the server logs one line to stderr.
+
+### Feature mode from your agent
+
+The same server drives [`pixelslash dev`](#feature-mode-pixelslash-dev), so an agent can build a page toward its spec and references and look at each iteration itself. The session is the one of the worktree `pixelslash mcp` was started in. Each tool runs the same function as its `pixelslash dev … --json` twin, and its first text is that twin's JSON; shots, diffs and refs follow as images, scaled down to at most 1024 px wide.
+
+| Tool | Arguments | Twin |
+| --- | --- | --- |
+| `dev_start` | `target?`, `url?`, `viewport?`, `theme?`, `against?` (`previous`, `main`), `judge?`, `ds?` | `pixelslash dev`: starts this worktree's session, or attaches to the one running, and returns `{ started, target, page, by }`. `page` is the live page, which shows every iteration the agent makes |
+| `dev_run` | — | `dev --once --json` with a session live: one run through the session, then its iteration with each shot and diff |
+| `dev_latest` | `target?` | `dev latest --json`: regions, counts, timings, file paths, the judge's `differences`, and the images, without shooting |
+| `dev_pin`, `dev_unpin` | `id?` | `dev pin\|unpin --json` |
+| `dev_spec` | `target?`, `viewport?`, `theme?`, `refresh_refs?` | `dev spec --json`, except that each ref's `image` names the image block that carries it (`"image 0"`) rather than holding a data URL |
+| `dev_stop` | — | `q`: stops the session this server started. A session started in a terminal is left running, and `dev_stop` says to quit it there |
+
+- **The loop.** The prompt `build-to-spec` (argument `target?`) walks it: read `dev_spec`, `dev_start`, edit, `dev_run` or `dev_latest`, repeat until the shot matches, then `dev_pin` and `dev_stop`. The tool descriptions tell the agent to check after every edit. A save re-runs the session as it does in a terminal, so `dev_latest` after a save shows that run.
+- **The session lives as long as the server.** One the server started stops when the agent's client closes it; one started in a terminal is driven through its live page, as a second `pixelslash dev` would be. One session per worktree still holds: `dev_start` on a different target than the live session's is an error.
+- **What an agent can change.** It can run and pin, and pins are local to the worktree. It cannot accept, reject or upload anything, and no tool writes a config. `--against main` reads main's baselines with the server's credentials, read-only; the server flags (`--config`, `--server`, `--token-path`, `--project`, `--base`, `--figma-token-path`) are the session's.
+- The judge's `differences` are descriptions, never a pass or a score, as on the live page.
 
 ## Uploading to a server
 

@@ -5,6 +5,7 @@ import { afterAll, describe, expect, test } from "vitest";
 import type { KeyInput } from "../src/dev-loop.ts";
 import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng } from "./support.ts";
+import { FIGMA, featureProject, project, until } from "./dev-support.ts";
 import { gitRepo } from "./upload-support.ts";
 
 afterAll(cleanup);
@@ -14,11 +15,6 @@ afterAll(cleanup);
 const SERVER = "https://ps.example";
 const pinned = { PIXELSLASH_IMAGE_VERSION: "test" };
 const withToken = { ...pinned, PIXELSLASH_TOKEN: "psci_t" };
-const servers: Array<{ stop(force?: boolean): unknown }> = [];
-afterAll(() => {
-  for (const s of servers) s.stop(true);
-});
-
 type Seen = { method: string; path: string };
 
 /** The review server, read-only: it picks a red baseline for every key it is asked about. */
@@ -49,28 +45,6 @@ function server() {
   return { fetch, seen };
 }
 
-/** A git repo with a config whose one route is `page.html` in the repo, read on every request. */
-async function project() {
-  const cwd = await gitRepo();
-  const file = join(cwd, "page.html");
-  await writeFile(file, `<body style="margin:0;background:#fff"><p>one</p></body>`);
-  const page = Bun.serve({
-    port: 0,
-    fetch: async () =>
-      new Response(await readFile(file, "utf8"), { headers: { "content-type": "text/html" } }),
-  });
-  servers.push(page);
-  await Bun.write(
-    join(cwd, "pixelslash.config.json"),
-    JSON.stringify({
-      baseUrl: `http://127.0.0.1:${page.port}`,
-      routes: ["/"],
-      variants: [{ name: "small", viewport: { width: 400, height: 300 } }],
-    }),
-  );
-  return { cwd, file };
-}
-
 /** Keys a test presses. */
 function keyboard(): KeyInput & { press: (k: string) => void } {
   const fns = new Set<(chunk: string) => void>();
@@ -81,16 +55,6 @@ function keyboard(): KeyInput & { press: (k: string) => void } {
       for (const fn of fns) fn(k);
     },
   };
-}
-
-async function until<T>(get: () => Promise<T | undefined>, ms = 30_000): Promise<T> {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    const v = await get();
-    if (v !== undefined) return v;
-    await Bun.sleep(50);
-  }
-  throw new Error("timed out");
 }
 
 const base = { listFonts: async () => [], which: () => null };
@@ -221,19 +185,6 @@ describe("pixelslash dev", () => {
     expect(await liveSession(store)).toBeUndefined();
   }, 90_000);
 });
-
-const FIGMA = "https://www.figma.com/design/AbC123/Shop?node-id=1-2";
-
-/** `project()` with `features.index`: a spec, a wide repo PNG, and a Figma frame. */
-async function featureProject() {
-  const p = await project();
-  await writeFile(join(p.cwd, "cart.md"), "# Cart\nThe total sits under the list.");
-  await writeFile(join(p.cwd, "cart.png"), solidPng(2048, 100, [0, 0, 200, 255]));
-  const config = JSON.parse(await readFile(join(p.cwd, "pixelslash.config.json"), "utf8"));
-  config.features = { index: { spec: "cart.md", refs: ["cart.png", FIGMA] } };
-  await writeFile(join(p.cwd, "pixelslash.config.json"), JSON.stringify(config));
-  return p;
-}
 
 describe("pixelslash dev, a feature's spec and refs (ob 1741)", () => {
   test("dev spec --json is the spec text and the refs, inline images capped at 1024 px", async () => {
