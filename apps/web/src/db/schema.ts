@@ -263,3 +263,38 @@ export const snapshots = sqliteTable(
     index("snapshots_carried_idx").on(t.carriedFrom),
   ],
 );
+
+export const FLAG_KINDS = ["missed", "false_positive"] as const;
+export type FlagKind = (typeof FLAG_KINDS)[number];
+
+/**
+ * A reviewer's word that the diff got a shot wrong (ob 1721): a change it `missed`, or a
+ * `false_positive` it flagged. One per user per snapshot. It is not a review decision: it never
+ * accepts, rejects or re-diffs, and a decision never clears it. What the diff measured is copied in
+ * at flag time, so the list stays the detector's work list even if the diff is rerun later.
+ */
+export const detectionFlags = sqliteTable(
+  "detection_flags",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    snapshotId: text("snapshot_id")
+      .notNull()
+      .references(() => snapshots.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: FLAG_KINDS }).notNull(),
+    note: text("note"),
+    /** Where on the shot, in image px: the ignore-area shape. Null when the flag names no area. */
+    rect: text("rect", { mode: "json" }).$type<IgnoreRect>(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    unique().on(t.snapshotId, t.createdBy),
+    index("detection_flags_project_idx").on(t.projectId, t.createdAt),
+  ],
+);

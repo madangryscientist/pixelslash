@@ -8,6 +8,7 @@ import { deflateSync } from "node:zlib";
 import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
 import { expectBaselineBuild, expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
+import { expectProjectFlag, flagFalsePositive } from "./detection-flag";
 import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
@@ -200,6 +201,18 @@ async function capture(page: Page, name: string) {
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
 }
 
+/** The shot's image is a signed URL that serves, and the same path in another org's prefix does not. */
+async function expectSignedImage(page: Page) {
+  const src = await page.locator("img").first().getAttribute("src");
+  expect(src).toMatch(/^\/images\/orgs\/.+\?exp=\d+&sig=.+$/);
+  expect((await page.request.get(SERVER + src)).status()).toBe(200);
+  expect(
+    (
+      await page.request.get(SERVER + (src ?? "").replace("/images/orgs/", "/images/orgs/x/"))
+    ).status(),
+  ).toBe(404);
+}
+
 function group(page: Page, name: string) {
   return page.getByTestId(`group-${name}`);
 }
@@ -291,14 +304,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(page.getByTestId("sizes")).toContainText("compared at 40×40");
   await expect(page.getByTestId("diff-options")).toContainText("threshold");
   await expect(page.getByTestId("diff-options")).toContainText("0.2");
-  const src = await page.locator("img").first().getAttribute("src");
-  expect(src).toMatch(/^\/images\/orgs\/.+\?exp=\d+&sig=.+$/);
-  expect((await page.request.get(SERVER + src)).status()).toBe(200);
-  expect(
-    (
-      await page.request.get(SERVER + (src ?? "").replace("/images/orgs/", "/images/orgs/x/"))
-    ).status(),
-  ).toBe(404);
+  await expectSignedImage(page);
   await capture(page, "03-snapshot-side-by-side");
 
   await page.getByRole("button", { name: "Overlay" }).click();
@@ -312,6 +318,8 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(page.getByLabel("Compare position")).toHaveValue("70");
   await capture(page, "05-snapshot-slider");
   await checkSnapshotViewer(page);
+  await flagFalsePositive(page);
+  await capture(page, "05b-snapshot-flagged");
 
   // j walks to the next shot in the build's order; k comes back.
   await page.locator("h1").click();
@@ -325,6 +333,8 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   // a accepts the shot on screen.
   await page.keyboard.press("a");
   await expect(page.getByTestId("review-state")).toHaveText("accepted by e2e-octocat");
+  // Accepting does not clear a flag: the two are independent.
+  await expect(page.getByTestId("detection-flag")).toHaveCount(1);
   await open(page, buildUrl);
   await expect(page.getByText("1 to review")).toBeVisible();
 
@@ -344,6 +354,8 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(page.getByTestId("build-row").first().getByTestId("to-review")).toHaveText(
     "2 to review",
   );
+  // The flag on the earlier build stays listed, and the export is exactly it.
+  await expectProjectFlag(page, projectId);
   await page.getByTestId("build-row").first().getByRole("link", { name: "review" }).click();
   await page.getByRole("button", { name: "Accept all" }).click();
   await expect(page.getByTestId("build-status")).toHaveText("passed");

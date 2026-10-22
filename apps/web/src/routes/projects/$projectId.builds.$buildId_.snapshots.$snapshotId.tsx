@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
+import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer } from "#/components/snapshot-viewer";
@@ -43,25 +44,31 @@ function useDecision(projectId: string, snapshotId: string, reviewable: boolean)
   return { busy, error, decide };
 }
 
-function SnapshotPage() {
-  const data = Route.useLoaderData();
-  const { project, org, build, snapshot, images, previousId, nextId, names } = data;
+/** Go to another shot of the same build; null (the end of the walk) goes nowhere. */
+function useWalk(projectId: string, buildId: string) {
   const navigate = useNavigate();
-  const reviewable = build.status === "changes" || build.status === "passed";
-  const { busy, error, decide } = useDecision(project.id, snapshot.id, reviewable);
-  const [help, setHelp] = useState(false);
-  const label = useMemo(() => shotLabeller(names)(snapshot.name), [names, snapshot.name]);
-
-  const go = useCallback(
+  return useCallback(
     (id: string | null) => {
       if (!id) return;
       void navigate({
         to: "/projects/$projectId/builds/$buildId/snapshots/$snapshotId",
-        params: { projectId: project.id, buildId: build.id, snapshotId: id },
+        params: { projectId, buildId, snapshotId: id },
       });
     },
-    [navigate, project.id, build.id],
+    [navigate, projectId, buildId],
   );
+}
+
+function SnapshotPage() {
+  const data = Route.useLoaderData();
+  const { project, org, build, snapshot, images, previousId, nextId, names } = data;
+  const reviewable = build.status === "changes" || build.status === "passed";
+  const { busy, error, decide } = useDecision(project.id, snapshot.id, reviewable);
+  const [help, setHelp] = useState(false);
+  const flag = useFlagDraft(snapshot.id, data.flags, snapshot.diffResult !== null);
+  const label = useMemo(() => shotLabeller(names)(snapshot.name), [names, snapshot.name]);
+
+  const go = useWalk(project.id, build.id);
   const openHelp = useCallback(() => setHelp(true), []);
   useReviewKeys({
     canDecide: reviewable,
@@ -89,6 +96,8 @@ function SnapshotPage() {
           onNext: nextId ? () => go(nextId) : null,
           onAccept: () => decide("accepted"),
           onReject: () => decide("rejected"),
+          onFlag: flag.toggle,
+          flagOpen: flag.open,
           onHelp: openHelp,
         }}
       />
@@ -109,6 +118,8 @@ function SnapshotPage() {
             diffUrl={images.diff}
             result={snapshot.diffResult}
             removed={snapshot.diffStatus === "removed"}
+            marks={flag.marks}
+            onDraw={flag.onDraw}
           />
         </div>
         <SidePanel
@@ -117,7 +128,14 @@ function SnapshotPage() {
           options={data.diffOptions}
           reviewable={reviewable}
           status={build.status}
-        />
+        >
+          <FlagPanel
+            projectId={project.id}
+            snapshotId={snapshot.id}
+            flags={data.flags}
+            draft={flag}
+          />
+        </SidePanel>
       </div>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}
     </Page>

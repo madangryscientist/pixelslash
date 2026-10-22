@@ -1,11 +1,17 @@
 import { Button } from "@hackcove/ui";
 import { useState } from "react";
 import { type Crop, changeCrop } from "../../../../packages/engine/src/report-crop.ts";
-import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
+import {
+  DrawLayer,
+  FlagMarks,
+  RegionBoxes,
+  type Scale,
+  Viewport,
+} from "#/components/snapshot-frame";
 import { SnapshotOverlay } from "#/components/snapshot-overlay";
 import { SnapshotSlider } from "#/components/snapshot-slider";
 import { useHydrated } from "#/components/ui";
-import type { DiffResult } from "#/db/schema";
+import type { DiffResult, IgnoreRect } from "#/db/schema";
 
 type Mode = "side" | "overlay" | "slider";
 
@@ -64,6 +70,16 @@ function Segmented<T extends string>({
   );
 }
 
+/** The flagged areas on a shot, and the layer that draws a new one while drawing is on. */
+function Marked({ width, height, marks, onDraw }: { width: number; height: number } & Marking) {
+  return (
+    <>
+      {marks.length > 0 && <FlagMarks width={width} height={height} marks={marks} />}
+      {onDraw && <DrawLayer width={width} height={height} onDraw={onDraw} />}
+    </>
+  );
+}
+
 function Pane({
   label,
   caption,
@@ -75,6 +91,8 @@ function Pane({
   boxes,
   scale,
   crop,
+  marks,
+  onDraw,
 }: {
   label: string;
   caption: string | null;
@@ -86,7 +104,7 @@ function Pane({
   boxes: DiffResult["regions"] | null;
   scale: Scale;
   crop: Crop | null;
-}) {
+} & Marking) {
   return (
     <figure className="min-w-0">
       <figcaption className="mb-2 text-sm font-medium">
@@ -100,6 +118,9 @@ function Pane({
             {boxes && width && height && (
               <RegionBoxes width={width} height={height} regions={boxes} />
             )}
+            {width && height && (
+              <Marked width={width} height={height} marks={marks} onDraw={onDraw} />
+            )}
           </div>
         </Viewport>
       ) : (
@@ -110,6 +131,9 @@ function Pane({
     </figure>
   );
 }
+
+/** Flagged areas to show, and while one is being drawn, where it goes. Side by side only. */
+type Marking = { marks: IgnoreRect[]; onDraw: ((rect: IgnoreRect) => void) | null };
 
 type Shots = {
   name: string;
@@ -130,7 +154,10 @@ function SideBySide({
   regions,
   scale,
   crop,
-}: Shots & { regions: DiffResult["regions"] | null; scale: Scale; crop: Crop | null }) {
+  marks,
+  onDraw,
+}: Shots & Marking & { regions: DiffResult["regions"] | null; scale: Scale; crop: Crop | null }) {
+  const marking = { marks, onDraw };
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Pane
@@ -142,6 +169,7 @@ function SideBySide({
         boxes={regions}
         scale={scale}
         crop={crop}
+        {...marking}
       />
       <Pane
         label="Branch"
@@ -152,6 +180,7 @@ function SideBySide({
         boxes={regions}
         scale={scale}
         crop={crop}
+        {...marking}
       />
     </div>
   );
@@ -204,17 +233,40 @@ function ViewerControls({
 }
 
 /**
+ * A drawn box clipped to the compared overlap (top-left, the smaller of the two sizes), where Main
+ * and Branch share px: the same box then means the same pixels on either side. Null when nothing
+ * of it is inside.
+ */
+function clipToOverlap(rect: IgnoreRect, result: DiffResult): IgnoreRect | null {
+  const width = Math.min(rect.x + rect.width, result.width) - rect.x;
+  const height = Math.min(rect.y + rect.height, result.height) - rect.y;
+  return width > 0 && height > 0 ? { ...rect, width, height } : null;
+}
+
+/** `onDraw`, taking only what lands in the overlap; nothing to draw on when nothing was measured. */
+function overlapDraw(onDraw: Marking["onDraw"], result: DiffResult | null): Marking["onDraw"] {
+  if (!onDraw || !result) return null;
+  return (rect) => {
+    const clipped = clipToOverlap(rect, result);
+    if (clipped) onDraw(clipped);
+  };
+}
+
+/**
  * The three ways to look at one shot, each at the chosen scale and with or without the measured
  * boxes. Boxes are drawn from the regions the diff stored, nothing is recomputed here; when the two
  * shots differ in size only the measured overlap carries boxes, and the zoom crop is clipped to it.
  */
-export function SnapshotViewer(shots: Shots) {
-  const [mode, setMode] = useState<Mode>("side");
+export function SnapshotViewer({ marks = [], onDraw = null, ...shots }: Shots & Partial<Marking>) {
+  const [chosen, setMode] = useState<Mode>("side");
+  // An area is drawn on Main or Branch as they stand; overlay and slider move the images around.
+  const mode = onDraw ? "side" : chosen;
   const [scale, setScale] = useState<Scale>("fit");
   const [highlight, setHighlight] = useState(true);
   const { result } = shots;
   const crop = result ? changeCrop(result.regions, result.width, result.height) : null;
   const view = { highlight, scale, crop };
+  const draw = overlapDraw(onDraw, result);
   return (
     <section aria-label="Snapshot viewer">
       <ViewerControls
@@ -228,7 +280,13 @@ export function SnapshotViewer(shots: Shots) {
         crop={crop}
       />
       {mode === "side" && (
-        <SideBySide {...shots} regions={result && highlight ? result.regions : null} {...view} />
+        <SideBySide
+          {...shots}
+          regions={result && highlight ? result.regions : null}
+          {...view}
+          marks={marks}
+          onDraw={draw}
+        />
       )}
       {mode === "overlay" && <SnapshotOverlay {...shots} {...view} />}
       {mode === "slider" && <SnapshotSlider {...shots} {...view} />}

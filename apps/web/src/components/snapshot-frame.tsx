@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { type PointerEvent, type ReactNode, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
-import type { DiffRegion } from "#/db/schema";
+import type { DiffRegion, IgnoreRect } from "#/db/schema";
 
 /** How big a shot is drawn: fitted to its pane, at its own pixels, or cropped to the change. */
 export type Scale = "fit" | "actual" | "zoom";
@@ -47,10 +47,8 @@ export function RegionBoxes({
           strokeWidth={2}
           vectorEffect="non-scaling-stroke"
         >
-          <title>
-            {region.kind}: {region.changedPixels} px
-            {region.why ? ` · ${region.why}` : ""}
-          </title>
+          {/* One string: a title of several text nodes does not hydrate (React #418). */}
+          <title>{`${region.kind}: ${region.changedPixels} px${region.why ? ` · ${region.why}` : ""}`}</title>
         </rect>
       ))}
     </svg>
@@ -118,6 +116,106 @@ export function Viewport({
       style={width ? { width: `${width}px` } : { width: "fit-content" }}
     >
       {children}
+    </div>
+  );
+}
+
+const FLAG_COLOUR = "#7c3aed";
+
+type Point = { x: number; y: number };
+
+const rectOf = (a: Point, b: Point): IgnoreRect => ({
+  x: Math.min(a.x, b.x),
+  y: Math.min(a.y, b.y),
+  width: Math.abs(a.x - b.x),
+  height: Math.abs(a.y - b.y),
+});
+
+const clamp = (v: number, max: number) => Math.round(Math.min(Math.max(v, 0), max));
+
+/** The areas reviewers marked when they flagged the detection, dashed so they read as theirs. */
+export function FlagMarks({
+  width,
+  height,
+  marks,
+}: {
+  width: number;
+  height: number;
+  marks: IgnoreRect[];
+}) {
+  return (
+    <svg
+      aria-label="Flagged areas"
+      role="img"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 h-full w-full"
+    >
+      {marks.map((mark, i) => (
+        <rect
+          // Marks are one flag each, in a fixed order: the index is a stable key.
+          key={i}
+          data-testid="flag-mark"
+          x={mark.x}
+          y={mark.y}
+          width={mark.width}
+          height={mark.height}
+          fill="none"
+          stroke={FLAG_COLOUR}
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * Drag a box over an image `width`×`height` px. Pointer positions are turned into the image's own
+ * px through the drawn size, so the rect is the same at any scale; a click without a drag is no box.
+ */
+export function DrawLayer({
+  width,
+  height,
+  onDraw,
+}: {
+  width: number;
+  height: number;
+  onDraw: (rect: IgnoreRect) => void;
+}) {
+  const [start, setStart] = useState<Point | null>(null);
+  const [end, setEnd] = useState<Point | null>(null);
+  const toImage = (event: PointerEvent<HTMLDivElement>): Point => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return {
+      x: clamp(((event.clientX - box.left) / box.width) * width, width),
+      y: clamp(((event.clientY - box.top) / box.height) * height, height),
+    };
+  };
+  const live = start && end ? rectOf(start, end) : null;
+  return (
+    <div
+      data-testid="flag-draw"
+      aria-label="Drag to mark an area"
+      className="absolute inset-0 cursor-crosshair touch-none"
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        const at = toImage(event);
+        setStart(at);
+        setEnd(at);
+      }}
+      onPointerMove={(event) => {
+        if (start) setEnd(toImage(event));
+      }}
+      onPointerUp={(event) => {
+        const rect = start ? rectOf(start, toImage(event)) : null;
+        setStart(null);
+        setEnd(null);
+        if (rect && rect.width > 0 && rect.height > 0) onDraw(rect);
+      }}
+    >
+      {live && <FlagMarks width={width} height={height} marks={[live]} />}
     </div>
   );
 }

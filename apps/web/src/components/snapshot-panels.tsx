@@ -75,6 +75,9 @@ type BarActions = {
   onNext: (() => void) | null;
   onAccept: () => void;
   onReject: () => void;
+  /** Open or close the flag form; `flagOpen` says which. Flagging is not a review decision. */
+  onFlag: () => void;
+  flagOpen: boolean;
   onHelp: () => void;
 };
 
@@ -113,6 +116,16 @@ function Actions({
         className={outline}
       >
         ›<Kbd>j</Kbd>
+      </button>
+      <button
+        type="button"
+        aria-expanded={actions.flagOpen}
+        disabled={!hydrated}
+        title="Missed change or false positive: tell PixelSlash the diff got this shot wrong"
+        onClick={actions.onFlag}
+        className={`${outline} ${actions.flagOpen ? "border-violet-500! text-violet-700!" : ""}`}
+      >
+        Flag detection
       </button>
       <button
         type="button"

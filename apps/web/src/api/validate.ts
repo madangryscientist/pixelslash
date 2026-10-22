@@ -101,16 +101,18 @@ function parseIgnore(v: unknown): IgnoreRect[] {
   if (v === undefined) return [];
   if (!Array.isArray(v) || v.length > MAX_IGNORE)
     bad("ignore", `must be an array of at most ${MAX_IGNORE} { x, y, width, height }`);
-  return v.map((r, i) => {
-    const where = `ignore[${i}]`;
-    const rect = object(r, where);
-    return {
-      x: coord(rect.x, `${where}.x`, 0),
-      y: coord(rect.y, `${where}.y`, 0),
-      width: coord(rect.width, `${where}.width`, 1),
-      height: coord(rect.height, `${where}.height`, 1),
-    };
-  });
+  return v.map((r, i) => parseRect(r, `ignore[${i}]`));
+}
+
+/** One image-px rectangle `{ x, y, width, height }`: an ignore area, or a detection flag's (ob 1721). */
+export function parseRect(v: unknown, where: string): IgnoreRect {
+  const rect = object(v, where);
+  return {
+    x: coord(rect.x, `${where}.x`, 0),
+    y: coord(rect.y, `${where}.y`, 0),
+    width: coord(rect.width, `${where}.width`, 1),
+    height: coord(rect.height, `${where}.height`, 1),
+  };
 }
 
 export function parseSnapshotInput(raw: unknown): SnapshotInput {

@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
 import { NotFoundError } from "#/db/db";
+import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
 import { isMarker } from "#/db/markers";
 import {
   createOrg,
@@ -21,7 +22,9 @@ import {
   listBuilds,
   reviewSnapshot,
 } from "#/db/review";
+import { FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
 import { issueCiToken, listCiTokens, revokeCiToken } from "#/db/tokens";
+import { BadRequest, parseRect } from "#/api/validate";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
@@ -169,8 +172,9 @@ export const getProjectPage = createServerFn()
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const builds = await listBuilds(db, project.id);
+    const flags = await listFlags(db, user.id, project.id);
     // `now` and `serverUrl` for the same reasons as `getOrgs`: one "2 h ago", the URL to upload to.
-    return { org, project, builds, now: new Date(), serverUrl: getRequestUrl().origin };
+    return { org, project, builds, flags, now: new Date(), serverUrl: getRequestUrl().origin };
   });
 
 export const getBuildPage = createServerFn()
@@ -224,6 +228,12 @@ export const getSnapshotPage = createServerFn()
       images,
       /** The options the diff was run with, through the accessor the server diff reads (ob 1494). */
       diffOptions: await snapshotDiffOptions(db, snapshot.id),
+      /** Every reviewer's detection flag on this shot (ob 1721); the viewer's own is `mine`. */
+      flags: await snapshotFlags(db, {
+        userId: user.id,
+        projectId: project.id,
+        snapshotId: snapshot.id,
+      }),
       /** The j/k order is the build's order, so a walk visits every shot once. */
       position: index + 1,
       total: view.snapshots.length,
@@ -278,4 +288,50 @@ export const acceptBuild = createServerFn({ method: "POST" })
         userId: user.id,
       }).then((status) => ({ status })),
     );
+  });
+
+/* ------------------------------------------------------------ detection flags (ob 1721) */
+
+const MAX_NOTE = 200;
+
+const isFlagKind = (v: unknown): v is FlagKind => FLAG_KINDS.some((kind) => kind === v);
+
+/** The flag's kind, its optional one-line note and its optional rect, from a server-fn payload. */
+function flagInput(d: unknown): { kind: FlagKind; note: string | null; rect: IgnoreRect | null } {
+  const get = (key: string) => (typeof d === "object" && d !== null ? Reflect.get(d, key) : null);
+  const kind = get("kind");
+  if (!isFlagKind(kind)) throw new Error(`kind is one of ${FLAG_KINDS.join(", ")}`);
+  const raw = get("note");
+  const note = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
+  if (note.length > MAX_NOTE) throw new Error(`note is at most ${MAX_NOTE} chars`);
+  const rect = get("rect");
+  try {
+    return { kind, note: note || null, rect: rect == null ? null : parseRect(rect, "rect") };
+  } catch (error) {
+    // A server fn has no 400: the message is what the form shows.
+    if (error instanceof BadRequest) throw new Error(error.message, { cause: error });
+    throw error;
+  }
+}
+
+/** Create or replace the viewer's flag on a shot. It decides nothing: review state is untouched. */
+export const flagShot = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({
+    projectId: field(d, "projectId"),
+    snapshotId: field(d, "snapshotId"),
+    ...flagInput(d),
+  }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(flagSnapshot(database(), { ...data, userId: user.id }));
+  });
+
+export const withdrawShotFlag = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({
+    projectId: field(d, "projectId"),
+    snapshotId: field(d, "snapshotId"),
+  }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(withdrawFlag(database(), { ...data, userId: user.id }));
   });

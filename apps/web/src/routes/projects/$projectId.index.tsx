@@ -3,6 +3,7 @@ import { Body, buttonClass } from "@hackcove/ui";
 import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb } from "#/components/crumbs";
+import { ProjectFlags } from "#/components/detection-flag";
 import { Step } from "#/components/org-empty";
 import { Page, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildSummary } from "#/db/review";
@@ -18,7 +19,7 @@ const COLUMNS = "lg:grid-cols-[1.4fr_110px_1.6fr_120px_92px]";
 const HEAD = "text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 function ProjectPage() {
-  const { project, org, builds, now, serverUrl } = Route.useLoaderData();
+  const { project, org, builds, flags, now, serverUrl } = Route.useLoaderData();
   const hydrated = useHydrated();
   return (
     <Page title={project.name} crumbs={[orgCrumb(org), project.name]} wide>
@@ -63,6 +64,7 @@ function ProjectPage() {
           </ul>
         </div>
       )}
+      <ProjectFlags projectId={project.id} flags={flags} />
     </Page>
   );
 }

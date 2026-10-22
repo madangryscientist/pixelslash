@@ -175,12 +175,15 @@ export function SidePanel({
   options,
   reviewable,
   status,
+  children,
 }: {
   projectId: string;
   snapshot: SnapshotView;
   options: DiffOptions;
   reviewable: boolean;
   status: string;
+  /** The detection flags, first: a second reviewer reads them before deciding. */
+  children?: ReactNode;
 }) {
   return (
     <aside className="space-y-6 border-slate-200 bg-white p-4 lg:border-l">
@@ -189,6 +192,7 @@ export function SidePanel({
           This build is {status}; a new build is needed to review it.
         </p>
       )}
+      {children}
       <Carried projectId={projectId} snapshot={snapshot} />
       <Measured snapshot={snapshot} />
       <Environment snapshot={snapshot} />
