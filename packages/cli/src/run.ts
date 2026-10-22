@@ -40,7 +40,7 @@ import type { KeyInput } from "./dev-loop.ts";
 import { FLAKE_USAGE, FLAKES_USAGE, runFlake, runFlakes } from "./flake.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
 import { INIT_USAGE, runInit } from "./init.ts";
-import { MCP_USAGE, runMcp } from "./mcp.ts";
+import { MCP_USAGE } from "./mcp-usage.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
 import { UPLOAD_USAGE, runUpload } from "./upload.ts";
 
@@ -147,7 +147,11 @@ const COMMANDS: Record<
   builds: { usage: BUILDS_USAGE, run: runBuilds },
   build: { usage: BUILD_USAGE, run: runBuild },
   status: { usage: STATUS_USAGE, run: runStatus },
-  mcp: { usage: MCP_USAGE, run: runMcp },
+  // Loaded on demand: no other command may need the MCP SDK installed (ob 1767).
+  mcp: {
+    usage: MCP_USAGE,
+    run: async (argv, io, deps) => (await import("./mcp.ts")).runMcp(argv, io, deps),
+  },
   flakes: { usage: FLAKES_USAGE, run: runFlakes },
   flake: { usage: FLAKE_USAGE, run: runFlake },
 };
