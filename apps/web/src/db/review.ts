@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
 import {
   SNAPSHOT_GROUPS,
   type SnapshotGroup,
@@ -166,14 +166,16 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
 }
 
 /**
- * True when no other build of the project came before this one (older, or the same millisecond with
- * a smaller id), so nothing could have been its baseline. Read, not stored: how a first build is
- * stored and diffed is unchanged.
+ * True when no earlier build of the project holds a shot that baseline selection could pick (ob 1718):
+ * the same predicate as `queryCandidates` in `baselines.ts`, without the merge-base reach. A build
+ * that errored or was rejected (`failed`) is not a candidate, so the build after it sets the
+ * baseline. Read, not stored: how a first build is stored and diffed is unchanged.
  */
 export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): Promise<boolean> {
   const [earlier] = await db
-    .select({ id: builds.id })
-    .from(builds)
+    .select({ id: snapshots.id })
+    .from(snapshots)
+    .innerJoin(builds, eq(builds.id, snapshots.buildId))
     .where(
       and(
         eq(builds.projectId, build.projectId),
@@ -181,6 +183,13 @@ export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): P
           lt(builds.createdAt, build.createdAt),
           and(eq(builds.createdAt, build.createdAt), lt(builds.id, build.id)),
         ),
+        inArray(builds.status, ["changes", "passed"]),
+        or(
+          eq(builds.status, "passed"),
+          eq(snapshots.reviewState, "accepted"),
+          eq(builds.branch, build.branch),
+        ),
+        or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
       ),
     )
     .limit(1);

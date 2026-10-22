@@ -96,9 +96,9 @@ export function BuildHeader({
       </div>
       {baseline ? (
         <p className="mt-4 text-sm text-slate-700" data-testid="build-baseline">
-          This build is the baseline. It is the first for this project, so its {snapshots.length}{" "}
-          shot{snapshots.length === 1 ? "" : "s"} have nothing to be compared with and need no
-          review. Later builds are compared against it.
+          This build is the baseline. It is the first build that can be a baseline for this project,
+          so its {snapshots.length} shot{snapshots.length === 1 ? "" : "s"} have nothing to be
+          compared with and need no review. Later builds are compared against it.
         </p>
       ) : (
         <div className="mt-4 flex flex-wrap items-end gap-4">

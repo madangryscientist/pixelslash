@@ -10,6 +10,7 @@ import {
   NotReviewableError,
   acceptAllSnapshots,
   buildView,
+  isFirstBuild,
   listBuilds,
   reviewSnapshot,
 } from "./review";
@@ -101,6 +102,47 @@ describe("the review model reads", () => {
     expect(summary?.counts).toMatchObject({ unmeasured: 1, rebaseline: 0, changed: 0 });
     const view = await buildView(ctx.db, ctx.projectId, errored.id);
     expect(view.snapshots.map((s) => groupOf(s))).toEqual(["unmeasured"]);
+  });
+
+  test("a build after an errored first build is the first baseline (ob 1718)", async () => {
+    const ctx = await context();
+    const errored = await upload(
+      ctx,
+      { branch: "main", commit: sha(1), shots: [{ name: "home", png: shot() }] },
+      {
+        now: () => {
+          throw new Error("isolate died");
+        },
+      },
+    );
+    expect(errored.status).toBe("errored");
+    await ctx.db
+      .update(buildRows)
+      .set({ createdAt: new Date(Date.now() - 60_000) })
+      .where(eq(buildRows.commitSha, sha(1)));
+    const next = await upload(ctx, {
+      branch: "main",
+      commit: sha(2),
+      shots: [{ name: "home", png: shot() }],
+    });
+    expect(await isFirstBuild(ctx.db, next)).toBe(true);
+    const view = await buildView(ctx.db, ctx.projectId, next.id);
+    expect(view.snapshots.map((s) => s.diffStatus)).toEqual(["new"]);
+  });
+
+  test("a build after an accepted earlier build is not the first baseline (ob 1718)", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ name: "home", png: shot() }] });
+    await ctx.db
+      .update(buildRows)
+      .set({ createdAt: new Date(Date.now() - 60_000) })
+      .where(eq(buildRows.commitSha, sha(1)));
+    const next = await upload(ctx, {
+      branch: "main",
+      commit: sha(2),
+      shots: [{ name: "home", png: shot() }],
+    });
+    expect(await isFirstBuild(ctx.db, next)).toBe(false);
   });
 
   test("accepting the changed shot records the reviewer and passes the build", async () => {
