@@ -24,6 +24,7 @@ import {
   type ListFonts,
 } from "./fingerprint.ts";
 import { joinOrigin } from "./routes.ts";
+import { signIn, type Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
 import { awaitStory, storybookRoutes } from "./storybook.ts";
 
@@ -177,6 +178,8 @@ type Shot = {
   stabilise: Stabilise;
   /** Ignore areas to resolve at screenshot time; the pixels are left as they are. */
   ignore: Ignore[];
+  /** What the config's `setup` left signed in, if it has one. */
+  session: Session | undefined;
   warn: (m: string) => void;
 };
 
@@ -202,6 +205,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
     viewport: variant.viewport,
     deviceScaleFactor: stabilise.deviceScaleFactor,
     colorScheme: variant.theme,
+    ...(shot.session && { storageState: shot.session }),
   });
   try {
     await pinClock(context, stabilise);
@@ -244,7 +248,12 @@ async function shootAll(
   config: CaptureConfig,
   routes: Route[],
   out: string,
-  ctx: { fingerprint: Fingerprint; browser: Browser; warn: (m: string) => void },
+  ctx: {
+    fingerprint: Fingerprint;
+    browser: Browser;
+    session: Session | undefined;
+    warn: (m: string) => void;
+  },
 ): Promise<SnapshotEntry[]> {
   const entries: SnapshotEntry[] = [];
   for (const variant of config.variants) {
@@ -257,6 +266,7 @@ async function shootAll(
         variant,
         stabilise: config.stabilise,
         ignore: resolveIgnore(config, route, variant),
+        session: ctx.session,
         warn: ctx.warn,
       });
       await mkdir(join(out, route.name), { recursive: true });
@@ -278,7 +288,8 @@ async function shootAll(
 
 /**
  * Capture every route × variant in `config` into `out` and write `out/manifest.json`.
- * Starts the app first when the config has a start command, and stops it after.
+ * Starts the app first when the config has a start command, and stops it after; runs the
+ * config's `setup` once the app is up, and shoots every route with the session it left.
  * Outside the pinned image this still works, warns, and records `image: "bare"`.
  */
 export async function captureSnapshots(
@@ -310,7 +321,8 @@ export async function captureSnapshots(
           )),
         ]
       : config.routes;
-    const snapshots = await shootAll(config, routes, out, { fingerprint, browser, warn });
+    const session = await signIn(browser, config);
+    const snapshots = await shootAll(config, routes, out, { fingerprint, browser, session, warn });
     const manifest: SnapshotManifest = { version: 1, snapshots };
     const manifestPath = join(out, "manifest.json");
     await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

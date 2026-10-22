@@ -1,4 +1,4 @@
-/** The fixed rows the organizations-page dogfood shoots (ob 1707): ids, names and times never change.
+/** The fixed rows the organizations-page dogfood capture shoots (ob 1707, dogfood-orgs.config.ts): ids, names and times never change.
  * Seeded through `wrangler d1 execute`, so it is plain INSERTs against the migrated schema. */
 import { createHash } from "node:crypto";
 

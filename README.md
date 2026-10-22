@@ -51,6 +51,7 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 {
   "baseUrl": "http://127.0.0.1:4173",
   "start": { "command": "bun run preview", "readyUrl": "http://127.0.0.1:4173", "timeoutMs": 60000 },
+  "setup": "./e2e/sign-in.ts",
   "routes": ["/", { "path": "/pricing", "name": "pricing", "masks": [".clock", { "x": 0, "y": 0, "width": 200, "height": 40 }], "ignore": [".live-chart"], "tags": ["billing"], "diff": { "threshold": 0.05 } }, { "path": "/dashboard", "variants": { "mobile-dark": { "diff": { "minChangedPixels": 50 } } } }],
   "variants": [
     { "name": "desktop", "viewport": { "width": 1280, "height": 720 } },
@@ -64,6 +65,28 @@ docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [-
 ```
 
 - `baseUrl` must already be up, unless `start` is given: then the command runs first (in the container, from the working dir), its `readyUrl` (default `baseUrl`) must answer below 400 within `timeoutMs`, and the command's whole process group is stopped after the run. Its output goes to stderr. If `readyUrl` already answers before the command runs (another run on the same port), or the command has exited by the time it answers, the capture fails with exit 1 and writes nothing: the answer would be someone else's server.
+- `setup` is the way in to pages behind sign-in: the path to a JS/TS module (relative to the config file) whose default export is an async function. It runs once, after `start` is ready and before the first shot, with `{ page, context, baseUrl }` (Playwright, in a fresh context whose `baseURL` is `baseUrl`, at the first variant's viewport and on the real clock). Whatever it leaves in that context, cookies and local storage, is given to every shot. The session is held in memory only: it is never written to the snapshot dir, the manifest or an upload. A setup that throws fails the capture with exit 1 and names the file; one that cannot be loaded or does not export a function is exit 2. Type it with `CaptureSetup` from `@pixelslash/engine`.
+
+  ```ts
+  // Sign in through the form. The password comes from env, never the config.
+  export default async ({ page }) => {
+    await page.goto("/login");
+    await page.fill("#email", "visual@example.com");
+    await page.fill("#password", process.env.APP_PASSWORD);
+    await page.click("button[type=submit]");
+    await page.waitForURL("**/dashboard");
+  };
+  ```
+
+  ```ts
+  // Reuse a saved session: a Playwright storageState file kept outside git, named in env.
+  export default async ({ context }) => {
+    const { cookies } = JSON.parse(await Bun.file(process.env.APP_SESSION_FILE).text());
+    await context.addCookies(cookies);
+  };
+  ```
+
+  A setup can also seed data (it runs in the CLI's process, so it may spawn a seed script). `apps/web/e2e/dogfood-orgs.config.ts` is a worked example: it starts a local build of the review app, signs in through a GitHub stand-in and seeds fixed rows. There is no separate `storageState` option, because the second example above covers it in three lines.
 - `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`; a query string is slugged too, so `/search?q=a&page=2` is `search-q-a-page-2`). Top-level `masks` and `tags` apply to every route. A route `path` may carry a query string; it is sent as written and recorded as-is in the manifest's `path`.
 - `storybook` shoots a Storybook without a hand-written route list. Once the app is up (after `start`), capture reads `<url>/index.json` (Storybook 7+; `docs` entries are skipped, only `type: "story"`) and adds one route per story × each combination of the listed `globals` (no globals: one per story), each then × the config's `variants`. `url` is required; `baseUrl` defaults to it, so a Storybook-only config needs no `routes`. Example:
 

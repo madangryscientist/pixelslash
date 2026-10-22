@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { parseArea, type Ignore, type Mask } from "./config-areas.ts";
 import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
 import type { DiffOptions } from "./diff.ts";
@@ -65,6 +65,11 @@ export type UploadConfig = { server: string | undefined; baseBranch: string | un
 export type CaptureConfig = {
   baseUrl: string;
   start: StartCommand | undefined;
+  /**
+   * A module run once before the routes, after `start`, that can sign in (see `CaptureSetup`).
+   * A path; `loadConfig` resolves it against the config file's directory.
+   */
+  setup: string | undefined;
   storybook: StorybookConfig | undefined;
   upload: UploadConfig;
   /** The project-wide diff options; routes and their variants layer over it. */
@@ -303,6 +308,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
   return {
     baseUrl,
     start: start(raw.start, baseUrl),
+    setup: raw.setup === undefined ? undefined : str(raw.setup, "setup"),
     storybook: sb,
     upload: upload(raw.upload),
     diff: diff(raw.diff, "diff"),
@@ -360,8 +366,12 @@ export async function loadConfig(path: string): Promise<CaptureConfig> {
         `config: ${path} is not JSON: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
-    return parseConfig(raw);
+    return besideConfig(parseConfig(raw), path);
   }
   const mod: unknown = await import(path);
-  return parseConfig(isObj(mod) ? mod.default : undefined);
+  return besideConfig(parseConfig(isObj(mod) ? mod.default : undefined), path);
 }
+
+/** A relative `setup` is relative to the config file, not to wherever capture was run from. */
+const besideConfig = (c: CaptureConfig, path: string): CaptureConfig =>
+  c.setup === undefined ? c : { ...c, setup: resolve(dirname(path), c.setup) };
