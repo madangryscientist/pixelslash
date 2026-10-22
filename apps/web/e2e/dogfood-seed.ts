@@ -1,6 +1,8 @@
 /** The fixed rows the organizations-page dogfood capture shoots (ob 1707, dogfood-orgs.config.ts): ids, names and times never change.
  * Seeded through `wrangler d1 execute`, so it is plain INSERTs against the migrated schema. */
 import { createHash } from "node:crypto";
+import type { DiffResult } from "#/db/schema";
+import { CHANGE, HEIGHT, WIDTH } from "./dogfood-images";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 9, 1, 12);
@@ -128,6 +130,43 @@ const ORGS: Org[] = [
   },
 ];
 
+/** What the diff measured for a changed shot: the one block `dogfood-images.ts` moves. */
+const CHANGED_RESULT: DiffResult = {
+  changedPixels: CHANGE.w * CHANGE.h,
+  antialiasedPixels: 0,
+  ignoredPixels: 0,
+  ignored: [],
+  specks: { count: 0, pixels: 0 },
+  regions: [
+    { ...CHANGE, changedPixels: CHANGE.w * CHANGE.h, antialiasedPixels: 0, kind: "change" },
+  ],
+  width: WIDTH,
+  height: HEIGHT,
+  mainWidth: WIDTH,
+  mainHeight: HEIGHT,
+  branchWidth: WIDTH,
+  branchHeight: HEIGHT,
+  sizeChanged: false,
+};
+
+/** The blob keys (under the org's prefix) of every seeded shot: its picture, and a baseline when changed. */
+export function seedBlobs(): { key: string; orgId: string; index: number; moved: boolean }[] {
+  const builds = ORGS.flatMap((org) =>
+    org.projects.flatMap((p) => p.builds.map((b) => ({ org, b }))),
+  );
+  return builds.flatMap(({ org, b }) =>
+    b.shots.flatMap(([, diff], index) => {
+      const shot = { key: imageKey(b, index), orgId: org.id, index, moved: diff === "changed" };
+      return diff === "changed"
+        ? [shot, { ...shot, key: baselineKey(b, index), moved: false }]
+        : [shot];
+    }),
+  );
+}
+
+const imageKey = (b: Build, i: number) => `seed/${b.id}-${i}.png`;
+const baselineKey = (b: Build, i: number) => `seed/${b.id}-${i}-main.png`;
+
 const q = (s: string) => `'${s.replaceAll("'", "''")}'`;
 const VIEWER = "(SELECT id FROM users WHERE login = 'e2e-octocat')";
 
@@ -170,7 +209,7 @@ function buildSql(p: Project, b: Build): string[] {
   ];
   for (const [i, [, diff, review]] of b.shots.entries()) {
     rows.push(
-      `INSERT INTO snapshots (id, build_id, name, platform, browser, viewport, theme, env_fingerprint, image_key, diff_status, review_state) VALUES (${q(`${b.id}-s${i}`)}, ${q(b.id)}, ${q(`shot-${i}`)}, 'linux', 'chromium', '1280x720', 'light', 'seed', ${q(`seed/${b.id}-${i}.png`)}, ${diff ? q(diff) : "NULL"}, ${q(review ?? "pending")});`,
+      `INSERT INTO snapshots (id, build_id, name, platform, browser, viewport, theme, env_fingerprint, image_key, baseline_key, diff_result, diff_status, review_state) VALUES (${q(`${b.id}-s${i}`)}, ${q(b.id)}, ${q(`shot-${i}`)}, 'linux', 'chromium', '1280x720', 'light', 'seed', ${q(imageKey(b, i))}, ${diff === "changed" ? q(baselineKey(b, i)) : "NULL"}, ${diff === "changed" ? q(JSON.stringify(CHANGED_RESULT)) : "NULL"}, ${diff ? q(diff) : "NULL"}, ${q(review ?? "pending")});`,
     );
   }
   return rows;

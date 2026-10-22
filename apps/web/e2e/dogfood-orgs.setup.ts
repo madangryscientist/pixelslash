@@ -7,7 +7,9 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import type { CaptureSetup } from "@pixelslash/engine";
 import { PERSIST, STUB, WEB } from "./dogfood-orgs.config";
-import { seedSql } from "./dogfood-seed";
+import { getPlatformProxy } from "wrangler";
+import { seedPng } from "./dogfood-images";
+import { seedBlobs, seedSql } from "./dogfood-seed";
 
 async function waitFor(url: string) {
   for (let i = 0; i < 60; i++) {
@@ -19,6 +21,24 @@ async function waitFor(url: string) {
     await Bun.sleep(250);
   }
   throw new Error(`the GitHub stand-in did not come up at ${url}`);
+}
+
+/** Put the seeded shots' PNGs in the local bucket the build serves them from. */
+async function seedImages() {
+  const proxy = await getPlatformProxy<{ BLOBS: R2Bucket }>({
+    environment: "e2e",
+    // The app and wrangler keep their state under `v3/`; the proxy takes the directory as is.
+    persist: { path: join(WEB, PERSIST, "v3") },
+    configPath: join(WEB, "wrangler.jsonc"),
+  });
+  try {
+    for (const { key, orgId, index, moved } of seedBlobs())
+      await proxy.env.BLOBS.put(`orgs/${orgId}/${key}`, seedPng(index, moved), {
+        httpMetadata: { contentType: "image/png" },
+      });
+  } finally {
+    await proxy.dispose();
+  }
 }
 
 const setup: CaptureSetup = async ({ page }) => {
@@ -50,6 +70,7 @@ const setup: CaptureSetup = async ({ page }) => {
       env: { ...process.env, TMPDIR: join(WEB, PERSIST, "tmp") },
     },
   );
+  await seedImages();
 };
 
 export default setup;

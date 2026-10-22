@@ -205,6 +205,19 @@ A change that is still open on the branch's last build (pending, never accepted 
 - A rejected build is never a baseline, so the next build on its branch is measured against rule 2.
 - Known gap: a carrier whose build is still diffing when the change is decided is not moved with it. It stays "to review" until someone decides it there; that decision changes nothing on the builds already decided. An `errored` build is not affected: a resumed finalise picks its baselines again, so its carrier follows the decision (passes after an accept, is measured again against rule 2 after a reject).
 
+### Reviewing the review app with itself
+
+`bun run dogfood:upload` (in `apps/web`) captures the review app's own project, build and snapshot pages, light and dark, from a local build, and uploads them, so a UI change to `apps/web` is a build to review in our own workspace. It is a local script: there is no CI file for it.
+
+```
+PIXELSLASH_SERVER=https://<server> PIXELSLASH_TOKEN_FILE=<path to a project's CI token> \
+  bun run dogfood:upload -- --branch NAME [--base main] [--pr N]
+```
+
+- Both variables are required (use an absolute token path; a `~` in the value is not expanded) and nothing is hard-coded: the shots go only to the server named, and the token file is given to the CLI as `--token-path` (nothing here reads it, and it is never in git). The script is one `package.json` line over `pixelslash capture --upload`; the snapshot dir `.wrangler/dogfood-snapshots` is cleared on every run.
+- The capture is `apps/web/e2e/dogfood-review.config.ts`: the same `start` and `setup` as the organizations-page dogfood (`dogfood-orgs.config.ts`), over the fixed seed in `dogfood-seed.ts`, whose shots now have real PNGs (`dogfood-images.ts`, written to the local bucket by the setup) so the build and snapshot pages render. Six shots: three pages × two themes. It shares `.wrangler/e2e` and `dist/` with the e2e suite, so do not run it while `nx test:e2e web` runs.
+- Upload once from the commit you compare against with `--branch main`, then from the branch: the server's baseline rules above apply, and only the pages a change touched land in Changed. Capture outside the pinned image records a `bare` fingerprint, so compare like with like: shots from the same machine, or the pinned image on both sides.
+
 ## Local-screenshot dogfood (GTK windows)
 
 Capture two windows with grim (automation is later), then compare:
