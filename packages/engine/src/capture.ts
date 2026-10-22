@@ -112,10 +112,18 @@ export async function roomyShm(): Promise<boolean> {
   }
 }
 
-/** Launch headless Chromium, using /dev/shm for shared memory when it has room (see `roomyShm`). */
+/**
+ * Launch headless Chromium, using /dev/shm for shared memory when it has room (see `roomyShm`).
+ * Playwright's own SIGTERM and SIGHUP handlers are off: they close the browser and leave the
+ * process running, so a `pixelslash dev` sent SIGTERM lived on, holding its lock with a dead
+ * browser, and the next `dev` attached to it and failed its first run (ob 1761). Without them the
+ * signal ends the process (or `dev`'s handler does), and the browser goes with its pipe.
+ */
 export async function launchChromium(args: string[] = []): Promise<Browser> {
   return chromium.launch({
     headless: true,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
     args,
     ...((await roomyShm()) ? { ignoreDefaultArgs: ["--disable-dev-shm-usage"] } : {}),
   });

@@ -161,10 +161,16 @@ async function watching(root: string, args: DevArgs, ctl: DevController): Promis
   };
 }
 
-/** The keys: r run, p pin, u unpin, m main/previous; resolves on q. */
+/** The keys: r run, p pin, u unpin, m main/previous; resolves on q, or on SIGTERM as if q. */
 function keyLoop(input: KeyInput, ctl: DevController, io: Io): Promise<void> {
   return new Promise((done) => {
     const say = sayTo(io);
+    const quit = () => {
+      process.off("SIGTERM", quit);
+      undo();
+      done();
+    };
+    process.on("SIGTERM", quit);
     const undo = onKeys(input, (key) => {
       if (key === "r") void ctl.run();
       else if (key === "p")
@@ -185,10 +191,7 @@ function keyLoop(input: KeyInput, ctl: DevController, io: Io): Promise<void> {
           .refreshRefs()
           .then((f) => say(f ? `refs refetched (${f.refs.length})` : "this target has no refs"))
           .catch((e: unknown) => say(`refs failed: ${e instanceof Error ? e.message : String(e)}`));
-      else if (key === "q") {
-        undo();
-        done();
-      }
+      else if (key === "q") quit();
     });
   });
 }
@@ -256,10 +259,13 @@ export async function startSession(
     return claim;
   }
   let unwatch = noop;
+  // The page stops before the last run is waited for: a click on Run after the wait would shoot
+  // through a browser that is closing.
   const stop = async () => {
     unwatch();
+    await page.stop();
     await ctl.idle();
-    await Promise.all([page.stop(), session.close()]);
+    await session.close();
     await claim.release();
   };
   try {

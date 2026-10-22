@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { devStore, liveSession } from "@pixelslash/engine";
+import { fileURLToPath } from "node:url";
+import { devStore, latestIteration, liveSession } from "@pixelslash/engine";
 import { afterAll, describe, expect, test } from "vitest";
 import type { KeyInput } from "../src/dev-loop.ts";
 import { run } from "../src/run.ts";
@@ -184,6 +185,33 @@ describe("pixelslash dev", () => {
     expect(await first).toBe(0);
     expect(await liveSession(store)).toBeUndefined();
   }, 90_000);
+
+  test("SIGTERM ends it like q, and the next dev starts its own session (ob 1761)", async () => {
+    const { cwd } = await project();
+    const store = devStore(cwd);
+    const bin = fileURLToPath(new URL("../src/index.ts", import.meta.url));
+    const proc = Bun.spawn([process.execPath, bin, "dev", "index"], {
+      cwd,
+      env: { ...process.env, ...pinned },
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const owner = await until(async () => (await liveSession(store))?.url ?? undefined);
+    expect(await until(async () => ((await latestIteration(store)) ? true : undefined))).toBe(true);
+    proc.kill("SIGTERM");
+    expect(await proc.exited).toBe(0);
+    expect(await Bun.file(join(store.root, "session.json")).exists()).toBe(false);
+    expect(await fetch(owner).catch(() => null)).toBeNull();
+    // Before, Playwright's handler closed the browser and the process lived on with the lock:
+    // this run attached to it and failed on "browser has been closed".
+    const next = capture();
+    expect(
+      await run(["dev", "index", "--once", "--json"], next.io, { ...base, cwd, env: pinned }),
+    ).toBe(0);
+    expect(JSON.parse(next.stdout)).toMatchObject({ page: null, id: "000002" });
+    expect(next.stderr).not.toMatch(/closed|failed/);
+  }, 60_000);
 });
 
 describe("pixelslash dev, a feature's spec and refs (ob 1741)", () => {
