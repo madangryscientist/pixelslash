@@ -94,6 +94,12 @@ function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }
         </span>
         {viewer.login}
       </span>
+      <Link
+        to="/settings"
+        className="rounded text-sm text-slate-600 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+      >
+        Settings
+      </Link>
       <form method="post" action="/auth/sign-out">
         <button
           type="submit"

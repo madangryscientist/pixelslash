@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrgsRouteImport } from './routes/orgs'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthGithubRouteImport } from './routes/auth/github'
 import { Route as AuthSignOutRouteImport } from './routes/auth/sign-out'
 import { Route as ImagesSplatRouteImport } from './routes/images/$'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const OrgsRoute = OrgsRouteImport.update({
   id: '/orgs',
   path: '/orgs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthGithubRoute = AuthGithubRouteImport.update({
@@ -90,6 +96,7 @@ const ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/orgs': typeof OrgsRoute
+  '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
   '/images/$': typeof ImagesSplatRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/orgs': typeof OrgsRoute
+  '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
   '/images/$': typeof ImagesSplatRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/orgs': typeof OrgsRoute
+  '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
   '/images/$': typeof ImagesSplatRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/orgs'
+    | '/settings'
     | '/auth/github'
     | '/auth/sign-out'
     | '/images/$'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/orgs'
+    | '/settings'
     | '/auth/github'
     | '/auth/sign-out'
     | '/images/$'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/orgs'
+    | '/settings'
     | '/auth/github'
     | '/auth/sign-out'
     | '/images/$'
@@ -178,6 +190,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OrgsRoute: typeof OrgsRoute
+  SettingsRoute: typeof SettingsRoute
   AuthGithubRoute: typeof AuthGithubRouteWithChildren
   AuthSignOutRoute: typeof AuthSignOutRoute
   ImagesSplatRoute: typeof ImagesSplatRoute
@@ -203,6 +216,13 @@ declare module '@tanstack/react-router' {
       path: '/orgs'
       fullPath: '/orgs'
       preLoaderRoute: typeof OrgsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/github': {
@@ -293,6 +313,7 @@ const AuthGithubRouteWithChildren = AuthGithubRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OrgsRoute: OrgsRoute,
+  SettingsRoute: SettingsRoute,
   AuthGithubRoute: AuthGithubRouteWithChildren,
   AuthSignOutRoute: AuthSignOutRoute,
   ImagesSplatRoute: ImagesSplatRoute,

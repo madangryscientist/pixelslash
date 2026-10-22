@@ -101,6 +101,29 @@ export const ciTokens = sqliteTable(
   (t) => [index("ci_tokens_project_idx").on(t.projectId)],
 );
 
+/**
+ * A person's API token (ob 1728): the CLI and MCP act as its user, seeing what they see in the
+ * web app. Shown once at issue; only its SHA-256 and a display prefix are stored, as for CI tokens.
+ */
+export const userTokens = sqliteTable(
+  "user_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prefix: text("prefix").notNull(),
+    hash: text("hash").notNull().unique(),
+    createdAt: createdAt(),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    /** Null never expires. */
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("user_tokens_user_idx").on(t.userId)],
+);
+
 export const BUILD_STATUSES = [
   "uploading",
   "processing",

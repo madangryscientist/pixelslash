@@ -2,7 +2,6 @@ import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
-import { NotFoundError } from "#/db/db";
 import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
 import { isMarker } from "#/db/markers";
 import {
@@ -29,17 +28,8 @@ import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
 import { database, imageSigningSecret } from "./env";
+import { field, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
-
-/** A repository NotFoundError (missing, or another org's) becomes the router's 404. */
-async function or404<T>(work: Promise<T>): Promise<T> {
-  try {
-    return await work;
-  } catch (error) {
-    if (error instanceof NotFoundError) throw notFound();
-    throw error;
-  }
-}
 
 /** A shot that is no longer reviewable is a conflict the page states, not a 404. */
 function orConflict<T>(work: Promise<T>): Promise<T> {
@@ -69,14 +59,6 @@ async function imageUrls(
     branch: await sign(keys.branch),
     diff: await sign(keys.diff),
   };
-}
-
-/** A trimmed, non-empty string of at most 100 chars from a server-fn payload. */
-function field(input: unknown, key: string): string {
-  const value = typeof input === "object" && input !== null ? Reflect.get(input, key) : null;
-  const text = typeof value === "string" ? value.trim() : "";
-  if (text.length === 0 || text.length > 100) throw new Error(`${key} is required (1-100 chars)`);
-  return text;
 }
 
 /** What every page's shell needs: who is signed in, and the theme the cookie asks for. */
