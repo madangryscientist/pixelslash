@@ -1,4 +1,4 @@
-import { DEV_HEADER, type DevIteration, type DevLock } from "@pixelslash/engine";
+import { DEV_HEADER, type DevIteration, type DevLock, UsageError } from "@pixelslash/engine";
 import { type DevArgs, type DevDeps, jsonOf, lineOf } from "./dev.ts";
 import { onKeys, onceInProgress } from "./dev-loop.ts";
 import type { Io } from "./run.ts";
@@ -97,7 +97,12 @@ export async function attachTo(
 ): Promise<number> {
   if (owner.url === null) onceInProgress(owner.pid);
   const url = owner.url;
-  if (args.target !== undefined && args.target !== owner.target)
+  const other = args.target !== undefined && args.target !== owner.target;
+  if (other && args.once)
+    throw new UsageError(
+      `this worktree's session is on ${owner.target}, not ${args.target}; run \`pixelslash dev --once\` without a target to use it, or quit it first`,
+    );
+  if (other)
     io.stderr.write(
       `pixelslash dev: this worktree's session is on ${owner.target}, not ${args.target}\n`,
     );

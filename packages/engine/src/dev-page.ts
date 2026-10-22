@@ -73,7 +73,13 @@ export async function devState(store: DevStore, target: string, mode: DevMode): 
 /** A file under the store, or undefined for a path that climbs out of it. */
 function storeFile(store: DevStore, rel: string): string | undefined {
   const root = resolve(store.root);
-  const path = resolve(root, decodeURIComponent(rel));
+  let name: string;
+  try {
+    name = decodeURIComponent(rel);
+  } catch {
+    return undefined;
+  }
+  const path = resolve(root, name);
   return path.startsWith(root + sep) ? path : undefined;
 }
 

@@ -12,8 +12,6 @@ export const DEFAULT_QUIET_MS = 150;
 export type Debouncer = {
   /** A file changed; the run starts once nothing has for `quietMs`. */
   touch: (path: string) => void;
-  /** Run now, without waiting for quiet (the `r` key). */
-  flush: () => void;
   close: () => void;
 };
 
@@ -56,7 +54,6 @@ export function debounce(quietMs: number, run: (paths: string[]) => Promise<void
       pending.add(path);
       arm(quietMs);
     },
-    flush: () => arm(0),
     close: () => {
       closed = true;
       if (timer) clearTimeout(timer);

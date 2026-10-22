@@ -124,7 +124,8 @@ describe("pixelslash dev --once", () => {
     expect(await Bun.file(it.shots[0].files.diff).exists()).toBe(true);
     expect(await Bun.file(it.shots[0].files.shot).exists()).toBe(true);
     expect(api.seen).toEqual([]);
-    expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(".pixelslash/dev/");
+    expect(await readFile(join(cwd, ".pixelslash", "dev", ".gitignore"), "utf8")).toBe("*\n");
+    expect(await Bun.file(join(cwd, ".gitignore")).exists()).toBe(false);
   }, 60_000);
 
   test("--against main reads main's baselines and writes nothing to the server", async () => {
@@ -198,6 +199,12 @@ describe("pixelslash dev", () => {
         page: owner?.url,
         against: { kind: "previous" },
       });
+
+      const elsewhere = capture();
+      expect(await run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd })).toBe(
+        2,
+      );
+      expect(elsewhere.stderr).toMatch(/session is on index, not other/);
 
       const otherKeys = keyboard();
       const attached = capture();

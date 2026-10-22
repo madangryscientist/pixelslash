@@ -1,5 +1,5 @@
-import { appendFile, mkdir, open, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, open, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { DEV_DIR, type DevStore } from "./dev-store.ts";
 import type { FetchLike } from "./figma.ts";
 
@@ -103,7 +103,8 @@ export async function claimSession(
     }
     const owner = await readLock(store);
     if (owner && (await lockLive(owner, deps))) return { held: false, owner };
-    await rm(lockFile(store), { force: true });
+    // Another claimant may have taken the stale lock meanwhile: remove only the dead owner's.
+    if ((await readLock(store))?.pid === owner?.pid) await rm(lockFile(store), { force: true });
   }
   const owner = await readLock(store);
   return owner ? { held: false, owner } : { held: false, owner: lock };
@@ -120,19 +121,14 @@ export async function worktreeRoot(cwd: string): Promise<string> {
   return (await proc.exited) === 0 && out ? out : cwd;
 }
 
-/** Add `.pixelslash/dev/` to the worktree's `.gitignore` unless git already ignores it. */
+/**
+ * Keep the store out of git without touching the user's `.gitignore`: the store ignores itself
+ * (a `*` in its own `.gitignore` covers that file too). Returns whether it wrote the file.
+ */
 export async function ensureIgnored(root: string): Promise<boolean> {
-  const probe = Bun.spawn(["git", "check-ignore", "-q", join(DEV_DIR, "session.json")], {
-    cwd: root,
-    stdout: "ignore",
-    stderr: "ignore",
-  });
-  const code = await probe.exited;
-  // 0: ignored; 128: not a git checkout, so there is nothing to keep it out of.
-  if (code !== 1) return false;
-  const file = Bun.file(join(root, ".gitignore"));
-  const text = (await file.exists()) ? await file.text() : "";
-  const sep = text === "" || text.endsWith("\n") ? "" : "\n";
-  await appendFile(join(root, ".gitignore"), `${sep}.pixelslash/dev/\n`);
+  const file = join(root, DEV_DIR, ".gitignore");
+  if (await Bun.file(file).exists()) return false;
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, "*\n");
   return true;
 }

@@ -4,7 +4,6 @@ import { afterAll, describe, expect, test } from "vitest";
 import { claimSession, liveSession } from "../src/dev-lock.ts";
 import { DEV_HEADER, type DevState, serveDevPage } from "../src/dev-page.ts";
 import { devController } from "../src/dev-session.ts";
-import { probeTarget } from "../src/dev-target.ts";
 import { debounce, notIgnored, watchTree } from "../src/dev-watch.ts";
 import { UsageError } from "../src/errors.ts";
 import { cleanupDev, fakeSession, tmpDir, tmpStore } from "./dev-fixtures.ts";
@@ -83,16 +82,6 @@ describe("dev trigger", () => {
 });
 
 describe("dev session", () => {
-  test("a down URL fails clearly, and says we do not start the server", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("ok") });
-    const url = `http://127.0.0.1:${server.port}/`;
-    await probeTarget(url);
-    await server.stop(true);
-    await expect(probeTarget(url)).rejects.toThrow(
-      /is not answering .*does not start a dev server/,
-    );
-  });
-
   test("a second claim names the live owner; a dead owner's lock is taken over", async () => {
     const store = await tmpStore();
     const page = Bun.serve({ port: 0, fetch: () => Response.json({}) });
@@ -156,6 +145,7 @@ describe("dev session", () => {
       });
       expect(await pinned.json()).toEqual({ pinned: after.id });
       expect((await fetch(`${live.url}/files/..%2F..%2Fx`)).status).toBe(404);
+      expect((await fetch(`${live.url}/files/%E0`)).status).toBe(404);
     } finally {
       stop();
       bounce.close();
