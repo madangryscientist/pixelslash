@@ -3,22 +3,24 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { RemoteError, isObj, str, type Reply } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
 import type { DevDeps } from "./dev.ts";
-import { MCP_FLAGS, arg, buildToSpec, devTools, text } from "./mcp-dev.ts";
+import { MCP_FLAGS, arg, devTools, text } from "./mcp-dev.ts";
+import { localTools, watchOf } from "./mcp-local.ts";
+import { servePrompts } from "./mcp-prompts.ts";
 import { connect, resolveProject, type Remote } from "./remote.ts";
 import type { Io } from "./run.ts";
 
 export const MCP_USAGE = `pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
-A stdio MCP server for a coding agent: it reads builds, snapshots, flakes and detection flags, and
+A stdio MCP server for a coding agent: it reads builds, snapshots, flakes and detection flags, runs
+the local fix loop (check_local, capture_local, check_flake, suggest_ignore, resolve_flake) and
 drives this worktree's \`pixelslash dev\` session (start, run, latest, pin, spec, stop). It accepts,
-rejects and uploads nothing. Add it with \`claude mcp add pixelslash -- pixelslash mcp\`.`;
+rejects, uploads and writes to the config nothing; resolve_flake resolves a flake only after a
+stable run here. Add it with \`claude mcp add pixelslash -- pixelslash mcp\`.`;
 
 type Args = Record<string, unknown>;
 type Fetch = NonNullable<DevDeps["fetch"]>;
@@ -180,8 +182,6 @@ const TOOLS: Record<string, Tool> = {
   },
 };
 
-const PROMPT = "build-to-spec";
-
 /** A tool's error the agent reads; anything else is a bug and throws. */
 function failed(e: unknown): CallToolResult {
   const known = [UsageError, RemoteError, CaptureError, FigmaError].some((c) => e instanceof c);
@@ -201,6 +201,7 @@ export function mcpServer(
 ): { server: Server; close: () => Promise<void> } {
   const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const dev = devTools(flags, deps, log);
+  const local = localTools(flags, deps, log);
   const server = new Server(
     { name: "pixelslash", version: CLIENT_VERSION },
     { capabilities: { tools: {}, prompts: {} } },
@@ -213,6 +214,12 @@ export function mcpServer(
         inputSchema: { type: "object" as const, properties: t.properties, required: t.required },
         annotations: { readOnlyHint: true, openWorldHint: false },
       })),
+      ...Object.entries(local).map(([name, t]) => ({
+        name,
+        description: t.description,
+        inputSchema: { type: "object" as const, properties: t.properties, required: t.required },
+        annotations: t.annotations,
+      })),
       ...Object.entries(dev.tools).map(([name, t]) => ({
         name,
         description: t.description,
@@ -221,10 +228,12 @@ export function mcpServer(
       })),
     ],
   }));
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+  server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const args = req.params.arguments ?? {};
-    const local = dev.tools[req.params.name];
-    if (local) return local.call(args).catch(failed);
+    const devTool = dev.tools[req.params.name];
+    if (devTool) return devTool.call(args).catch(failed);
+    const fix = local[req.params.name];
+    if (fix) return fix.call(args, watchOf(req.params, extra)).catch(failed);
     const tool = TOOLS[req.params.name];
     if (!tool) return { ...text(`unknown tool: ${req.params.name}`), isError: true };
     try {
@@ -234,24 +243,7 @@ export function mcpServer(
       return failed(e);
     }
   });
-  server.setRequestHandler(ListPromptsRequestSchema, () => ({
-    prompts: [
-      {
-        name: PROMPT,
-        description:
-          "Build a page or component to its spec and references with the dev tools: spec, edit, run, read the differences, repeat, pin.",
-        arguments: [{ name: "target", description: TARGET_HINT, required: false }],
-      },
-    ],
-  }));
-  server.setRequestHandler(GetPromptRequestSchema, (req) => {
-    if (req.params.name !== PROMPT) throw new UsageError(`unknown prompt: ${req.params.name}`);
-    const target = req.params.arguments?.target || undefined;
-    return {
-      description: `Build ${target ?? "the target"} to its spec`,
-      messages: [{ role: "user", content: { type: "text", text: buildToSpec(target) } }],
-    };
-  });
+  servePrompts(server);
   return {
     server,
     close: async () => {
@@ -260,8 +252,6 @@ export function mcpServer(
     },
   };
 }
-
-const TARGET_HINT = "A route or story name from the config with a features entry.";
 
 /** `pixelslash mcp`: serve on stdin/stdout until the client closes stdin. Nothing else goes to stdout. */
 export async function runMcp(argv: string[], io: Io, deps: DevDeps = {}): Promise<number> {

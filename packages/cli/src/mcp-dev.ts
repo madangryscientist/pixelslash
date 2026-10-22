@@ -52,11 +52,11 @@ function on(args: Args, name: string): boolean {
 }
 
 export const text = (s: string): CallToolResult => ({ content: [{ type: "text", text: s }] });
-const pretty = (v: unknown) => JSON.stringify(v, null, 2);
+export const pretty = (v: unknown) => JSON.stringify(v, null, 2);
 const DATA_URL = "data:image/png;base64,";
 
 /** A labelled PNG, scaled to at most 1024 px wide. */
-async function picture(label: string, file: string): Promise<CallToolResult["content"]> {
+export async function picture(label: string, file: string): Promise<CallToolResult["content"]> {
   const data = (await inlinePng(file)).slice(DATA_URL.length);
   return [
     { type: "text", text: label },
@@ -83,7 +83,7 @@ const VIEWPORT = { type: "string", description: "Only this variant: a WxH or a v
 const THEME = { type: "string", description: "Only this theme.", enum: ["light", "dark"] };
 const CHECK = "After each edit, call dev_run, or wait for the save to run and call dev_latest.";
 
-const LOCAL: ToolAnnotations = {
+export const LOCAL: ToolAnnotations = {
   readOnlyHint: false,
   destructiveHint: false,
   openWorldHint: false,

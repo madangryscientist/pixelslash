@@ -6,22 +6,23 @@ import {
   type SnapshotDeps,
   type UploadDeps,
   UploadError,
-  UsageError,
   checkAgainstServer,
   findConfig,
   loadConfig,
+  onlyRoutes,
   openCaptureSession,
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
-import { readFlagPairs, takeJson } from "./args.ts";
+import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
 import { type Remote, connect, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 import { flakeRetries } from "./upload.ts";
+import { type Watch, watched } from "./watch.ts";
 
 export const CHECK_USAGE =
   "pixelslash check [--config FILE] [--out DIR] [--base BRANCH] [--only NAME]... [--server URL] [--token-path PATH] [--project ID|NAME] [--flake-retries N] [--json]\nCaptures the config's routes (the app must already be up), fetches the baselines the server would pick for this commit, and writes the same report `compare` does into DIR/report. Nothing is uploaded. Exit 0 whether or not anything changed; 3 when the server refuses or cannot be reached.";
 
-const FLAGS = [
+const CHECK_FLAGS = [
   "config",
   "out",
   "base",
@@ -30,23 +31,6 @@ const FLAGS = [
   "project",
   "flake-retries",
 ] as const;
-
-/** `--only NAME` may repeat, which a flag map cannot hold: pull the pairs out first. */
-function takeOnly(argv: string[]): { only: string[] | undefined; rest: string[] } {
-  const only: string[] = [];
-  const rest: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i] ?? "";
-    if (a !== "--only") {
-      rest.push(a);
-      continue;
-    }
-    const name = argv[++i];
-    if (!name || name.startsWith("--")) throw new UsageError("missing value for --only");
-    only.push(name);
-  }
-  return { only: only.length > 0 ? only : undefined, rest };
-}
 
 function summary(result: CheckResult): string {
   const lines: string[] = [];
@@ -69,30 +53,26 @@ function summary(result: CheckResult): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** `--json`, for agents: the counts, where things are, and every shot with its regions. */
-function jsonOf(result: CheckResult): string {
+/** `--json` and `check_local`: the counts, where things are, and every shot with its regions. */
+export function checkJson(result: CheckResult) {
   const { git } = result;
-  return JSON.stringify(
-    {
-      measured: "local",
-      uploaded: false,
-      git: { commit: git.commitSha, branch: git.branch, mergeBase: git.mergeBaseSha },
-      counts: {
-        changed: result.changed.length,
-        unchanged: result.unchanged.length,
-        new: result.added.length,
-        removed: result.removed.length,
-        mismatched: result.mismatched.length,
-        flaky: result.flaky.length,
-      },
-      report: result.indexPath,
-      flakeReport: result.flakeReport ?? null,
-      dirs: result.dirs,
-      shots: result.shots,
+  return {
+    measured: "local",
+    uploaded: false,
+    git: { commit: git.commitSha, branch: git.branch, mergeBase: git.mergeBaseSha },
+    counts: {
+      changed: result.changed.length,
+      unchanged: result.unchanged.length,
+      new: result.added.length,
+      removed: result.removed.length,
+      mismatched: result.mismatched.length,
+      flaky: result.flaky.length,
     },
-    null,
-    2,
-  );
+    report: result.indexPath,
+    flakeReport: result.flakeReport ?? null,
+    dirs: result.dirs,
+    shots: result.shots,
+  };
 }
 
 /**
@@ -100,10 +80,10 @@ function jsonOf(result: CheckResult): string {
  * anything (ob 1732). Exit 0 whatever changed; a refused or unreachable server is a RemoteError
  * (exit 3), as it is for every remote command that only reads.
  */
-type Flags = Partial<Record<(typeof FLAGS)[number], string>>;
+export type CheckFlags = Partial<Record<(typeof CHECK_FLAGS)[number], string>>;
 
 /** Where to look and as whom; a personal token reaches several projects, so it names one. */
-async function optionsOf(flags: Flags, remote: Remote, cwd: string): Promise<CheckOptions> {
+async function optionsOf(flags: CheckFlags, remote: Remote, cwd: string): Promise<CheckOptions> {
   const projectId = remote.token.startsWith("psu_")
     ? (await resolveProject(remote, flags.project)).id
     : undefined;
@@ -117,27 +97,24 @@ async function optionsOf(flags: Flags, remote: Remote, cwd: string): Promise<Che
   };
 }
 
-export async function runCheck(
-  argv: string[],
-  io: Io,
-  deps: SnapshotDeps & UploadDeps = {},
-): Promise<number> {
-  const { json, rest } = takeJson(argv);
-  const { only, rest: pairs } = takeOnly(rest);
-  const flags = readFlagPairs(pairs, FLAGS);
+/** Capture and measure against the server's baselines; `pixelslash check` and `check_local`. */
+export async function checkLocal(
+  flags: CheckFlags,
+  only: string[] | undefined,
+  deps: SnapshotDeps & UploadDeps,
+  watch: Watch = {},
+): Promise<CheckResult> {
   const retries = flakeRetries(flags["flake-retries"]);
   const cwd = deps.cwd ?? process.cwd();
   const config = await loadConfig(findConfig(flags.config, cwd));
   const remote = await connect(flags, { ...deps, cwd });
-  const warn = deps.warn ?? ((m: string) => io.stderr.write(`${m}\n`));
   const opts = await optionsOf(flags, remote, cwd);
   opts.only = only;
   opts.flakeRetries = retries ?? config.flake.retries;
-  const session = await openCaptureSession(config, { ...deps, warn });
+  const session = await openCaptureSession(config, deps);
   try {
-    const result = await checkAgainstServer(session, opts, { ...deps, warn });
-    io.stdout.write(json ? `${jsonOf(result)}\n` : summary(result));
-    return 0;
+    const total = onlyRoutes(session, only).routes.length * config.variants.length;
+    return await checkAgainstServer(watched(session, watch, total), opts, deps);
   } catch (e) {
     // The client's errors say `upload failed`; this command uploads nothing.
     if (e instanceof UploadError)
@@ -146,4 +123,18 @@ export async function runCheck(
   } finally {
     await session.close();
   }
+}
+
+export async function runCheck(
+  argv: string[],
+  io: Io,
+  deps: SnapshotDeps & UploadDeps = {},
+): Promise<number> {
+  const { json, rest } = takeJson(argv);
+  const { only, rest: pairs } = takeOnly(rest);
+  const flags = readFlagPairs(pairs, CHECK_FLAGS);
+  const warn = deps.warn ?? ((m: string) => io.stderr.write(`${m}\n`));
+  const result = await checkLocal(flags, only, { ...deps, warn });
+  io.stdout.write(json ? `${JSON.stringify(checkJson(result), null, 2)}\n` : summary(result));
+  return 0;
 }

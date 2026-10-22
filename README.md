@@ -42,10 +42,10 @@ A one-pair run without a design system writes `--out/report.html` (open as `file
 
 ```
 docker build -f docker/capture/Dockerfile -t pixelslash-capture:dev .
-docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [--config FILE] [--out DIR]
+docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [--config FILE] [--out DIR] [--only NAME]... [--json]
 ```
 
-`--config` defaults to the first `pixelslash.config.{ts,js,mjs,json}` in the working dir (JS/TS: the default export). `--out` defaults to `pixelslash-snapshots`. Exit 0 on success, 1 when a page cannot be captured or the start command fails, 2 on a bad flag or config.
+`--config` defaults to the first `pixelslash.config.{ts,js,mjs,json}` in the working dir (JS/TS: the default export). `--out` defaults to `pixelslash-snapshots`. `--only NAME` (repeatable) captures just those routes or stories, every variant; an unknown name is exit 2. `--json` prints `{ measured: "local", uploaded: false, manifest, shots }` instead of the summary, each shot with its `name`, `variant`, `browser`, `viewport`, `theme` and absolute `file`; it is what the `capture_local` MCP tool returns. Exit 0 on success, 1 when a page cannot be captured or the start command fails, 2 on a bad flag or config.
 
 ```json
 {
@@ -233,7 +233,7 @@ pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
-pixelslash flake ID [--runs N] [--out DIR] [--write] [--resolve [--note TEXT]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
+pixelslash flake ID [--runs N] [--out DIR] [--write | --suggest] [--resolve [--note TEXT]] [--json] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
 pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
 pixelslash --version
 pixelslash install-browser
@@ -293,9 +293,29 @@ It resolves the server, the token and the default project as every remote comman
 
 `project` is an id or a name; without it, `--project`, then `upload.project`, then the only project the token sees.
 
-- **It only reads the server.** There is no tool to accept or reject a shot, upload, resolve a flake or manage tokens: a review decision is a person's, in the web app. The `dev_*` tools below write only to the worktree's `.pixelslash/dev/`.
+- **It only reads the server, with one exception.** There is no tool to accept or reject a shot, upload or manage tokens: a review decision is a person's, in the web app. `resolve_flake` ([below](#using-pixelslash-from-your-agent)) marks a flake resolved, and only after a stable run on this machine. The `dev_*` tools write only to the worktree's `.pixelslash/dev/`, and the fix-loop tools only to their `out` dirs.
 - **`get_snapshot_images` hands page shots to whatever model your agent uses.** The PNGs are fetched from the configured server only when that tool is called, and go back to the agent, which sends them to its model wherever that model runs. No other read tool returns pixels; the `dev_*` tools return the local shots, diffs and refs the same way. An image URL that is not on the configured server is not fetched.
 - Nothing is sent anywhere but the configured server. Stdout is the MCP channel; the server logs one line to stderr.
+
+### Using PixelSlash from your agent
+
+The server also runs the local fix loop: **read** what the server says changed or is flaky, **reproduce** it on this machine, **change** the code (or, for content that is meant to move, the config), **re-check**, and **resolve**. The app must already be up at the config's `baseUrl`; no tool starts a dev server beyond the config's own `start` command. Shots are taken in the worktree the server was started in and stay there. Each tool runs the same function as its CLI twin with `--json`, and its first text is that twin's JSON:
+
+| Tool | Arguments | Twin |
+| --- | --- | --- |
+| `check_local` | `only?`, `base?`, `flake_retries?`, `out?` | [`pixelslash check --json`](#check-before-you-push): captures here, compares with the baselines the server would pick for this commit, and returns each shot's status and regions and the report's path. Nothing is uploaded |
+| `capture_local` | `only`, `out?` | `pixelslash capture --only NAME --json`: one route or story (or the ones named), every variant; the JSON, then each PNG as an image |
+| `check_flake` | `flake_id`, `runs?`, `out?` | [`pixelslash flake ID --json`](#fixing-a-flake-locally): stable or not, each run's regions, the suggested fixes and the report |
+| `suggest_ignore` | `flake_id`, `runs?`, `out?` | `pixelslash flake ID --suggest --json`: the suggested config changes (an ignore area, a stabilise setting, `flaky: "skip"`) as edits, each with the exact line it sets. It writes nothing: the agent shows the edit and the user makes it |
+| `resolve_flake` | `flake_id`, `runs?`, `out?`, `note?` | `pixelslash flake ID --resolve --json`: reproduces it and resolves it on the server only when every run was the same. An unstable run sends nothing and returns `resolved: false` |
+
+`only` is a name or a list of names. The prompts teach an agent the loop:
+
+- **`fix-flake`** (argument `flake_id?`): `list_flakes` to read it, `check_flake` to reproduce it, fix the page or `suggest_ignore` and show the user the edit, `check_flake` again until stable, then `resolve_flake` with a note on what fixed it.
+- **`explain-build`** (argument `build_id?`): `get_build`, `get_snapshot` and `get_snapshot_images` to say what changed, `check_local` on the changed shots to reproduce them, fix, `check_local` again, then report what is fixed, what still differs and what the user should accept on the server.
+
+- **Progress and cancelling.** A client that sends a progress token gets one `notifications/progress` per shot (`progress` of `total` runs). Cancelling a call stops it before its next shot; the shot already in the browser finishes, bounded by its timeout.
+- **What an agent cannot do.** No tool accepts, rejects or uploads anything, or writes the config. Nothing is sent anywhere but the configured server: `check_local` reads baselines and their PNGs, the flake tools read the flake list, and only `resolve_flake` writes, as `pixelslash flake --resolve` does.
 
 ### Feature mode from your agent
 
@@ -384,6 +404,8 @@ Carries and the default branch's auto-accept work as on the server. A CLI from b
 - Each run is diffed against run 1 under the shot's own diff options and ignore areas. It prints each run's regions and what the engine calls them (`real change`, `sub-pixel shift`, `noise`, or `size change` when the page's size differs), then `stable: all N runs rendered the same` or `unstable: X of N-1 runs differed from run 1`. A run differs when the diff calls it changed: noise and shift regions are listed but do not on their own make a shot unstable.
 - When unstable, it says what to change, most specific first: a page size that moves; any stabilisation the config turned off (`animations`, `caret`, `clock`, `timers`); an ignore area around every region that changed, in CSS px, for the flake's variant of the route; and last, `flaky: "skip"` on the route. For a story the ignore area and the policy are said as `data-pixelslash-ignore` and the `pixelslash-flaky-skip` tag, to add by hand.
 - `--write` lists the suggestions that are config changes, each as the exact line it would set (`routes[1].variants.small.ignore += {…}`), and asks on the terminal which one to write. Only the number typed is written; an empty answer, or no terminal, writes nothing. It edits a JSON config only (rewritten as 2-space JSON, after the edited config is validated again); a JS/TS config is left alone and the change is to make by hand.
+- `--suggest` lists the same config changes, each with the exact line it would set, and writes nothing. It cannot be combined with `--write` or `--resolve` (exit 2).
+- `--json` prints the run as JSON instead of the text: `{ flake, measured: "local", uploaded: false, stable, differed, area, runs, suggestions, report, resolved }`, where each run has its `regions`, `causes`, `file` and `overlay`, and `resolved` is `null` without `--resolve`. With `--suggest` it prints `{ flake, stable, config, editable, written: false, edits, report }`, each edit with its `text`, `edit` and the `set` line (`null` for a change to make by hand). It is what the MCP tools `check_flake`, `suggest_ignore` and `resolve_flake` return. `--write --json` is exit 2: `--write` asks on the terminal.
 - `--resolve` marks the flake resolved on the server (`POST /api/v1/flakes/:id/resolve`, with `--note TEXT`, at most 200 characters) only when this run was stable; an unstable run prints `not resolved` and resolves nothing. Resolving needs a personal token: a CI token is refused (exit 3). `--note` without `--resolve` is exit 2.
 - The runs (`runs/run<N>.png`), each differing run's overlay (`runs/diff<N>.png`) and `report.html` are written to `--out` (default `pixelslash-flake`), whose earlier `runs/` and report are removed first. Nothing is uploaded.
 - Exit 0 stable, 6 unstable, 2 on a usage error, 3 when the server refuses or does not know the flake, 1 when the capture fails.

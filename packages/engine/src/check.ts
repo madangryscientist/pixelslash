@@ -182,7 +182,8 @@ async function writeBaselines(
   await Bun.write(join(dirs.main, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-function onlyRoutes(session: CaptureSession, only: string[] | undefined): CaptureSession {
+/** The session with only the routes `only` names; a name the config lacks is a usage error. */
+export function onlyRoutes(session: CaptureSession, only: string[] | undefined): CaptureSession {
   if (!only) return session;
   const known = new Set(session.routes.map((r) => r.name));
   const unknown = only.filter((n) => !known.has(n));

@@ -84,7 +84,7 @@ const json = (r: Result): Record<string, unknown> => {
 };
 
 describe("pixelslash mcp", () => {
-  test("lists the server's read tools, each read-only, and the local dev tools", async () => {
+  test("lists the server's read tools, each read-only, and the local dev and fix-loop tools", async () => {
     const { client } = await connected();
     const { tools } = await client.listTools();
     const dev = tools.filter((t) => t.name.startsWith("dev_"));
@@ -99,7 +99,16 @@ describe("pixelslash mcp", () => {
     ]);
     // Nothing that writes to the server: the dev tools touch the worktree's store only.
     expect(tools.some((t) => /accept|reject|upload/.test(t.name))).toBe(false);
-    const read = tools.filter((t) => !t.name.startsWith("dev_"));
+    const LOCAL = [
+      "capture_local",
+      "check_flake",
+      "check_local",
+      "resolve_flake",
+      "suggest_ignore",
+    ];
+    const local = tools.filter((t) => LOCAL.includes(t.name));
+    expect(local.map((t) => t.name).toSorted()).toEqual(LOCAL);
+    const read = tools.filter((t) => !t.name.startsWith("dev_") && !LOCAL.includes(t.name));
     expect(read.map((t) => t.name).toSorted()).toEqual([
       "get_build",
       "get_snapshot",

@@ -56,6 +56,7 @@ export {
 export {
   baselinesInto,
   checkAgainstServer,
+  onlyRoutes,
   type BaselineSource,
   type CheckDeps,
   type CheckOptions,

@@ -181,3 +181,20 @@ export function takeJson(argv: string[]): { json: boolean; rest: string[] } {
   const rest = argv.filter((a) => a !== "--json");
   return { json: rest.length !== argv.length, rest };
 }
+
+/** `--only NAME` may repeat, which a flag map cannot hold: pull the pairs out first. */
+export function takeOnly(argv: string[]): { only: string[] | undefined; rest: string[] } {
+  const only: string[] = [];
+  const rest: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? "";
+    if (a !== "--only") {
+      rest.push(a);
+      continue;
+    }
+    const name = argv[++i];
+    if (!name || name.startsWith("--")) throw new UsageError("missing value for --only");
+    only.push(name);
+  }
+  return { only: only.length > 0 ? only : undefined, rest };
+}

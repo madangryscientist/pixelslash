@@ -181,7 +181,7 @@ describe("pixelslash mcp, feature mode", () => {
     const { cwd } = await project();
     const { client } = await inMemory(cwd);
     const { prompts } = await client.listPrompts();
-    expect(prompts.map((p) => p.name)).toEqual(["build-to-spec"]);
+    expect(prompts.map((p) => p.name)).toContain("build-to-spec");
     const got = await client.getPrompt({ name: "build-to-spec", arguments: { target: "cart" } });
     const [message] = got.messages;
     const body = message?.content.type === "text" ? message.content.text : "";
