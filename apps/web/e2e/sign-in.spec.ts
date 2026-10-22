@@ -56,7 +56,12 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
   const branch = page.getByLabel("Default branch, e.g. main");
   await expect(branch).toHaveValue("main");
   await branch.fill("master");
+  // Reload only once the save's server call has returned: its response is what makes the value stick.
+  const saved = page.waitForResponse(
+    (res) => res.request().method() === "POST" && !!res.request().postData()?.includes("master"),
+  );
   await page.getByRole("button", { name: "Save" }).click();
+  expect((await saved).ok()).toBe(true);
   await page.reload();
   await expect(page.getByLabel("Default branch, e.g. main")).toHaveValue("master");
   expect(hydrationErrors).toEqual([]);
