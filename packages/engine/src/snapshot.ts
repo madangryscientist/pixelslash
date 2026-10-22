@@ -102,11 +102,6 @@ function boxesOf(elements: Measured[]): MaskRect[] {
   });
 }
 
-/** PNG dimensions from the IHDR chunk, without decoding the image. */
-function pngSize(png: Buffer): { width: number; height: number } {
-  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
-}
-
 /**
  * CSS-px boxes to image px: scaled by `scale`, grown outward to whole pixels, clipped to the image.
  * Boxes that end up empty (zero-size elements, boxes wholly off the image) are dropped.
@@ -167,8 +162,10 @@ export function paintRects(png: Buffer, rects: MaskRect[], scale: number): Buffe
   return PNG.sync.write(img);
 }
 
-async function open(page: Page, url: string, route: Route, timeoutMs: number): Promise<void> {
+/** Load the page and wait for it to settle; returns how long that took, the page's own time. */
+async function open(page: Page, url: string, route: Route, timeoutMs: number): Promise<number> {
   page.setDefaultNavigationTimeout(timeoutMs);
+  const loading = performance.now();
   const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
   if (!resp) throw new CaptureError(`capture failed for ${url}: no response`);
   if (resp.status() >= 400)
@@ -177,6 +174,7 @@ async function open(page: Page, url: string, route: Route, timeoutMs: number): P
   const started = Date.now();
   if (route.storybook) await awaitStory(page, route.name, timeoutMs);
   await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
+  return performance.now() - loading;
 }
 
 type Shot = {
@@ -191,8 +189,8 @@ type Shot = {
   warn: (m: string) => void;
 };
 
-/** One capture of a shot: its PNG and its ignore areas in image px. */
-export type Shoot = { png: Buffer; ignore: IgnoreRect[] };
+/** One capture of a shot: its PNG, its ignore areas in image px, and the page's load + settle time. */
+export type Shoot = { png: Buffer; ignore: IgnoreRect[]; settleMs?: number };
 
 /**
  * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
@@ -219,7 +217,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   try {
     await pinClock(context, stabilise);
     const page = await context.newPage();
-    await open(page, url, route, stabilise.timeoutMs);
+    const settleMs = await open(page, url, route, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");
     const locators = selectors.map((s) => page.locator(s));
     for (const [i, loc] of locators.entries()) {
@@ -233,7 +231,9 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
       mask: locators,
       maskColor: MASK_COLOR,
     });
-    const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, pngSize(png));
+    // The PNG's size from its IHDR chunk, without decoding the image.
+    const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+    const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
     return {
       png: paintRects(
         png,
@@ -241,6 +241,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
         stabilise.deviceScaleFactor,
       ),
       ignore,
+      settleMs,
     };
   } catch (e) {
     if (e instanceof CaptureError) throw e;

@@ -167,6 +167,33 @@ pixelslash compare MAIN_DIR BRANCH_DIR [--out DIR]
 - If a pair's fingerprints differ (image, browser or fonts), `compare` warns on stderr by name and **still diffs**; the index says so at the top, since the pixels then mix a real change with a different renderer. A server would instead ask for a re-baseline.
 - stdout is `pixelslash: N changed, N unchanged, N new, N removed`, `fingerprint: N differ (diffed anyway)` when any differ, then `report: file://…/index.html`. Exit 0 whether or not anything changed: this is a viewer, not a gate. Exit 2 on a missing dir or manifest, a bad manifest or PNG, a missing argument, or an overlapping `--out`.
 
+## Feature mode: `pixelslash dev`
+
+`pixelslash dev` is a fast local loop for one page or component while you build it: every save re-captures the target and diffs it with the previous iteration. Nothing is uploaded, and nothing is written to a server.
+
+```
+pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge --ds DIR] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
+pixelslash dev latest [TARGET] [--json]
+pixelslash dev pin [ID] [--json] · pixelslash dev unpin [ID] [--json]
+```
+
+- **Target.** `TARGET` is a route or story name in the config; `--url URL` shoots a bare page with the config's variants, or the defaults when there is no config. Every variant runs unless `--viewport` (a `WxH` or a variant name) or `--theme` narrows them. The app must already be up: `dev` ignores the config's `start`, and a URL that does not answer is exit 2 with `is not answering …; pixelslash dev does not start a dev server`.
+- **Watching.** The git working tree, minus what git ignores and minus `.pixelslash/`, or only the paths given with `--watch` (repeatable or comma-separated). A burst of saves is debounced into one run; a save during a run queues exactly one more. Each run waits for the page to settle as `capture` does. A directory created after `dev` starts is not watched until the next start.
+- **Speed.** The browser stays open between runs. Every run prints one line, with the page's settle time apart from ours:
+
+  ```
+  #3 vs #2: 3 regions changed · 412 px · ours 0.9 s · settle 1.4 s · http://127.0.0.1:PORT
+  ```
+
+- **Keys.** `r` run now · `p` pin the latest iteration · `u` unpin · `m` toggle main / previous · `q` quit.
+- **What a run is compared with.** By default the previous iteration; while an iteration is pinned, the newest pin. `--against main` (or `m`) compares with the baselines the server would pick for this checkout, through the same read-only `POST /api/v1/baselines` that `check` uses, as whoever `pixelslash login` or `PIXELSLASH_TOKEN` is. Without credentials it says `no credentials for main's baselines (…)` and stays on the previous iteration.
+- **Judge.** `--judge --ds DIR` runs the design-system judge on each iteration after its diff is shown. With no judge available it prints `skip: no judge` and invents nothing.
+- **Live page.** `http://127.0.0.1:PORT` (bound to loopback only) shows the shots, the diff, the comparison image, the timeline of iterations, the pins and the judge's notes, and updates itself after each run. Its buttons send a header a page from another origin cannot, so another site cannot pin or run.
+- **Storage.** Iterations and pins live in `.pixelslash/dev/` at the worktree root, which `dev` adds to `.gitignore`, and they survive a restart. The store is capped at 200 MB: past it the oldest iterations go first, never a pin, the newest, or what the newest was compared with.
+- **One session per worktree.** A second `pixelslash dev` in the same worktree attaches to the first: it prints the live page and follows its runs, and `q` leaves it without stopping the session. A lock whose process is gone is taken over.
+- **Without the terminal.** `dev --once --json` runs one iteration and prints `{ uploaded: false, page, id, target, against, note, counts, regions, changedPixels, timings: { totalMs, settleMs, oursMs }, shots, judge }`, where each shot names its PNG and diff files; with a session live it asks that session to run (no second browser) and prints its iteration with the session's `page`. `dev latest [--json]` prints the latest iteration, and `dev pin|unpin [ID] [--json]` pin or unpin one (the latest by default), live session or not.
+- Exit 0 on a run, changed or not. Exit 2 on a usage error or a down URL. Exit 1 when a `--once` run fails (the capture, or main's baselines not reachable), and from `latest`, `pin` or `unpin` when there is nothing to show or change. In the live loop a failed run is printed and the loop carries on.
+
 ## Signing in and reading builds
 
 The remote commands talk to a server's [API](#api) as one token. They read; only `upload` sends page shots.

@@ -35,6 +35,8 @@ import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { CHECK_USAGE, runCheck } from "./check.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
+import { DEV_USAGE, runDev } from "./dev.ts";
+import type { KeyInput } from "./dev-loop.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
 import { UPLOAD_USAGE, runUpload } from "./upload.ts";
@@ -82,7 +84,12 @@ function report(cli: Cli, result: CompareResult, io: Io): number {
   return n === 0 ? 0 : 1;
 }
 
-export type CliDeps = Deps & SnapshotDeps & UploadDeps & { readSecret?: ReadSecret };
+export type CliDeps = Deps &
+  SnapshotDeps &
+  UploadDeps & {
+    readSecret?: ReadSecret;
+    /** `pixelslash dev`'s keys; stdin by default. */ keys?: KeyInput;
+  };
 
 /** `pixelslash install-browser`: the Chromium `capture` launches, by the Playwright it launches it with. */
 async function installBrowser(io: Io, deps: CliDeps): Promise<number> {
@@ -123,6 +130,7 @@ const COMMANDS: Record<
   import: { usage: IMPORT_USAGE, run: (argv, io) => runImport(argv, io) },
   upload: { usage: UPLOAD_USAGE, run: runUpload },
   check: { usage: CHECK_USAGE, run: runCheck },
+  dev: { usage: DEV_USAGE, run: runDev },
   "install-browser": {
     usage: "pixelslash install-browser",
     run: (_, io, deps) => installBrowser(io, deps),

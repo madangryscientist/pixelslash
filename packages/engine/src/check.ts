@@ -194,7 +194,7 @@ function onlyRoutes(session: CaptureSession, only: string[] | undefined): Captur
 }
 
 /** The git context, refused as a usage error: `check` reads the checkout and sends nothing. */
-async function gitOf(opts: CheckOptions, deps: CheckDeps): Promise<GitContext> {
+async function gitOf(opts: Pick<CheckOptions, "git">, deps: CheckDeps): Promise<GitContext> {
   const warn = deps.warn ?? (() => {});
   try {
     return await gitContext({
@@ -231,7 +231,7 @@ async function flakeRows(
   return flakes.finish(entries);
 }
 
-function clientOf(opts: CheckOptions, deps: CheckDeps): Client {
+function clientOf(opts: Pick<CheckOptions, "server" | "token">, deps: CheckDeps): Client {
   return {
     fetch: deps.fetch ?? globalThis.fetch.bind(globalThis),
     base: opts.server.replace(/\/+$/, ""),
@@ -239,6 +239,28 @@ function clientOf(opts: CheckOptions, deps: CheckDeps): Client {
     warn: deps.warn ?? (() => {}),
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
   };
+}
+
+/** Where main's baselines come from: the server, as whom, and the checkout it picks them for. */
+export type BaselineSource = Pick<CheckOptions, "server" | "token" | "projectId" | "git">;
+
+/**
+ * The baselines the server would pick for `entries` (already captured into `dirs.branch`), settled
+ * and written into `dirs.main` with their manifest: `check`'s read-only path without the capture or
+ * the compare, for `pixelslash dev --against main` (ob 1740). Nothing is written to the server.
+ */
+export async function baselinesInto(
+  src: BaselineSource,
+  dirs: { branch: string; main: string },
+  entries: SnapshotEntry[],
+  deps: CheckDeps = {},
+): Promise<void> {
+  if (!isHttpUrl(src.server)) throw new UsageError(`server must be an http(s) URL: ${src.server}`);
+  const ctx = await gitOf(src, deps);
+  const client = clientOf(src, deps);
+  await rm(dirs.main, { recursive: true, force: true });
+  const { picks } = await preview(client, ctx, src.projectId, entries);
+  await writeBaselines(client, dirs, entries, picks);
 }
 
 /**

@@ -50,7 +50,9 @@ export {
   type PixelDiff,
 } from "./diff.ts";
 export {
+  baselinesInto,
   checkAgainstServer,
+  type BaselineSource,
   type CheckDeps,
   type CheckOptions,
   type CheckResult,
@@ -61,3 +63,38 @@ export type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 export type { FlakeRecord } from "./flake.ts";
 export type { Region, RegionKind, Specks } from "./regions.ts";
 export { CLIENT_VERSION, USER_AGENT } from "./version.ts";
+export {
+  DEFAULT_MAX_BYTES,
+  DEV_DIR,
+  devStore,
+  latestIteration,
+  pinIteration,
+  readPins,
+  unpinIteration,
+  type DevIteration,
+  type DevJudge,
+  type DevShot,
+  type DevStore,
+} from "./dev-store.ts";
+export {
+  devConfig,
+  loadDevConfig,
+  narrowSession,
+  probeTarget,
+  targetName,
+  targetUrl,
+  type DevTargetOptions,
+} from "./dev-target.ts";
+export { runIteration, type FetchMain } from "./dev-run.ts";
+export { judgeIteration, type DevJudgeDeps } from "./dev-judge.ts";
+export { DEFAULT_QUIET_MS, debounce, notIgnored, watchTree, type Debouncer } from "./dev-watch.ts";
+export {
+  claimSession,
+  ensureIgnored,
+  liveSession,
+  worktreeRoot,
+  type DevLock,
+  type LockDeps,
+} from "./dev-lock.ts";
+export { DEV_HEADER, devState, serveDevPage, type DevPage, type DevState } from "./dev-page.ts";
+export { devController, type DevController, type DevSessionOptions } from "./dev-session.ts";

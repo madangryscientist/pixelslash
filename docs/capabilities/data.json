@@ -584,7 +584,7 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732)"
+        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732); `dev` re-diffs one page on every save, locally (ob 1740)"
       },
       "t": {
         "argos": "n",
