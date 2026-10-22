@@ -380,7 +380,7 @@
       "label": "Per-snapshot thresholds",
       "ps": {
         "v": "y",
-        "note": "three config levels, stored on upload"
+        "note": "three config levels, stored on upload; set per test or variant in the review UI, audited, exportable as config (ob 1495)"
       },
       "t": {
         "argos": "y",

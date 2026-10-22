@@ -78,7 +78,7 @@ const DIFF_KINDS: Record<keyof DiffOptions, "share" | "count"> = {
   maxShift: "share",
 };
 
-function isDiffKey(k: string): k is keyof DiffOptions {
+export function isDiffKey(k: string): k is keyof DiffOptions {
   return Object.hasOwn(DIFF_KINDS, k);
 }
 
@@ -92,7 +92,7 @@ function diffValue(key: keyof DiffOptions, value: unknown): number {
 }
 
 /** Absent is `{}`: older clients send no `diff`. */
-function parseDiff(v: unknown): DiffOptions {
+export function parseDiff(v: unknown): DiffOptions {
   if (v === undefined) return {};
   const out: DiffOptions = {};
   for (const [key, value] of Object.entries(object(v, "diff"))) {

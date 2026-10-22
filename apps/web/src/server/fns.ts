@@ -5,6 +5,8 @@ import { snapshotDiffOptions } from "#/db/builds";
 import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
 import { isMarker } from "#/db/markers";
+import { settingsOverrides, snapshotOverrides } from "#/db/override-export";
+import { overrideChanges } from "#/db/overrides";
 import {
   createOrg,
   createProject,
@@ -129,7 +131,8 @@ export const getProjectSettings = createServerFn()
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const tokens = await listCiTokens(db, user.id, project.id);
-    return { org, project, tokens, serverUrl: getRequestUrl().origin };
+    const overrides = await settingsOverrides(db, user.id, project.id);
+    return { org, project, tokens, overrides, serverUrl: getRequestUrl().origin };
   });
 
 export const saveDefaultBranch = createServerFn({ method: "POST" })
@@ -199,7 +202,10 @@ export const getBuildPage = createServerFn()
       if (branch) thumbs[shot.id] = branch;
     }
     const firstBuild = await isFirstBuild(db, view.build);
-    return { org, project, ...view, thumbs, firstBuild };
+    /** Review-UI threshold changes to this build's tests (ob 1495), newest first. */
+    const names = [...new Set(view.snapshots.map((shot) => shot.name))];
+    const thresholdChanges = await overrideChanges(db, user.id, project.id, names);
+    return { org, project, ...view, thumbs, firstBuild, thresholdChanges };
   });
 
 export const getSnapshotPage = createServerFn()
@@ -228,8 +234,10 @@ export const getSnapshotPage = createServerFn()
       build: view.build,
       snapshot,
       images,
-      /** The options the diff was run with, through the accessor the server diff reads (ob 1494). */
+      /** The options the config asked for (ob 1494); `snapshot.resolvedDiff` holds what was measured. */
       diffOptions: await snapshotDiffOptions(db, snapshot.id),
+      /** The review-UI overrides on this shot's test and variant (ob 1495), each with its snippet. */
+      overrides: await snapshotOverrides(db, user.id, project.id, snapshot),
       /** Every reviewer's detection flag on this shot (ob 1721); the viewer's own is `mine`. */
       flags: await snapshotFlags(db, {
         userId: user.id,

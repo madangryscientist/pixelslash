@@ -32,6 +32,7 @@ import {
   markRemoved,
   projectOf,
 } from "./build-writes";
+import { withOverrides } from "./with-overrides";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
@@ -198,7 +199,8 @@ export type ProcessResult = {
  * change that would be carried now. The baseline is chosen from other builds' shots, and one can
  * be accepted or decided between two runs; a shot measured against another baseline is measured
  * again, so a resumed build ends with the verdict a single run would have given. A shot's own
- * image, options and ignore areas cannot change: the build is closed to uploads once finalised.
+ * image, options and ignore areas cannot change: the build is closed to uploads once finalised. A
+ * review-UI override can (ob 1495), and `withOverrides` clears a result it moved before this runs.
  */
 function stands(shot: SnapshotRow, baseline: Baseline | undefined): boolean {
   if (shot.diffStatus === null && !shot.rebaselineNeeded) return false;
@@ -300,7 +302,8 @@ async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: 
 
 /**
  * Measure every shot against its own baseline, in CI's results or here under the run's budget,
- * then a branch build's against main with what that budget leaves (ob 1723).
+ * then a branch build's against main with what that budget leaves (ob 1723). Only the server diff
+ * reads the review-UI overrides; a CI project's results are measured with the config alone.
  */
 export async function measureAll(
   deps: ProcessDeps,
@@ -309,7 +312,8 @@ export async function measureAll(
   baselines: Baselines,
 ) {
   const budget = project.diffLocation === "ci" ? null : new Budget(deps.now ?? Date.now);
-  if (budget) await measure(deps, rows, baselines, budget);
+  if (budget)
+    await measure(deps, await withOverrides(deps.db, build.projectId, rows), baselines, budget);
   else await measureFromCi(deps, rows, baselines);
   if (build.branch !== project.defaultBranch)
     await measureAgainstMain(deps, { buildId: build.id, only }, baselines, budget);

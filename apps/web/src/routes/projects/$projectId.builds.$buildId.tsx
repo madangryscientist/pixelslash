@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
 import { TabBody, Tabs } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { BuildOverrideChanges } from "#/components/override-trail";
 import { RerunErrored } from "#/components/rerun";
 import { Page } from "#/components/ui";
 import { BUILD_TABS, type BuildTab, defaultTab, setsBaseline, tabCounts } from "#/lib/build-tabs";
@@ -20,7 +21,8 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
 });
 
 function BuildPage() {
-  const { project, org, build, snapshots, thumbs, firstBuild } = Route.useLoaderData();
+  const { project, org, build, snapshots, thumbs, firstBuild, thresholdChanges } =
+    Route.useLoaderData();
   const search = Route.useSearch();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +96,7 @@ function BuildPage() {
         A rejection keeps the build failed until a new build arrives. New and removed shots are
         listed for review and never block a build.
       </p>
+      <BuildOverrideChanges changes={thresholdChanges} />
     </Page>
   );
 }

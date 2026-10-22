@@ -80,6 +80,8 @@ export type SnapshotView = {
   reviewedBy: string | null;
   reviewedAt: Date | null;
   diffOptions: DiffOptions;
+  /** What the server diff measured with, and where each value came from (ob 1495). */
+  resolvedDiff: (typeof snapshots.$inferSelect)["resolvedDiff"];
   ignore: IgnoreRect[];
   imageKey: string;
   baselineKey: string | null;
@@ -145,6 +147,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       reviewedAt: snapshots.reviewedAt,
       reviewer: users.login,
       diffOptions: snapshots.diffOptions,
+      resolvedDiff: snapshots.resolvedDiff,
       ignore: snapshots.ignore,
       imageKey: snapshots.imageKey,
       baselineKey: snapshots.baselineKey,

@@ -51,9 +51,10 @@ export function serverComparer(
       readBlob(deps.blobs, baseline.imageKey),
       readBlob(deps.blobs, shot.imageKey),
     ]);
-    // The new shot's stored options; the engine's defaults fill any key it left out. The ignore
+    // The new shot's options, with the project's review-UI overrides laid over them when
+    // `measureAll` resolved them (ob 1495); the engine's defaults fill any key left out. The ignore
     // areas are the union of both shots', so an element that moved is covered at both places.
-    const result = diff(main, branch, shot.diffOptions, {
+    const result = diff(main, branch, shot.resolvedDiff?.options ?? shot.diffOptions, {
       main: baseline.ignore,
       branch: shot.ignore,
     });

@@ -38,6 +38,7 @@ const view = (name: string, over: Partial<SnapshotView> = {}): SnapshotView => (
   reviewedBy: null,
   reviewedAt: null,
   diffOptions: {},
+  resolvedDiff: null,
   ignore: [],
   imageKey: `${name}.png`,
   baselineKey: null,

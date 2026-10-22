@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
+import { DiffOverride } from "#/components/diff-override";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
 import { RerunShot } from "#/components/rerun";
@@ -71,6 +72,29 @@ function DecisionError({ error }: { error: string | null }) {
   );
 }
 
+/** The flag, flake and re-run panels under the side panel's options. */
+function ShotPanels({
+  data,
+  flag,
+}: {
+  data: ReturnType<typeof Route.useLoaderData>;
+  flag: ReturnType<typeof useFlagDraft>;
+}) {
+  const { project, build, snapshot } = data;
+  return (
+    <>
+      <FlagPanel projectId={project.id} snapshotId={snapshot.id} flags={data.flags} draft={flag} />
+      <FlakePanel
+        projectId={project.id}
+        snapshot={snapshot}
+        flake={data.flake}
+        skipped={skippedFlaky(snapshot)}
+      />
+      <RerunShot project={project} build={build} snapshot={snapshot} />
+    </>
+  );
+}
+
 function SnapshotPage() {
   const data = Route.useLoaderData();
   const { project, org, build, snapshot, images, previousId, nextId, names } = data;
@@ -133,20 +157,9 @@ function SnapshotPage() {
           options={data.diffOptions}
           reviewable={reviewable}
           status={build.status}
+          after={<DiffOverride {...data} />}
         >
-          <FlagPanel
-            projectId={project.id}
-            snapshotId={snapshot.id}
-            flags={data.flags}
-            draft={flag}
-          />
-          <FlakePanel
-            projectId={project.id}
-            snapshot={snapshot}
-            flake={data.flake}
-            skipped={skippedFlaky(snapshot)}
-          />
-          <RerunShot project={project} build={build} snapshot={snapshot} />
+          <ShotPanels data={data} flag={flag} />
         </SidePanel>
       </div>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}

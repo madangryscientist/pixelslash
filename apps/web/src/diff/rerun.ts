@@ -118,24 +118,41 @@ export async function rerunShots(
       throw new RerunError(`build is ${build.status}: nothing errored`);
     return processBuild(deps, build);
   }
+  return rediffShots(deps, build, [snapshotId]);
+}
+
+/**
+ * Re-diff the picked shots of a build with a verdict, and give it its verdict again: one shot a
+ * reviewer picked, or every shot of the build a review-UI override applies to (ob 1495). The rest
+ * of the build keeps what it has, reviews included.
+ */
+export async function rediffShots(
+  deps: ProcessDeps,
+  build: Build,
+  snapshotIds: string[],
+): Promise<ProcessResult> {
+  const project = await projectOf(deps.db, build);
+  if (project.diffLocation === "ci") throw new NoRecoveryError();
   const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
-  const target = targetOf(rows, snapshotId);
+  const targets = snapshotIds.map((id) => targetOf(rows, id));
+  if (targets.length === 0) throw new RerunError("no shot to re-diff");
   if (!(await claimForRerun(deps.db, build)))
     throw new RerunError(`build is ${build.status}: a diff run holds it or it has no verdict yet`);
+  const ids = targets.map((t) => t.id);
   try {
-    await clearResults(deps.db, [target]);
+    await clearResults(deps.db, targets);
     const held = rows.filter((row) => !isMarker(row));
     const baselines = await selectBaselines(deps.db, build, new Set(held.map(snapshotKeyOf)));
-    const cleared = { ...target, diffStatus: null, rebaselineNeeded: false };
-    await measureAll(deps, { build, project, only: new Set([target.id]) }, [cleared], baselines);
-    await settleReviews(deps.db, { build, project }, [target]);
+    const cleared = targets.map((t) => ({ ...t, diffStatus: null, rebaselineNeeded: false }));
+    await measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines);
+    await settleReviews(deps.db, { build, project }, targets);
     return { status: await refreshBuildStatus(deps.db, build.id), error: null, unmeasured: 0 };
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await deps.db
       .update(snapshots)
       .set({ reviewState: "pending", reviewedBy: null, reviewedAt: null })
-      .where(eq(snapshots.id, target.id));
+      .where(inArray(snapshots.id, ids));
     await markErrored(deps.db, build, e);
     return { status: "errored", error: e instanceof Error ? e.message : String(e), unmeasured: 0 };
   }

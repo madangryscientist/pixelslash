@@ -11,6 +11,24 @@ export type DiffOptions = {
   maxShift?: number;
 };
 
+/**
+ * Where one option's value came from (ob 1495): the uploaded config (its variant, route and project
+ * layers, merged by the CLI), or a reviewer's override in the review UI, for the test or for one
+ * variant of it. `by` is the GitHub login, `at` epoch ms.
+ */
+export type OptionSource =
+  | { from: "config" }
+  | { from: "ui"; scope: "test" | "variant"; by: string; at: number };
+
+/**
+ * The options a shot was measured with and where each came from (ob 1495). A key in neither the
+ * config nor an override is left out, so the engine default applies to it.
+ */
+export type ResolvedDiff = {
+  options: DiffOptions;
+  sources: Partial<Record<keyof DiffOptions, OptionSource>>;
+};
+
 /** A rectangle in image px that the diff skips; the same shape as the engine's `IgnoreRect`. */
 export type IgnoreRect = { x: number; y: number; width: number; height: number };
 

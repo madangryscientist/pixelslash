@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { SnapshotView } from "#/db/review";
-import type { DiffOptions } from "#/db/schema";
+import type { DiffOptions, OptionSource } from "#/db/schema";
 import { formatDateTime, formatNumber } from "#/lib/format";
 import { awaitsDecision } from "#/lib/snapshot-groups";
 
@@ -132,16 +132,45 @@ function Environment({ snapshot }: { snapshot: SnapshotView }) {
   );
 }
 
-/** The options the diff ran with: one line when every one is the engine's default. */
+/** Where a value came from, in the words the ticket asked for (ob 1495). */
+function sourceText(source: OptionSource | undefined, config: number | undefined): string | null {
+  if (!source) return null;
+  if (source.from === "config") return "set in the config";
+  const scope = source.scope === "variant" ? "this test, this variant" : "this test";
+  const was = config === undefined ? "engine default" : String(config);
+  return `set in the UI by @${source.by} on ${formatDateTime(new Date(source.at))} (${scope}); config says ${was}`;
+}
+
+/**
+ * The options the diff ran with, and the source of each: one line when every one is the engine's
+ * default. A server-measured shot carries what it was measured with (overrides included); a CI
+ * shot only the config's.
+ */
 function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffOptions }) {
-  const allDefault = OPTION_KEYS.every((key) => options[key] === undefined);
+  const resolved = snapshot.resolvedDiff;
+  const used = resolved?.options ?? options;
+  const sourceOf = (key: keyof DiffOptions) => {
+    if (resolved) return sourceText(resolved.sources[key], options[key]);
+    return used[key] === undefined ? null : "set in the config";
+  };
+  const allDefault = OPTION_KEYS.every((key) => used[key] === undefined);
   const list = (
     <dl data-testid="diff-options" className="space-y-1 text-sm">
-      {OPTION_KEYS.map((key) => (
-        <Row key={key} label={key}>
-          {options[key] ?? "engine default"}
-        </Row>
-      ))}
+      {OPTION_KEYS.map((key) => {
+        const source = sourceOf(key);
+        return (
+          <div key={key}>
+            <Row label={key}>
+              <span data-testid={`option-${key}`}>{used[key] ?? "engine default"}</span>
+            </Row>
+            {source && (
+              <p data-testid={`source-${key}`} className="text-xs text-slate-500">
+                {source}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </dl>
   );
   return (
@@ -234,6 +263,7 @@ export function SidePanel({
   options,
   reviewable,
   status,
+  after,
   children,
 }: {
   projectId: string;
@@ -241,6 +271,8 @@ export function SidePanel({
   options: DiffOptions;
   reviewable: boolean;
   status: string;
+  /** Below the options: the override form, which edits them (ob 1495). */
+  after?: ReactNode;
   /** The detection flags and the flake, first: a second reviewer reads them before deciding. */
   children?: ReactNode;
 }) {
@@ -257,6 +289,7 @@ export function SidePanel({
       <Measured snapshot={snapshot} />
       <Environment snapshot={snapshot} />
       <Options snapshot={snapshot} options={options} />
+      {after}
     </aside>
   );
 }

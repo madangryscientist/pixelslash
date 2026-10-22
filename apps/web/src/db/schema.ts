@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
-import type { DiffOptions, DiffRegion, DiffResult, IgnoreRect } from "./diff-json";
+import type { DiffOptions, DiffRegion, DiffResult, IgnoreRect, ResolvedDiff } from "./diff-json";
 import { isSmoke } from "./synthetic";
 
-const createdAt = () =>
+export const createdAt = () =>
   integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`);
@@ -176,7 +176,15 @@ export const builds = sqliteTable(
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],
 );
 
-export type { DiffOptions, DiffRegion, DiffResult, IgnoreRect, RegionKind } from "./diff-json";
+export type {
+  DiffOptions,
+  DiffRegion,
+  DiffResult,
+  IgnoreRect,
+  OptionSource,
+  RegionKind,
+  ResolvedDiff,
+} from "./diff-json";
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
@@ -220,6 +228,12 @@ export const snapshots = sqliteTable(
       .$type<DiffOptions>()
       .notNull()
       .default(sql`'{}'`),
+    /**
+     * What the server diff measured with (ob 1495): the config's options above with the project's
+     * review-UI overrides laid over them, and each value's source. Null on a shot measured with
+     * `diff_options` as uploaded: a CI project's, or one measured before overrides existed.
+     */
+    resolvedDiff: text("resolved_diff", { mode: "json" }).$type<ResolvedDiff>(),
     /** Areas the diff skips (kept visible in the PNG); `[]` means everything is measured. */
     ignore: text("ignore", { mode: "json" })
       .$type<IgnoreRect[]>()
