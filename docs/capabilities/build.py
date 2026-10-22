@@ -7,8 +7,10 @@ opened as file:// or committed and diffed.
 """
 import json
 import pathlib
+import subprocess
 
 HERE = pathlib.Path(__file__).resolve().parent
+REPO = "https://github.com/madangryscientist/pixelslash/commit/"
 DATA = json.loads((HERE / "data.json").read_text())
 OUT = HERE / "matrix.html"
 
@@ -20,6 +22,11 @@ rows = DATA["rows"]
 for r in rows:
     best = max(SCORE[r["t"][k]] for k in COMPETITORS)
     r["behind"] = SCORE[r["ps"]["v"]] < best
+    # The short sha in data.json names the land; the link needs the full one. An unknown sha stops the build.
+    r["ps"]["sha"] = subprocess.run(
+        ["git", "rev-parse", "--verify", r["ps"]["commit"] + "^{commit}"],
+        cwd=HERE, capture_output=True, text=True, check=True,
+    ).stdout.strip()
 behind = [r for r in rows if r["behind"]]
 level = len(rows) - len(behind)
 
@@ -29,9 +36,10 @@ payload = json.dumps({
     "src": {t["key"]: t.get("src", "") for t in TOOLS},
     "names": {t["key"]: t["name"] for t in TOOLS},
     "competitors": COMPETITORS,
+    "repo": REPO,
 })
 
-METHOD = DATA["method"].replace("{commit}", f'<code>{DATA["ours_commit"]}</code>').replace("{date}", DATA["updated"])
+METHOD = DATA["method"].replace("{commit}", f'<code>{DATA["ours_commit"]}</code> (audited {DATA["audited"]})').replace("{date}", DATA["updated"])
 
 HEAD_HTML = "".join(
     f'<th class="{"self" if t["key"] == "ps" else ""}" title="{t.get("src", "read from the code")}">{t["name"]}</th>'
@@ -68,6 +76,7 @@ html = f"""<!doctype html>
   thead th.self {{ color: var(--ink); }}
   td.row {{ font-size: 11.5px; line-height: 1.35; }}
   td.row small {{ display: block; font: 10px/1.3 var(--font-mono, monospace); color: var(--dim); }}
+  td.row small a.sha {{ font: 9.5px/1 var(--font-mono, monospace); color: var(--dim); opacity: .75; }}
   td.c {{ text-align: center; font-size: 12px; }}
   tr.grp td {{ border-top: 1px solid var(--line); padding-top: 12px; font: 9.5px/1 var(--font-sans, sans-serif);
               letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }}
@@ -133,7 +142,7 @@ changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
 
 <div class="foot">
   Our column: README.md, packages/engine/src, packages/cli/src, apps/web/src at <b>{DATA["ours_commit"]}</b>,
-  {DATA["updated"]}.<br>
+  audited {DATA["audited"]}; each of our cells names the land that made it true.<br>
   Theirs: {" · ".join(t.get("src", "") for t in TOOLS if t["key"] != "ps")} (all fetched {DATA["updated"]}).<br>
   A "partial" is a documented subset, not a guess: read the note on the cell. Regenerate with
   <code>python3 docs/capabilities/build.py</code> after editing <code>data.json</code>.
@@ -157,7 +166,7 @@ D.rows.forEach(r => {{
   tr.dataset.behind = r.behind ? '1' : '0';
   tr.innerHTML = '<td class="row">' + r.label +
     (r.behind && r.plan ? ' <small class="plan">' + r.plan + '</small>' : '') +
-    '<small>' + r.ps.note + '</small></td>' +
+    '<small>' + r.ps.note + ' <a class="sha" href="' + D.repo + r.ps.sha + '">' + r.ps.commit + '</a></small></td>' +
     '<td class="c psc v-' + r.ps.v + '" title="' + r.ps.note.replace(/"/g, '') + '">' + GLYPH[r.ps.v] + '</td>' +
     D.competitors.map(k => {{
       const v = r.t[k];

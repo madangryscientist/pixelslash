@@ -1,6 +1,7 @@
 {
   "updated": "2026-10-20",
   "ours_commit": "b97e714",
+  "audited": "2026-10-22",
   "method": "Our column is read from the code at {commit}: a yes means it exists in the code and is exercised by the gate where it has a test, not that a customer can reach it. The other five are their public docs, fetched {date}. A ? means the docs did not say, not that the tool lacks it.",
   "tools": [
     {
@@ -40,7 +41,8 @@
       "label": "Capture a page pair by URL",
       "ps": {
         "v": "y",
-        "note": "pair mode, or --routes over an origin; pages behind sign-in via a config setup script (ob 1710)"
+        "note": "pair mode, or --routes over an origin; pages behind sign-in via a config setup script (ob 1710)",
+        "commit": "01e5ae9"
       },
       "t": {
         "argos": "y",
@@ -57,7 +59,8 @@
       "label": "No Storybook dependency",
       "ps": {
         "v": "y",
-        "note": "pages and PNG dirs, nothing to wrap; a Storybook is read over HTTP, never imported"
+        "note": "pages and PNG dirs, nothing to wrap; a Storybook is read over HTTP, never imported",
+        "commit": "e175f30"
       },
       "t": {
         "argos": "n",
@@ -74,7 +77,8 @@
       "label": "Snapshot every Storybook story from its index",
       "ps": {
         "v": "y",
-        "note": "reads index.json from a running Storybook 7+; one snapshot per story, no route list"
+        "note": "reads index.json from a running Storybook 7+; one snapshot per story, no route list",
+        "commit": "e175f30"
       },
       "t": {
         "argos": "y",
@@ -91,7 +95,8 @@
       "label": "Storybook globals as snapshot variants, no extra stories",
       "ps": {
         "v": "y",
-        "note": "config lists globals (a theme, say); every story is shot under each combination"
+        "note": "config lists globals (a theme, say); every story is shot under each combination",
+        "commit": "e175f30"
       },
       "t": {
         "argos": "y",
@@ -108,7 +113,8 @@
       "label": "Component SDK for your own test run",
       "ps": {
         "v": "n",
-        "note": "open: Playwright helper ob 1498"
+        "note": "open: Playwright helper ob 1498; none since before the omnibus extraction",
+        "commit": "06a2472"
       },
       "t": {
         "argos": "y",
@@ -125,7 +131,8 @@
       "label": "First-class Playwright helper",
       "ps": {
         "v": "n",
-        "note": "Playwright is our capture engine, not your SDK"
+        "note": "Playwright is our capture engine, not your SDK; true since before the omnibus extraction",
+        "commit": "06a2472"
       },
       "t": {
         "argos": "y",
@@ -142,7 +149,8 @@
       "label": "More than one browser engine",
       "ps": {
         "v": "n",
-        "note": "chromium only: a variant naming another browser is a config error, because the image ships one"
+        "note": "chromium only: a variant naming another browser is a config error, because the image ships one",
+        "commit": "f358669"
       },
       "t": {
         "argos": "y",
@@ -159,7 +167,8 @@
       "label": "Configurable viewports, several per run",
       "ps": {
         "v": "y",
-        "note": "variants carry viewport, per route"
+        "note": "variants carry viewport, per route",
+        "commit": "f358669"
       },
       "t": {
         "argos": "y",
@@ -176,7 +185,8 @@
       "label": "Browser / viewport / theme variants",
       "ps": {
         "v": "y",
-        "note": "a variant is browser + viewport + theme"
+        "note": "a variant is browser + viewport + theme",
+        "commit": "f358669"
       },
       "t": {
         "argos": "y",
@@ -193,7 +203,8 @@
       "label": "Full-page screenshots",
       "ps": {
         "v": "y",
-        "note": "fullPage: true"
+        "note": "fullPage: true; true since before the omnibus extraction",
+        "commit": "06a2472"
       },
       "t": {
         "argos": "y",
@@ -210,7 +221,8 @@
       "label": "Pinned render environment",
       "ps": {
         "v": "y",
-        "note": "image digest + font hash in the fingerprint"
+        "note": "image digest + font hash in the fingerprint",
+        "commit": "f358669"
       },
       "t": {
         "argos": "n",
@@ -227,7 +239,8 @@
       "label": "Animations, caret, clock, timers",
       "ps": {
         "v": "y",
-        "note": "all four, plus a bounded settle"
+        "note": "all four, plus a bounded settle",
+        "commit": "9e55170"
       },
       "t": {
         "argos": "y",
@@ -244,7 +257,8 @@
       "label": "Redact before the image is stored",
       "ps": {
         "v": "y",
-        "note": "painted #FF00FF before the PNG is written"
+        "note": "painted #FF00FF before the PNG is written",
+        "commit": "f358669"
       },
       "t": {
         "argos": "y",
@@ -261,7 +275,8 @@
       "label": "Skip an area in the diff, keep it visible",
       "ps": {
         "v": "y",
-        "note": "dropped before clustering, hatched, counted"
+        "note": "dropped before clustering, hatched, counted",
+        "commit": "116ccf7"
       },
       "t": {
         "argos": "n",
@@ -278,7 +293,8 @@
       "label": "Perceptual diff, not raw pixel-exact",
       "ps": {
         "v": "y",
-        "note": "YIQ threshold, alpha over white"
+        "note": "YIQ threshold, alpha over white",
+        "commit": "b85f170"
       },
       "t": {
         "argos": "p",
@@ -295,7 +311,8 @@
       "label": "Anti-aliasing handled, not counted",
       "ps": {
         "v": "y",
-        "note": "edge pixels set aside in either shot"
+        "note": "edge pixels set aside in either shot",
+        "commit": "b85f170"
       },
       "t": {
         "argos": "y",
@@ -312,7 +329,8 @@
       "label": "Tolerates sub-pixel content shift",
       "ps": {
         "v": "y",
-        "note": "four-test fit with an edge-tile veto (ob 1487)"
+        "note": "four-test fit with an edge-tile veto (ob 1487)",
+        "commit": "42289c5"
       },
       "t": {
         "argos": "p",
@@ -329,7 +347,8 @@
       "label": "Classifies renderer noise, does not fail on it",
       "ps": {
         "v": "y",
-        "note": "faint + uneven + both directions is noise"
+        "note": "faint + uneven + both directions is noise",
+        "commit": "b2f1053"
       },
       "t": {
         "argos": "p",
@@ -346,7 +365,8 @@
       "label": "Size change measured, overlap only",
       "ps": {
         "v": "y",
-        "note": "both sizes stated, non-overlap never painted"
+        "note": "both sizes stated, non-overlap never painted",
+        "commit": "b85f170"
       },
       "t": {
         "argos": "p",
@@ -363,7 +383,8 @@
       "label": "Changed regions, not just a pixel count",
       "ps": {
         "v": "y",
-        "note": "boxes, 24px merge, speck floor"
+        "note": "boxes, 24px merge, speck floor",
+        "commit": "b2f1053"
       },
       "t": {
         "argos": "y",
@@ -380,7 +401,8 @@
       "label": "Per-snapshot thresholds",
       "ps": {
         "v": "y",
-        "note": "three config levels, stored on upload; set per test or variant in the review UI, audited, exportable as config (ob 1495)"
+        "note": "three config levels, stored on upload; set per test or variant in the review UI, audited, exportable as config (ob 1495)",
+        "commit": "80e2cfc"
       },
       "t": {
         "argos": "y",
@@ -397,7 +419,8 @@
       "label": "Baseline from merge-base / ancestors",
       "ps": {
         "v": "y",
-        "note": "server diff picks it per snapshot (ob 1470); `check` previews that pick locally (ob 1732)"
+        "note": "server diff picks it per snapshot (ob 1470); `check` previews that pick locally (ob 1732)",
+        "commit": "8a1c4f5"
       },
       "t": {
         "argos": "y",
@@ -414,7 +437,8 @@
       "label": "Approvals carry forward on a branch",
       "ps": {
         "v": "y",
-        "note": "an acceptance on the branch survives a rebase or amend; a branch build is diffed against the branch's last build, and a still-open change is carried and decided once (ob 1712)"
+        "note": "an acceptance on the branch survives a rebase or amend; a branch build is diffed against the branch's last build, and a still-open change is carried and decided once (ob 1712)",
+        "commit": "af54f8c"
       },
       "t": {
         "argos": "y",
@@ -431,7 +455,8 @@
       "label": "Main auto-accepted",
       "ps": {
         "v": "y",
-        "note": "acceptDefaultBranchBuild on finalise; the branch is the project's, set in settings (default main)"
+        "note": "acceptDefaultBranchBuild on finalise; the branch is the project's, set in settings (default main)",
+        "commit": "8416393"
       },
       "t": {
         "argos": "y",
@@ -448,7 +473,8 @@
       "label": "Accept / reject in a web UI",
       "ps": {
         "v": "y",
-        "note": "project / build / snapshot pages and a branch page (the branch against main, plus what changed since its last build, ob 1723); accept or reject records who and when; a mis-detection can be flagged and kept (ob 1721); Playwright e2e"
+        "note": "project / build / snapshot pages and a branch page (the branch against main, plus what changed since its last build, ob 1723); accept or reject records who and when; a mis-detection can be flagged and kept (ob 1721); Playwright e2e",
+        "commit": "32b352e"
       },
       "t": {
         "argos": "y",
@@ -465,7 +491,8 @@
       "label": "Keyboard review",
       "ps": {
         "v": "y",
-        "note": "j/k walk the build, a accept, r reject; e2e walks one"
+        "note": "j/k walk the build, a accept, r reject; e2e walks one",
+        "commit": "b80fe09"
       },
       "t": {
         "argos": "y",
@@ -482,7 +509,8 @@
       "label": "PR status blocked on review",
       "ps": {
         "v": "p",
-        "note": "no check run; a CI job blocks on review by exit code with `pixelslash status --wait` or `upload --wait` (ob 1731)"
+        "note": "no check run; a CI job blocks on review by exit code with `pixelslash status --wait` or `upload --wait` (ob 1731)",
+        "commit": "f093755"
       },
       "t": {
         "argos": "y",
@@ -499,7 +527,8 @@
       "label": "GitHub App integration",
       "ps": {
         "v": "p",
-        "note": "sign-in only"
+        "note": "sign-in only",
+        "commit": "853940f"
       },
       "t": {
         "argos": "y",
@@ -516,7 +545,8 @@
       "label": "CI tokens",
       "ps": {
         "v": "y",
-        "note": "psci_ token per project, env or file; psu_ personal tokens the CLI and MCP act as their user with (ob 1728)"
+        "note": "psci_ token per project, env or file; psu_ personal tokens the CLI and MCP act as their user with (ob 1728)",
+        "commit": "90e1103"
       },
       "t": {
         "argos": "y",
@@ -533,7 +563,8 @@
       "label": "Orgs, projects, builds, snapshots",
       "ps": {
         "v": "y",
-        "note": "D1 tables, org invites, per-project tokens"
+        "note": "D1 tables, org invites, per-project tokens",
+        "commit": "853940f"
       },
       "t": {
         "argos": "y",
@@ -550,7 +581,8 @@
       "label": "Documented upload API",
       "ps": {
         "v": "y",
-        "note": "upload and capture --upload; /api/v1, a stable additive-only contract: projects, builds, snapshots, images, baselines, detection flags, flakes (ob 1729)"
+        "note": "upload and capture --upload; /api/v1, a stable additive-only contract: projects, builds, snapshots, images, baselines, detection flags, flakes (ob 1729)",
+        "commit": "f4a5622"
       },
       "t": {
         "argos": "y",
@@ -567,7 +599,8 @@
       "label": "Self-hosting",
       "ps": {
         "v": "p",
-        "note": "the review app runs on your own box from a local build (LAN deploy units, apps/web/README), but sign-in is a GitHub stand-in and there is no self-host guide; DB and blob seams are swappable"
+        "note": "the review app runs on your own box from a local build (LAN deploy units, apps/web/README), but sign-in is a GitHub stand-in and there is no self-host guide; DB and blob seams are swappable",
+        "commit": "3e6ea10"
       },
       "t": {
         "argos": "p",
@@ -584,7 +617,8 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732); `dev` re-diffs one page on every save, locally (ob 1740); the MCP fix loop takes shots locally and only reads the server, bar resolving a flake (ob 1735)"
+        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732); `dev` re-diffs one page on every save, locally (ob 1740); the MCP fix loop takes shots locally and only reads the server, bar resolving a flake (ob 1735)",
+        "commit": "e4c2a1f"
       },
       "t": {
         "argos": "n",
@@ -601,7 +635,8 @@
       "label": "AI judgement against a design system",
       "ps": {
         "v": "y",
-        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745)"
+        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745)",
+        "commit": "42fce7b"
       },
       "t": {
         "argos": "n",
@@ -618,7 +653,8 @@
       "label": "Accessibility checks",
       "ps": {
         "v": "n",
-        "note": "no WCAG surface"
+        "note": "no WCAG surface; true since before the omnibus extraction",
+        "commit": "06a2472"
       },
       "t": {
         "argos": "p",
@@ -635,7 +671,8 @@
       "label": "Flake detection",
       "ps": {
         "v": "y",
-        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724); `pixelslash flake ID` reproduces one locally N times, names each difference's cause, suggests the config fix (`--write` adds it after a prompt) and resolves it only when stable (ob 1725)"
+        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724); `pixelslash flake ID` reproduces one locally N times, names each difference's cause, suggests the config fix (`--write` adds it after a prompt) and resolves it only when stable (ob 1725)",
+        "commit": "1859027"
       },
       "t": {
         "argos": "y",
@@ -652,7 +689,8 @@
       "label": "Documented retention",
       "ps": {
         "v": "n",
-        "note": "the review app keeps every build and shot: nothing expires; the map decides PR builds and diffs keep 30 days, and no code does it yet"
+        "note": "the review app keeps every build and shot: nothing expires; the map decides PR builds and diffs keep 30 days, and no code does it yet",
+        "commit": "853940f"
       },
       "t": {
         "argos": "y",
@@ -669,7 +707,8 @@
       "label": "Free tier / OSS plan",
       "ps": {
         "v": "n",
-        "note": "no pricing in the code; the shape is decided (bill changed shots only), price points wait on beta cost data"
+        "note": "no pricing in the code; the shape is decided (bill changed shots only), price points wait on beta cost data",
+        "commit": "4a50905"
       },
       "t": {
         "argos": "y",
@@ -686,7 +725,8 @@
       "label": "Open source",
       "ps": {
         "v": "p",
-        "note": "private repo today; the map has us opening the source at launch"
+        "note": "private repo today; the map has us opening the source at launch",
+        "commit": "4a50905"
       },
       "t": {
         "argos": "y",

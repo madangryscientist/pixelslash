@@ -217,6 +217,17 @@ it opens as `file://` without a build step.
   `note` in `data.json`, clear its `plan` when the ticket lands, re-run `build.py`, commit the
   regenerated `matrix.html` with it. A row that says "open: ob N" after N has landed is a lie
   with a ticket number on it.
+
+  Each of our cells also has a `commit`: the short sha of the squash on main that made its `v`
+  and `note` true. A commit cannot name its own sha, so the builder leaves `commit` alone and
+  the **planner** fixes it in the land: after the squash, before the push, a second commit
+  `docs(ob N): matrix rows name the <sha> land` sets each changed row's `commit` to the squash's
+  short sha and re-runs `build.py`. Both go out in the same `git push origin main`, so main on
+  the remote never shows a changed row with the old sha. `build.py` stops on a sha `git` cannot
+  resolve. A row whose value and note were already true before the omnibus extraction names `06a2472`
+  and says so in its note.
+  `audited` is the date our column was last read against `ours_commit`; `updated` is the
+  competitors' fetch date.
 - **A positioning or pricing decision is about to be made** — refresh the competitor columns
   (1422, 1425, 1426). Fetch each vendor's docs again, update `updated`, and keep the per-cell
   notes: they are what makes a `partial` arguable rather than a guess.
