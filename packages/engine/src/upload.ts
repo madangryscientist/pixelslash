@@ -1,10 +1,10 @@
 import { join, resolve, sep } from "node:path";
+import { type MaskRect, parseArea } from "./config-areas.ts";
 import { isHttpUrl } from "./routes.ts";
 import { parseDiffOptions } from "./diff-options.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
-import type { IgnoreRect } from "./diff.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
 
 /** The pinned capture image is Linux; the manifest carries no platform of its own. */
@@ -33,24 +33,16 @@ function posInt(v: unknown, where: string): number {
   return v;
 }
 
-function nonNegInt(v: unknown, where: string): number {
-  if (typeof v !== "number" || !Number.isInteger(v) || v < 0)
-    bad(where, "must be a non-negative integer");
-  return v;
-}
-
 /** Ignore rects in image px; a manifest from before ignore areas has none. */
-function ignoreRects(v: unknown, where: string): IgnoreRect[] {
+function ignoreRects(v: unknown, where: string): MaskRect[] {
   if (v === undefined) return [];
   if (!Array.isArray(v)) bad(where, "must be an array of { x, y, width, height }");
   return v.map((r, i) => {
-    if (!isObj(r)) bad(`${where}[${i}]`, "must be an object");
-    return {
-      x: nonNegInt(r.x, `${where}[${i}].x`),
-      y: nonNegInt(r.y, `${where}[${i}].y`),
-      width: posInt(r.width, `${where}[${i}].width`),
-      height: posInt(r.height, `${where}[${i}].height`),
-    };
+    const at = `${where}[${i}]`;
+    // A selector is a valid area but not a rect, so a string reads like any other non-object.
+    const rect = isObj(r) ? parseArea(r, at, bad) : "";
+    if (typeof rect === "string") bad(at, "must be an object");
+    return rect;
   });
 }
 

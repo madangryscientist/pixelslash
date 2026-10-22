@@ -167,23 +167,21 @@ function ignoreAreas(v: unknown, where: string): Ignore[] {
   return list(v, where).map((a, i) => mask(a, `${where}[${i}]`));
 }
 
-/** One option layer per variant name, read from `variants.<name>.<key>`. */
-function variantLayer<T>(
-  v: unknown,
-  where: string,
-  key: "diff" | "ignore",
-  parse: (v: unknown, where: string) => T,
-): Record<string, T> {
-  if (v === undefined) return {};
+type VariantLayers = { diff: Record<string, DiffOptions>; ignore: Record<string, Ignore[]> };
+
+/** The `diff` and `ignore` layers per variant name, read from `variants.<name>` in one pass. */
+function variantLayers(v: unknown, where: string): VariantLayers {
+  const out: VariantLayers = { diff: {}, ignore: {} };
+  if (v === undefined) return out;
   if (!isObj(v)) bad(where, "must be an object keyed by variant name");
-  const out: Record<string, T> = {};
   for (const [name, entry] of Object.entries(v)) {
     if (!isObj(entry)) bad(`${where}.${name}`, "must be { diff?, ignore? }");
     for (const k of Object.keys(entry)) {
       if (k !== "diff" && k !== "ignore")
         bad(`${where}.${name}.${k}`, "is not a variant option (diff, ignore)");
     }
-    out[name] = parse(entry[key], `${where}.${name}.${key}`);
+    out.diff[name] = diff(entry.diff, `${where}.${name}.diff`);
+    out.ignore[name] = ignoreAreas(entry.ignore, `${where}.${name}.ignore`);
   }
   return out;
 }
@@ -196,6 +194,7 @@ function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] })
   const path = str(r.path, `${where}.path`);
   if (!path.startsWith("/")) bad(`${where}.path`, "must start with /");
   const name = fileName(r.name, `${where}.name`, routeSlug(path));
+  const variants = variantLayers(r.variants, `${where}.variants`);
   return {
     path,
     name,
@@ -206,8 +205,8 @@ function route(v: unknown, i: number, global: { masks: Mask[]; tags: string[] })
     ignore: ignoreAreas(r.ignore, `${where}.ignore`),
     tags: [...new Set([...global.tags, ...strings(r.tags, `${where}.tags`)])],
     diff: diff(r.diff, `${where}.diff`),
-    variantDiff: variantLayer(r.variants, `${where}.variants`, "diff", diff),
-    variantIgnore: variantLayer(r.variants, `${where}.variants`, "ignore", ignoreAreas),
+    variantDiff: variants.diff,
+    variantIgnore: variants.ignore,
   };
 }
 

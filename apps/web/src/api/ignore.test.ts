@@ -1,11 +1,10 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
-import { snapshotIgnore } from "#/db/builds";
 import { snapshots } from "#/db/schema";
 import { META, call, openBuild, setup, snapshotForm } from "./test-support";
 
 describe("snapshot ignore areas", () => {
-  test("an upload stores the rects the diff skips, readable back through snapshotIgnore", async () => {
+  test("an upload stores the rects the diff skips", async () => {
     const { db, deps, acme } = await setup();
     const id = await openBuild(deps, acme.token);
     const put = await call(deps, `PUT /api/v1/builds/${id}/snapshots`, acme.token, snapshotForm());
@@ -13,7 +12,6 @@ describe("snapshot ignore areas", () => {
 
     const [snap] = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
     expect(snap?.ignore).toEqual(META.ignore);
-    expect(await snapshotIgnore(db, snap?.id ?? "")).toEqual(META.ignore);
   });
 
   test("a snapshot sent without ignore areas stores []", async () => {

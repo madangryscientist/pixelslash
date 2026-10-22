@@ -149,13 +149,3 @@ export async function snapshotDiffOptions(db: Db, snapshotId: string): Promise<D
   if (!row) throw new NotFoundError("snapshot");
   return row.diffOptions;
 }
-
-/** The areas a snapshot's diff skips, as sent at upload: image px, `[]` when none. */
-export async function snapshotIgnore(db: Db, snapshotId: string): Promise<IgnoreRect[]> {
-  const [row] = await db
-    .select({ ignore: snapshots.ignore })
-    .from(snapshots)
-    .where(eq(snapshots.id, snapshotId));
-  if (!row) throw new NotFoundError("snapshot");
-  return row.ignore;
-}
