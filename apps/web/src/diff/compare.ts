@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { ENGINE_VERSION, diffPngs, summarizeDiff } from "@pixelslash/engine/diff";
 import type { BaselineSnapshot } from "#/db/baselines";
-import type { DiffLocation, DiffResult, snapshots } from "#/db/schema";
+import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
 import { checkCiResult } from "./ci-result";
 
@@ -40,6 +40,11 @@ export type Measured = {
 
 export type Comparer = (shot: SnapshotRow, baseline: BaselineSnapshot) => Promise<Measured>;
 
+/** The rects of a shot's review-UI ignore boxes (ob 1499), as the engine takes them. */
+function uiRects(resolved: ResolvedDiff | null): IgnoreRect[] {
+  return (resolved?.ignore ?? []).map(({ x, y, width, height }) => ({ x, y, width, height }));
+}
+
 /** The server diff: both PNGs read and measured here. */
 export function serverComparer(
   deps: { blobs: BlobStore; diff?: typeof diffPngs | undefined },
@@ -53,10 +58,11 @@ export function serverComparer(
     ]);
     // The new shot's options, with the project's review-UI overrides laid over them when
     // `measureAll` resolved them (ob 1495); the engine's defaults fill any key left out. The ignore
-    // areas are the union of both shots', so an element that moved is covered at both places.
+    // areas are the union of both shots', so an element that moved is covered at both places, and
+    // of the boxes drawn on the test in the review UI (ob 1499).
     const result = diff(main, branch, shot.resolvedDiff?.options ?? shot.diffOptions, {
       main: baseline.ignore,
-      branch: shot.ignore,
+      branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)],
     });
     return {
       changed: result.changed,

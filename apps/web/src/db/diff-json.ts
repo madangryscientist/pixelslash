@@ -27,10 +27,20 @@ export type OptionSource =
 export type ResolvedDiff = {
   options: DiffOptions;
   sources: Partial<Record<keyof DiffOptions, OptionSource>>;
+  /** Ignore boxes drawn in the review UI (ob 1499), on top of the shot's own; absent when none. */
+  ignore?: UiIgnoreBox[];
 };
 
 /** A rectangle in image px that the diff skips; the same shape as the engine's `IgnoreRect`. */
 export type IgnoreRect = { x: number; y: number; width: number; height: number };
+
+/** An ignore box drawn in the review UI (ob 1499): its rect, scope, who drew it, when (epoch ms). */
+export type UiIgnoreBox = IgnoreRect & {
+  id: string;
+  scope: "test" | "variant";
+  by: string;
+  at: number;
+};
 
 export type RegionKind = "change" | "noise" | "shift";
 

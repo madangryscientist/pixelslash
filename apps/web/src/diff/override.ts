@@ -53,21 +53,35 @@ export async function saveAndRediff(
   },
 ): Promise<SavedOverride> {
   const changed = await saveOverride(deps.db, userId, build.projectId, { ...target, options });
-  const unchanged = { changed, rediffed: 0, status: build.status, note: null };
-  if (!changed) return unchanged;
+  if (!changed) return { changed, rediffed: 0, status: build.status, note: null };
+  return { changed, ...(await rediffTarget(deps, build, target, "override")) };
+}
+
+/**
+ * Re-diff the open build's shots of a test (or one variant of it) after something the diff reads
+ * for it changed in the review UI: an override (ob 1495) or an ignore box (ob 1499). A build with
+ * no verdict yet is left to its next run, and a run that holds the build measures with it.
+ */
+export async function rediffTarget(
+  deps: ProcessDeps,
+  build: Build,
+  target: OverrideTarget,
+  what: string,
+): Promise<Omit<SavedOverride, "changed">> {
+  const unchanged = { rediffed: 0, status: build.status, note: null };
   if (!VERDICTS.includes(build.status))
     return {
       ...unchanged,
-      note: `build is ${build.status}: it is measured with the override on its next run`,
+      note: `build is ${build.status}: it is measured with the ${what} on its next run`,
     };
   const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
   const ids = rows.filter((row) => applies(row, target)).map((row) => row.id);
   if (ids.length === 0) return unchanged;
   try {
     const result = await rediffShots(deps, build, ids);
-    return { changed, rediffed: ids.length, status: result.status, note: result.error };
+    return { rediffed: ids.length, status: result.status, note: result.error };
   } catch (e) {
-    // A diff run holds the build: the override is saved, and that run or the next measures with it.
+    // A diff run holds the build: the change is saved, and that run or the next measures with it.
     if (!(e instanceof RerunError)) throw e;
     return { ...unchanged, note: e.message };
   }

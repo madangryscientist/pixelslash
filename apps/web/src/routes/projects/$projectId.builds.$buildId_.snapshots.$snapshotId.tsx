@@ -3,12 +3,14 @@ import { useCallback, useMemo, useState } from "react";
 import { DiffOverride } from "#/components/diff-override";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
+import { EdgeWarning, IgnoreBoxes, useIgnoreDraft } from "#/components/ignore-boxes";
 import { RerunShot } from "#/components/rerun";
 import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer } from "#/components/snapshot-viewer";
 import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
+import { ignoreAreas } from "#/lib/ignore-areas";
 import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
 import { useReviewKeys } from "#/lib/use-review-keys";
@@ -102,6 +104,8 @@ function SnapshotPage() {
   const { busy, error, decide } = useDecision(project.id, snapshot.id, reviewable);
   const [help, setHelp] = useState(false);
   const flag = useFlagDraft(snapshot.id, data.flags, snapshot.diffResult !== null);
+  const ignore = useIgnoreDraft(snapshot.id);
+  const ignored = ignoreAreas(snapshot, data.uploadedIgnore, ignore.rect);
   const label = useMemo(() => shotLabeller(names)(snapshot.name), [names, snapshot.name]);
 
   const go = useWalk(project.id, build.id);
@@ -139,7 +143,8 @@ function SnapshotPage() {
       />
       <DecisionError error={error} />
       <div className="grid lg:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="min-w-0 p-4">
+        <div className="min-w-0 space-y-3 p-4">
+          <EdgeWarning result={snapshot.diffResult} />
           <SnapshotViewer
             name={snapshot.name}
             mainUrl={images.main}
@@ -148,7 +153,8 @@ function SnapshotPage() {
             result={snapshot.diffResult}
             removed={snapshot.diffStatus === "removed"}
             marks={flag.marks}
-            onDraw={flag.onDraw}
+            onDraw={flag.onDraw ?? ignore.onDraw}
+            ignored={ignored}
           />
         </div>
         <SidePanel
@@ -157,7 +163,12 @@ function SnapshotPage() {
           options={data.diffOptions}
           reviewable={reviewable}
           status={build.status}
-          after={<DiffOverride {...data} />}
+          after={
+            <>
+              <DiffOverride {...data} />
+              <IgnoreBoxes {...data} draft={ignore} />
+            </>
+          }
         >
           <ShotPanels data={data} flag={flag} />
         </SidePanel>

@@ -5,7 +5,8 @@ import { snapshotDiffOptions } from "#/db/builds";
 import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
 import { isMarker } from "#/db/markers";
-import { settingsOverrides, snapshotOverrides } from "#/db/override-export";
+import { settingsOverrides, snapshotIgnoreBoxes, snapshotOverrides } from "#/db/override-export";
+import { uploadedIgnoreSource } from "#/db/ignore-boxes";
 import { overrideChanges } from "#/db/overrides";
 import {
   createOrg,
@@ -238,6 +239,9 @@ export const getSnapshotPage = createServerFn()
       diffOptions: await snapshotDiffOptions(db, snapshot.id),
       /** The review-UI overrides on this shot's test and variant (ob 1495), each with its snippet. */
       overrides: await snapshotOverrides(db, user.id, project.id, snapshot),
+      /** The review-UI ignore boxes on this shot's test and variant (ob 1499), and the source of its own. */
+      ignoreBoxes: await snapshotIgnoreBoxes(db, user.id, project.id, snapshot),
+      uploadedIgnore: await uploadedIgnoreSource(db, snapshot.id),
       /** Every reviewer's detection flag on this shot (ob 1721); the viewer's own is `mine`. */
       flags: await snapshotFlags(db, {
         userId: user.id,

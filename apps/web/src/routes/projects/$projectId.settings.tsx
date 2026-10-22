@@ -4,6 +4,7 @@ import { Body, Callout, Pill, SectionHeading } from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
+import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { OverrideSettings } from "#/components/override-trail";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
@@ -82,6 +83,12 @@ function ProjectSettings() {
       </section>
       <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
       <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
+      <IgnoreBoxSettings
+        projectId={project.id}
+        boxes={overrides.boxes}
+        trail={overrides.boxTrail}
+        hydrated={hydrated}
+      />
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
         <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
         <Body as="p" className="mb-3">

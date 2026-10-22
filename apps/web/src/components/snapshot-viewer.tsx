@@ -4,6 +4,8 @@ import { type Crop, changeCrop } from "../../../../packages/engine/src/report-cr
 import {
   DrawLayer,
   FlagMarks,
+  type IgnoreArea,
+  IgnoreAreas,
   RegionBoxes,
   type Scale,
   Viewport,
@@ -70,10 +72,20 @@ function Segmented<T extends string>({
   );
 }
 
-/** The flagged areas on a shot, and the layer that draws a new one while drawing is on. */
-function Marked({ width, height, marks, onDraw }: { width: number; height: number } & Marking) {
+/**
+ * The ignored areas and flagged areas on a shot, and the layer that draws a new one while drawing
+ * is on.
+ */
+function Marked({
+  width,
+  height,
+  marks,
+  onDraw,
+  ignored,
+}: { width: number; height: number } & Marking) {
   return (
     <>
+      {ignored.length > 0 && <IgnoreAreas width={width} height={height} areas={ignored} />}
       {marks.length > 0 && <FlagMarks width={width} height={height} marks={marks} />}
       {onDraw && <DrawLayer width={width} height={height} onDraw={onDraw} />}
     </>
@@ -93,6 +105,7 @@ function Pane({
   crop,
   marks,
   onDraw,
+  ignored,
 }: {
   label: string;
   caption: string | null;
@@ -119,7 +132,13 @@ function Pane({
               <RegionBoxes width={width} height={height} regions={boxes} />
             )}
             {width && height && (
-              <Marked width={width} height={height} marks={marks} onDraw={onDraw} />
+              <Marked
+                width={width}
+                height={height}
+                marks={marks}
+                onDraw={onDraw}
+                ignored={ignored}
+              />
             )}
           </div>
         </Viewport>
@@ -132,8 +151,14 @@ function Pane({
   );
 }
 
-/** Flagged areas to show, and while one is being drawn, where it goes. Side by side only. */
-type Marking = { marks: IgnoreRect[]; onDraw: ((rect: IgnoreRect) => void) | null };
+/**
+ * Flagged and ignored areas to show, and while one is being drawn, where it goes. Side by side only.
+ */
+type Marking = {
+  marks: IgnoreRect[];
+  onDraw: ((rect: IgnoreRect) => void) | null;
+  ignored: IgnoreArea[];
+};
 
 type Shots = {
   name: string;
@@ -156,8 +181,9 @@ function SideBySide({
   crop,
   marks,
   onDraw,
+  ignored,
 }: Shots & Marking & { regions: DiffResult["regions"] | null; scale: Scale; crop: Crop | null }) {
-  const marking = { marks, onDraw };
+  const marking = { marks, onDraw, ignored };
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Pane
@@ -252,19 +278,29 @@ function overlapDraw(onDraw: Marking["onDraw"], result: DiffResult | null): Mark
   };
 }
 
+/** The crop to the measured change; none when nothing was measured. */
+function cropOf(result: DiffResult | null): Crop | null {
+  return result ? changeCrop(result.regions, result.width, result.height) : null;
+}
+
 /**
  * The three ways to look at one shot, each at the chosen scale and with or without the measured
  * boxes. Boxes are drawn from the regions the diff stored, nothing is recomputed here; when the two
  * shots differ in size only the measured overlap carries boxes, and the zoom crop is clipped to it.
  */
-export function SnapshotViewer({ marks = [], onDraw = null, ...shots }: Shots & Partial<Marking>) {
+export function SnapshotViewer({
+  marks = [],
+  onDraw = null,
+  ignored = [],
+  ...shots
+}: Shots & Partial<Marking>) {
   const [chosen, setMode] = useState<Mode>("side");
   // An area is drawn on Main or Branch as they stand; overlay and slider move the images around.
   const mode = onDraw ? "side" : chosen;
   const [scale, setScale] = useState<Scale>("fit");
   const [highlight, setHighlight] = useState(true);
   const { result } = shots;
-  const crop = result ? changeCrop(result.regions, result.width, result.height) : null;
+  const crop = cropOf(result);
   const view = { highlight, scale, crop };
   const draw = overlapDraw(onDraw, result);
   return (
@@ -286,6 +322,7 @@ export function SnapshotViewer({ marks = [], onDraw = null, ...shots }: Shots & 
           {...view}
           marks={marks}
           onDraw={draw}
+          ignored={ignored}
         />
       )}
       {mode === "overlay" && <SnapshotOverlay {...shots} {...view} />}

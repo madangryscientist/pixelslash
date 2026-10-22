@@ -34,7 +34,7 @@ function overrideInput(d: unknown): DiffOptions {
   }
 }
 
-function scopeInput(d: unknown): "test" | "variant" {
+export function scopeInput(d: unknown): "test" | "variant" {
   const scope = field(d, "scope");
   if (scope !== "test" && scope !== "variant") throw new Error("scope must be test or variant");
   return scope;

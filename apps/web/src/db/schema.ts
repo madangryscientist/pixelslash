@@ -184,6 +184,7 @@ export type {
   OptionSource,
   RegionKind,
   ResolvedDiff,
+  UiIgnoreBox,
 } from "./diff-json";
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;

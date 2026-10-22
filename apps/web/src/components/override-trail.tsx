@@ -9,7 +9,7 @@ import { clearDiffOverride } from "#/server/overrides";
 
 /** Review-UI diff overrides (ob 1495) on the settings and build pages: the list, the audit trail. */
 
-type Variant = { platform: string; browser: string; viewport: string; theme: string };
+export type Variant = { platform: string; browser: string; viewport: string; theme: string };
 
 type Change = {
   id: string;
@@ -30,9 +30,9 @@ type Listed = {
   snippet: string;
 };
 
-const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
+export const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
-const variantLabel = (v: Variant | null) =>
+export const variantLabel = (v: Variant | null) =>
   v ? `${v.platform} · ${v.browser} · ${v.viewport} · ${v.theme}` : "every variant";
 
 /** `threshold 0.1, minChangedPixels 100`; none is the config's values. */
@@ -134,14 +134,17 @@ function ClearButton({
   );
 }
 
-/** The settings page's section: every override, clear one, export them all, and the trail. */
+/**
+ * The settings page's section: every override, clear one, export them all (with the ignore boxes,
+ * ob 1499), and the trail.
+ */
 export function OverrideSettings({
   projectId,
   overrides,
   hydrated,
 }: {
   projectId: string;
-  overrides: { list: Listed[]; changes: Change[]; exported: string };
+  overrides: { list: Listed[]; changes: Change[]; boxes: unknown[]; exported: string };
   hydrated: boolean;
 }) {
   return (
@@ -188,14 +191,16 @@ export function OverrideSettings({
           </tbody>
         </table>
       )}
-      {overrides.list.length > 0 && (
+      {(overrides.list.length > 0 || overrides.boxes.length > 0) && (
         <details className="mt-4 text-sm" data-testid="override-export">
           <summary className="cursor-pointer text-violet-700">Export as config</summary>
           <p className="mt-2 text-slate-600">
-            Merge each route&apos;s <code>diff</code> and <code>variants</code> into the route of
-            that name in <code>pixelslash.config.json</code>, then clear the overrides here: the
-            builds measure the same. A key the config already sets on that variant beats a
-            route&apos;s; move it to the variant.
+            Merge each route&apos;s <code>diff</code>, <code>ignore</code> and <code>variants</code>{" "}
+            into the route of that name in <code>pixelslash.config.json</code>, then clear the
+            overrides and ignore boxes here: the builds measure the same. A key the config already
+            sets on that variant beats a route&apos;s; move it to the variant. Ignore boxes are in
+            image px, the config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise
+            divide by it.
           </p>
           <div className="mt-2 flex justify-end">
             <CopyButton text={overrides.exported} hydrated={hydrated} />

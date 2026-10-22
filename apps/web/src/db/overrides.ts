@@ -50,9 +50,9 @@ export class OverrideError extends Error {
   }
 }
 
-const NO_VARIANT: VariantKey = { platform: "", browser: "", viewport: "", theme: "" };
+export const NO_VARIANT: VariantKey = { platform: "", browser: "", viewport: "", theme: "" };
 
-function variantOf(row: VariantKey): VariantKey | null {
+export function variantOf(row: VariantKey): VariantKey | null {
   return row.platform === "" && row.browser === "" && row.viewport === "" && row.theme === ""
     ? null
     : { platform: row.platform, browser: row.browser, viewport: row.viewport, theme: row.theme };

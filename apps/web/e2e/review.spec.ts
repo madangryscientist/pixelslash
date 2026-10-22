@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +13,7 @@ import { expectProjectFlag, flagFalsePositive } from "./detection-flag";
 import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
+import { rivalContext, rivalSession } from "./rival";
 import { checkSnapshotViewer } from "./snapshot-viewer";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -176,47 +176,8 @@ function group(page: Page, name: string) {
   return page.getByTestId(`group-${name}`);
 }
 
-/** A rival member: a real user in another org, with a session inserted straight into D1. */
-/** One statement against the running e2e D1, as the wrangler CLI does. */
-function sql(command: string) {
-  return spawnSync(
-    "bunx",
-    [
-      "wrangler",
-      "d1",
-      "execute",
-      "DB",
-      "--local",
-      "--env",
-      "e2e",
-      "--persist-to",
-      ".wrangler/e2e",
-      "--command",
-      command,
-    ],
-    { cwd: WEB, encoding: "utf8" },
-  );
-}
-
-async function rivalSession(): Promise<string> {
-  const token = "pss_e2e_rival";
-  const hash = createHash("sha256").update(token).digest("hex");
-  const user = sql("INSERT INTO users (id, github_id, login) VALUES ('rival-user', 9999, 'rival')");
-  const org = sql("INSERT INTO orgs (id, name) VALUES ('rival-org', 'Rival Co')");
-  const member = sql("INSERT INTO members (org_id, user_id) VALUES ('rival-org', 'rival-user')");
-  const session = sql(
-    `INSERT INTO sessions (id, user_id, expires_at) VALUES ('${hash}', 'rival-user', ${Date.now() + 3_600_000})`,
-  );
-  for (const result of [user, org, member, session]) {
-    if (result.status !== 0) throw new Error(`seeding the rival failed: ${result.stderr}`);
-  }
-  return token;
-}
-
 async function rivalGets404(browser: Browser, projectId: string, buildId: string) {
-  const token = await rivalSession();
-  const context = await browser.newContext();
-  await context.addCookies([{ name: "ps_session", value: token, url: SERVER }]);
+  const context = await rivalContext(browser, await rivalSession());
   const page = await context.newPage();
   await page.goto("/orgs");
   await expect(page.getByRole("heading", { name: "Rival Co" })).toBeVisible();

@@ -271,7 +271,7 @@ export function SidePanel({
   options: DiffOptions;
   reviewable: boolean;
   status: string;
-  /** Below the options: the override form, which edits them (ob 1495). */
+  /** Below the options: the override form, which edits them (ob 1495), and the ignore boxes (ob 1499). */
   after?: ReactNode;
   /** The detection flags and the flake, first: a second reviewer reads them before deciding. */
   children?: ReactNode;

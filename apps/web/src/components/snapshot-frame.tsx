@@ -219,3 +219,52 @@ export function DrawLayer({
     </div>
   );
 }
+
+/** Where an ignore area came from: drawn in the review UI, or uploaded with the shot. */
+export type IgnoreSource = "UI" | "config" | "manifest";
+
+export type IgnoreArea = { rect: IgnoreRect; source: IgnoreSource };
+
+/** The report's hatch, so an area ignored here reads the same as one ignored there. */
+const HATCH =
+  "repeating-linear-gradient(45deg, rgba(94,200,255,.55) 0 3px, rgba(0,0,0,.35) 3px 7px)";
+
+/**
+ * The areas left out of the diff over an image `width`×`height` px, hatched and labelled with where
+ * each came from. Placed in percent of the image, so they sit right at any scale.
+ */
+export function IgnoreAreas({
+  width,
+  height,
+  areas,
+}: {
+  width: number;
+  height: number;
+  areas: IgnoreArea[];
+}) {
+  return (
+    <div aria-label="Ignored areas" className="pointer-events-none absolute inset-0">
+      {areas.map(({ rect, source }, i) => (
+        <div
+          // Areas are listed in a fixed order for one page load: the index is a stable key.
+          key={i}
+          data-testid="ignore-box"
+          data-source={source}
+          title={`ignored (${source}): ${rect.width}×${rect.height} at ${rect.x},${rect.y}`}
+          className="absolute border border-[#5ec8ff]"
+          style={{
+            left: `${(rect.x / width) * 100}%`,
+            top: `${(rect.y / height) * 100}%`,
+            width: `${(rect.width / width) * 100}%`,
+            height: `${(rect.height / height) * 100}%`,
+            background: HATCH,
+          }}
+        >
+          <span className="absolute top-0 left-0 bg-sky-800 px-1 text-[10px] leading-tight text-white">
+            {source}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}

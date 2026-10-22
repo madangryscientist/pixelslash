@@ -58,3 +58,35 @@ export const diffOverrideChanges = sqliteTable(
   },
   (t) => [index("diff_override_changes_project_idx").on(t.projectId, t.at)],
 );
+
+/**
+ * An ignore box drawn in the review UI (ob 1499): a rectangle in image px the server diff skips on
+ * one test, for every variant (the four variant columns `""`) or for one. Unioned with the shot's
+ * uploaded ignore areas. Clearing one stamps `cleared_*` rather than deleting it, so the row is
+ * its own audit trail: who drew it and when, who cleared it and when.
+ */
+export const ignoreBoxes = sqliteTable(
+  "ignore_boxes",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    platform: text("platform").notNull().default(""),
+    browser: text("browser").notNull().default(""),
+    viewport: text("viewport").notNull().default(""),
+    theme: text("theme").notNull().default(""),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    clearedBy: text("cleared_by").references(() => users.id),
+    clearedAt: integer("cleared_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("ignore_boxes_project_idx").on(t.projectId, t.name)],
+);
