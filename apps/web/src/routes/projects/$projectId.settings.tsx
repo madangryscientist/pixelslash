@@ -5,6 +5,7 @@ import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
+import { ModelSettings } from "#/components/model-settings";
 import { OverrideSettings } from "#/components/override-trail";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
 const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 function ProjectSettings() {
-  const { project, org, tokens, overrides, serverUrl } = Route.useLoaderData();
+  const { project, org, tokens, overrides, model, serverUrl } = Route.useLoaderData();
   const router = useRouter();
   const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
@@ -89,19 +90,26 @@ function ProjectSettings() {
         trail={overrides.boxTrail}
         hydrated={hydrated}
       />
-      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
-        <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
-        <Body as="p" className="mb-3">
-          From CI or your machine, with the token in{" "}
-          <span className="font-mono text-[13px]">PIXELSLASH_TOKEN</span>:
-        </Body>
-        <CopyLine
-          text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}
-          hydrated={hydrated}
-          testId="upload-command"
-        />
-      </section>
+      <ModelSettings projectId={project.id} saved={model} hydrated={hydrated} />
+      <UploadCommand serverUrl={serverUrl} hydrated={hydrated} />
     </Page>
+  );
+}
+
+function UploadCommand({ serverUrl, hydrated }: { serverUrl: string; hydrated: boolean }) {
+  return (
+    <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
+      <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
+      <Body as="p" className="mb-3">
+        From CI or your machine, with the token in{" "}
+        <span className="font-mono text-[13px]">PIXELSLASH_TOKEN</span>:
+      </Body>
+      <CopyLine
+        text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}
+        hydrated={hydrated}
+        testId="upload-command"
+      />
+    </section>
   );
 }
 

@@ -84,7 +84,7 @@
       }
     },
     {
-      "files": ["src/lib/log.ts", "scripts/**"],
+      "files": ["apps/web/src/lib/log.ts", "scripts/**"],
       "rules": {
         "no-console": "off"
       }

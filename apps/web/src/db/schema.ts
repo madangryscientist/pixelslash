@@ -1,6 +1,13 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
-import type { DiffOptions, DiffRegion, DiffResult, IgnoreRect, ResolvedDiff } from "./diff-json";
+import type {
+  AiReview,
+  DiffOptions,
+  DiffRegion,
+  DiffResult,
+  IgnoreRect,
+  ResolvedDiff,
+} from "./diff-json";
 import { isSmoke } from "./synthetic";
 
 export const createdAt = () =>
@@ -93,6 +100,23 @@ export const projects = sqliteTable(
   (t) => [unique().on(t.orgId, t.name)],
 );
 
+/**
+ * The project's own OpenAI-compatible vision model (ob 1473), which explains the changed regions.
+ * No row, no model: shots go to no model the project did not name. A table of its own so the key
+ * never rides along with a `projects` row to a page; only `src/db/models.ts` reads it.
+ */
+export const projectModels = sqliteTable("project_models", {
+  projectId: text("project_id")
+    .primaryKey()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  baseUrl: text("base_url").notNull(),
+  model: text("model").notNull(),
+  apiKey: text("api_key").notNull(),
+  /** A shot whose every `change` region the model labels noise is accepted without a reviewer. */
+  autoPassNoise: integer("auto_pass_noise", { mode: "boolean" }).notNull().default(false),
+  createdAt: createdAt(),
+});
+
 /** A CI token is shown once at issue; only its SHA-256 and a display prefix are stored. */
 export const ciTokens = sqliteTable(
   "ci_tokens",
@@ -177,6 +201,9 @@ export const builds = sqliteTable(
 );
 
 export type {
+  AiLabel,
+  AiRegionNote,
+  AiReview,
   DiffOptions,
   DiffRegion,
   DiffResult,
@@ -186,6 +213,7 @@ export type {
   ResolvedDiff,
   UiIgnoreBox,
 } from "./diff-json";
+export { AI_LABELS } from "./diff-json";
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;
 export const REVIEW_STATES = ["pending", "accepted", "rejected"] as const;
@@ -310,6 +338,8 @@ export const snapshots = sqliteTable(
      * only: no review state, threshold or exit code reads it.
      */
     changeNote: text("change_note"),
+    /** The project's model on each `change` region (ob 1473); null when no model explained one. */
+    aiReview: text("ai_review", { mode: "json" }).$type<AiReview>(),
     createdAt: createdAt(),
   },
   (t) => [

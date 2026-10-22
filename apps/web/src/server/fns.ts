@@ -5,6 +5,7 @@ import { snapshotDiffOptions } from "#/db/builds";
 import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
 import { isMarker } from "#/db/markers";
+import { projectModelView } from "#/db/models";
 import { settingsOverrides, snapshotIgnoreBoxes, snapshotOverrides } from "#/db/override-export";
 import { uploadedIgnoreSource } from "#/db/ignore-boxes";
 import { overrideChanges } from "#/db/overrides";
@@ -19,13 +20,8 @@ import {
   withdrawInvite,
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
-import {
-  NotReviewableError,
-  acceptAllSnapshots,
-  buildView,
-  isFirstBuild,
-  reviewSnapshot,
-} from "#/db/review";
+import { NotReviewableError, acceptAllSnapshots, buildView, reviewSnapshot } from "#/db/review";
+import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
 import { issueCiToken, listCiTokens, revokeCiToken } from "#/db/tokens";
 import { BadRequest, parseRect } from "#/api/validate";
@@ -133,7 +129,8 @@ export const getProjectSettings = createServerFn()
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const tokens = await listCiTokens(db, user.id, project.id);
     const overrides = await settingsOverrides(db, user.id, project.id);
-    return { org, project, tokens, overrides, serverUrl: getRequestUrl().origin };
+    const model = await projectModelView(db, user.id, project.id);
+    return { org, project, tokens, overrides, model, serverUrl: getRequestUrl().origin };
   });
 
 export const saveDefaultBranch = createServerFn({ method: "POST" })

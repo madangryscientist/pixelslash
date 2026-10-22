@@ -80,3 +80,32 @@ export type DiffResult = {
   /** The shots are different sizes: `changed`, and only the overlap was measured. */
   sizeChanged: boolean;
 };
+
+/** What the project's model said a `change` region is (ob 1473). */
+export const AI_LABELS = ["intended", "unintended", "noise"] as const;
+export type AiLabel = (typeof AI_LABELS)[number];
+
+/** One `change` region the model explained, keyed by its box so it pairs with `regions`. */
+export type AiRegionNote = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: AiLabel;
+  /** One short sentence: what changed in the region. */
+  explanation: string;
+};
+
+/**
+ * The model's account of a shot's `change` regions (ob 1473). It explains what the diff found and
+ * never adds a region: a region it could not explain is left out, and a shot with none explained
+ * stores no review at all, so the page says "skip: no judge".
+ */
+export type AiReview = {
+  model: string;
+  /** Epoch ms of the explanation. */
+  at: number;
+  regions: AiRegionNote[];
+  /** The project opted in and every `change` region was labelled noise: accepted without a reviewer. */
+  autoPassed: boolean;
+};

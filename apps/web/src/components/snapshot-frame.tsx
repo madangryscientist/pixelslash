@@ -1,5 +1,6 @@
 import { type PointerEvent, type ReactNode, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
+import { useRegionNote } from "#/components/ai-notes";
 import type { DiffRegion, IgnoreRect } from "#/db/schema";
 
 /** How big a shot is drawn: fitted to its pane, at its own pixels, or cropped to the change. */
@@ -33,25 +34,34 @@ export function RegionBoxes({
       className="pointer-events-none absolute inset-0 h-full w-full"
     >
       {regions.map((region, i) => (
-        <rect
-          // Regions come from one measurement of this image: the index is a stable key.
-          key={i}
-          data-kind={region.kind}
-          x={region.x}
-          y={region.y}
-          width={region.w}
-          height={region.h}
-          fill={REGION_COLOURS[region.kind]}
-          fillOpacity={0.12}
-          stroke={REGION_COLOURS[region.kind]}
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
-        >
-          {/* One string: a title of several text nodes does not hydrate (React #418). */}
-          <title>{`${region.kind}: ${region.changedPixels} px${region.why ? ` · ${region.why}` : ""}`}</title>
-        </rect>
+        // Regions come from one measurement of this image: the index is a stable key.
+        <RegionBox key={i} region={region} />
       ))}
     </svg>
+  );
+}
+
+/** One region's box; its title carries the model's label and sentence when it gave one (ob 1473). */
+function RegionBox({ region }: { region: DiffRegion }) {
+  const note = useRegionNote(region);
+  const ai = note ? ` · AI ${note.label}: ${note.explanation}` : "";
+  return (
+    <rect
+      data-kind={region.kind}
+      data-ai-label={note?.label}
+      x={region.x}
+      y={region.y}
+      width={region.w}
+      height={region.h}
+      fill={REGION_COLOURS[region.kind]}
+      fillOpacity={0.12}
+      stroke={REGION_COLOURS[region.kind]}
+      strokeWidth={2}
+      vectorEffect="non-scaling-stroke"
+    >
+      {/* One string: a title of several text nodes does not hydrate (React #418). */}
+      <title>{`${region.kind}: ${region.changedPixels} px${region.why ? ` · ${region.why}` : ""}${ai}`}</title>
+    </rect>
   );
 }
 

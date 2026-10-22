@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo, useState } from "react";
 import { navTabClass } from "@hackcove/ui";
+import { aiFiltered } from "#/components/ai-notes";
 import { ShotCard, measured } from "#/components/shot-card";
 import { ReviewChip } from "#/components/ui";
 import type { SnapshotView } from "#/db/review";
 import { BUILD_TABS, type BuildTab } from "#/lib/build-tabs";
-import { shotLabeller } from "#/lib/shot-label";
+import { type ShotLabel, shotLabeller } from "#/lib/shot-label";
 import { GROUP_LABEL, type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
 
 export function Tabs({
@@ -160,23 +161,16 @@ export function TabBody({
     );
   }
   if (tab === "changed" || tab === "new") {
-    const rows = inGroup(tab);
     return (
-      <GroupSection group={tab} count={rows.length} heading={false}>
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">
-          {rows.map((shot) => (
-            <ShotCard
-              key={shot.id}
-              projectId={projectId}
-              buildId={buildId}
-              shot={shot}
-              label={label(shot.name)}
-              src={thumbs[shot.id]}
-              baseline={baseline}
-            />
-          ))}
-        </ul>
-      </GroupSection>
+      <CardGroups
+        projectId={projectId}
+        buildId={buildId}
+        group={tab}
+        rows={inGroup(tab)}
+        label={label}
+        thumbs={thumbs}
+        baseline={baseline}
+      />
     );
   }
   if (tab === "unchanged") {
@@ -201,6 +195,61 @@ export function TabBody({
           />
         </GroupSection>
       ))}
+    </>
+  );
+}
+
+/** A changed or new tab's cards; those the project's model auto-passed as noise below, in their own group (ob 1473). */
+function CardGroups({
+  projectId,
+  buildId,
+  group,
+  rows,
+  label,
+  thumbs,
+  baseline,
+}: {
+  projectId: string;
+  buildId: string;
+  group: "changed" | "new";
+  rows: SnapshotView[];
+  label: (name: string) => ShotLabel;
+  thumbs: Record<string, string>;
+  baseline: boolean;
+}) {
+  const cards = (shots: SnapshotView[]) => (
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">
+      {shots.map((shot) => (
+        <ShotCard
+          key={shot.id}
+          projectId={projectId}
+          buildId={buildId}
+          shot={shot}
+          label={label(shot.name)}
+          src={thumbs[shot.id]}
+          baseline={baseline}
+        />
+      ))}
+    </ul>
+  );
+  const filtered = rows.filter(aiFiltered);
+  return (
+    <>
+      <GroupSection group={group} count={rows.length - filtered.length} heading={false}>
+        {cards(rows.filter((shot) => !aiFiltered(shot)))}
+      </GroupSection>
+      {filtered.length > 0 && (
+        <section data-testid="group-ai-filtered" className="mb-8">
+          <h2 className="mb-1 text-lg font-semibold">
+            AI-filtered <span className="text-slate-500">({filtered.length})</span>
+          </h2>
+          <p className="mb-3 text-sm text-slate-600">
+            Accepted without a person: the project&apos;s model labelled every changed region noise.
+            Open one to reject it.
+          </p>
+          {cards(filtered)}
+        </section>
+      )}
     </>
   );
 }

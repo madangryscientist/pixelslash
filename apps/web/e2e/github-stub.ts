@@ -1,6 +1,7 @@
 /**
  * A stand-in for github.com and api.github.com, enough for the OAuth web flow: authorize
- * bounces straight back with a code, the code buys a token, the token reads one fixed user.
+ * bounces straight back with a code, the code buys a token, the token reads one fixed user. It also
+ * answers as a project's model, so no e2e run sends a shot anywhere else.
  */
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 
@@ -13,6 +14,8 @@ function readJson(req: IncomingMessage): Promise<unknown> {
     req.on("end", () => resolve(JSON.parse(raw)));
   });
 }
+
+const STUB_MODEL_ANSWER = "LABEL noise\nWHY Text edges moved by a sub-pixel.";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<void> | void;
 
@@ -38,6 +41,13 @@ const ROUTES: Record<string, Handler> = {
   },
   "/user": (req, res) => {
     if (req.headers.authorization === "Bearer stub-token") json(res, STUB_USER);
+    else res.writeHead(401).end();
+  },
+  // An OpenAI-compatible vision endpoint for a project's own model (ob 1473): every region is noise.
+  "/v1/chat/completions": async (req, res) => {
+    await readJson(req);
+    if (req.headers.authorization === "Bearer sk-e2e-model")
+      json(res, { choices: [{ message: { role: "assistant", content: STUB_MODEL_ANSWER } }] });
     else res.writeHead(401).end();
   },
 };

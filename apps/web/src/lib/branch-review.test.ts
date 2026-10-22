@@ -58,6 +58,7 @@ const view = (name: string, over: Partial<SnapshotView> = {}): SnapshotView => (
   mainDiffStatus: null,
   mainDiffResult: null,
   changeNote: null,
+  aiReview: null,
   createdAt: new Date(0),
   ...over,
 });

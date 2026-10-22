@@ -7,13 +7,8 @@ import { createBuild } from "./builds";
 import { NotFoundError } from "./db";
 import { builds as buildRows } from "./schema";
 import { listBuilds } from "./build-list";
-import {
-  NotReviewableError,
-  acceptAllSnapshots,
-  buildView,
-  isFirstBuild,
-  reviewSnapshot,
-} from "./review";
+import { NotReviewableError, acceptAllSnapshots, buildView, reviewSnapshot } from "./review";
+import { isFirstBuild } from "./first-build";
 
 const block = { x: 8, y: 8, w: 12, h: 12, rgb: RED };
 

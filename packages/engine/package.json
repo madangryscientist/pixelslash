@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./diff": "./src/diff.ts",
-    "./ci-diff": "./src/ci-diff.ts"
+    "./ci-diff": "./src/ci-diff.ts",
+    "./region-crops": "./src/region-crops.ts"
   },
   "dependencies": {
     "playwright": "1.60.0",

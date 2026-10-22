@@ -2,7 +2,7 @@ import { redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { branchView } from "#/db/branch-view";
 import { getProjectWithOrg } from "#/db/orgs";
-import { isFirstBuild } from "#/db/review";
+import { isFirstBuild } from "#/db/first-build";
 import { signedImagePath } from "#/storage/signed";
 import { database, imageSigningSecret } from "./env";
 import { field, or404 } from "./input";

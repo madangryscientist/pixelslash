@@ -6,6 +6,7 @@ import type { Db } from "#/db/db";
 import type { SentFlake } from "#/db/flakes";
 import { type FlakyPolicy, snapshots } from "#/db/schema";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
+import type { ModelFetch } from "#/ai/model";
 import { processBuild } from "./process";
 
 /** Uploading and diffing whole builds, as the CI API does. Tests only. */
@@ -89,7 +90,8 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
  * front of the diff only, so a failure there is not the store the assertions read back from;
- * `blobs` does the same for the images; `diff` stands in for the engine's diff.
+ * `blobs` does the same for the images; `diff` stands in for the engine's diff; `modelFetch` for
+ * the project's model.
  */
 export async function upload(
   ctx: Uploads,
@@ -99,10 +101,17 @@ export async function upload(
     db = ctx.db,
     blobs = ctx.scoped,
     diff,
-  }: { now?: () => number; db?: Db; blobs?: BlobStore; diff?: typeof diffPngs | undefined } = {},
+    modelFetch,
+  }: {
+    now?: () => number;
+    db?: Db;
+    blobs?: BlobStore;
+    diff?: typeof diffPngs | undefined;
+    modelFetch?: ModelFetch | undefined;
+  } = {},
 ): Promise<Build> {
   const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
-  await processBuild({ db, blobs, now, diff }, done);
+  await processBuild({ db, blobs, now, diff, modelFetch }, done);
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

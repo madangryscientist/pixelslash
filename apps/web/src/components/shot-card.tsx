@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Pill } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { SnapshotView } from "#/db/review";
+import { labelSummary } from "#/components/ai-notes";
 import { FlakyBadge } from "#/components/flake";
 import { ReviewChip } from "#/components/ui";
 import { formatNumber } from "#/lib/format";
@@ -186,6 +187,12 @@ export function ShotCard({
           <p className="mt-2 text-sm text-slate-800" data-testid="shot-change-note">
             <span className="text-slate-500">Judge (local model): </span>
             {shot.changeNote}.
+          </p>
+        )}
+        {shot.aiReview && (
+          <p className="mt-2 text-sm text-slate-800" data-testid="shot-ai-labels">
+            <span className="text-slate-500">AI: </span>
+            {labelSummary(shot.aiReview.regions)}
           </p>
         )}
         <p className="mt-2 text-sm text-slate-600">{line}</p>

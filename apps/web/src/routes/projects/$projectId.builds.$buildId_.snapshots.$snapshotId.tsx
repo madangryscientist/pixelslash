@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
+import { RegionNotesProvider } from "#/components/ai-notes";
 import { DiffOverride } from "#/components/diff-override";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
@@ -145,17 +146,19 @@ function SnapshotPage() {
       <div className="grid lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0 space-y-3 p-4">
           <EdgeWarning result={snapshot.diffResult} />
-          <SnapshotViewer
-            name={snapshot.name}
-            mainUrl={images.main}
-            branchUrl={images.branch}
-            diffUrl={images.diff}
-            result={snapshot.diffResult}
-            removed={snapshot.diffStatus === "removed"}
-            marks={flag.marks}
-            onDraw={flag.onDraw ?? ignore.onDraw}
-            ignored={ignored}
-          />
+          <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
+            <SnapshotViewer
+              name={snapshot.name}
+              mainUrl={images.main}
+              branchUrl={images.branch}
+              diffUrl={images.diff}
+              result={snapshot.diffResult}
+              removed={snapshot.diffStatus === "removed"}
+              marks={flag.marks}
+              onDraw={flag.onDraw ?? ignore.onDraw}
+              ignored={ignored}
+            />
+          </RegionNotesProvider>
         </div>
         <SidePanel
           projectId={project.id}

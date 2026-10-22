@@ -10,6 +10,8 @@ import { NoRecoveryError, claimForRerun } from "./claim";
 import type { SnapshotRow } from "./compare";
 import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
+import { explainBuild } from "#/ai/explain";
+import { runStart } from "./budget";
 
 /**
  * Partial re-runs (ob 1738): measure again only the shots of a build that errored, or one shot
@@ -50,10 +52,10 @@ const resultOf = (row: SnapshotRow) =>
  * overlay keys stay, so the run can drop an overlay it no longer writes.
  */
 async function clearResults(db: Db, targets: SnapshotRow[]): Promise<void> {
-  // The six cleared fields are bound beside the ids.
+  // The seven cleared fields are bound beside the ids.
   for (const part of chunk(
     targets.map((t) => t.id),
-    6,
+    7,
   ))
     await db
       .update(snapshots)
@@ -64,6 +66,7 @@ async function clearResults(db: Db, targets: SnapshotRow[]): Promise<void> {
         diffError: null,
         mainBaselineKey: null,
         mainDiffStatus: null,
+        aiReview: null,
       })
       .where(inArray(snapshots.id, part));
 }
@@ -92,8 +95,17 @@ async function settleReviews(
     0,
     (part) => db.select().from(snapshots).where(inArray(snapshots.id, part)),
   );
-  const prior = new Map(before.map((row) => [row.id, resultOf(row)]));
-  const moved = after.filter((row) => prior.get(row.id) !== resultOf(row)).map((row) => row.id);
+  const prior = new Map(before.map((row) => [row.id, row]));
+  const unmoved = (row: SnapshotRow) => {
+    const was = prior.get(row.id);
+    return was !== undefined && resultOf(was) === resultOf(row);
+  };
+  // Measured the same: the model's explanation of that result stands with the review (ob 1473).
+  for (const row of after.filter(unmoved)) {
+    const aiReview = prior.get(row.id)?.aiReview ?? null;
+    if (aiReview) await db.update(snapshots).set({ aiReview }).where(eq(snapshots.id, row.id));
+  }
+  const moved = after.filter((row) => !unmoved(row)).map((row) => row.id);
   if (moved.length === 0) return;
   await reopenReviews(db, moved);
   if (build.branch !== project.defaultBranch) return;
@@ -145,12 +157,16 @@ export async function rediffShots(
     throw new RerunError(`build is ${build.status}: a diff run holds it or it has no verdict yet`);
   const ids = targets.map((t) => t.id);
   try {
+    const startedAt = runStart(deps.now);
     await clearResults(deps.db, targets);
     const held = rows.filter((row) => !isMarker(row));
     const baselines = await selectBaselines(deps.db, build, new Set(held.map(snapshotKeyOf)));
     const cleared = targets.map((t) => ({ ...t, diffStatus: null, rebaselineNeeded: false }));
     await measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines);
     await settleReviews(deps.db, { build, project }, targets);
+    const status = await refreshBuildStatus(deps.db, build.id);
+    if ((await explainBuild(deps, build, { startedAt, only: ids })) === 0)
+      return { status, error: null, unmeasured: 0 };
     return { status: await refreshBuildStatus(deps.db, build.id), error: null, unmeasured: 0 };
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.

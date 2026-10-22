@@ -23,7 +23,7 @@ import {
   serverComparer,
 } from "./compare";
 import { measureAgainstMain } from "./against-main";
-import { Budget } from "./budget";
+import { Budget, runStart } from "./budget";
 import {
   type ProjectOfBuild,
   acceptDefaultBranchBuild,
@@ -33,6 +33,8 @@ import {
   projectOf,
 } from "./build-writes";
 import { withOverrides } from "./with-overrides";
+import { explainBuild } from "#/ai/explain";
+import type { ModelFetch } from "#/ai/model";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
@@ -58,6 +60,8 @@ export type ProcessDeps = {
   now?: (() => number) | undefined;
   /** The engine's diff; a test passes one that throws to prove a CI build never calls it. */
   diff?: typeof diffPngs | undefined;
+  /** The transport to the project's model (ob 1473); a test passes a stub. */
+  modelFetch?: ModelFetch | undefined;
 };
 
 /**
@@ -112,6 +116,7 @@ async function storeUncompared(
           measuredBy: null,
           engineVersion: null,
           diffError: null,
+          aiReview: null,
         }
       : {
           diffStatus: "new",
@@ -124,6 +129,7 @@ async function storeUncompared(
           measuredBy: null,
           engineVersion: null,
           diffError: null,
+          aiReview: null,
         },
   );
   // Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot.
@@ -149,6 +155,8 @@ async function storeDiff(
     measuredBy: measured.measuredBy,
     engineVersion: measured.engineVersion,
     diffError: null,
+    // An explanation was of the result this one replaces (ob 1473).
+    aiReview: null,
   });
 }
 
@@ -357,6 +365,7 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
   if (ci && build.status === "errored") throw new NoRecoveryError();
   if (!(await claim(deps.db, build, ci))) return heldElsewhere(deps.db, build, ci);
   try {
+    const startedAt = runStart(deps.now);
     await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
     const baselines: Baselines = await selectBaselines(
@@ -368,7 +377,10 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     await markRemoved(deps, build, baselines.removed);
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
-    return { status, error: null, unmeasured: 0 };
+    // After the verdict, so a run the Worker stops while the model is asked has already given one.
+    if ((await explainBuild(deps, build, { startedAt })) === 0)
+      return { status, error: null, unmeasured: 0 };
+    return { status: await refreshBuildStatus(deps.db, build.id), error: null, unmeasured: 0 };
   } catch (e) {
     await markErrored(deps.db, build, e);
     // The ceiling's count includes shots a changed baseline sends back to be measured again, which

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { AiExplanation } from "#/components/ai-notes";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions, OptionSource } from "#/db/schema";
 import { formatDateTime, formatNumber } from "#/lib/format";
@@ -286,6 +287,7 @@ export function SidePanel({
       {children}
       <Carried projectId={projectId} snapshot={snapshot} />
       <ApprovedEarlier projectId={projectId} snapshot={snapshot} />
+      <AiExplanation snapshot={snapshot} />
       <Measured snapshot={snapshot} />
       <Environment snapshot={snapshot} />
       <Options snapshot={snapshot} options={options} />
