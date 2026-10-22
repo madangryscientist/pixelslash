@@ -1,6 +1,6 @@
 {
   "updated": "2026-10-20",
-  "ours_commit": "3969ae0",
+  "ours_commit": "b97e714",
   "method": "Our column is read from the code at {commit}: a yes means it exists in the code and is exercised by the gate where it has a test, not that a customer can reach it. The other five are their public docs, fetched {date}. A ? means the docs did not say, not that the tool lacks it.",
   "tools": [
     {
@@ -40,7 +40,7 @@
       "label": "Capture a page pair by URL",
       "ps": {
         "v": "y",
-        "note": "pair mode, or --routes over an origin"
+        "note": "pair mode, or --routes over an origin; pages behind sign-in via a config setup script (ob 1710)"
       },
       "t": {
         "argos": "y",
@@ -141,8 +141,8 @@
       "k": "browsers",
       "label": "More than one browser engine",
       "ps": {
-        "v": "p",
-        "note": "config takes a browser; the image ships chromium only"
+        "v": "n",
+        "note": "chromium only: a variant naming another browser is a config error, because the image ships one"
       },
       "t": {
         "argos": "y",
@@ -448,7 +448,7 @@
       "label": "Accept / reject in a web UI",
       "ps": {
         "v": "y",
-        "note": "project / build / snapshot pages; accept or reject records who and when; Playwright e2e"
+        "note": "project / build / snapshot pages and a branch page (the branch against main, plus what changed since its last build, ob 1723); accept or reject records who and when; a mis-detection can be flagged and kept (ob 1721); Playwright e2e"
       },
       "t": {
         "argos": "y",
@@ -516,7 +516,7 @@
       "label": "CI tokens",
       "ps": {
         "v": "y",
-        "note": "psci_ token per project, env or file"
+        "note": "psci_ token per project, env or file; psu_ personal tokens the CLI and MCP act as their user with (ob 1728)"
       },
       "t": {
         "argos": "y",
@@ -550,7 +550,7 @@
       "label": "Documented upload API",
       "ps": {
         "v": "y",
-        "note": "upload and capture --upload; read API for projects, builds, shots, image URLs"
+        "note": "upload and capture --upload; /api/v1, a stable additive-only contract: projects, builds, snapshots, images, baselines, detection flags, flakes (ob 1729)"
       },
       "t": {
         "argos": "y",
@@ -567,7 +567,7 @@
       "label": "Self-hosting",
       "ps": {
         "v": "p",
-        "note": "DB and blob seams are swappable; nothing shipped"
+        "note": "the review app runs on your own box from a local build (LAN deploy units, apps/web/README), but sign-in is a GitHub stand-in and there is no self-host guide; DB and blob seams are swappable"
       },
       "t": {
         "argos": "p",
@@ -584,7 +584,7 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732); `dev` re-diffs one page on every save, locally (ob 1740)"
+        "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading (ob 1732); `dev` re-diffs one page on every save, locally (ob 1740); the MCP fix loop takes shots locally and only reads the server, bar resolving a flake (ob 1735)"
       },
       "t": {
         "argos": "n",
@@ -652,7 +652,7 @@
       "label": "Documented retention",
       "ps": {
         "v": "n",
-        "note": "no hosted product to retain"
+        "note": "the review app keeps every build and shot: nothing expires; the map decides PR builds and diffs keep 30 days, and no code does it yet"
       },
       "t": {
         "argos": "y",
@@ -661,7 +661,7 @@
         "applitools": "p",
         "lost": "?"
       },
-      "plan": "not planned"
+      "plan": ""
     },
     {
       "g": "platform",
@@ -669,7 +669,7 @@
       "label": "Free tier / OSS plan",
       "ps": {
         "v": "n",
-        "note": "no pricing exists yet"
+        "note": "no pricing in the code; the shape is decided (bill changed shots only), price points wait on beta cost data"
       },
       "t": {
         "argos": "y",
@@ -678,7 +678,7 @@
         "applitools": "n",
         "lost": "y"
       },
-      "plan": "ob 1426"
+      "plan": "ob 1475"
     },
     {
       "g": "platform",
