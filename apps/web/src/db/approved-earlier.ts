@@ -1,4 +1,5 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
+import { inChunks } from "./chunks";
 import type { Db } from "./db";
 import { builds, projects, snapshots, users } from "./schema";
 
@@ -30,30 +31,35 @@ type Waiting = Map<string, string[]>;
 const wait = (waiting: Waiting, baselineId: string, ids: string[]) =>
   waiting.set(baselineId, [...(waiting.get(baselineId) ?? []), ...ids]);
 
-/** The baseline shots of one hop, on the same branch and not this build: another branch ends the walk. */
+/**
+ * The baseline shots of one hop, on the same branch and not this build: another branch ends the walk.
+ * The ids are sent in parts: beside them the statement binds the project, the branch and the build.
+ */
 function readLinks(db: Db, build: Build, ids: string[]) {
-  return db
-    .select({
-      id: snapshots.id,
-      buildId: snapshots.buildId,
-      diffStatus: snapshots.diffStatus,
-      reviewState: snapshots.reviewState,
-      reviewedAt: snapshots.reviewedAt,
-      reviewedBy: users.login,
-      baselineSnapshotId: snapshots.baselineSnapshotId,
-      commitSha: builds.commitSha,
-    })
-    .from(snapshots)
-    .innerJoin(builds, eq(builds.id, snapshots.buildId))
-    .leftJoin(users, eq(users.id, snapshots.reviewedBy))
-    .where(
-      and(
-        inArray(snapshots.id, ids),
-        eq(builds.projectId, build.projectId),
-        eq(builds.branch, build.branch),
-        ne(builds.id, build.id),
+  return inChunks(ids, 3, (part) =>
+    db
+      .select({
+        id: snapshots.id,
+        buildId: snapshots.buildId,
+        diffStatus: snapshots.diffStatus,
+        reviewState: snapshots.reviewState,
+        reviewedAt: snapshots.reviewedAt,
+        reviewedBy: users.login,
+        baselineSnapshotId: snapshots.baselineSnapshotId,
+        commitSha: builds.commitSha,
+      })
+      .from(snapshots)
+      .innerJoin(builds, eq(builds.id, snapshots.buildId))
+      .leftJoin(users, eq(users.id, snapshots.reviewedBy))
+      .where(
+        and(
+          inArray(snapshots.id, part),
+          eq(builds.projectId, build.projectId),
+          eq(builds.branch, build.branch),
+          ne(builds.id, build.id),
+        ),
       ),
-    );
+  );
 }
 
 type Link = Awaited<ReturnType<typeof readLinks>>[number];

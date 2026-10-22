@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { SnapshotKey } from "./baselines";
+import { inChunks } from "./chunks";
 import type { Db } from "./db";
 import { getProjectWithOrg } from "./orgs";
 import { NotFoundError } from "./db";
@@ -277,17 +278,22 @@ export async function overrideChanges(
 ): Promise<OverrideChange[]> {
   await getProjectWithOrg(db, userId, projectId);
   if (names?.length === 0) return [];
-  const rows = await db
-    .select({ row: diffOverrideChanges, login: users.login })
-    .from(diffOverrideChanges)
-    .innerJoin(users, eq(users.id, diffOverrideChanges.userId))
-    .where(
-      and(
-        eq(diffOverrideChanges.projectId, projectId),
-        names ? inArray(diffOverrideChanges.name, names) : undefined,
-      ),
-    )
-    .orderBy(desc(diffOverrideChanges.at));
+  const read = (part?: string[]) =>
+    db
+      .select({ row: diffOverrideChanges, login: users.login })
+      .from(diffOverrideChanges)
+      .innerJoin(users, eq(users.id, diffOverrideChanges.userId))
+      .where(
+        and(
+          eq(diffOverrideChanges.projectId, projectId),
+          part ? inArray(diffOverrideChanges.name, part) : undefined,
+        ),
+      )
+      .orderBy(desc(diffOverrideChanges.at));
+  // A build's names go in parts beside the project id; the parts are merged newest first again.
+  const rows = names
+    ? (await inChunks(names, 1, read)).toSorted((a, b) => b.row.at.getTime() - a.row.at.getTime())
+    : await read();
   return rows.map(({ row, login }) => ({
     id: row.id,
     name: row.name,

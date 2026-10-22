@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
+import { inChunks } from "./chunks";
 import { type Db, NotFoundError } from "./db";
 import { type BuildCounts, countBuilds, emptyCounts } from "./review";
 import { type DiffLocation, builds, invites, members, orgs, projects, users } from "./schema";
@@ -52,27 +53,29 @@ export type OrgOverview = Org & {
 async function latestBuilds(db: Db, projectIds: string[]): Promise<Map<string, LatestBuild>> {
   const latest = new Map<string, LatestBuild>();
   if (projectIds.length === 0) return latest;
-  const rows = await db
-    .select({
-      id: builds.id,
-      projectId: builds.projectId,
-      branch: builds.branch,
-      commitSha: builds.commitSha,
-      prNumber: builds.prNumber,
-      status: builds.status,
-      createdAt: builds.createdAt,
-    })
-    .from(builds)
-    .where(
-      and(
-        inArray(builds.projectId, projectIds),
-        // The id breaks a tie between two builds created in the same millisecond.
-        eq(
-          builds.id,
-          sql`(select b.id from builds b where b.project_id = ${builds.projectId} order by b.created_at desc, b.id desc limit 1)`,
+  const rows = await inChunks(projectIds, 0, (part) =>
+    db
+      .select({
+        id: builds.id,
+        projectId: builds.projectId,
+        branch: builds.branch,
+        commitSha: builds.commitSha,
+        prNumber: builds.prNumber,
+        status: builds.status,
+        createdAt: builds.createdAt,
+      })
+      .from(builds)
+      .where(
+        and(
+          inArray(builds.projectId, part),
+          // The id breaks a tie between two builds created in the same millisecond.
+          eq(
+            builds.id,
+            sql`(select b.id from builds b where b.project_id = ${builds.projectId} order by b.created_at desc, b.id desc limit 1)`,
+          ),
         ),
       ),
-    );
+  );
   const counts = await countBuilds(
     db,
     rows.map((row) => row.id),
@@ -110,29 +113,34 @@ export async function listOrgs(db: Db, userId: string): Promise<OrgOverview[]> {
       db,
       rows.flatMap(({ project }) => (project ? [project.id] : [])),
     ),
-    db
-      .select({
-        orgId: members.orgId,
-        userId: users.id,
-        login: users.login,
-        name: users.name,
-        avatarUrl: users.avatarUrl,
-        joinedAt: members.createdAt,
-      })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(inArray(members.orgId, orgIds))
-      .orderBy(asc(members.createdAt), asc(users.login)),
-    db
-      .select({
-        id: invites.id,
-        orgId: invites.orgId,
-        githubLogin: invites.githubLogin,
-        createdAt: invites.createdAt,
-      })
-      .from(invites)
-      .where(inArray(invites.orgId, orgIds))
-      .orderBy(asc(invites.createdAt), asc(invites.githubLogin)),
+    // In parts, each org whole: an org's members and invites keep their order.
+    inChunks(orgIds, 0, (part) =>
+      db
+        .select({
+          orgId: members.orgId,
+          userId: users.id,
+          login: users.login,
+          name: users.name,
+          avatarUrl: users.avatarUrl,
+          joinedAt: members.createdAt,
+        })
+        .from(members)
+        .innerJoin(users, eq(users.id, members.userId))
+        .where(inArray(members.orgId, part))
+        .orderBy(asc(members.createdAt), asc(users.login)),
+    ),
+    inChunks(orgIds, 0, (part) =>
+      db
+        .select({
+          id: invites.id,
+          orgId: invites.orgId,
+          githubLogin: invites.githubLogin,
+          createdAt: invites.createdAt,
+        })
+        .from(invites)
+        .where(inArray(invites.orgId, part))
+        .orderBy(asc(invites.createdAt), asc(invites.githubLogin)),
+    ),
   ]);
   return assemble(rows, latest, memberRows, inviteRows);
 }

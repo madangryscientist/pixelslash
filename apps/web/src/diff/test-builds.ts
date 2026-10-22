@@ -32,6 +32,9 @@ export type Ctx = Awaited<ReturnType<typeof setup>> & {
   scoped: ReturnType<typeof orgBlobs>;
 };
 
+/** What uploading a build needs: a store, a project and its blobs, on any database (ob 1773: a local D1 too). */
+export type Uploads = Pick<Ctx, "projectId" | "scoped"> & { db: Db };
+
 export async function context(): Promise<Ctx> {
   const held = await setup();
   return {
@@ -52,7 +55,7 @@ export type BuildSpec = {
 };
 
 /** Create a build and send its shots, as a client does before it finalises. */
-async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
+async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
   const id = await createBuild(ctx.db, ctx.projectId, {
     commitSha: spec.commit,
     branch: spec.branch,
@@ -89,7 +92,7 @@ async function open(ctx: Ctx, spec: BuildSpec): Promise<Build> {
  * `blobs` does the same for the images; `diff` stands in for the engine's diff.
  */
 export async function upload(
-  ctx: Ctx,
+  ctx: Uploads,
   spec: BuildSpec,
   {
     now,
@@ -103,12 +106,12 @@ export async function upload(
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 
-export async function rows(ctx: Ctx, build: Build) {
+export async function rows(ctx: Uploads, build: Build) {
   return ctx.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
 }
 
 /** The one shot a single-shot build holds. */
-export async function onlyShot(ctx: Ctx, build: Build) {
+export async function onlyShot(ctx: Uploads, build: Build) {
   const [row] = await rows(ctx, build);
   if (!row) throw new Error("build has no snapshots");
   return row;

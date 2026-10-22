@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { selectBaselines, snapshotKeyOf } from "#/db/baselines";
+import { chunk, inChunks } from "#/db/chunks";
 import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
 import { isMarker } from "#/db/markers";
@@ -49,22 +50,31 @@ const resultOf = (row: SnapshotRow) =>
  * overlay keys stay, so the run can drop an overlay it no longer writes.
  */
 async function clearResults(db: Db, targets: SnapshotRow[]): Promise<void> {
-  await db
-    .update(snapshots)
-    .set({
-      diffStatus: null,
-      diffResult: null,
-      rebaselineNeeded: false,
-      diffError: null,
-      mainBaselineKey: null,
-      mainDiffStatus: null,
-    })
-    .where(
-      inArray(
-        snapshots.id,
-        targets.map((t) => t.id),
-      ),
-    );
+  // The six cleared fields are bound beside the ids.
+  for (const part of chunk(
+    targets.map((t) => t.id),
+    6,
+  ))
+    await db
+      .update(snapshots)
+      .set({
+        diffStatus: null,
+        diffResult: null,
+        rebaselineNeeded: false,
+        diffError: null,
+        mainBaselineKey: null,
+        mainDiffStatus: null,
+      })
+      .where(inArray(snapshots.id, part));
+}
+
+/** Send a shot's review back to pending: three fields bound beside the ids. */
+async function reopenReviews(db: Db, ids: string[]): Promise<void> {
+  for (const part of chunk(ids, 3))
+    await db
+      .update(snapshots)
+      .set({ reviewState: "pending", reviewedBy: null, reviewedAt: null })
+      .where(inArray(snapshots.id, part));
 }
 
 /**
@@ -77,27 +87,22 @@ async function settleReviews(
   { build, project }: { build: Build; project: ProjectOfBuild },
   before: SnapshotRow[],
 ): Promise<void> {
-  const after = await db
-    .select()
-    .from(snapshots)
-    .where(
-      inArray(
-        snapshots.id,
-        before.map((t) => t.id),
-      ),
-    );
+  const after = await inChunks(
+    before.map((t) => t.id),
+    0,
+    (part) => db.select().from(snapshots).where(inArray(snapshots.id, part)),
+  );
   const prior = new Map(before.map((row) => [row.id, resultOf(row)]));
   const moved = after.filter((row) => prior.get(row.id) !== resultOf(row)).map((row) => row.id);
   if (moved.length === 0) return;
-  await db
-    .update(snapshots)
-    .set({ reviewState: "pending", reviewedBy: null, reviewedAt: null })
-    .where(inArray(snapshots.id, moved));
+  await reopenReviews(db, moved);
   if (build.branch !== project.defaultBranch) return;
-  await db
-    .update(snapshots)
-    .set({ reviewState: "accepted", reviewedAt: new Date() })
-    .where(and(inArray(snapshots.id, moved), isNull(snapshots.flakeId)));
+  const reviewedAt = new Date();
+  for (const part of chunk(moved, 2))
+    await db
+      .update(snapshots)
+      .set({ reviewState: "accepted", reviewedAt })
+      .where(and(inArray(snapshots.id, part), isNull(snapshots.flakeId)));
 }
 
 /**
@@ -149,10 +154,7 @@ export async function rediffShots(
     return { status: await refreshBuildStatus(deps.db, build.id), error: null, unmeasured: 0 };
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
-    await deps.db
-      .update(snapshots)
-      .set({ reviewState: "pending", reviewedBy: null, reviewedAt: null })
-      .where(inArray(snapshots.id, ids));
+    await reopenReviews(deps.db, ids);
     await markErrored(deps.db, build, e);
     return { status: "errored", error: e instanceof Error ? e.message : String(e), unmeasured: 0 };
   }

@@ -1,5 +1,6 @@
 import { and, eq, gt } from "drizzle-orm";
 import { randomToken, sha256Hex } from "#/lib/crypto";
+import { chunk } from "./chunks";
 import type { Db } from "./db";
 import { invites, members, sessions, users } from "./schema";
 
@@ -33,10 +34,12 @@ async function acceptInvites(db: Db, user: User): Promise<void> {
   const login = user.login.toLowerCase();
   const pending = await db.select().from(invites).where(eq(invites.githubLogin, login));
   if (pending.length === 0) return;
-  await db
-    .insert(members)
-    .values(pending.map((i) => ({ orgId: i.orgId, userId: user.id })))
-    .onConflictDoNothing();
+  // Two parameters a row; `createdAt` is a column default, not bound.
+  for (const part of chunk(pending, 0, 2))
+    await db
+      .insert(members)
+      .values(part.map((i) => ({ orgId: i.orgId, userId: user.id })))
+      .onConflictDoNothing();
   await db.delete(invites).where(eq(invites.githubLogin, login));
 }
 

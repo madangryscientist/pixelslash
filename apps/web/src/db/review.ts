@@ -7,6 +7,7 @@ import {
   skippedFlaky,
 } from "#/lib/snapshot-groups";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
+import { inChunks } from "./chunks";
 import { heldShot, notSkippedFlaky } from "./markers";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
@@ -247,32 +248,30 @@ export const emptyCounts = (): BuildCounts => ({
   skippedFlaky: 0,
 });
 
-/** The per-group counts of each build's shots, in one grouped read. A build with no shots is absent. */
+/** The grouped columns of `countBuilds`: each is selected and grouped by. */
+const statColumns = {
+  buildId: snapshots.buildId,
+  diffStatus: snapshots.diffStatus,
+  rebaselineNeeded: snapshots.rebaselineNeeded,
+  reviewState: snapshots.reviewState,
+  carried: isNotNull(snapshots.carriedFrom),
+  flaky: isNotNull(snapshots.flakeId),
+  flakyPolicy: snapshots.flakyPolicy,
+};
+
+/**
+ * The per-group counts of each build's shots, in one grouped read per part of the ids (a project
+ * page counts every build of the project). A build with no shots is absent.
+ */
 export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<string, BuildCounts>> {
   const counts = new Map<string, BuildCounts>();
-  if (buildIds.length === 0) return counts;
-  const stats = await db
-    .select({
-      buildId: snapshots.buildId,
-      diffStatus: snapshots.diffStatus,
-      rebaselineNeeded: snapshots.rebaselineNeeded,
-      reviewState: snapshots.reviewState,
-      carried: isNotNull(snapshots.carriedFrom),
-      flaky: isNotNull(snapshots.flakeId),
-      flakyPolicy: snapshots.flakyPolicy,
-      n: count(),
-    })
-    .from(snapshots)
-    .where(inArray(snapshots.buildId, buildIds))
-    .groupBy(
-      snapshots.buildId,
-      snapshots.diffStatus,
-      snapshots.rebaselineNeeded,
-      snapshots.reviewState,
-      isNotNull(snapshots.carriedFrom),
-      isNotNull(snapshots.flakeId),
-      snapshots.flakyPolicy,
-    );
+  const stats = await inChunks(buildIds, 0, (part) =>
+    db
+      .select({ ...statColumns, n: count() })
+      .from(snapshots)
+      .where(inArray(snapshots.buildId, part))
+      .groupBy(...Object.values(statColumns)),
+  );
   for (const stat of stats) {
     const held = counts.get(stat.buildId) ?? emptyCounts();
     held[groupOf(stat)] += stat.n;
