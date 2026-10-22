@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { diffPngs } from "@pixelslash/engine/diff";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import {
+  type Baseline,
   type Baselines,
   type BaselineSnapshot,
   selectBaselines,
@@ -100,50 +101,62 @@ async function storeSnapshot(
 }
 
 /**
- * Compare one shot with its baseline. No baseline is `new`; a baseline rendered by a different
- * environment needs a re-baseline and is measured against nothing, so it never shows a wall of
- * false diffs and never blocks.
+ * A shot with nothing to compare against. No baseline is `new`; a baseline rendered by a
+ * different environment needs a re-baseline and is measured against nothing, so it never shows
+ * a wall of false diffs and never blocks.
  */
-async function diffOne(
+async function storeUncompared(
   deps: ProcessDeps,
   shot: SnapshotRow,
   baseline: BaselineSnapshot | undefined,
 ): Promise<void> {
   // A shot measured again against another baseline may have had an overlay; one that now has no
   // overlay to write drops it.
-  if (!baseline || baseline.envFingerprint !== shot.envFingerprint) {
-    await storeSnapshot(
-      deps.db,
-      shot.id,
-      baseline
-        ? {
-            diffStatus: null,
-            diffResult: null,
-            diffKey: null,
-            rebaselineNeeded: true,
-            baselineKey: baseline.imageKey,
-          }
-        : {
-            diffStatus: "new",
-            diffResult: null,
-            diffKey: null,
-            baselineKey: null,
-            rebaselineNeeded: false,
-          },
-    );
-    if (shot.diffKey) await deps.blobs.delete(shot.diffKey);
-    return;
-  }
+  await storeSnapshot(
+    deps.db,
+    shot.id,
+    baseline
+      ? {
+          diffStatus: null,
+          diffResult: null,
+          diffKey: null,
+          rebaselineNeeded: true,
+          baselineKey: baseline.imageKey,
+          carriedFrom: null,
+        }
+      : {
+          diffStatus: "new",
+          diffResult: null,
+          diffKey: null,
+          baselineKey: null,
+          rebaselineNeeded: false,
+          carriedFrom: null,
+        },
+  );
+  if (shot.diffKey) await deps.blobs.delete(shot.diffKey);
+}
+
+async function compare(deps: ProcessDeps, shot: SnapshotRow, baseline: BaselineSnapshot) {
   const [main, branch] = await Promise.all([
     readBlob(deps.blobs, baseline.imageKey),
     readBlob(deps.blobs, shot.imageKey),
   ]);
   // The new shot's stored options; the engine's defaults fill any key it left out. The ignore
   // areas are the union of both shots', so an element that moved is covered at both places.
-  const result = diffPngs(main, branch, shot.diffOptions, {
+  return diffPngs(main, branch, shot.diffOptions, {
     main: baseline.ignore,
     branch: shot.ignore,
   });
+}
+
+/** Store a comparison: the shot it was against, and the open change it carries, if any (ob 1712). */
+async function storeDiff(
+  deps: ProcessDeps,
+  shot: SnapshotRow,
+  result: ReturnType<typeof diffPngs>,
+  against: { baseline: BaselineSnapshot; carriedFrom: string | null },
+): Promise<void> {
+  const { baseline, carriedFrom } = against;
   const diffKey = diffKeyOf(shot.imageKey);
   // One bulk copy, not a view: a blob store takes an ArrayBuffer, and a Buffer may be a view
   // into a pooled one. The overlay of a full-page shot is ~20 MB against a Worker's 128 MB.
@@ -155,7 +168,40 @@ async function diffOne(
     diffStatus: result.changed ? "changed" : "unchanged",
     diffResult: summarize(result),
     rebaselineNeeded: false,
+    carriedFrom,
   });
+}
+
+async function measureAgainst(
+  deps: ProcessDeps,
+  shot: SnapshotRow,
+  baseline: BaselineSnapshot | undefined,
+): Promise<void> {
+  if (!baseline || baseline.envFingerprint !== shot.envFingerprint)
+    return storeUncompared(deps, shot, baseline);
+  await storeDiff(deps, shot, await compare(deps, shot, baseline), { baseline, carriedFrom: null });
+}
+
+/**
+ * Compare one shot with its baseline. When the baseline holds an undecided change (ob 1712), an
+ * identical shot carries that change and one that differs is measured against the accepted shot,
+ * so a reviewer is always shown the change against an image someone accepted.
+ */
+async function diffOne(
+  deps: ProcessDeps,
+  shot: SnapshotRow,
+  baseline: Baseline | undefined,
+): Promise<void> {
+  if (!baseline?.carry) return measureAgainst(deps, shot, baseline?.shot);
+  if (baseline.shot.envFingerprint === shot.envFingerprint) {
+    const result = await compare(deps, shot, baseline.shot);
+    if (!result.changed)
+      return storeDiff(deps, shot, result, {
+        baseline: baseline.shot,
+        carriedFrom: baseline.carry,
+      });
+  }
+  await measureAgainst(deps, shot, baseline.accepted);
 }
 
 /** A shot the baseline build had and this one does not: a marker row, so reviewers can see it. */
@@ -254,15 +300,23 @@ async function clearMarkers(deps: ProcessDeps, build: Build): Promise<void> {
 
 /**
  * Whether a shot's stored result still stands. It does when it was measured (a status, or a
- * re-baseline that measured nothing) against the baseline that would be picked now. The baseline
- * is chosen from other builds' accepted shots, and one can be accepted between two runs; a shot
- * measured against another baseline is measured again, so a resumed build ends with the verdict
- * a single run would have given. A shot's own image, options and ignore areas cannot change: the
- * build is closed to uploads once finalised.
+ * re-baseline that measured nothing) against the baseline that would be picked now, carrying the
+ * change that would be carried now. The baseline is chosen from other builds' shots, and one can
+ * be accepted or decided between two runs; a shot measured against another baseline is measured
+ * again, so a resumed build ends with the verdict a single run would have given. A shot's own
+ * image, options and ignore areas cannot change: the build is closed to uploads once finalised.
  */
-function stands(shot: SnapshotRow, baseline: BaselineSnapshot | undefined): boolean {
-  const measured = shot.diffStatus !== null || shot.rebaselineNeeded;
-  return measured && shot.baselineKey === (baseline?.imageKey ?? null);
+function stands(shot: SnapshotRow, baseline: Baseline | undefined): boolean {
+  if (shot.diffStatus === null && !shot.rebaselineNeeded) return false;
+  if (shot.baselineKey === (baseline?.shot.imageKey ?? null))
+    return shot.carriedFrom === (baseline?.carry ?? null);
+  return measuredPastCarry(shot, baseline);
+}
+
+/** Measured against the accepted shot because it differed from an undecided one (`diffOne`). */
+function measuredPastCarry(shot: SnapshotRow, baseline: Baseline | undefined): boolean {
+  if (!baseline?.carry || shot.carriedFrom !== null) return false;
+  return shot.baselineKey === (baseline.accepted?.imageKey ?? null);
 }
 
 /**

@@ -414,7 +414,7 @@
       "label": "Approvals carry forward on a branch",
       "ps": {
         "v": "y",
-        "note": "an acceptance on the branch survives a rebase or amend"
+        "note": "an acceptance on the branch survives a rebase or amend; a branch build is diffed against the branch's last build, and a still-open change is carried and decided once (ob 1712)"
       },
       "t": {
         "argos": "y",

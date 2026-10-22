@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions } from "#/db/schema";
@@ -138,12 +139,44 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
   );
 }
 
+/**
+ * An unchanged shot that carries the branch's open change (ob 1712): it was compared with the
+ * branch's previous shot, which holds the change; a decision here is a decision there too.
+ */
+function Carried({ projectId, snapshot }: { projectId: string; snapshot: SnapshotView }) {
+  if (!snapshot.carriedFrom) return null;
+  return (
+    <section data-testid="carried">
+      <Heading>Carried change</Heading>
+      <p className="text-sm text-slate-700">
+        No change since the branch's last build, whose change against the accepted baseline is still
+        open. Accepting or rejecting here decides it on both builds.
+      </p>
+      {snapshot.carriedFromBuild && (
+        <Link
+          to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+          params={{
+            projectId,
+            buildId: snapshot.carriedFromBuild,
+            snapshotId: snapshot.carriedFrom,
+          }}
+          className="mt-1 inline-block text-sm text-violet-700 underline"
+        >
+          See the change
+        </Link>
+      )}
+    </section>
+  );
+}
+
 export function SidePanel({
+  projectId,
   snapshot,
   options,
   reviewable,
   status,
 }: {
+  projectId: string;
   snapshot: SnapshotView;
   options: DiffOptions;
   reviewable: boolean;
@@ -156,6 +189,7 @@ export function SidePanel({
           This build is {status}; a new build is needed to review it.
         </p>
       )}
+      <Carried projectId={projectId} snapshot={snapshot} />
       <Measured snapshot={snapshot} />
       <Environment snapshot={snapshot} />
       <Options snapshot={snapshot} options={options} />

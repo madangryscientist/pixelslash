@@ -1,5 +1,11 @@
-import { and, count, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
-import { SNAPSHOT_GROUPS, type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
+import { and, count, desc, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
+import {
+  SNAPSHOT_GROUPS,
+  type SnapshotGroup,
+  awaitsDecision,
+  groupOf,
+} from "#/lib/snapshot-groups";
+import { decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
   type DiffOptions,
@@ -14,31 +20,35 @@ import {
 
 /**
  * Build status after the diff (ob 1470, review model 1422). A changed shot blocks until it is
- * accepted or rejected; new and removed shots never block; any rejection fails the build until a
- * new build arrives. `passed` therefore means "nothing left to decide", not "no differences".
+ * accepted or rejected, and so does an unchanged one that carries a change still open on the
+ * branch's previous build (ob 1712); new and removed shots never block; any rejection fails the
+ * build until a new build arrives. `passed` therefore means "nothing left to decide", not "no
+ * differences".
  */
 export type Verdict = "changes" | "passed" | "failed";
 
-type Decidable = {
-  diffStatus: DiffStatus | null;
-  reviewState: string;
-};
-
-export function verdictOf(rows: Decidable[]): Verdict {
+export function verdictOf(rows: Parameters<typeof awaitsDecision>[0][]): Verdict {
   if (rows.some((row) => row.reviewState === "rejected")) return "failed";
-  if (rows.some((row) => row.diffStatus === "changed" && row.reviewState === "pending"))
-    return "changes";
+  if (rows.some(awaitsDecision)) return "changes";
   return "passed";
 }
 
 export async function refreshBuildStatus(db: Db, buildId: string): Promise<Verdict> {
   const rows = await db
-    .select({ diffStatus: snapshots.diffStatus, reviewState: snapshots.reviewState })
+    .select({
+      diffStatus: snapshots.diffStatus,
+      reviewState: snapshots.reviewState,
+      carriedFrom: snapshots.carriedFrom,
+    })
     .from(snapshots)
     .where(eq(snapshots.buildId, buildId));
   const status = verdictOf(rows);
   await db.update(builds).set({ status }).where(eq(builds.id, buildId));
   return status;
+}
+
+async function refreshBuilds(db: Db, buildIds: string[]): Promise<void> {
+  for (const buildId of buildIds) await refreshBuildStatus(db, buildId);
 }
 
 /** A build still uploading, processing or errored has no verdict to review. */
@@ -69,6 +79,13 @@ export type SnapshotView = {
   diffKey: string | null;
   diffResult: DiffResult | null;
   rebaselineNeeded: boolean;
+  /**
+   * The shot whose open change this one carries (ob 1712): it is identical to the branch's previous
+   * shot, which still waits for a decision. With the build that holds it, for a link.
+   */
+  carriedFrom: string | null;
+  /** The build that holds `carriedFrom`; null when that shot is gone. */
+  carriedFromBuild: string | null;
   createdAt: Date;
 };
 
@@ -108,13 +125,34 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       diffKey: snapshots.diffKey,
       diffResult: snapshots.diffResult,
       rebaselineNeeded: snapshots.rebaselineNeeded,
+      carriedFrom: snapshots.carriedFrom,
       createdAt: snapshots.createdAt,
     })
     .from(snapshots)
     .leftJoin(users, eq(users.id, snapshots.reviewedBy))
     .where(eq(snapshots.buildId, buildId));
+  const roots = new Map(
+    (
+      await db
+        .select({ id: snapshots.id, buildId: snapshots.buildId })
+        .from(snapshots)
+        .where(
+          inArray(
+            snapshots.id,
+            db
+              .select({ id: snapshots.carriedFrom })
+              .from(snapshots)
+              .where(and(eq(snapshots.buildId, buildId), isNotNull(snapshots.carriedFrom))),
+          ),
+        )
+    ).map((root) => [root.id, root.buildId]),
+  );
   const ordered = rows
-    .map(({ reviewer, ...row }) => ({ ...row, reviewedBy: reviewer }))
+    .map(({ reviewer, ...row }) => ({
+      ...row,
+      reviewedBy: reviewer,
+      carriedFromBuild: (row.carriedFrom && roots.get(row.carriedFrom)) ?? null,
+    }))
     .toSorted(
       (a, b) =>
         SNAPSHOT_GROUPS.indexOf(groupOf(a)) - SNAPSHOT_GROUPS.indexOf(groupOf(b)) ||
@@ -151,7 +189,7 @@ export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): P
 
 export type BuildCounts = Record<SnapshotGroup, number> & {
   pending: number;
-  /** Changed shots nobody has decided yet: what the build page calls "to review". */
+  /** Shots that wait for a decision (`awaitsDecision`): what the build page calls "to review". */
   toReview: number;
 };
 
@@ -187,6 +225,7 @@ export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<strin
       diffStatus: snapshots.diffStatus,
       rebaselineNeeded: snapshots.rebaselineNeeded,
       reviewState: snapshots.reviewState,
+      carried: isNotNull(snapshots.carriedFrom),
       n: count(),
     })
     .from(snapshots)
@@ -196,12 +235,13 @@ export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<strin
       snapshots.diffStatus,
       snapshots.rebaselineNeeded,
       snapshots.reviewState,
+      isNotNull(snapshots.carriedFrom),
     );
   for (const stat of stats) {
     const held = counts.get(stat.buildId) ?? emptyCounts();
     held[groupOf(stat)] += stat.n;
     if (stat.reviewState === "pending") held.pending += stat.n;
-    if (stat.diffStatus === "changed" && stat.reviewState === "pending") held.toReview += stat.n;
+    if (awaitsDecision({ ...stat, carriedFrom: stat.carried ? "" : null })) held.toReview += stat.n;
     counts.set(stat.buildId, held);
   }
   return counts;
@@ -240,15 +280,23 @@ async function reviewableBuildId(db: Db, projectId: string, buildId: string): Pr
   return row.id;
 }
 
-async function snapshotBuildId(db: Db, projectId: string, snapshotId: string): Promise<string> {
+async function reviewableSnapshot(
+  db: Db,
+  projectId: string,
+  snapshotId: string,
+): Promise<{ buildId: string; carriedFrom: string | null }> {
   const [row] = await db
-    .select({ buildId: snapshots.buildId, status: builds.status })
+    .select({
+      buildId: snapshots.buildId,
+      carriedFrom: snapshots.carriedFrom,
+      status: builds.status,
+    })
     .from(snapshots)
     .innerJoin(builds, eq(builds.id, snapshots.buildId))
     .where(and(eq(snapshots.id, snapshotId), eq(builds.projectId, projectId)));
   if (!row) throw new NotFoundError("snapshot");
   if (row.status !== "changes" && row.status !== "passed") throw new NotReviewableError(row.status);
-  return row.buildId;
+  return row;
 }
 
 /** Record one reviewer's decision on one shot and move the build to its verdict. */
@@ -261,27 +309,35 @@ export async function reviewSnapshot(
     userId: string;
   },
 ): Promise<Verdict> {
-  const buildId = await snapshotBuildId(db, input.projectId, input.snapshotId);
-  await db
-    .update(snapshots)
-    .set({ reviewState: input.state, reviewedBy: input.userId, reviewedAt: new Date() })
-    .where(eq(snapshots.id, input.snapshotId));
-  return refreshBuildStatus(db, buildId);
+  const shot = await reviewableSnapshot(db, input.projectId, input.snapshotId);
+  const decision = { reviewState: input.state, reviewedBy: input.userId, reviewedAt: new Date() };
+  await db.update(snapshots).set(decision).where(eq(snapshots.id, input.snapshotId));
+  const group = groupOfShot(shot.carriedFrom ?? input.snapshotId);
+  await refreshBuilds(db, await decideGroup(db, input.projectId, group, decision));
+  return refreshBuildStatus(db, shot.buildId);
 }
 
 /**
  * Accept every shot of the build, recording who and when. A rejection is never undone — a
  * rejected build is not reviewable at all, so accepting cannot mask it; the build stays failed
- * until a new build arrives.
+ * until a new build arrives. The acceptance reaches the other builds' shots that carry the same
+ * change (`decideGroup`).
  */
 export async function acceptAllSnapshots(
   db: Db,
   input: { projectId: string; buildId: string; userId: string },
 ): Promise<Verdict> {
   const buildId = await reviewableBuildId(db, input.projectId, input.buildId);
+  const decision = {
+    reviewState: "accepted",
+    reviewedBy: input.userId,
+    reviewedAt: new Date(),
+  } as const;
   await db
     .update(snapshots)
-    .set({ reviewState: "accepted", reviewedBy: input.userId, reviewedAt: new Date() })
+    .set(decision)
     .where(and(eq(snapshots.buildId, buildId), ne(snapshots.reviewState, "accepted")));
+  const group = groupsOfBuild(db, buildId);
+  await refreshBuilds(db, await decideGroup(db, input.projectId, group, decision));
   return refreshBuildStatus(db, buildId);
 }

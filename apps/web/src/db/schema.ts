@@ -237,6 +237,14 @@ export const snapshots = sqliteTable(
     /** The baseline's environment differs: needs a new baseline, measured against nothing. */
     rebaselineNeeded: integer("rebaseline_needed", { mode: "boolean" }).notNull().default(false),
     reviewState: text("review_state", { enum: REVIEW_STATES }).notNull().default("pending"),
+    /**
+     * Set on a shot the diff found unchanged against the same branch's previous shot while that
+     * one's change was still undecided (ob 1712): the id of the shot that holds the change, as
+     * measured against the accepted baseline. The change stays open here too, so the shot blocks
+     * until it is decided, and a decision on either applies to both. No foreign key: a reader
+     * treats a missing one as gone.
+     */
+    carriedFrom: text("carried_from"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
@@ -244,5 +252,6 @@ export const snapshots = sqliteTable(
   (t) => [
     unique().on(t.buildId, t.name, t.platform, t.browser, t.viewport, t.theme),
     index("snapshots_build_idx").on(t.buildId),
+    index("snapshots_carried_idx").on(t.carriedFrom),
   ],
 );

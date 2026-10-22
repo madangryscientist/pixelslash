@@ -113,7 +113,8 @@ describe("a re-run resumes", () => {
     const list = names(3);
     const ctx = await context();
     await mainThen(ctx, list);
-    // An earlier build on the branch, not yet accepted: not a baseline (main's is).
+    // An earlier build on the branch, not yet reviewed: its shots are the baseline, and the red
+    // shot, identical to its own, carries that build's open change (ob 1712).
     const earlier = await upload(ctx, {
       branch: "feat/x",
       commit: sha(2),
@@ -128,15 +129,15 @@ describe("a re-run resumes", () => {
     );
     expect(build.status).toBe("errored");
     const done = (await rows(ctx, build)).find((r) => r.diffStatus !== null);
-    expect(done).toMatchObject({ diffStatus: "changed" });
-
-    // Between the runs, the earlier build's shot of the same name is accepted: it is now the
-    // baseline (same branch, newer), and the red shot is unchanged against it.
     const theirs = (await rows(ctx, earlier)).find((r) => r.name === done?.name);
+    expect(done).toMatchObject({ diffStatus: "unchanged", carriedFrom: theirs?.id });
+
+    // Between the runs, the earlier build's shot is rejected: that build fails and is no baseline,
+    // so main's white shot is, and the red shot is changed against it.
     await reviewSnapshot(ctx.db, {
       projectId: ctx.projectId,
       snapshotId: theirs?.id ?? "",
-      state: "accepted",
+      state: "rejected",
       userId: ctx.userId,
     });
     const runs = await runsToFinish(ctx, build.id, clock);
@@ -150,7 +151,12 @@ describe("a re-run resumes", () => {
       .select()
       .from(snapshots)
       .where(eq(snapshots.id, done?.id ?? ""));
-    expect(after[0]).toMatchObject({ diffStatus: "unchanged", baselineKey: theirs?.imageKey });
+    expect(after[0]).toMatchObject({
+      diffStatus: "changed",
+      carriedFrom: null,
+      reviewState: "pending",
+    });
+    expect(after[0]?.baselineKey).not.toBe(theirs?.imageKey);
     const final = await getBuild(ctx.db, ctx.projectId, build.id);
     expect(final.status).toBe("changes");
   });

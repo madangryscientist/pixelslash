@@ -20,6 +20,7 @@ import {
   reviewSnapshot,
 } from "#/db/review";
 import { issueCiToken, listCiTokens, revokeCiToken } from "#/db/tokens";
+import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
 import { database, imageSigningSecret } from "./env";
@@ -222,19 +223,17 @@ export const getSnapshotPage = createServerFn()
       /** Every name in the build, so the label reads the same as on the build page. */
       names: view.snapshots.map((shot) => shot.name),
       /**
-       * Where this shot sits among the changed ones, the shots a reviewer decides on. The build
-       * order puts them first, so their walk index is their review index; null off that set.
+       * Where this shot sits among the ones a reviewer decides on (`holdsChange`): the changed
+       * shots and the unchanged ones that carry an open change. Null off that set.
        */
       review: {
-        index: snapshot.diffStatus === "changed" ? changedBefore(view.snapshots, index) + 1 : null,
-        total: view.snapshots.filter((shot) => shot.diffStatus === "changed").length,
+        index: holdsChange(snapshot)
+          ? view.snapshots.slice(0, index).filter(holdsChange).length + 1
+          : null,
+        total: view.snapshots.filter(holdsChange).length,
       },
     };
   });
-
-function changedBefore(shots: { diffStatus: string | null }[], index: number): number {
-  return shots.slice(0, index).filter((shot) => shot.diffStatus === "changed").length;
-}
 
 export const reviewShot = createServerFn({ method: "POST" })
   .validator((d: unknown) => {

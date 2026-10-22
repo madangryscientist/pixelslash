@@ -112,6 +112,7 @@ function SnapshotPage() {
           />
         </div>
         <SidePanel
+          projectId={project.id}
           snapshot={snapshot}
           options={data.diffOptions}
           reviewable={reviewable}

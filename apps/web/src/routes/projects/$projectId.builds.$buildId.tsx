@@ -5,6 +5,7 @@ import { TabBody, Tabs } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
 import { BUILD_TABS, type BuildTab, defaultTab, setsBaseline, tabCounts } from "#/lib/build-tabs";
+import { awaitsDecision } from "#/lib/snapshot-groups";
 import { acceptBuild, getBuildPage } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
@@ -25,10 +26,9 @@ function BuildPage() {
   const counts = tabCounts(snapshots);
   const baseline = setsBaseline(firstBuild, snapshots);
   const active = search.tab ?? defaultTab(counts);
-  // Only a changed shot blocks a build (verdictOf); new, removed and unchanged ones do not need a decision.
-  const toReview = snapshots.filter(
-    (shot) => shot.diffStatus === "changed" && shot.reviewState === "pending",
-  ).length;
+  // Only a shot holding a change blocks a build (verdictOf); new, removed and unchanged ones do not
+  // need a decision, unless an unchanged one carries the branch's open change (ob 1712).
+  const toReview = snapshots.filter(awaitsDecision).length;
   const reviewable = build.status === "changes" || build.status === "passed";
   const acceptAll = async () => {
     setError(null);

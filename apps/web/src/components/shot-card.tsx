@@ -4,7 +4,7 @@ import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { SnapshotView } from "#/db/review";
 import { ReviewChip } from "#/components/ui";
 import { formatNumber } from "#/lib/format";
-import { groupOf } from "#/lib/snapshot-groups";
+import { groupOf, holdsChange } from "#/lib/snapshot-groups";
 import { type ShotLabel, shotChips } from "#/lib/shot-label";
 import { coversMostOfShot } from "#/lib/thumb-crop";
 
@@ -95,6 +95,11 @@ function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | undefined 
 const newLine = (baseline: boolean) =>
   baseline ? "sets the baseline" : "no baseline: not compared";
 
+/** An unchanged shot that carries the branch's open change (ob 1712): no change here, one to decide. */
+const CARRIED = "no change since the branch's last build; its change is still open";
+
+const unchangedLine = (shot: SnapshotView) => (shot.carriedFrom ? CARRIED : "no change");
+
 /** The measured change, in the words the reviewer needs; nothing invented. */
 export function measured(shot: SnapshotView, baseline: boolean): string {
   if (shot.diffStatus === "new") return newLine(baseline);
@@ -104,7 +109,7 @@ export function measured(shot: SnapshotView, baseline: boolean): string {
   }
   const result = shot.diffResult;
   if (!result) return "not compared";
-  if (shot.diffStatus === "unchanged") return "no change";
+  if (shot.diffStatus === "unchanged") return unchangedLine(shot);
   const boxes = result.regions.filter((region) => region.kind === "change").length;
   const changed = `${formatNumber(result.changedPixels)} px in ${boxes} box${boxes === 1 ? "" : "es"}`;
   if (result.sizeChanged) {
@@ -150,7 +155,7 @@ export function ShotCard({
               {label.story}
             </p>
           </div>
-          {!baseline && (shot.diffStatus === "changed" || shot.reviewState !== "pending") && (
+          {!baseline && (holdsChange(shot) || shot.reviewState !== "pending") && (
             <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
           )}
         </div>

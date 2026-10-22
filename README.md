@@ -154,6 +154,19 @@ The API, for other CI integrations (`Authorization: Bearer <token>`; errors are 
 
 Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A token only reaches its own project's builds; another project's build id is a 404. 401 is a missing, wrong or revoked token.
 
+**What a shot is compared against (its baseline).** Each shot is matched by name, platform, browser, viewport and theme, and the server picks one earlier shot for it:
+
+1. **The branch's last build.** The same shot from the newest earlier build on the same branch whose build was not rejected, reviewed or not. A second build of an unchanged commit therefore shows 0 changed: a re-run shows only what moved since the last one. A shot accepted on build 1 and unchanged on build 2 passes on build 2.
+2. **Otherwise, the accepted shot on the base.** The newest accepted shot from a build at the merge-base or one of the ancestor SHAs (nearest first). A main build is auto-accepted, so on `main` rule 1 and rule 2 pick the same shot, and main's baselining is as before.
+
+A change that is still open on the branch's last build (pending, never accepted or rejected) is not dropped by rule 1:
+
+- A shot identical to it is stored `unchanged` with 0 changed pixels, and it **carries** that change: it still counts as "to review", its card says so and links to the build where the change was measured, and the build stays `changes` until it is decided. A third build carries from the shot that measured the change, not from the carrier.
+- A shot that differs from it is measured against rule 2's accepted shot instead, and is `changed` against that. Diffing it against the unreviewed shot would let one acceptance approve a change no one has seen.
+- A decision on any shot of a carried change (the one that measured it or any carrier) is the decision on all of them, in every build that is `changes` or `passed`, and each of those builds moves to its new verdict. Accepting the earliest build passes the later ones; rejecting a carrier fails every build of the change.
+- A rejected build is never a baseline, so the next build on its branch is measured against rule 2.
+- Known gap: a carrier whose build is still diffing when the change is decided is not moved with it. It stays "to review" until someone decides it there; that decision changes nothing on the builds already decided. An `errored` build is not affected: a resumed finalise picks its baselines again, so its carrier follows the decision (passes after an accept, is measured again against rule 2 after a reject).
+
 ## Local-screenshot dogfood (GTK windows)
 
 Capture two windows with grim (automation is later), then compare:

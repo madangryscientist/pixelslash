@@ -20,6 +20,22 @@ export const GROUP_LABEL: Record<SnapshotGroup, string> = {
   unmeasured: "Not measured",
 };
 
+type Decidable = { diffStatus: DiffStatus | null; carriedFrom: string | null };
+
+/**
+ * A shot a reviewer decides on: a change measured on this build, or one carried from the branch's
+ * previous build because this shot is identical to it while that change is undecided (ob 1712). A
+ * carried shot is `unchanged` (that is what was measured here), yet the change it carries is open.
+ */
+export function holdsChange(row: Decidable): boolean {
+  return row.diffStatus === "changed" || row.carriedFrom !== null;
+}
+
+/** A shot that waits for a reviewer: it holds a change nobody has decided yet. */
+export function awaitsDecision(row: Decidable & { reviewState: string }): boolean {
+  return row.reviewState === "pending" && holdsChange(row);
+}
+
 /**
  * `rebaseline` is not a diff status: it is a row the server could not compare because its
  * baseline came from another environment (`rebaselineNeeded`). It is shown, never counted as a

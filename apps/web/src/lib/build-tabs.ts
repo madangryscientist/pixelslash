@@ -1,4 +1,4 @@
-import { type SnapshotGroup, groupOf } from "./snapshot-groups";
+import { type SnapshotGroup, awaitsDecision, groupOf } from "./snapshot-groups";
 
 /**
  * The build page's tabs. `Not measured` holds both kinds of shot that were never compared (no
@@ -52,9 +52,9 @@ export function setsBaseline(
   return firstBuild && snapshots.length > 0 && snapshots.every((shot) => shot.diffStatus === "new");
 }
 
-type Reviewable = { id: string; diffStatus: string | null; reviewState: string };
+type Reviewable = { id: string } & Parameters<typeof awaitsDecision>[0];
 
-/** The first changed shot still waiting for a decision, in the build's order. */
-export function firstToReview<T extends Reviewable>(rows: T[]): T | undefined {
-  return rows.find((row) => row.diffStatus === "changed" && row.reviewState === "pending");
+/** The first shot still waiting for a decision, in the build's order. */
+export function firstToReview<T extends Reviewable>(rows: readonly T[]): T | undefined {
+  return rows.find(awaitsDecision);
 }

@@ -5,6 +5,7 @@ import { StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { firstToReview } from "#/lib/build-tabs";
 import { formatDateTime } from "#/lib/format";
+import { holdsChange } from "#/lib/snapshot-groups";
 
 function toReviewText(baseline: boolean, toReview: number): string {
   if (baseline) return "baseline set";
@@ -77,7 +78,7 @@ export function BuildHeader({
   /** The project's first build: it sets the baseline, so there is nothing to review or accept. */
   baseline: boolean;
 }) {
-  const changed = snapshots.filter((shot) => shot.diffStatus === "changed");
+  const changed = snapshots.filter(holdsChange);
   const next = firstToReview(snapshots);
   return (
     <header className="mb-6 rounded-lg border border-slate-200 bg-white p-4">

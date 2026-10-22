@@ -4,11 +4,19 @@ import type { Build } from "./builds";
 import { builds, type IgnoreRect, snapshots } from "./schema";
 
 /**
- * Baseline selection (ob 1470), Argos-style and with no git access: the CLI uploads the
- * merge-base and the ancestor SHAs, and the server picks. For each snapshot key the baseline is
- * the shot in the newest accepted build among the build's merge-base and ancestors; an accepted
- * shot on the same branch carries forward to a later build even when its commit is no longer an
- * ancestor (a rebase or an amend). A build that was rejected never feeds a baseline.
+ * Baseline selection (ob 1470, ob 1712), with no git access: the CLI uploads the merge-base and
+ * the ancestor SHAs, and the server picks, per snapshot key:
+ *
+ * 1. The same branch's previous shot, reviewed or not: the newest earlier build of this branch
+ *    that holds the key and was not rejected. A re-run of one commit is therefore 0 changed, and
+ *    the shot carries forward after a rebase or an amend too.
+ * 2. Else the shot in the newest accepted build among the merge-base and its ancestors.
+ *
+ * A previous shot whose change is still undecided is not an accepted image, so it is a baseline
+ * only for an unchanged shot, which then carries the open change (`carried_from`). A shot that
+ * differs from it is measured against rule 2's accepted shot instead, so accepting it never
+ * approves a change nobody was shown. A build that was rejected never feeds a baseline. On main
+ * every shot is accepted, so rule 1 there is the rule main always had.
  */
 
 /** The fields of a snapshot this module reads; a whole row would drag the blobs' JSON along. */
@@ -34,20 +42,70 @@ export function snapshotKeyOf(shot: SnapshotKey): string {
   return JSON.stringify([shot.name, shot.platform, shot.browser, shot.viewport, shot.theme]);
 }
 
+export type Baseline = {
+  /** The shot this one is compared against first. */
+  shot: BaselineSnapshot;
+  /**
+   * Set when `shot` holds an undecided change: the id of the shot that holds it. An identical
+   * shot carries it; a different one is compared against `accepted` instead.
+   */
+  carry: string | null;
+  /** The newest accepted shot in reach; read only when `carry` is set. Missing is `new`. */
+  accepted: BaselineSnapshot | undefined;
+};
+
 export type Baselines = {
-  /** Snapshot key → the shot this build is compared against. A missing key is `new`. */
-  byKey: Map<string, BaselineSnapshot>;
+  /** Snapshot key → what this build's shot is compared against. A missing key is `new`. */
+  byKey: Map<string, Baseline>;
   /** Shots the baseline build had and this one does not: removed, and never blocking. */
   removed: BaselineSnapshot[];
 };
 
 const emptyBaselines = (): Baselines => ({ byKey: new Map(), removed: [] });
 
-type Candidate = BaselineSnapshot & { branch: string; buildId: string };
+type Candidate = BaselineSnapshot & {
+  branch: string;
+  buildId: string;
+  buildStatus: string;
+  diffStatus: string | null;
+  reviewState: string;
+  carriedFrom: string | null;
+};
+
+/** Accepted for a baseline from any build: the build passed, or this one shot was accepted. */
+const acceptedRow = (row: Candidate) =>
+  row.buildStatus === "passed" || row.reviewState === "accepted";
+
+/** A shot whose change nobody has decided yet: a baseline only for an identical shot. */
+const openRow = (row: Candidate) =>
+  row.reviewState === "pending" && (row.diffStatus === "changed" || row.carriedFrom !== null);
+
+const baselineOf = ({
+  id,
+  name,
+  platform,
+  browser,
+  viewport,
+  theme,
+  ignore,
+  envFingerprint,
+  imageKey,
+}: Candidate): BaselineSnapshot => ({
+  id,
+  name,
+  platform,
+  browser,
+  viewport,
+  theme,
+  ignore,
+  envFingerprint,
+  imageKey,
+});
 
 /**
- * Accepted for a baseline: the build itself passed (main auto-accepts, so a squash-merged main
- * build counts), or this one shot was accepted on a build that was not rejected.
+ * Every shot that may be a baseline, newest first: an accepted one (see `acceptedRow`; main
+ * auto-accepts, so a squash-merged main build counts), or any shot of this branch. Only from a
+ * build that was not rejected.
  */
 function queryCandidates(db: Db, build: Build) {
   const commits = [build.mergeBaseSha, ...build.ancestorShas].filter(
@@ -71,6 +129,10 @@ function queryCandidates(db: Db, build: Build) {
       envFingerprint: snapshots.envFingerprint,
       imageKey: snapshots.imageKey,
       branch: builds.branch,
+      buildStatus: builds.status,
+      diffStatus: snapshots.diffStatus,
+      reviewState: snapshots.reviewState,
+      carriedFrom: snapshots.carriedFrom,
     })
     .from(snapshots)
     .innerJoin(builds, eq(builds.id, snapshots.buildId))
@@ -83,7 +145,11 @@ function queryCandidates(db: Db, build: Build) {
         // stable rather than dependent on the scan order.
         lte(builds.createdAt, build.createdAt),
         inArray(builds.status, ["changes", "passed"]),
-        or(eq(builds.status, "passed"), eq(snapshots.reviewState, "accepted")),
+        or(
+          eq(builds.status, "passed"),
+          eq(snapshots.reviewState, "accepted"),
+          eq(builds.branch, build.branch),
+        ),
         // A removed row is a marker, not an image of that build: it can never be a baseline.
         or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
         inReach,
@@ -93,9 +159,10 @@ function queryCandidates(db: Db, build: Build) {
 }
 
 /** Newest first; a same-branch shot outranks a newer one from another branch. */
-function pick(candidates: Candidate[], build: Build): Map<string, Candidate> {
+function pickAccepted(candidates: Candidate[], build: Build): Map<string, Candidate> {
   const picked = new Map<string, Candidate>();
   for (const row of candidates) {
+    if (!acceptedRow(row)) continue;
     const key = snapshotKeyOf(row);
     const held = picked.get(key);
     const preferred = row.branch === build.branch && held?.branch !== build.branch;
@@ -104,10 +171,30 @@ function pick(candidates: Candidate[], build: Build): Map<string, Candidate> {
   return picked;
 }
 
-/** The build whose set of shots decides what was removed: the newest accepted one in reach. */
+function pick(candidates: Candidate[], build: Build): Map<string, Baseline> {
+  const accepted = pickAccepted(candidates, build);
+  const previous = new Map<string, Candidate>();
+  for (const row of candidates) {
+    const key = snapshotKeyOf(row);
+    if (row.branch === build.branch && !previous.has(key)) previous.set(key, row);
+  }
+  const picked = new Map<string, Baseline>();
+  for (const key of new Set([...accepted.keys(), ...previous.keys()])) {
+    const prior = previous.get(key);
+    const held = accepted.get(key);
+    const fallback = held && baselineOf(held);
+    if (prior) {
+      const carry = openRow(prior) ? (prior.carriedFrom ?? prior.id) : null;
+      picked.set(key, { shot: baselineOf(prior), carry, accepted: fallback });
+    } else if (fallback) picked.set(key, { shot: fallback, carry: null, accepted: fallback });
+  }
+  return picked;
+}
+
+/** The build whose set of shots decides what was removed: the branch's previous one, else the newest accepted one in reach. */
 function primaryBuild(build: Build, candidates: Candidate[]): string | null {
   const onBranch = candidates.find((row) => row.branch === build.branch);
-  return (onBranch ?? candidates[0])?.buildId ?? null;
+  return (onBranch ?? candidates.find(acceptedRow))?.buildId ?? null;
 }
 
 async function removedSince(
@@ -142,10 +229,9 @@ async function removedSince(
 export async function selectBaselines(db: Db, build: Build, keys: Set<string>): Promise<Baselines> {
   const candidates = await queryCandidates(db, build);
   if (candidates.length === 0) return emptyBaselines();
-  const picked = pick(candidates, build);
   const baselineBuildId = primaryBuild(build, candidates);
   return {
-    byKey: new Map([...picked].map(([key, row]) => [key, row])),
+    byKey: pick(candidates, build),
     removed: await removedSince(db, baselineBuildId, keys),
   };
 }

@@ -32,9 +32,9 @@ const barButton =
 type Review = { index: number | null; total: number };
 
 function reviewText(review: Review): string {
-  if (review.index !== null) return `${review.index} / ${review.total} changed`;
+  if (review.index !== null) return `${review.index} / ${review.total} with a change`;
   if (review.total === 0) return "nothing to review";
-  return `not to review · ${review.total} changed`;
+  return `not to review · ${review.total} with a change`;
 }
 
 /**
