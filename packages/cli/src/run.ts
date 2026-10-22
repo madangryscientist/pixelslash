@@ -39,6 +39,7 @@ import { DEV_USAGE, runDev } from "./dev.ts";
 import type { KeyInput } from "./dev-loop.ts";
 import { FLAKE_USAGE, FLAKES_USAGE, runFlake, runFlakes } from "./flake.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
+import { INIT_USAGE, runInit } from "./init.ts";
 import { MCP_USAGE, runMcp } from "./mcp.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
 import { UPLOAD_USAGE, runUpload } from "./upload.ts";
@@ -129,6 +130,7 @@ const COMMANDS: Record<
   string,
   { usage: string; run: (argv: string[], io: Io, deps: CliDeps) => Promise<number> }
 > = {
+  init: { usage: INIT_USAGE, run: runInit },
   capture: { usage: CAPTURE_USAGE, run: runCapture },
   compare: { usage: COMPARE_USAGE, run: (argv, io) => runCompare(argv, io) },
   import: { usage: IMPORT_USAGE, run: (argv, io) => runImport(argv, io) },

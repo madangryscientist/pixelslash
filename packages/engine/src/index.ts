@@ -20,6 +20,7 @@ export { isHttpUrl, loadRoutes } from "./routes.ts";
 export type { RunManifest } from "./run.ts";
 export type { CaptureSetup, SetupArgs } from "./setup.ts";
 export {
+  CONFIG_NAMES,
   DEFAULT_FLAKE_RETRIES,
   findConfig,
   findConfigIfAny,

@@ -36,6 +36,20 @@ If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still write
 
 A one-pair run without a design system writes `--out/report.html` (open as `file://`): the changed-pixel count, the region and speck counts, both sizes, and Main, Branch and Diff. A changed shot (a `change` region survives) leads with those three **cropped to the changed region** — the union of the `change` regions plus 24px, clipped to the overlap of the two shots, scaled up with CSS so no extra file is written — and the full frame sits behind a `Full frame` click, where the Diff carries the region boxes (yellow for a change, dashed grey for noise). A shot with no `change` region keeps the full frame as is. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 
+## Start a repo: `pixelslash init`
+
+```
+pixelslash init [--url URL | --storybook URL] [--routes /,/about] [--viewports 1280x720,375x812] [--themes light,dark] [--server URL] [--project NAME] [--yes] [--force]
+```
+
+- It writes `pixelslash.config.ts` from a few questions on stdin (a terminal or a pipe, one answer per line; an empty answer takes the default in brackets). Each flag answers its question instead; `--yes` takes the default for every question no flag answered and asks nothing.
+- The app URL is probed for `<url>/index.json`: when it answers as a Storybook index, the config gets `storybook: { url }` and no routes are asked. `--storybook URL` says so without the probe. A URL that does not answer is just an app; nothing has to be running.
+- The variants are every viewport × every theme. The project-wide `flaky: "review"` is written commented out, as the default it already is.
+- The server is `--server`, else `PIXELSLASH_SERVER`, else asked (blank for none). When this machine holds a token for it (`pixelslash login`, or `PIXELSLASH_TOKEN`) the project is read from the server: the only one the token sees, or the one you name when it sees several. Not logged in, `upload.project` is left commented. **No token is ever written into the config.**
+- It appends `pixelslash-snapshots/` and `.pixelslash/` to `.gitignore` when they are missing (a line with or without its slashes counts), so a second run changes nothing.
+- It prints the next commands: `pixelslash check`, `pixelslash capture --upload`, and the CI steps from [Block CI on review](#block-ci-on-review).
+- An existing `pixelslash.config.*` is kept and the run exits 2, unless `--force`. A bad answer (a URL that is not http(s), a route without a leading `/`, a viewport that is not `WxH`, a theme other than `light` or `dark`) exits 2 and writes nothing.
+
 ## Snapshot capture (the pinned image)
 
 `pixelslash capture` shoots every route × variant in a config into a snapshot dir plus `manifest.json`, for upload to a PixelSlash server. Run it inside the pinned capture image: it fixes Bun, Playwright, Chromium and the font set, so the same commit renders the same pixels on any CI runner.
