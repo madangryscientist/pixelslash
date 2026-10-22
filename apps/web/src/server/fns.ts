@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
 import { NotFoundError } from "#/db/db";
+import { isMarker } from "#/db/markers";
 import {
   createOrg,
   createProject,
@@ -212,7 +213,7 @@ export const getSnapshotPage = createServerFn()
     if (!snapshot) throw notFound();
     const images = await imageUrls(project.orgId, {
       main: snapshot.baselineKey,
-      branch: snapshot.diffStatus === "removed" ? null : snapshot.imageKey,
+      branch: isMarker(snapshot) ? null : snapshot.imageKey,
       diff: snapshot.diffKey,
     });
     return {

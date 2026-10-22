@@ -202,9 +202,15 @@ export type ReviewState = (typeof REVIEW_STATES)[number];
  * A name + a fixed variant (platform, browser, viewport, theme). Images live in the blob
  * store under the org's prefix; these are their keys. `diffStatus` is null until diffed.
  *
- * A `removed` row is a marker, not an upload: it keeps the baseline build's `image_key` and
- * `baseline_key` so a reviewer can still see what went away. Every reader that counts or picks
- * a baseline must skip it; `diff_result` is null on it.
+ * A `removed` row is a marker, not an upload: it keeps the baseline build's blob as both
+ * `image_key` and `baseline_key` so a reviewer can still see what went away, so it names bytes it
+ * does not own. `diff_result` is null on it. Whether a row is a marker is decided in `markers.ts`
+ * (`isMarker`, `heldShot`); every query that counts, bills or picks a baseline goes through it
+ * rather than testing `diff_status` itself (ob 1558).
+ *
+ * Retention: no cleanup deletes blobs yet. One that deletes a build's blobs must keep every key a
+ * row of another build still names as its `baseline_key` (which covers every marker), and every
+ * key of a shot a later build could still pick as a baseline.
  */
 export const snapshots = sqliteTable(
   "snapshots",

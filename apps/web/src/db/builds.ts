@@ -1,7 +1,8 @@
-import { and, count, eq, isNull, ne, or } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { sha256Hex } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
+import { heldShot } from "./markers";
 import { type DiffOptions, type IgnoreRect, builds, snapshots } from "./schema";
 
 export type Build = typeof builds.$inferSelect;
@@ -120,12 +121,7 @@ export async function finaliseBuild(db: Db, build: Build, expected: number): Pro
     .select({ n: count() })
     .from(snapshots)
     // Removed markers are written by the diff, not uploaded, so they never count as deliveries.
-    .where(
-      and(
-        eq(snapshots.buildId, build.id),
-        or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
-      ),
-    );
+    .where(and(eq(snapshots.buildId, build.id), heldShot()));
   const actual = held?.n ?? 0;
   if (actual !== expected) throw new SnapshotCountError(expected, actual);
   // A retry after a lost reply: the build already moved on and is being, or has been, diffed.

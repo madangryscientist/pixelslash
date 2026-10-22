@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, desc, eq, inArray, lte, ne, or } from "drizzle-orm";
 import type { Db } from "./db";
 import type { Build } from "./builds";
+import { heldShot } from "./markers";
 import { builds, type IgnoreRect, snapshots } from "./schema";
 
 /**
@@ -151,7 +152,7 @@ function queryCandidates(db: Db, build: Build) {
           eq(builds.branch, build.branch),
         ),
         // A removed row is a marker, not an image of that build: it can never be a baseline.
-        or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
+        heldShot(),
         inReach,
       ),
     )
@@ -216,13 +217,7 @@ async function removedSince(
       imageKey: snapshots.imageKey,
     })
     .from(snapshots)
-    .where(
-      and(
-        eq(snapshots.buildId, baselineBuildId),
-        // A re-baseline row has no status yet but is still a shot the build holds.
-        or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
-      ),
-    );
+    .where(and(eq(snapshots.buildId, baselineBuildId), heldShot()));
   return rows.filter((row) => !keys.has(snapshotKeyOf(row)));
 }
 

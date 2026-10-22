@@ -1,10 +1,11 @@
-import { and, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
 import {
   SNAPSHOT_GROUPS,
   type SnapshotGroup,
   awaitsDecision,
   groupOf,
 } from "#/lib/snapshot-groups";
+import { heldShot } from "./markers";
 import { decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
@@ -189,7 +190,7 @@ export async function isFirstBuild(db: Db, build: typeof builds.$inferSelect): P
           eq(snapshots.reviewState, "accepted"),
           eq(builds.branch, build.branch),
         ),
-        or(isNull(snapshots.diffStatus), ne(snapshots.diffStatus, "removed")),
+        heldShot(),
       ),
     )
     .limit(1);
