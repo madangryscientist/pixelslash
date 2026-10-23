@@ -202,6 +202,50 @@ describe("review-UI diff overrides (ob 1495)", () => {
     ).rejects.toThrow(OverrideError);
   });
 
+  test("a CI project can still clear an override, audited, and the next diff no longer applies it", async () => {
+    const ctx = await context();
+    const build = await faintBranch(ctx, { minChangedPixels: 100 });
+    await saveAndRediff(deps(ctx), {
+      userId: ctx.userId,
+      build,
+      target: wholeTest,
+      options: { minChangedPixels: 0 },
+    });
+    await ctx.db.update(projects).set({ diffLocation: "ci" }).where(eq(projects.id, ctx.projectId));
+
+    // Replacing the value is setting one; clearing it is not.
+    await expect(
+      saveOverride(ctx.db, ctx.userId, ctx.projectId, {
+        ...wholeTest,
+        options: { minChangedPixels: 5 },
+      }),
+    ).rejects.toThrow(OverrideError);
+    expect(
+      await saveOverride(ctx.db, ctx.userId, ctx.projectId, { ...wholeTest, options: {} }),
+    ).toBe(true);
+    expect(await listOverrides(ctx.db, ctx.userId, ctx.projectId)).toEqual([]);
+    const trail = await overrideChanges(ctx.db, ctx.userId, ctx.projectId);
+    expect(trail[0]).toMatchObject({
+      before: { minChangedPixels: 0 },
+      after: null,
+      by: "ada",
+    });
+
+    await ctx.db
+      .update(projects)
+      .set({ diffLocation: "server" })
+      .where(eq(projects.id, ctx.projectId));
+    const later = await upload(ctx, {
+      branch: "feat/y",
+      commit: sha(3),
+      mergeBase: sha(1),
+      shots: [{ png: faint, diff: { minChangedPixels: 100 } }],
+    });
+    expect((await onlyShot(ctx, later)).resolvedDiff?.sources).toEqual({
+      minChangedPixels: { from: "config" },
+    });
+  });
+
   test("the export, uploaded instead of the overrides, gives the same verdicts", async () => {
     const config = {
       baseUrl: "http://localhost:3000",

@@ -5,6 +5,7 @@ import { type OverrideTarget, saveOverride } from "#/db/overrides";
 import { snapshots } from "#/db/schema";
 import type { DiffOptions } from "#/db/schema";
 import type { SnapshotRow } from "./compare";
+import { projectOf } from "./build-writes";
 import type { ProcessDeps } from "./process";
 import { RerunError, rediffShots } from "./rerun";
 
@@ -69,6 +70,8 @@ export async function rediffTarget(
   what: string,
 ): Promise<Omit<SavedOverride, "changed">> {
   const unchanged = { rediffed: 0, status: build.status, note: null };
+  // A CI project's results are the CLI's: a clear is stored, and there is nothing to measure here.
+  if ((await projectOf(deps.db, build)).diffLocation === "ci") return unchanged;
   if (!VERDICTS.includes(build.status))
     return {
       ...unchanged,

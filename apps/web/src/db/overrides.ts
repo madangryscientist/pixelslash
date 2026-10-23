@@ -13,7 +13,8 @@ import { diffOverrideChanges, diffOverrides } from "./schema-overrides";
  * test and variant, laid over what the uploaded config asked for. The precedence is UI variant >
  * UI test > config (whose own layers, variant > route > project, the CLI merged before upload) >
  * engine default, key by key. Only the server diff reads them: a CI project's results are the
- * CLI's, measured with the config alone, so an override there would be a value nothing measured.
+ * CLI's, measured with the config alone, so an override there would be a value nothing measured;
+ * such a project refuses a new one but can still clear what it holds (ob 1772).
  *
  * Every change writes one audit row, and a project can export its overrides as config, so nothing
  * set here is only here.
@@ -245,8 +246,8 @@ const sameOptions = (a: DiffOptions | null, b: DiffOptions | null) =>
 
 /**
  * Set a test's (or a variant's) override to `options`, replacing what it held; empty options clear
- * it, so the config's values apply again. Writes one audit row per change and none when nothing
- * changed. Returns whether anything did.
+ * it, so the config's values apply again; a CI project may clear but not set (ob 1772). Writes one
+ * audit row per change and none when nothing changed. Returns whether anything did.
  */
 export async function saveOverride(
   db: Db,
@@ -255,12 +256,13 @@ export async function saveOverride(
   { options, ...target }: OverrideTarget & { options: DiffOptions },
 ): Promise<boolean> {
   const { project } = await getProjectWithOrg(db, userId, projectId);
-  if (project.diffLocation === "ci")
+  const after = Object.keys(options).length > 0 ? options : null;
+  // A CI project cannot take a value, but can drop one it already holds (ob 1772).
+  if (after && project.diffLocation === "ci")
     throw new OverrideError(
       "this project diffs in CI: the CLI measures with the config, so set this in the config",
     );
   const [held] = await db.select().from(diffOverrides).where(targetWhere(projectId, target));
-  const after = Object.keys(options).length > 0 ? options : null;
   if (sameOptions(held?.options ?? null, after)) return false;
   await writeOverride(db, userId, { projectId, target, held, after });
   return true;

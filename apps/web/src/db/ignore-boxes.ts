@@ -11,7 +11,8 @@ import { ignoreBoxes } from "./schema-overrides";
 /**
  * Ignore boxes drawn in the review UI (ob 1499): a rectangle in image px the server diff skips on
  * one test, or one variant of it, unioned with the ignore areas the shot was uploaded with. Like
- * the UI thresholds (ob 1495) only the server diff reads them, so a CI project refuses one. A box
+ * the UI thresholds (ob 1495) only the server diff reads them, so a CI project refuses a new one but
+ * can still clear what it holds (ob 1772). A box
  * is never deleted: clearing it stamps who and when, and the settings page lists the trail.
  */
 
@@ -134,7 +135,7 @@ export async function clearIgnoreBox(
   projectId: string,
   boxId: string,
 ): Promise<OverrideTarget | null> {
-  await serverProject(db, userId, projectId);
+  await getProjectWithOrg(db, userId, projectId);
   const where = and(
     eq(ignoreBoxes.id, boxId),
     eq(ignoreBoxes.projectId, projectId),

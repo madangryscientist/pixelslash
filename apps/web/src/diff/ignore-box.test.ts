@@ -179,6 +179,45 @@ describe("review-UI ignore boxes (ob 1499)", () => {
     ).rejects.toThrow(OverrideError);
   });
 
+  test("a CI project can still clear a box, audited, and the next diff no longer applies it", async () => {
+    const ctx = await context();
+    const build = await changedBranch(ctx);
+    await addBoxAndRediff(deps(ctx), {
+      userId: ctx.userId,
+      build,
+      target: wholeTest,
+      rect: OVER_CHANGE,
+    });
+    const [box] = (await listIgnoreBoxes(ctx.db, ctx.userId, ctx.projectId)).active;
+    if (!box) throw new Error("no box");
+    await ctx.db.update(projects).set({ diffLocation: "ci" }).where(eq(projects.id, ctx.projectId));
+
+    // The clear is stored; a CI build is not measured here, so nothing is re-diffed.
+    const open = await getBuild(ctx.db, ctx.projectId, build.id);
+    expect(
+      await clearBoxAndRediff(deps(ctx), { userId: ctx.userId, build: open, boxId: box.id }),
+    ).toMatchObject({ changed: true, rediffed: 0 });
+    const { active, trail } = await listIgnoreBoxes(ctx.db, ctx.userId, ctx.projectId);
+    expect(active).toEqual([]);
+    expect(trail).toEqual([
+      expect.objectContaining({ id: box.id, cleared: expect.objectContaining({ by: "ada" }) }),
+    ]);
+
+    await ctx.db
+      .update(projects)
+      .set({ diffLocation: "server" })
+      .where(eq(projects.id, ctx.projectId));
+    const later = await upload(ctx, {
+      branch: "feat/y",
+      commit: sha(3),
+      mergeBase: sha(1),
+      shots: [{ png: changed }],
+    });
+    const row = await onlyShot(ctx, later);
+    expect(row.diffStatus).toBe("changed");
+    expect(row.resolvedDiff?.ignore).toBeUndefined();
+  });
+
   test("the export, uploaded as config ignore instead of the boxes, gives the same verdicts", async () => {
     const config = {
       baseUrl: "http://localhost:3000",
