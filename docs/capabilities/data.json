@@ -348,7 +348,7 @@
       "ps": {
         "v": "y",
         "note": "faint + uneven + both directions is noise; on the server, a project's own (or its org's) OpenAI-compatible model labels each changed region (intended, unintended, noise) with a sentence, and with Auto-pass noise on, a shot it labels all noise is accepted and listed as AI-filtered (ob 1473, ob 1789)",
-        "commit": "7fdb921"
+        "commit": "4b4343b"
       },
       "t": {
         "argos": "p",
