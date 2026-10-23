@@ -15,7 +15,7 @@ import {
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
 import type { DevArgs, DevDeps } from "./dev.ts";
-import { connect, resolveProject } from "./remote.ts";
+import { connect, namesProject, resolveProject } from "./remote.ts";
 
 /**
  * What a `pixelslash dev` session needs before its first run (ob 1740): the target's config with
@@ -84,7 +84,7 @@ export async function mainSource(
   }
   const baseBranch = flags.base ?? remote.upload?.baseBranch ?? "main";
   const main: FetchMain = async (dirs, entries) => {
-    const projectId = remote.token.startsWith("psu_")
+    const projectId = namesProject(remote.token)
       ? (await resolveProject(remote, flags.project)).id
       : undefined;
     const src = {

@@ -104,24 +104,36 @@ function onlyProject(projects: Project[], server: string): Project {
   );
 }
 
-function namedProject(projects: Project[], wanted: string): Project {
+function namedProject(projects: Project[], wanted: string, orgToken = false): Project {
   const byId = projects.find((p) => p.id === wanted);
   if (byId) return byId;
   const byName = projects.filter((p) => p.name === wanted);
   const [hit, ...others] = byName;
   if (hit && others.length === 0) return hit;
-  const why = hit ? `is more than one project: pass its id` : `is not a project this token sees`;
+  const missing = orgToken
+    ? `is not a project in this org: create it with \`pixelslash project create ${wanted}\``
+    : `is not a project this token sees`;
+  const why = hit ? `is more than one project: pass its id` : missing;
   throw new UsageError(`"${wanted}" ${why}\n${listed(hit ? byName : projects)}`);
 }
 
+/** A project's own `psci_` token holds one project; a personal or org token names which. */
+export const namesProject = (secret: string) => secret.startsWith("psu_") || isOrgToken(secret);
+
+const isOrgToken = (secret: string) => secret.startsWith("psorg_");
+
 /**
- * `--project` (an id or a name), else `upload.project` in the config, else the only project the
- * token sees. More than one and none named is a usage error listing them.
+ * `--project` (an id or a name), else `upload.project` in the config, else the only project a
+ * personal token sees. More than one and none named is a usage error listing them. An org token
+ * always names its project: which one a monorepo's job builds is never "the only one" (ob 1787).
  */
 export async function resolveProject(remote: Remote, flag: string | undefined): Promise<Project> {
-  const projects = await listProjects(remote.client);
   const wanted = flag ?? remote.upload?.project;
-  return wanted === undefined
-    ? onlyProject(projects, remote.client.server)
-    : namedProject(projects, wanted);
+  if (wanted === undefined && isOrgToken(remote.token))
+    throw new UsageError(
+      "an org token reaches every project of its org: pass --project NAME, or set upload.project in the config",
+    );
+  const projects = await listProjects(remote.client);
+  if (wanted === undefined) return onlyProject(projects, remote.client.server);
+  return namedProject(projects, wanted, isOrgToken(remote.token));
 }

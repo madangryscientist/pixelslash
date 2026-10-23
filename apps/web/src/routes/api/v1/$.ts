@@ -3,6 +3,7 @@ import { handleApi } from "#/api/handler";
 import {
   blobStore,
   database,
+  defaultDiffLocation,
   imageSigningSecret,
   minCliVersion,
   modelKeySecret,
@@ -15,6 +16,7 @@ const handle = ({ request }: { request: Request }) =>
     imageSecret: imageSigningSecret,
     minCliVersion: minCliVersion(),
     modelKeySecret: modelKeySecret(),
+    defaultDiffLocation,
   });
 
 export const Route = createFileRoute("/api/v1/$")({

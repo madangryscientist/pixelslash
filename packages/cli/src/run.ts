@@ -38,6 +38,7 @@ import { COMPARE_USAGE, runCompare } from "./compare.ts";
 import { DEV_USAGE, runDev } from "./dev.ts";
 import type { KeyInput } from "./dev-loop.ts";
 import { FLAKE_USAGE, FLAKES_USAGE, runFlake, runFlakes } from "./flake.ts";
+import { PROJECT_USAGE, runProject } from "./project.ts";
 import { IMPORT_USAGE, runImport } from "./import.ts";
 import { INIT_USAGE, runInit } from "./init.ts";
 import { MCP_USAGE } from "./mcp-usage.ts";
@@ -154,6 +155,7 @@ const COMMANDS: Record<
   },
   flakes: { usage: FLAKES_USAGE, run: runFlakes },
   flake: { usage: FLAKE_USAGE, run: runFlake },
+  project: { usage: PROJECT_USAGE, run: runProject },
 };
 
 export async function run(argv: string[], io: Io = process, deps: CliDeps = {}): Promise<number> {

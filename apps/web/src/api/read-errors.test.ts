@@ -27,7 +27,7 @@ describe("the read API's errors (ob 1729)", () => {
       status: 404,
       body: { api_version: 1, error: { code: "not_found", message: "not found" } },
     });
-    const post = await get(w.deps, "/api/v1/projects", w.ada, { method: "POST" });
+    const post = await get(w.deps, "/api/v1/projects", w.ada, { method: "PUT" });
     expect(post.status).toBe(405);
     expect(post.body.error.code).toBe("method_not_allowed");
   });

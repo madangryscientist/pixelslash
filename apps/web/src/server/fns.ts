@@ -23,7 +23,7 @@ import { listBuilds } from "#/db/build-list";
 import { NotReviewableError, acceptAllSnapshots, buildView, reviewSnapshot } from "#/db/review";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
-import { issueCiToken, listCiTokens, revokeCiToken } from "#/db/tokens";
+import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
 import { BadRequest, parseRect } from "#/api/validate";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
@@ -82,8 +82,10 @@ export const getViewer = createServerFn().handler(getViewerSummary);
  */
 export const getOrgs = createServerFn().handler(async () => {
   const user = await requireViewer();
-  const orgs = await listOrgs(database(), user.id);
-  return { orgs, now: new Date(), serverUrl: getRequestUrl().origin };
+  const db = database();
+  const orgs = await listOrgs(db, user.id);
+  const orgTokens = await listOrgTokens(db, user.id);
+  return { orgs, orgTokens, now: new Date(), serverUrl: getRequestUrl().origin };
 });
 
 export const newOrg = createServerFn({ method: "POST" })

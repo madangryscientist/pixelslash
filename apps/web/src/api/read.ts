@@ -203,7 +203,8 @@ function snapshot(ctx: ReadCtx, projectId: string, buildId: string, s: SnapshotV
   };
 }
 
-function projectOf(ctx: ReadCtx, p: Awaited<ReturnType<typeof actorProjects>>[number]) {
+/** A project as `/api/v1` replies with it; the list and `POST /projects` share this one shape. */
+export function projectOf(ctx: ReadCtx, p: Awaited<ReturnType<typeof actorProjects>>[number]) {
   return {
     id: p.id,
     name: p.name,

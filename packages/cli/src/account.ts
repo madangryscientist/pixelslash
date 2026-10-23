@@ -75,7 +75,7 @@ export async function runLogin(argv: string[], io: Io, deps: AccountDeps = {}): 
   if (!token) throw new UsageError("no token given");
   if (!token.startsWith("psu_"))
     throw new UsageError(
-      "login takes a personal token (psu_…); a CI token goes in PIXELSLASH_TOKEN or --token-path",
+      "login takes a personal token (psu_…); a CI token (psci_… or psorg_…) goes in PIXELSLASH_TOKEN or --token-path",
     );
   const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const user = meUser(await apiClient(server, token, fetch).get("/api/v1/me"));
@@ -95,6 +95,16 @@ export async function runLogout(argv: string[], io: Io, deps: AccountDeps = {}):
   return 0;
 }
 
+/** `whoami`'s identity lines: a user and their orgs, an org token, or a project's CI token. */
+function whoLine(me: Reply, projects: { name: string; org: string }[], orgs: string[]): string {
+  const user = meUser(me);
+  if (user)
+    return `user: ${user.login}${user.name ? ` (${user.name})` : ""}\norgs: ${orgs.join(", ") || "none"}`;
+  if (me.body.kind === "org-ci")
+    return `org token for ${orgs.join(", ") || str(me.body.orgId)}\nprojects: ${projects.map((p) => p.name).join(", ") || "none"}`;
+  return `CI token for project ${projects.map((p) => `${p.name} (${p.org})`).join(", ") || str(me.body.projectId)}`;
+}
+
 /** `pixelslash whoami`: the server, the token's source, its user and their orgs (or its CI project). */
 export async function runWhoami(argv: string[], io: Io, deps: AccountDeps = {}): Promise<number> {
   const { json, rest } = takeJson(argv);
@@ -107,10 +117,6 @@ export async function runWhoami(argv: string[], io: Io, deps: AccountDeps = {}):
     io.stdout.write(`${JSON.stringify({ server, via: remote.via, me: me.body, orgs })}\n`);
     return 0;
   }
-  const user = meUser(me);
-  const who = user
-    ? `user: ${user.login}${user.name ? ` (${user.name})` : ""}\norgs: ${orgs.join(", ") || "none"}`
-    : `CI token for project ${projects.map((p) => `${p.name} (${p.org})`).join(", ") || str(me.body.projectId)}`;
-  io.stdout.write(`server: ${server}\ntoken: ${remote.via}\n${who}\n`);
+  io.stdout.write(`server: ${server}\ntoken: ${remote.via}\n${whoLine(me, projects, orgs)}\n`);
   return 0;
 }

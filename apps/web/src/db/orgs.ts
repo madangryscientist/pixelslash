@@ -234,6 +234,10 @@ export async function createProject(
   made: string | NewProject,
 ): Promise<Project> {
   await requireMember(db, userId, orgId);
+  return insertProject(db, orgId, made);
+}
+
+async function insertProject(db: Db, orgId: string, made: string | NewProject): Promise<Project> {
   const { name, diffLocation } = typeof made === "string" ? { name: made } : made;
   const [project] = await db
     .insert(projects)
@@ -241,6 +245,34 @@ export async function createProject(
     .returning();
   if (!project) throw new Error("project insert returned nothing");
   return project;
+}
+
+/**
+ * The project of that name in the org, made if there is none (ob 1787). The caller has already
+ * proved it may act in the org: a member's `psu_` token, or the org's own `psorg_` token.
+ * Idempotent: a second call, or a lost race on the (org, name) unique index, finds the first.
+ */
+export async function ensureProject(
+  db: Db,
+  orgId: string,
+  made: NewProject,
+): Promise<{ project: Project; created: boolean }> {
+  const find = async () => {
+    const [row] = await db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.orgId, orgId), eq(projects.name, made.name)));
+    return row;
+  };
+  const existing = await find();
+  if (existing) return { project: existing, created: false };
+  try {
+    return { project: await insertProject(db, orgId, made), created: true };
+  } catch (error) {
+    const raced = await find();
+    if (raced) return { project: raced, created: false };
+    throw error;
+  }
 }
 
 /** Which branch auto-accepts (ob 1559). Any member may change it, as any member may issue a token. */

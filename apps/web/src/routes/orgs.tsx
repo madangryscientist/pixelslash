@@ -4,6 +4,7 @@ import { ActionButton } from "#/components/action-button";
 import { Avatar } from "#/components/avatar";
 import { FieldDialog } from "#/components/dialog";
 import { MembersPanel } from "#/components/org-members";
+import { type OrgToken, OrgTokensPanel } from "#/components/org-tokens";
 import { EmptyOrg } from "#/components/org-empty";
 import { ProjectTable, WaitingStrip, plural } from "#/components/org-projects";
 import { OrgRail } from "#/components/org-rail";
@@ -11,7 +12,7 @@ import { Page, useHydrated } from "#/components/ui";
 import type { OrgOverview } from "#/db/orgs";
 import { getOrgs, invite, newOrg, newProject, withdrawOrgInvite } from "#/server/fns";
 
-type OrgsSearch = { org?: string; tab?: "members" };
+type OrgsSearch = { org?: string; tab?: "members" | "tokens" };
 
 const rootRoute = getRouteApi("__root__");
 
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/orgs")({
   validateSearch: (search: Record<string, unknown>): OrgsSearch => {
     const out: OrgsSearch = {};
     if (typeof search.org === "string" && search.org) out.org = search.org;
-    if (search.tab === "members") out.tab = "members";
+    if (search.tab === "members" || search.tab === "tokens") out.tab = search.tab;
     return out;
   },
   loader: () => getOrgs(),
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/orgs")({
 type DialogKind = "project" | "org" | "invite";
 
 function Orgs() {
-  const { orgs, now, serverUrl } = Route.useLoaderData();
+  const { orgs, orgTokens, now, serverUrl } = Route.useLoaderData();
   const search = Route.useSearch();
   const { viewer } = rootRoute.useLoaderData();
   const router = useRouter();
@@ -53,6 +54,7 @@ function Orgs() {
           {selected ? (
             <OrgPanel
               org={selected}
+              tokens={orgTokens.filter((t) => t.orgId === selected.id)}
               now={now}
               serverUrl={serverUrl}
               tab={search.tab ?? "projects"}
@@ -172,7 +174,9 @@ function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
 const TAB =
   "-mb-px border-b-2 px-0.5 pb-2.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600";
 
-function OrgTabs({ org, tab }: { org: OrgOverview; tab: "projects" | "members" }) {
+type Tab = "projects" | "members" | "tokens";
+
+function OrgTabs({ org, tab }: { org: OrgOverview; tab: Tab }) {
   return (
     <nav aria-label="Organization" className="mb-5 flex gap-6 border-b border-slate-200">
       <Link
@@ -190,6 +194,14 @@ function OrgTabs({ org, tab }: { org: OrgOverview; tab: "projects" | "members" }
         className={`${TAB} ${tab === "members" ? "border-violet-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"}`}
       >
         Members <span className="ml-1 text-slate-400">{org.members.length}</span>
+      </Link>
+      <Link
+        to="/orgs"
+        search={{ org: org.id, tab: "tokens" }}
+        aria-current={tab === "tokens" ? "page" : undefined}
+        className={`${TAB} ${tab === "tokens" ? "border-violet-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+      >
+        Tokens
       </Link>
     </nav>
   );
@@ -227,6 +239,7 @@ function ProjectsPanel({
 
 function OrgPanel({
   org,
+  tokens,
   now,
   serverUrl,
   tab,
@@ -237,9 +250,10 @@ function OrgPanel({
   onWithdraw,
 }: {
   org: OrgOverview;
+  tokens: OrgToken[];
   now: Date;
   serverUrl: string;
-  tab: "projects" | "members";
+  tab: Tab;
   viewerLogin: string | null;
   hydrated: boolean;
   onDialog: (kind: DialogKind) => void;
@@ -272,7 +286,10 @@ function OrgPanel({
         </ActionButton>
       </div>
       <OrgTabs org={org} tab={tab} />
-      {tab === "members" ? (
+      {tab === "tokens" && (
+        <OrgTokensPanel orgId={org.id} orgName={org.name} tokens={tokens} hydrated={hydrated} />
+      )}
+      {tab === "members" && (
         <MembersPanel
           org={org}
           viewerLogin={viewerLogin}
@@ -280,7 +297,8 @@ function OrgPanel({
           onInvite={onInvite}
           onWithdraw={onWithdraw}
         />
-      ) : (
+      )}
+      {tab === "projects" && (
         <ProjectsPanel
           org={org}
           now={now}

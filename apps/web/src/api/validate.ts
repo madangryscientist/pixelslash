@@ -33,6 +33,11 @@ function text(v: unknown, where: string, max: number, pattern?: RegExp): string 
   return v;
 }
 
+/** A project's name as the web app takes it: trimmed, 1 to 100 characters. */
+export function projectName(v: unknown): string {
+  return text(typeof v === "string" ? v.trim() : v, "name", 100);
+}
+
 /** A git object id: SHA-1 (40) or SHA-256 (64) hex. */
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const TOKEN = /^[\w.-]+$/;

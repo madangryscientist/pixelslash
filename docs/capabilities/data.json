@@ -545,7 +545,7 @@
       "label": "CI tokens",
       "ps": {
         "v": "y",
-        "note": "psci_ token per project, env or file; psu_ personal tokens the CLI and MCP act as their user with (ob 1728)",
+        "note": "psci_ token per project, env or file; psu_ personal tokens the CLI and MCP act as their user with (ob 1728); one psorg_ org token reaches every project of its org, with `project create NAME` making projects by name (ob 1787)",
         "commit": "90e1103"
       },
       "t": {

@@ -285,15 +285,17 @@ pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash project create NAME [--org NAME] [--server URL] [--token-path PATH] [--config FILE] [--json]
+pixelslash project list [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash flake ID [--runs N] [--out DIR] [--write | --suggest] [--resolve [--note TEXT]] [--json] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
 pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
 pixelslash --version
 pixelslash install-browser
 ```
 
-- `login` asks for a personal token (`psu_…`; it prints where to make one: Settings → API tokens on the server, `<server>/settings`). On a terminal the token is read with echo off; otherwise it is the first line of stdin (`pixelslash login --server URL < token-file`). It checks the token with `GET /api/v1/me`, then stores it. A CI token (`psci_…`) is refused: CI passes its token by `PIXELSLASH_TOKEN` or `--token-path` instead. No token is ever printed.
+- `login` asks for a personal token (`psu_…`; it prints where to make one: Settings → API tokens on the server, `<server>/settings`). On a terminal the token is read with echo off; otherwise it is the first line of stdin (`pixelslash login --server URL < token-file`). It checks the token with `GET /api/v1/me`, then stores it. A CI token (`psci_…` or an org token `psorg_…`) is refused: CI passes its token by `PIXELSLASH_TOKEN` or `--token-path` instead. No token is ever printed.
 - **The credential file** is `~/.config/pixelslash/credentials.json` (`$XDG_CONFIG_HOME/pixelslash/` when that is set), mode 0600 in a 0700 dir, one token per server: `{ "servers": { "https://ps.example": { "token": "psu_…" } } }`. `logout` removes the server's entry and does not revoke the token; revoke it on the settings page.
-- `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
+- `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), `org token for ORG` with the projects it reaches, or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
 - `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
 - `status` prints one build's link and where its review stands (`changes: 2 waiting · 1 accepted · 0 rejected`), then one `skipped flaky: <name> (WxH theme)` line per flaky shot the `skip` policy kept out of review, and exits by the outcome (the table below). The build is `--build ID`; else the newest at a commit `--commit SHA` starts; else the newest on `--branch NAME`; else the one `upload` recorded in `DIR/build.json` (`--dir`, default `pixelslash-snapshots`) for this same server and the checked-out commit; else the newest at the checked-out commit. `--commit` and the commit fallback look among the project's newest 100 builds; an older one is named with `--build`. Picking more than one is exit 2, and no build at the commit or on the branch is exit 3. `--json` prints the build read (`GET /api/v1/builds/:id`) as sent. See [Block CI on review](#block-ci-on-review) for `--wait`.
 - `--version` prints `pixelslash <version>`, the version the User-Agent sends. `install-browser` runs the Playwright that `capture` uses to install `chromium-headless-shell`.
@@ -309,7 +311,7 @@ pixelslash install-browser
 | Code | Meaning |
 | --- | --- |
 | 0 | ok. For `status`: every changed shot accepted, or nothing changed. |
-| 1 | **Reserved for NEW design-system violations on Branch** (invariant 3); no remote command uses it, except `upload`'s older exit 1 for a refused upload. |
+| 1 | **Reserved for NEW design-system violations on Branch** (invariant 3); no remote command uses it, except `upload`'s older exit 1 for a refused upload and `project create`'s for a server that refuses it. |
 | 2 | A usage error: a bad flag or duration, no server, not logged in, no project picked, more than one build picked. |
 | 3 | **The server did not give what was asked**: a refused, expired or revoked token (401), an id the token cannot reach (404), a server error, or a server that cannot be reached. For `status`, also a build that `errored` and no build at the commit or branch. `install-browser` also exits 3 when the install fails. |
 | 4 | `status`: a reviewer rejected a shot, so the build `failed`. |
@@ -397,7 +399,7 @@ pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-
 ```
 
 - `DIR` is a snapshot dir: a `manifest.json` and the PNGs it names (what `capture` writes). The whole manifest and every PNG are checked before anything is sent, so a bad dir never opens a build on the server.
-- The token is a per-project CI token (`psci_…`, issued in the project's settings). A personal token (`psu_…`, issued under Settings → API tokens, with an optional 30-day, 90-day or 1-year expiry) acts as its user and reaches every project of that user's orgs; with one, `upload` names the project it opens the build in, resolved as in [Signing in](#signing-in-and-reading-builds) (`--project`, `upload.project`, or the only one the token sees). It comes from the file `--token-path` names, else `PIXELSLASH_TOKEN`, else the one `pixelslash login` stored for the server. Never put it in git.
+- The token is a per-project CI token (`psci_…`, issued in the project's settings). An org token (`psorg_…`, issued under Organizations → Tokens) reaches every project of its org; like a personal token it names the project, but it never defaults to "the only one": with neither `--project` nor `upload.project` it is exit 2, naming both. A personal token (`psu_…`, issued under Settings → API tokens, with an optional 30-day, 90-day or 1-year expiry) acts as its user and reaches every project of that user's orgs; with one, `upload` names the project it opens the build in, resolved as in [Signing in](#signing-in-and-reading-builds) (`--project`, `upload.project`, or the only one the token sees). It comes from the file `--token-path` names, else `PIXELSLASH_TOKEN`, else the one `pixelslash login` stored for the server. Never put it in git.
 - The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main", "project": "web" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
 - From the local git checkout it sends the commit, the branch, the **merge-base** with the base branch (`--base`, else `upload.baseBranch`, else `main`; `origin/<base>` is tried first) and up to **20 ancestor SHAs**, nearest first. Without the base branch in the checkout (a shallow clone) it warns and sends no merge-base: fetch full history in CI. The branch is `--branch`, else `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`, else the checked-out branch; a detached `HEAD` with none of those is a usage error. The PR number is `--pr`, else read from `GITHUB_REF` (`refs/pull/N/…`).
 - It opens a build, uploads each PNG, then finalises with the snapshot count; the server diffs inside that request. Exit 0 on success. Exit 1 when the server refuses (wrong or revoked token, 4xx/5xx) or cannot be reached; the build is then left open on the server, unfinalised, and its snapshots are not counted. The message names the step (`open build`, `upload <snapshot>`, `finalize`) and the server's answer in one line. A request the API never answered (the connection failed, a 502/503/504, or a 5xx that is not the API's `{"error"}` JSON, such as `vite preview`'s proxy page) is tried again after 1 s and 2 s, three tries in all, with a warning on stderr for each retry; an error the API itself answered is not retried. Every step is safe to repeat, and a repeated open at worst leaves an empty unfinalised build behind. A finalise whose answer is `processing` (a retry that met an earlier try's diff still running, or one the runtime killed) is exit 1: nothing has been measured yet. Exit 2 on a bad flag, a missing token or server, or a bad manifest. Re-running makes a new build.
@@ -489,7 +491,7 @@ Carries and the default branch's auto-accept work as on the server. A CLI from b
 
 **One shot's diff failing does not stop the others.** A shot whose server diff throws (its baseline missing from storage, a PNG that does not decode) keeps the reason in its `diffError` and is left unmeasured; the rest are measured, and the build ends `errored` naming each failed shot (`N of M shots could not be measured…`). The build page of an errored server-diff build has **Re-run errored shots** (the same as sending finalise again: only the shots with no result are measured), and on a build with a verdict each shot's page has **Re-run this shot**, which measures that one shot again. Both work from the PNGs the server holds (nothing is captured), and the build gets its verdict once none is left unmeasured; a picked shot whose re-diff fails loses its review and errors the build. A re-run shot whose result is the same keeps its review; one whose result moved goes back to pending (and is accepted again on the default branch, unless it is flaky). A `ci` project has neither control, and the server refuses the re-run (ob 1738).
 
-Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A CI token only reaches its own project's builds, a personal token the projects of its user's orgs; any other project or build id is a 404. 401 is a missing, wrong, expired or revoked token.
+Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A CI token only reaches its own project's builds, an org token the projects of its org, a personal token the projects of its user's orgs; any other project or build id is a 404. 401 is a missing, wrong, expired or revoked token.
 
 **What a shot is compared against (its baseline).** Each shot is matched by name, platform, browser, viewport and theme, and the server picks one earlier shot for it:
 
@@ -520,6 +522,25 @@ pixelslash upload pixelslash-snapshots --wait --timeout 30m
 ```
 
 To keep the upload and the wait in separate steps (a separate job, or a retry of the wait alone), run `pixelslash upload pixelslash-snapshots`, then `pixelslash status --wait` from the same working dir: it reads the build from `pixelslash-snapshots/build.json`. A job with no snapshot dir names the build with `--build`, `--commit "$COMMIT_SHA"` or `--branch NAME`. This calls no GitHub or GitLab API and comments on no PR; the job's own pass or fail is the signal.
+
+### A monorepo: one org token
+
+A monorepo has many projects, and one `psci_` token per project is tedious. Mint one **org token** (`psorg_…`) under Organizations → Tokens (any member can; it is shown once and can be revoked there), keep it as the CI's one secret, and name the project on each step. `project create` makes the project if the org has none of that name and otherwise says it exists, so it is safe to run on every build:
+
+```sh
+export PIXELSLASH_SERVER=https://<server>
+export PIXELSLASH_TOKEN="$PIXELSLASH_ORG_TOKEN"   # the CI's secret store, never git
+
+for pkg in web docs admin; do
+  pixelslash project create "$pkg"                # created: … or already exists: …, exit 0 either way
+  pixelslash capture --config "packages/$pkg/pixelslash.config.ts" --out "snapshots/$pkg"
+  pixelslash upload "snapshots/$pkg" --project "$pkg"
+done
+```
+
+- `project create NAME` prints the project's id and name and whether it was `created` or `already exists`; `--json` prints the server's reply (`created` is a boolean). Exit 0 both ways, 1 when the server refuses, 2 on a usage error. `project list` prints the projects the token reaches.
+- An upload never creates a project. A name the org does not have is exit 2 naming it (and `project create NAME`), so a typo makes no stray project.
+- An org token reaches the projects of its org and nothing else: another org's project is a 404. Per-project `psci_` tokens keep working as before.
 
 ### Check before you push
 
@@ -555,6 +576,7 @@ PIXELSLASH_SERVER=https://<server> PIXELSLASH_TOKEN_FILE=<path to a project's CI
 Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any other integration. Send the token as `Authorization: Bearer <token>`:
 
 - A **CI token** (`psci_…`) reaches its one project.
+- An **org token** (`psorg_…`, issued by any member under Organizations → Tokens) reaches every project of its org and nothing else. It names the project in the request, as a personal token does, and can create one by name (`POST /api/v1/projects`). An upload never creates a project: an unknown project is a 404.
 - A **personal token** (`psu_…`) acts as its user and reaches every project of that user's orgs.
 - A project, build or snapshot the token cannot reach is a **404**, never a 403, so a 404 does not tell you whether the id exists.
 
@@ -562,22 +584,23 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 
 | Request | Auth | Query or body | Reply |
 | --- | --- | --- | --- |
-| `GET /api/v1/me` | CI or personal | — | `200 { kind: "user", user: { id, login, name } }` or `200 { kind: "ci", projectId }` |
-| `POST /api/v1/builds` | CI or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId?, clientDiff? }`; `projectId` is required with a personal token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
-| `POST /api/v1/builds/:id/baselines` | CI or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
-| `POST /api/v1/baselines` | CI or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick], removed: [{ name, platform, browser, viewport, theme }] }`: `removed` is what the baseline build holds and no key asked about |
-| `PUT /api/v1/builds/:id/snapshots` | CI or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake?, changeNote? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (≤32 MiB each, counted in the request's size cap) | `200 { id }` |
-| `POST /api/v1/builds/:id/finalize` | CI or personal | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
-| `GET /api/v1/projects` | CI or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; a CI token's one project |
-| `GET /api/v1/projects/:id/builds` | CI or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
-| `GET /api/v1/builds/:id` | CI or personal | — | `200 { build: { …build, snapshots: [snapshot] } }`, snapshots in review order |
-| `GET /api/v1/snapshots/:id` | CI or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
-| `GET /api/v1/projects/:id/detection-flags` | CI or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
+| `GET /api/v1/me` | CI, org or personal | — | `200 { kind: "user", user: { id, login, name } }`, `200 { kind: "ci", projectId }` or `200 { kind: "org-ci", orgId }` |
+| `POST /api/v1/builds` | CI, org or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤20), prNumber?, projectId?, clientDiff? }`; `projectId` is required with a personal or org token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
+| `POST /api/v1/builds/:id/baselines` | CI, org or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
+| `POST /api/v1/baselines` | CI, org or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick], removed: [{ name, platform, browser, viewport, theme }] }`: `removed` is what the baseline build holds and no key asked about |
+| `PUT /api/v1/builds/:id/snapshots` | CI, org or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake?, changeNote? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (≤32 MiB each, counted in the request's size cap) | `200 { id }` |
+| `POST /api/v1/builds/:id/finalize` | CI, org or personal | JSON `{ snapshots: N }` | `200 { id, status, error, unmeasured }` |
+| `GET /api/v1/projects` | CI, org or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; an org token's org's; a CI token's one project |
+| `POST /api/v1/projects` | org or personal | JSON `{ name, org? }`: `name` is 1 to 100 characters; `org` (an id or exact name) is needed only when a personal token belongs to several orgs, and an org token's is its own | `201 { …project, created: true }` for a new project, `200 { …project, created: false }` for the one of that name already in the org (idempotent). A project's `ci` token is a 403; an unknown `org` a 404 |
+| `GET /api/v1/projects/:id/builds` | CI, org or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
+| `GET /api/v1/builds/:id` | CI, org or personal | — | `200 { build: { …build, snapshots: [snapshot] } }`, snapshots in review order |
+| `GET /api/v1/snapshots/:id` | CI, org or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
+| `GET /api/v1/projects/:id/detection-flags` | CI, org or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
 | `POST /api/v1/detection-flags/:id/exported` | personal | — | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
-| `GET /api/v1/projects/:id/flakes` | CI or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
+| `GET /api/v1/projects/:id/flakes` | CI, org or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
 | `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
 
-There are no write endpoints besides the four upload ones, resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
+There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
 **The upload endpoints** (`me`, `builds`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`.
 

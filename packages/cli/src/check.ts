@@ -15,7 +15,7 @@ import {
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
 import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
-import { type Remote, connect, resolveProject } from "./remote.ts";
+import { type Remote, connect, namesProject, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 import { flakeRetries } from "./upload.ts";
 import { type Watch, watched } from "./watch.ts";
@@ -88,9 +88,9 @@ export function checkJson(result: CheckResult) {
  */
 export type CheckFlags = Partial<Record<(typeof CHECK_FLAGS)[number], string>>;
 
-/** Where to look and as whom; a personal token reaches several projects, so it names one. */
+/** Where to look and as whom; a personal or org token reaches several projects, so it names one. */
 async function optionsOf(flags: CheckFlags, remote: Remote, cwd: string): Promise<CheckOptions> {
-  const projectId = remote.token.startsWith("psu_")
+  const projectId = namesProject(remote.token)
     ? (await resolveProject(remote, flags.project)).id
     : undefined;
   return {

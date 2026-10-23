@@ -57,6 +57,7 @@ export async function setup() {
     store: blobs.store,
     imageSecret: () => "test-image-secret",
     modelKeySecret: TEST_MODEL_KEY_SECRET,
+    defaultDiffLocation: () => "server",
   };
   return { db, deps, blobs, acme, other };
 }

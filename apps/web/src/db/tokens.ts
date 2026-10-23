@@ -1,8 +1,9 @@
-import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { randomToken, sha256Hex } from "#/lib/crypto";
 import { type Db, NotFoundError } from "./db";
-import { getProject } from "./orgs";
-import { ciTokens, projects, userTokens } from "./schema";
+import { getProject, requireMember } from "./orgs";
+import { ciTokens, members, projects, userTokens } from "./schema";
+import { orgTokens } from "./schema-org-tokens";
 
 const PREFIX = "psci_";
 
@@ -62,6 +63,70 @@ export async function verifyCiToken(db: Db, token: string, now = new Date()) {
   if (!row) return null;
   await db.update(ciTokens).set({ lastUsedAt: now }).where(eq(ciTokens.id, row.tokenId));
   return { projectId: row.projectId, orgId: row.orgId };
+}
+
+const ORG_PREFIX = "psorg_";
+
+/** An org CI token (ob 1787): any member may issue one. The plaintext is returned here and nowhere else. */
+export async function issueOrgToken(db: Db, userId: string, orgId: string, name: string) {
+  await requireMember(db, userId, orgId);
+  const token = randomToken(ORG_PREFIX);
+  const id = crypto.randomUUID();
+  await db.insert(orgTokens).values({
+    id,
+    orgId,
+    name,
+    tokenHash: await sha256Hex(token),
+    prefix: token.slice(0, ORG_PREFIX.length + 4),
+    createdBy: userId,
+  });
+  return { id, token };
+}
+
+/** The org tokens of every org the user belongs to, for the organizations page: never the hash. */
+export async function listOrgTokens(db: Db, userId: string) {
+  const orgIds = db
+    .select({ orgId: members.orgId })
+    .from(members)
+    .where(eq(members.userId, userId));
+  return db
+    .select({
+      id: orgTokens.id,
+      orgId: orgTokens.orgId,
+      name: orgTokens.name,
+      prefix: orgTokens.prefix,
+      createdAt: orgTokens.createdAt,
+      lastUsedAt: orgTokens.lastUsedAt,
+      revokedAt: orgTokens.revokedAt,
+    })
+    .from(orgTokens)
+    .where(inArray(orgTokens.orgId, orgIds))
+    .orderBy(desc(orgTokens.createdAt), desc(orgTokens.id));
+}
+
+/** Another org's token is the same 404 as a missing one. */
+export async function revokeOrgToken(db: Db, userId: string, tokenId: string): Promise<void> {
+  const [row] = await db
+    .select({ id: orgTokens.id })
+    .from(orgTokens)
+    .innerJoin(members, and(eq(members.orgId, orgTokens.orgId), eq(members.userId, userId)))
+    .where(eq(orgTokens.id, tokenId));
+  if (!row) throw new NotFoundError("token");
+  await db
+    .update(orgTokens)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(orgTokens.id, tokenId), isNull(orgTokens.revokedAt)));
+}
+
+/** What CI authenticates with when it names its project: the org a live org token belongs to, or null. */
+export async function verifyOrgToken(db: Db, token: string, now = new Date()) {
+  const [row] = await db
+    .select({ tokenId: orgTokens.id, orgId: orgTokens.orgId })
+    .from(orgTokens)
+    .where(and(eq(orgTokens.tokenHash, await sha256Hex(token)), isNull(orgTokens.revokedAt)));
+  if (!row) return null;
+  await db.update(orgTokens).set({ lastUsedAt: now }).where(eq(orgTokens.id, row.tokenId));
+  return { orgId: row.orgId };
 }
 
 const USER_PREFIX = "psu_";

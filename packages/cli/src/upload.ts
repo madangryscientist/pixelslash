@@ -22,7 +22,7 @@ import {
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
-import { connect, resolveProject } from "./remote.ts";
+import { connect, namesProject, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
 
@@ -77,15 +77,15 @@ export function flakeRetries(raw: string | undefined): number | undefined {
 type Target = { server: string; token: string; baseBranch: string; projectId?: string };
 
 /**
- * Where to send and as whom, resolved as every remote command does. A personal token reaches
- * several projects, so it also names one; a CI token's project is its own.
+ * Where to send and as whom, resolved as every remote command does. A personal or org token
+ * reaches several projects, so it also names one; a CI token's project is its own.
  */
 async function resolveTarget(flags: UploadFlags, deps: UploadDeps, cwd: string): Promise<Target> {
   const remote = await connect(flags, { ...deps, cwd });
   const { server } = remote.client;
   const { token } = remote;
   const baseBranch = flags.base ?? remote.upload?.baseBranch ?? "main";
-  if (!token.startsWith("psu_")) return { server, token, baseBranch };
+  if (!namesProject(token)) return { server, token, baseBranch };
   try {
     const project = await resolveProject(remote, flags.project);
     return { server, token, baseBranch, projectId: project.id };

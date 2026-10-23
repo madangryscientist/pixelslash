@@ -4,7 +4,8 @@ import { snapshotDiffOptions } from "#/db/builds";
 import { builds, snapshots } from "#/db/schema";
 import { revokeCiToken } from "#/db/tokens";
 import { usageCounts } from "#/db/usage";
-import { type ApiDeps, MAX_PNG_BYTES, handleApi } from "./handler";
+import { type ApiDeps, handleApi } from "./handler";
+import { MAX_PNG_BYTES } from "./snapshot-form";
 import { MAX_FLAKE_RUNS } from "./validate";
 import {
   META,
@@ -196,7 +197,12 @@ describe("upload API", () => {
 
   test("a failed blob write leaves no snapshot row", async () => {
     const { db, acme } = await setup();
-    const deps: ApiDeps = { db, store: memoryStore(true).store, imageSecret: () => "s" };
+    const deps: ApiDeps = {
+      db,
+      store: memoryStore(true).store,
+      imageSecret: () => "s",
+      defaultDiffLocation: () => "server",
+    };
     const id = await openBuild(deps, acme.token);
     await expect(
       call(deps, `PUT /api/v1/builds/${id}/snapshots`, acme.token, snapshotForm()),
