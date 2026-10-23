@@ -16,7 +16,9 @@ import {
 } from "./judge.ts";
 import { renderIndex, renderPixelReport, renderReport, type RouteRow } from "./report.ts";
 import { joinOrigin, routeSlug } from "./routes.ts";
-import { writeRunFiles, type RunManifest } from "./run.ts";
+import { writeRunFiles, writeRunTimings, type RunManifest } from "./run.ts";
+import { withTimings } from "./report-timings.ts";
+import { buildTimings, timed, type ShotTiming, type Timings } from "./timings.ts";
 
 export type Deps = {
   spawn?: SpawnProc;
@@ -53,16 +55,20 @@ export type CompareResult = {
   manifest?: RunManifest;
   out: string;
   changedPixels?: number;
+  /** Where the time went (ob 1791): also in `manifest.json` and the report. */
+  timings?: Timings;
 };
 
 type Verdict = { already: Violation[]; fresh: Violation[]; skipped: boolean };
 
 export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Promise<CompareResult> {
+  const started = performance.now();
   const routes = opts.routes ?? [];
   const pixel = !opts.ds;
   await mkdir(opts.out, { recursive: true });
-  const browser = opts.live && opts.local && !deps.capture ? await launchBrowser() : undefined;
+  const browser = await routeBrowser(opts, deps);
   const rows: RouteRow[] = [];
+  const shots: ShotTiming[] = [];
   const already: Violation[] = [];
   const fresh: Violation[] = [];
   let skipped = false;
@@ -71,6 +77,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
       const slug = routeSlug(path);
       const one = await compare(routeOptions(opts, path, slug), deps, browser, path);
       rows.push(routeRow(path, slug, one));
+      shots.push(...(one.timings?.shots ?? []));
       already.push(...one.already);
       fresh.push(...one.fresh);
       skipped = one.skipped;
@@ -79,10 +86,15 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
     await browser?.close();
   }
   const reportPath = join(opts.out, "index.html");
-  await Bun.write(reportPath, renderIndex(rows, pixel));
-  const result: CompareResult = { already, fresh, reportPath, skipped, out: opts.out };
+  const timings = buildTimings(started, shots);
+  await Bun.write(reportPath, withTimings(renderIndex(rows, pixel), timings));
+  const result: CompareResult = { already, fresh, reportPath, skipped, out: opts.out, timings };
   if (pixel) result.changedPixels = rows.reduce((n, r) => n + r.changedPixels, 0);
   return result;
+}
+
+function routeBrowser(opts: CompareOptions, deps: Deps): Promise<Browser | undefined> | undefined {
+  return opts.live && opts.local && !deps.capture ? launchBrowser() : undefined;
 }
 
 function routeRow(path: string, slug: string, one: CompareResult): RouteRow {
@@ -156,10 +168,11 @@ export async function compare(
   browser?: Browser,
   routePath?: string,
 ): Promise<CompareResult> {
+  const started = performance.now();
   const components = opts.ds ? await dsComponents(opts.ds) : [];
 
   await mkdir(opts.out, { recursive: true });
-  await takeShots(opts, deps, browser);
+  const captured = await timed(() => takeShots(opts, deps, browser));
 
   const main = Buffer.from(await Bun.file(join(opts.out, "live.png")).arrayBuffer());
   const branch = Buffer.from(await Bun.file(join(opts.out, "local.png")).arrayBuffer());
@@ -171,9 +184,13 @@ export async function compare(
     ignore: { main: opts.ignore, branch: opts.ignore },
   });
   const manifest = written.manifest;
+  const shot: ShotTiming = { name: routePath ?? "page", diffMs: written.diffMs };
+  // Existing PNGs are only copied: no capture happened, so no capture timing.
+  if (!(opts.livePng && opts.localPng)) shot.captureMs = captured.ms;
 
   const reportPath = join(opts.out, "report.html");
   if (!opts.ds) {
+    const timings = buildTimings(started, [shot]);
     const html = renderPixelReport({
       path: routePath,
       changedPixels: manifest.changedPixels,
@@ -186,11 +203,25 @@ export async function compare(
       main: written.main,
       branch: written.branch,
     });
-    await Bun.write(reportPath, html);
-    return { already: [], fresh: [], reportPath, skipped: false, manifest, out: opts.out };
+    await Bun.write(reportPath, withTimings(html, timings));
+    await writeRunTimings(opts.out, manifest, timings);
+    return {
+      already: [],
+      fresh: [],
+      reportPath,
+      skipped: false,
+      manifest,
+      out: opts.out,
+      timings,
+    };
   }
 
-  const verdict = await judgePair(opts.out, opts.ds, components, deps);
+  const ds = opts.ds;
+  const judged = await timed(() => judgePair(opts.out, ds, components, deps));
+  const verdict = judged.value;
+  // A run with no judge has no judge timing, not 0.
+  if (!verdict.skipped) shot.judgeMs = judged.ms;
+  const timings = buildTimings(started, [shot]);
   const dsOut = join(opts.out, "ds");
   await mkdir(dsOut, { recursive: true });
   for (const name of components) {
@@ -198,7 +229,11 @@ export async function compare(
   }
   await Bun.write(
     reportPath,
-    renderReport({ already: verdict.already, fresh: verdict.fresh, components }),
+    withTimings(
+      renderReport({ already: verdict.already, fresh: verdict.fresh, components }),
+      timings,
+    ),
   );
-  return { ...verdict, reportPath, manifest, out: opts.out };
+  await writeRunTimings(opts.out, manifest, timings);
+  return { ...verdict, reportPath, manifest, out: opts.out, timings };
 }

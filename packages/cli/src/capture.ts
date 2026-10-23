@@ -1,13 +1,16 @@
 import { join, resolve } from "node:path";
 import {
   UsageError,
+  buildTimings,
   captureInto,
   findConfig,
   loadConfig,
   onlyRoutes,
   openCaptureSession,
   recapture,
+  timingLine,
   type SnapshotDeps,
+  type Timings,
   type UploadDeps,
   type DevJudgeDeps,
 } from "@pixelslash/engine";
@@ -17,6 +20,9 @@ import { UPLOAD_FLAGS, type UploadFlags, uploadDir } from "./upload.ts";
 import { type Watch, watched } from "./watch.ts";
 
 type SnapshotResult = Awaited<ReturnType<typeof captureInto>>;
+
+/** A capture and how long it took, browser launch included. */
+type TimedSnapshotResult = SnapshotResult & { timings: Timings };
 
 export const CAPTURE_USAGE =
   "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--json] | [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
@@ -51,11 +57,12 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
 }
 
 /** `--json` and `capture_local`: every shot taken, with its PNG's absolute path. */
-export function captureJson(out: string, { manifest, manifestPath }: SnapshotResult) {
+export function captureJson(out: string, { manifest, manifestPath, timings }: TimedSnapshotResult) {
   return {
     measured: "local",
     uploaded: false,
     manifest: manifestPath,
+    timings,
     shots: manifest.snapshots.map((e) => ({
       name: e.name,
       variant: e.variant.name,
@@ -72,13 +79,15 @@ export async function captureLocal(
   flags: { config?: string | undefined; out: string; only: string[] | undefined },
   deps: SnapshotDeps & { cwd?: string },
   watch: Watch = {},
-): Promise<SnapshotResult> {
+): Promise<TimedSnapshotResult> {
+  const started = performance.now();
   const config = await loadConfig(findConfig(flags.config, deps.cwd ?? process.cwd()));
   const session = await openCaptureSession(config, deps);
   try {
     const shooting = onlyRoutes(session, flags.only);
     const total = shooting.routes.length * config.variants.length;
-    return await captureInto(watched(shooting, watch, total), flags.out);
+    const result = await captureInto(watched(shooting, watch, total), flags.out);
+    return { ...result, timings: buildTimings(started, result.shots) };
   } finally {
     await session.close();
   }
@@ -114,13 +123,12 @@ export async function runCapture(
         warn,
       },
     );
-    if (flags.json) {
-      io.stdout.write(`${JSON.stringify(captureJson(flags.out, result), null, 2)}\n`);
-      return 0;
-    }
-    printCaptured(result, io);
+    if (flags.json) io.stdout.write(`${JSON.stringify(captureJson(flags.out, result), null, 2)}\n`);
+    else printCaptured(result, io);
+    io.stderr.write(`${timingLine(result.timings)}\n`);
     return 0;
   }
+  const started = performance.now();
   const config = await loadConfig(findConfig(flags.uploadFlags.config, cwd));
   const session = await openCaptureSession(config, {
     ...deps,
@@ -128,12 +136,14 @@ export async function runCapture(
   });
   try {
     const result = await captureInto(session, flags.out);
+    const timings = buildTimings(started, result.shots);
     printCaptured(result, io);
     // The config's retries unless the flag says otherwise; the shots were just shot here.
     const retries = flags.uploadFlags["flake-retries"] ?? String(config.flake.retries);
     return await uploadDir(flags.out, { ...flags.uploadFlags, "flake-retries": retries }, io, {
       ...deps,
       recapture: (e) => recapture(session, e),
+      timings,
     });
   } finally {
     await session.close();

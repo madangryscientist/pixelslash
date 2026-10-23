@@ -13,6 +13,8 @@ import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, pngPath } from "./manifest.ts";
 import { isHttpUrl } from "./routes.ts";
 import { type CaptureSession, type SnapshotEntry, captureInto, recapture } from "./snapshot.ts";
+import { withTimings } from "./report-timings.ts";
+import { buildTimings, mergeShots } from "./timings.ts";
 import { type Client, isObj } from "./upload-client.ts";
 
 /**
@@ -41,6 +43,8 @@ export type CheckDeps = {
   env?: NodeJS.ProcessEnv;
   warn?: (message: string) => void;
   sleep?: (ms: number) => Promise<void>;
+  /** A `performance.now()` reading the run's total counts from; default: when the check begins. */
+  started?: number;
 };
 
 export type { CheckShot } from "./check-rows.ts";
@@ -229,6 +233,7 @@ export async function checkAgainstServer(
 ): Promise<CheckResult> {
   if (!isHttpUrl(opts.server))
     throw new UsageError(`server must be an http(s) URL: ${opts.server}`);
+  const started = deps.started ?? performance.now();
   const shooting = onlyRoutes(session, opts.only);
   const ctx = await gitOf(opts, deps);
   const out = resolve(opts.out);
@@ -239,7 +244,7 @@ export async function checkAgainstServer(
   };
   await rm(dirs.main, { recursive: true, force: true });
   await rm(dirs.report, { recursive: true, force: true });
-  const { manifest } = await captureInto(shooting, dirs.branch);
+  const { manifest, shots: captured } = await captureInto(shooting, dirs.branch);
   const client = clientOf(opts, deps);
   const { picks, removed } = await preview(client, ctx, opts.projectId, manifest.snapshots);
   await writeBaselines(client, dirs, manifest.snapshots, picks);
@@ -253,14 +258,19 @@ export async function checkAgainstServer(
     retries: opts.flakeRetries,
     warn: client.warn,
   });
+  // No upload timing: `check` only reads the server. Its requests are inside the total.
+  result.timings = buildTimings(started, mergeShots(captured, result.timings.shots));
   await Bun.write(
     result.indexPath,
-    renderCompareIndex({
-      ...result,
-      title: "PixelSlash check",
-      note: `Measured locally against ${client.base}'s baselines for ${ctx.branch} at ${ctx.commitSha.slice(0, 7)}: a preview, not a stored result. Nothing was uploaded.`,
-      flakes: outcome.report ? relative(dirs.report, outcome.report) : undefined,
-    }),
+    withTimings(
+      renderCompareIndex({
+        ...result,
+        title: "PixelSlash check",
+        note: `Measured locally against ${client.base}'s baselines for ${ctx.branch} at ${ctx.commitSha.slice(0, 7)}: a preview, not a stored result. Nothing was uploaded.`,
+        flakes: outcome.report ? relative(dirs.report, outcome.report) : undefined,
+      }),
+      result.timings,
+    ),
   );
   const shots = shotsOf(result, manifest.snapshots, dirs);
   return {

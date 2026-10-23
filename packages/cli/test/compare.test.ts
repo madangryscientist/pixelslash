@@ -73,7 +73,7 @@ describe("compare", () => {
     expect(code).toBe(0);
     expect(cap.stdout).toContain("pixelslash: 2 changed, 4 unchanged, 2 new, 1 removed");
     expect(cap.stdout).toContain(`report: file://${join(out, "index.html")}`);
-    expect(cap.stderr).toBe("");
+    expect(cap.stderr).toMatch(/^timing: 6 shots, diff \d+\.\ds, total \d+\.\ds\n$/);
 
     const index = await Bun.file(join(out, "index.html")).text();
     expect(index).toContain("2 changed · 4 unchanged · 2 new · 1 removed");

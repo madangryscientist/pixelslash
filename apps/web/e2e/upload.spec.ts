@@ -89,6 +89,14 @@ function upload(dir: string, token: string) {
   return { code: res.status, stdout: res.stdout, stderr: res.stderr };
 }
 
+/** The CLI's stderr less its one `timing:` line (ob 1791): anything else on it is a warning. */
+function withoutTiming(stderr: string): string {
+  return stderr
+    .split("\n")
+    .filter((l) => !l.startsWith("timing: "))
+    .join("\n");
+}
+
 async function wrangler(...args: string[]) {
   const { stdout } = await run(
     "bunx",
@@ -139,7 +147,7 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
   expect(bad.stderr).toContain("401");
 
   const ok = upload(dir, acme);
-  expect(ok.stderr).toBe("");
+  expect(withoutTiming(ok.stderr)).toBe("");
   expect(ok.code).toBe(0);
   const buildId = /build: (\S+)/.exec(ok.stdout)?.[1] ?? "";
   expect(buildId).not.toBe("");
@@ -230,7 +238,7 @@ test("a dir of loose PNGs goes through `import` and `upload`, and the server dif
   expect(made.status).toBe(0);
 
   const first = upload(out, token);
-  expect(first.stderr).toBe("");
+  expect(withoutTiming(first.stderr)).toBe("");
   expect(first.code).toBe(0);
   const second = upload(out, token);
   expect(second.code).toBe(0);
@@ -263,7 +271,7 @@ test("a project switched to CI diffs in the CLI: the server stores what it measu
   const dir = await snapshotDir();
   expect(upload(dir, token).code).toBe(0);
   const again = upload(dir, token);
-  expect(again.stderr).toBe("");
+  expect(withoutTiming(again.stderr)).toBe("");
   expect(again.code).toBe(0);
   const id = /build: (\S+)/.exec(again.stdout)?.[1] ?? "";
   const [row] = await rows(

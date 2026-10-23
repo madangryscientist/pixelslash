@@ -3,7 +3,8 @@ import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
 import { inChunks } from "./chunks";
 import { type Db, NotFoundError } from "./db";
 import { type BuildCounts, countBuilds, emptyCounts } from "./review";
-import { type DiffLocation, builds, invites, members, orgs, projects, users } from "./schema";
+import { type DiffLocation, builds, members, orgs, projects, users } from "./schema";
+import { invites } from "./schema-invites";
 import type { User } from "./users";
 
 export type Org = typeof orgs.$inferSelect;

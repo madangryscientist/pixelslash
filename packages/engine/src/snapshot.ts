@@ -30,6 +30,8 @@ import { maskLocators, measureIgnore, toImageRects } from "./page-areas.ts";
 import { joinOrigin } from "./routes.ts";
 import { signIn, type Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
+import { elapsed, type ShotTiming } from "./timings.ts";
+import { identity } from "./manifest.ts";
 import { awaitStory, storybookRoutes } from "./storybook.ts";
 
 /** Masked regions are painted this colour, by Playwright for selectors and by us for rectangles. */
@@ -73,7 +75,12 @@ export type SnapshotDeps = {
   warn?: (message: string) => void;
 };
 
-export type SnapshotResult = { manifest: SnapshotManifest; manifestPath: string };
+export type SnapshotResult = {
+  manifest: SnapshotManifest;
+  manifestPath: string;
+  /** How long each shot took to capture (load, settle, screenshot), in capture order. Not in the manifest: that stays byte-for-byte reproducible. */
+  shots: ShotTiming[];
+};
 
 export { toImageRects };
 
@@ -287,13 +294,16 @@ export async function captureInto(session: CaptureSession, out: string): Promise
   await mkdir(out, { recursive: true });
   await clearFlakeOutput(out);
   const snapshots: SnapshotEntry[] = [];
+  const shots: ShotTiming[] = [];
   for (const variant of config.variants) {
     for (const route of routes) {
       const file = `${route.name}/${variant.name}.png`;
+      const started = performance.now();
       const { png, ignore } = await session.shoot(route, variant);
+      const captureMs = elapsed(started);
       await mkdir(join(out, route.name), { recursive: true });
       await Bun.write(join(out, file), png);
-      snapshots.push({
+      const entry: SnapshotEntry = {
         name: route.name,
         path: route.path,
         variant,
@@ -303,13 +313,15 @@ export async function captureInto(session: CaptureSession, out: string): Promise
         flaky: resolveFlaky(config, route),
         file,
         fingerprint,
-      });
+      };
+      snapshots.push(entry);
+      shots.push({ name: identity(entry), captureMs });
     }
   }
   const manifest: SnapshotManifest = { version: 1, snapshots };
   const manifestPath = join(out, "manifest.json");
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  return { manifest, manifestPath };
+  return { manifest, manifestPath, shots };
 }
 
 /**

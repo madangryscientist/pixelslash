@@ -2,7 +2,8 @@ import { and, eq, gt } from "drizzle-orm";
 import { randomToken, sha256Hex } from "#/lib/crypto";
 import { chunk } from "./chunks";
 import type { Db } from "./db";
-import { invites, members, sessions, users } from "./schema";
+import { members, sessions, users } from "./schema";
+import { invites } from "./schema-invites";
 
 export type GithubProfile = {
   githubId: number;

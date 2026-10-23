@@ -5,7 +5,14 @@ import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
 import { type SentFlake, labelFlake } from "./flakes";
 import { heldShot } from "./markers";
-import { type DiffOptions, type FlakyPolicy, type IgnoreRect, builds, snapshots } from "./schema";
+import {
+  type BuildTimings,
+  type DiffOptions,
+  type FlakyPolicy,
+  type IgnoreRect,
+  builds,
+  snapshots,
+} from "./schema";
 
 export type Build = typeof builds.$inferSelect;
 
@@ -163,7 +170,12 @@ export async function putSnapshot(
  * snapshots the client sent: a short count means an upload was lost, so the build stays open.
  * Finalising twice is fine (a retry after a lost reply); a changed count after that is not.
  */
-export async function finaliseBuild(db: Db, build: Build, expected: number): Promise<Build> {
+export async function finaliseBuild(
+  db: Db,
+  build: Build,
+  expected: number,
+  timings: BuildTimings | null = null,
+): Promise<Build> {
   const [held] = await db
     .select({ n: count() })
     .from(snapshots)
@@ -175,7 +187,7 @@ export async function finaliseBuild(db: Db, build: Build, expected: number): Pro
   if (build.status !== "uploading") return build;
   await db
     .update(builds)
-    .set({ status: "processing" })
+    .set({ status: "processing", timings })
     .where(and(eq(builds.id, build.id), eq(builds.status, "uploading")));
   return getBuild(db, build.projectId, build.id);
 }

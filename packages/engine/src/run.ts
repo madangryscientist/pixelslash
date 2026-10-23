@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { diffPngs, type DiffIgnore, type DiffOptions, type IgnoreRect } from "./diff.ts";
 import type { Region, Specks } from "./regions.ts";
+import { elapsed, type Timings } from "./timings.ts";
 
 export type RunManifest = {
   id: string;
@@ -20,6 +21,8 @@ export type RunManifest = {
   label?: string;
   /** The diff options the run was compared with; absent when none were set. */
   diff?: DiffOptions;
+  /** How long the run's steps took (ob 1791); absent in a manifest from before, and read as such. */
+  timings?: Timings;
 };
 
 export const RUN_FILES = ["main.png", "branch.png", "diff.png"] as const;
@@ -28,6 +31,8 @@ export type FrameSize = { width: number; height: number };
 
 export type WrittenRun = {
   manifest: RunManifest;
+  /** The milliseconds `diffPngs` took. */
+  diffMs: number;
   main: FrameSize;
   branch: FrameSize;
 };
@@ -52,7 +57,9 @@ export async function writeRunFiles(
     createdAt?: string;
   },
 ): Promise<WrittenRun> {
+  const diffStarted = performance.now();
   const diff = diffPngs(input.main, input.branch, input.diff, input.ignore);
+  const diffMs = elapsed(diffStarted);
   const manifest: RunManifest = {
     id: input.id && isSafeRunId(input.id) ? input.id : newRunId(),
     changedPixels: diff.changedPixels,
@@ -72,7 +79,14 @@ export async function writeRunFiles(
   await Bun.write(join(dest, "manifest.json"), JSON.stringify(manifest));
   return {
     manifest,
+    diffMs,
     main: { width: diff.mainWidth, height: diff.mainHeight },
     branch: { width: diff.branchWidth, height: diff.branchHeight },
   };
+}
+
+/** Write the finished run's timings into its `manifest.json`: known only after the report is made. */
+export async function writeRunTimings(dest: string, manifest: RunManifest, timings: Timings) {
+  manifest.timings = timings;
+  await Bun.write(join(dest, "manifest.json"), JSON.stringify(manifest));
 }

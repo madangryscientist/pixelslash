@@ -78,9 +78,21 @@ describe("pixelslash check", () => {
       "POST /api/v1/baselines",
       "GET /images/s0.png",
     ]);
-    expect(await Bun.file(join(cwd, "pixelslash-check", "report", "index.html")).exists()).toBe(
-      true,
-    );
+    const index = join(cwd, "pixelslash-check", "report", "index.html");
+    expect(await Bun.file(index).exists()).toBe(true);
+    // Capture, the baseline fetch and the diff are all timed; there is no judge and no upload.
+    expect(out).toMatchObject({
+      timings: {
+        totalMs: expect.any(Number),
+        captureMs: expect.any(Number),
+        diffMs: expect.any(Number),
+        shots: [{ captureMs: expect.any(Number), diffMs: expect.any(Number) }],
+      },
+    });
+    expect(JSON.stringify(out)).not.toContain("judgeMs");
+    expect(JSON.stringify(out)).not.toContain('"upload"');
+    expect(cap.stderr).toMatch(/timing: 1 shot, capture \d+\.\ds, diff \d+\.\ds, total \d+\.\ds/);
+    expect(await Bun.file(index).text()).toContain("Timings");
   }, 60_000);
 
   test("the summary names the changed shot under the counts line", async () => {

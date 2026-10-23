@@ -183,6 +183,33 @@ describe("uploadSnapshots", () => {
     });
   });
 
+  test("finalize carries the CLI's timings and the upload's own, per request kind (ob 1791)", async () => {
+    const { dir: cwd } = await repo(1, 1);
+    const dir = await snapshotDir([entry("home"), entry("pricing")]);
+    const server = fakeServer();
+    const captured = { totalMs: 900, captureMs: 800, shots: [{ name: "home", captureMs: 800 }] };
+    const result = await uploadSnapshots(
+      { dir, server: "https://ps.example", token: "psci_t", git: gitOpts(cwd), timings: captured },
+      { fetch: server.fetch },
+    );
+    expect(server.calls.at(-1)?.body).toMatchObject({
+      timings: {
+        totalMs: expect.any(Number),
+        captureMs: 800,
+        shots: captured.shots,
+        upload: {
+          totalMs: expect.any(Number),
+          batches: [
+            { step: "open build", count: 1, ms: expect.any(Number) },
+            { step: "upload", count: 2, ms: expect.any(Number) },
+          ],
+        },
+      },
+    });
+    // The result also names the finalize, which the body could not.
+    expect(result.timings.upload?.batches.map((b) => b.step)).toContain("finalize");
+  });
+
   test("sends each snapshot's ignore rects, [] when it has none", async () => {
     const { dir: cwd } = await repo(1, 1);
     const box = { x: 4, y: 8, width: 100, height: 50 };

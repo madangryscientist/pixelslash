@@ -150,6 +150,40 @@ describe("upload API", () => {
     expect(new Uint8Array(stored ?? new ArrayBuffer(0))).toEqual(second);
   });
 
+  test("the CLI's timings sent at finalize are stored; without them, or malformed, the column stays null", async () => {
+    const { db, deps, acme } = await setup();
+    const timings = {
+      totalMs: 1200,
+      captureMs: 800,
+      diffMs: 40,
+      upload: { totalMs: 300, batches: [{ step: "upload", count: 1, ms: 250 }] },
+      shots: [{ name: "pricing", captureMs: 800, diffMs: 40 }],
+    };
+    const stored = async (body: unknown) => {
+      const id = await openBuild(deps, acme.token);
+      await call(deps, `PUT /api/v1/builds/${id}/snapshots`, acme.token, snapshotForm());
+      const res = await call(
+        deps,
+        `POST /api/v1/builds/${id}/finalize`,
+        acme.token,
+        JSON.stringify(body),
+      );
+      expect(res.status).toBe(200);
+      const [row] = await db.select().from(builds).where(eq(builds.id, id));
+      return row?.timings;
+    };
+    expect(await stored({ snapshots: 1, timings })).toEqual(timings);
+    expect(await stored({ snapshots: 1 })).toBeNull();
+    expect(await stored({ snapshots: 1, timings: { totalMs: -1, shots: [] } })).toBeNull();
+    expect(await stored({ snapshots: 1, timings: "slow" })).toBeNull();
+    expect(
+      await stored({
+        snapshots: 1,
+        timings: { totalMs: 5, shots: [{ name: "x", captureMs: "1" }] },
+      }),
+    ).toBeNull();
+  });
+
   test("a finalised build is immutable; finalising again is only a retry", async () => {
     const { db, deps, acme } = await setup();
     const id = await openBuild(deps, acme.token);

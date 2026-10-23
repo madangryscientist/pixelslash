@@ -98,7 +98,8 @@ async function addSnapshot(ctx: Ctx, build: Build, owner: BuildOwner): Promise<R
 }
 
 async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promise<Response> {
-  const done = await finaliseBuild(ctx.db, build, parseFinalise(await jsonBody(ctx.request)));
+  const { snapshots, timings } = parseFinalise(await jsonBody(ctx.request));
+  const done = await finaliseBuild(ctx.db, build, snapshots, timings);
   // The diff runs here, in the request: inline for beta, no Queue (the map's server diff). One
   // whole-page change at 1280x4000 fits the 30 s CPU limit; several do not, and processBuild stops
   // before the limit and ends the build `errored` with a reason that names it, so the reply carries

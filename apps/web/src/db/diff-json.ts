@@ -110,6 +110,19 @@ export type AiReview = {
   autoPassed: boolean;
 };
 
+/**
+ * How long the CLI's steps took for a build (ob 1791), in whole milliseconds, as the CLI sent it at
+ * finalize. A step the run did not do is absent, never 0. Numbers and shot names only.
+ */
+export type BuildTimings = {
+  totalMs: number;
+  captureMs?: number;
+  diffMs?: number;
+  judgeMs?: number;
+  upload?: { totalMs: number; batches: { step: string; count: number; ms: number }[] };
+  shots: { name: string; captureMs?: number; diffMs?: number; judgeMs?: number }[];
+};
+
 /** One sentence of a build's summary and the shots it describes, for links. */
 export type AiSummarySentence = { text: string; shots: string[] };
 

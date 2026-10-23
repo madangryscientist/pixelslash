@@ -2,6 +2,7 @@ import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
 import type { FlakeInput } from "#/db/flakes";
 import {
+  type BuildTimings,
   type DiffOptions,
   type DiffRegion,
   FLAKY_POLICIES,
@@ -180,11 +181,68 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
   };
 }
 
-export function parseFinalise(raw: unknown): number {
-  const n = object(raw, "body").snapshots;
+type Finalise = { snapshots: number; timings: BuildTimings | null };
+
+const MAX_TIMED_SHOTS = 5000;
+const MAX_BATCHES = 20;
+
+function ms(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1e10;
+}
+
+function steps(o: Obj): Pick<BuildTimings, "captureMs" | "diffMs" | "judgeMs"> | undefined {
+  const out: Pick<BuildTimings, "captureMs" | "diffMs" | "judgeMs"> = {};
+  for (const k of ["captureMs", "diffMs", "judgeMs"] as const) {
+    if (o[k] === undefined) continue;
+    if (!ms(o[k])) return undefined;
+    out[k] = Math.round(o[k]);
+  }
+  return out;
+}
+
+function timedShot(s: unknown): BuildTimings["shots"][number] | undefined {
+  if (!isObj(s) || typeof s.name !== "string" || s.name.length > 300) return undefined;
+  const own = steps(s);
+  return own && { name: s.name, ...own };
+}
+
+function batch(b: unknown): { step: string; count: number; ms: number } | undefined {
+  if (!isObj(b) || typeof b.step !== "string" || b.step.length > 100) return undefined;
+  if (!ms(b.count) || !ms(b.ms)) return undefined;
+  return { step: b.step, count: Math.round(b.count), ms: Math.round(b.ms) };
+}
+
+function uploadTiming(up: unknown): BuildTimings["upload"] | undefined {
+  if (!isObj(up) || !ms(up.totalMs) || !Array.isArray(up.batches)) return undefined;
+  if (up.batches.length > MAX_BATCHES) return undefined;
+  const batches = up.batches.map(batch);
+  return batches.every((b) => b !== undefined)
+    ? { totalMs: Math.round(up.totalMs), batches }
+    : undefined;
+}
+
+/**
+ * The CLI's timings (ob 1791), or null. They are an extra: anything that is not the shape the CLI
+ * sends is dropped whole rather than failing the finalize.
+ */
+function parseTimings(raw: unknown): BuildTimings | null {
+  if (!isObj(raw) || !ms(raw.totalMs) || !Array.isArray(raw.shots)) return null;
+  if (raw.shots.length > MAX_TIMED_SHOTS) return null;
+  const total = steps(raw);
+  const shots = raw.shots.map(timedShot);
+  if (!total || !shots.every((s) => s !== undefined)) return null;
+  const timings: BuildTimings = { totalMs: Math.round(raw.totalMs), ...total, shots };
+  if (raw.upload === undefined) return timings;
+  const upload = uploadTiming(raw.upload);
+  return upload ? { ...timings, upload } : null;
+}
+
+export function parseFinalise(raw: unknown): Finalise {
+  const body = object(raw, "body");
+  const n = body.snapshots;
   if (typeof n !== "number" || !Number.isInteger(n) || n < 0)
     bad("snapshots", "must be a non-negative integer");
-  return n;
+  return { snapshots: n, timings: parseTimings(body.timings) };
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

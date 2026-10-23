@@ -96,7 +96,7 @@ async function uploadWith(noter: (shot: { main: Buffer; file: string }) => Promi
   await Bun.write(join(dir, "about/desktop.png"), png());
   const fake = server();
   const warnings: string[] = [];
-  await uploadSnapshots(
+  const { timings } = await uploadSnapshots(
     { dir, server: "https://ps.example", token: "psci_t", git: gitOpts(cwd) },
     { fetch: fake.fetch, describe: noter, warn: (m) => warnings.push(m) },
   );
@@ -104,7 +104,7 @@ async function uploadWith(noter: (shot: { main: Buffer; file: string }) => Promi
     .filter((c) => c.method === "PUT")
     .map((c) => metaOf(c.body) as ReturnType<typeof metaOf> & { changeNote?: string });
   const byName = Object.fromEntries(metas.map((m) => [m.name, m]));
-  return { byName, warnings };
+  return { byName, warnings, timings, finalized: fake.calls.at(-1)?.body };
 }
 
 describe("uploadSnapshots with a judge (ob 1745)", () => {
@@ -120,6 +120,19 @@ describe("uploadSnapshots with a judge (ob 1745)", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.file).toMatch(/home\/desktop\.png$/);
     expect(seen[0]?.main.equals(png())).toBe(true);
+  });
+
+  test("the judge and the diff are timed per shot, and a shot the judge did not read has no judge time (ob 1791)", async () => {
+    const { timings, finalized } = await uploadWith(async () => "The square turned red");
+    const by = Object.fromEntries(timings.shots.map((s) => [s.name, s]));
+    expect(by["home / chromium / 1280x720 / light"]).toMatchObject({
+      diffMs: expect.any(Number),
+      judgeMs: expect.any(Number),
+    });
+    expect(by["about / chromium / 1280x720 / light"]).not.toHaveProperty("judgeMs");
+    expect(by["about / chromium / 1280x720 / light"]).toHaveProperty("diffMs");
+    expect(timings.judgeMs).toBe(by["home / chromium / 1280x720 / light"]?.judgeMs);
+    expect(finalized).toMatchObject({ timings: { judgeMs: timings.judgeMs } });
   });
 
   test("a judge that fails is said, and the shot goes up without a sentence", async () => {

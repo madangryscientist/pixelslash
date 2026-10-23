@@ -22,6 +22,8 @@ export type Client = {
   sleep: (ms: number) => Promise<void>;
   /** The command speaking, for its errors and warnings: `check` fails as "check failed". Default `upload`. */
   verb?: "upload" | "check";
+  /** Told how long each request took, retries included (ob 1791): the upload's timings. */
+  onRequest?: (step: string, ms: number) => void;
 };
 /** `step` is what the CLI says failed: "open build", "upload <snapshot>", "finalize". */
 export type Call = {
@@ -95,6 +97,15 @@ async function attempt(client: Client, call: Call): Promise<Attempt> {
  * count is a no-op), and a repeated open at worst leaves an empty, unfinalised build behind.
  */
 export async function send(client: Client, call: Call): Promise<unknown> {
+  const started = performance.now();
+  try {
+    return await sendWithRetries(client, call);
+  } finally {
+    client.onRequest?.(call.step, performance.now() - started);
+  }
+}
+
+async function sendWithRetries(client: Client, call: Call): Promise<unknown> {
   const verb = client.verb ?? "upload";
   for (let n = 1; ; n++) {
     const result = await attempt(client, call);

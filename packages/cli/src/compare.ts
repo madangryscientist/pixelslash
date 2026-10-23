@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { UsageError, changeLines, compareSnapshots } from "@pixelslash/engine";
+import { UsageError, changeLines, compareSnapshots, timingLine } from "@pixelslash/engine";
 import type { Io } from "./run.ts";
 import { readFlagPairs } from "./args.ts";
 
@@ -16,6 +16,7 @@ export async function runCompare(argv: string[], io: Io): Promise<number> {
     { mainDir: resolve(mainDir), branchDir: resolve(branchDir), out: resolve(out) },
     { warn: (m) => io.stderr.write(`${m}\n`) },
   );
+  io.stderr.write(`${timingLine(r.timings)}\n`);
   io.stdout.write(
     `pixelslash: ${r.changed.length} changed, ${r.unchanged.length} unchanged, ${r.added.length} new, ${r.removed.length} removed\n`,
   );

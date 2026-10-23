@@ -7,6 +7,7 @@ import {
   type Shoot,
   type SnapshotEntry,
   UploadError,
+  type Timings,
   type UploadResult,
   UsageError,
   findConfigIfAny,
@@ -15,6 +16,7 @@ import {
   loadConfig,
   openCaptureSession,
   recapture,
+  timingLine,
   uploadSnapshots,
   type UploadDeps,
   type DevJudgeDeps,
@@ -174,13 +176,14 @@ function printFlakes(result: UploadResult, io: Io): void {
  * `status`. Returns the exit code (0): a flaky shot is said and sent, and what it does to the
  * build is the server's call. With `wait`, the build is then followed as `status --wait` does. `deps.recapture` is
  * the caller's own re-capture (`capture --upload`); without one, the config found is opened when
- * a shot needs it. `--flake-retries 0` opens nothing.
+ * a shot needs it. `--flake-retries 0` opens nothing. `given.timings` is `capture --upload`'s own
+ * capture, sent with the build and added to the stderr timing line.
  */
 export async function uploadDir(
   dir: string,
   flags: UploadFlags,
   io: Io,
-  given: UploadDeps & DevJudgeDeps = {},
+  { timings, ...given }: UploadDeps & DevJudgeDeps & { timings?: Timings } = {},
 ): Promise<number> {
   const deps = judgeDeps(flags, io, given);
   const cwd = deps.cwd ?? process.cwd();
@@ -197,6 +200,7 @@ export async function uploadDir(
         token: target.token,
         projectId: target.projectId,
         flakeRetries: retries ?? own?.retries ?? DEFAULT_FLAKE_RETRIES,
+        timings,
         git: {
           cwd,
           baseBranch: target.baseBranch,
@@ -210,6 +214,7 @@ export async function uploadDir(
     io.stdout.write(`pixelslash: uploaded ${result.snapshots} snapshots\n`);
     io.stdout.write(`build: ${result.buildId} (${commitSha.slice(0, 7)} on ${branch})\n`);
     printFlakes(result, io);
+    io.stderr.write(`${timingLine(result.timings, result.snapshots)}\n`);
     await recordBuild(resolve(dir), {
       server: target.server,
       build: result.buildId,

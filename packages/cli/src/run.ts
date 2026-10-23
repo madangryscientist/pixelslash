@@ -14,6 +14,7 @@ import {
   loadRoutes,
   playwrightCli,
   resolveToken,
+  timingLine,
   type CompareResult,
   type Deps,
   type SnapshotDeps,
@@ -71,6 +72,12 @@ async function figmaDs(cli: Cli, file: string, deps: Deps): Promise<string> {
 
 /** Print the run summary and return the exit code: 1 only on NEW violations on Branch. */
 function report(cli: Cli, result: CompareResult, io: Io): number {
+  const code = summary(cli, result, io);
+  if (result.timings) io.stderr.write(`${timingLine(result.timings)}\n`);
+  return code;
+}
+
+function summary(cli: Cli, result: CompareResult, io: Io): number {
   const link = `report: ${fileUrl(result.reportPath)}\n`;
   if (!cli.ds) {
     const px = result.changedPixels ?? result.manifest?.changedPixels ?? 0;

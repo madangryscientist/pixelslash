@@ -3,6 +3,7 @@ import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-o
 import type {
   AiReview,
   AiSummary,
+  BuildTimings,
   DiffOptions,
   DiffRegion,
   DiffResult,
@@ -55,23 +56,6 @@ export const members = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.orgId, t.userId] }), index("members_user_idx").on(t.userId)],
-);
-
-/** An invite names a GitHub login (lowercased); it becomes a membership when that user signs in. */
-export const invites = sqliteTable(
-  "invites",
-  {
-    id: text("id").primaryKey(),
-    orgId: text("org_id")
-      .notNull()
-      .references(() => orgs.id, { onDelete: "cascade" }),
-    githubLogin: text("github_login").notNull(),
-    invitedBy: text("invited_by")
-      .notNull()
-      .references(() => users.id),
-    createdAt: createdAt(),
-  },
-  (t) => [unique().on(t.orgId, t.githubLogin), index("invites_login_idx").on(t.githubLogin)],
 );
 
 /**
@@ -214,6 +198,8 @@ export const builds = sqliteTable(
     processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
     /** The project model's summary of what changed (ob 1668); null when none was made. Text only. */
     aiSummary: text("ai_summary", { mode: "json" }).$type<AiSummary>(),
+    /** The CLI's step timings, sent at finalize (ob 1791); null when the client sent none. */
+    timings: text("timings", { mode: "json" }).$type<BuildTimings>(),
     createdAt: createdAt(),
   },
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],

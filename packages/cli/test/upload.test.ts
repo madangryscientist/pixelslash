@@ -24,6 +24,8 @@ describe("pixelslash upload", () => {
       "POST /api/v1/builds/build-1/finalize",
     ]);
     expect(api.calls.every((c) => c.auth === "Bearer psci_env")).toBe(true);
+    // The timing line goes to stderr, with the upload's time; stdout is as it was.
+    expect(cap.stderr).toMatch(/^timing: 1 shot, upload \d+\.\ds, total \d+\.\ds\n$/);
   });
 
   test("the token can come from --token-path, the server from env or the config", async () => {

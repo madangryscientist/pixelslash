@@ -4,9 +4,11 @@ import { diffPngs } from "./diff.ts";
 import { UsageError } from "./errors.ts";
 import type { Fingerprint } from "./fingerprint.ts";
 import { renderCompareIndex, type CompareRow } from "./compare-report.ts";
+import { withTimings } from "./report-timings.ts";
 import { renderPixelReport } from "./report.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 import { identity, readManifest } from "./manifest.ts";
+import { buildTimings, elapsed, type ShotTiming, type Timings } from "./timings.ts";
 
 export type SnapshotCompareOptions = {
   mainDir: string;
@@ -26,6 +28,8 @@ export type SnapshotCompareResult = {
   removed: CompareRow[];
   /** Matched snapshots whose two sides were rendered by different environments. */
   mismatched: CompareRow[];
+  /** The diff of each matched shot, and the run's total (ob 1791); `check` adds its capture and upload. */
+  timings: Timings;
 };
 
 const FINGERPRINT_KEYS = ["image", "browser", "fonts"] as const;
@@ -93,7 +97,7 @@ async function diffMatch(
   main: SnapshotEntry,
   branch: SnapshotEntry,
   dir: string,
-): Promise<{ row: CompareRow; changed: boolean }> {
+): Promise<{ row: CompareRow; changed: boolean; diffMs: number }> {
   const row = {
     ...rowOf(branch, paths.varied),
     mismatch: fingerprintDiff(main.fingerprint, branch.fingerprint),
@@ -101,6 +105,7 @@ async function diffMatch(
   const mainPng = await readPng(paths.main, main);
   const branchPng = await readPng(paths.branch, branch);
   let diff;
+  const started = performance.now();
   try {
     diff = diffPngs(mainPng, branchPng, branch.diff, {
       main: main.ignore,
@@ -111,8 +116,9 @@ async function diffMatch(
       `${branch.name}: cannot diff ${main.file} against ${branch.file}: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
+  const diffMs = elapsed(started);
   row.changedPixels = diff.changedPixels;
-  if (!diff.changed) return { row, changed: false };
+  if (!diff.changed) return { row, changed: false, diffMs };
   row.regions = diff.regions;
   const dest = join(paths.out, dir);
   await mkdir(dest, { recursive: true });
@@ -135,7 +141,7 @@ async function diffMatch(
     }),
   );
   row.report = `${dir}/report.html`;
-  return { row, changed: true };
+  return { row, changed: true, diffMs };
 }
 
 function refuseOverlap(out: string, dirs: string[]): void {
@@ -156,6 +162,7 @@ export async function compareSnapshots(
   opts: SnapshotCompareOptions,
   deps: SnapshotCompareDeps = {},
 ): Promise<SnapshotCompareResult> {
+  const started = performance.now();
   const out = resolve(opts.out);
   refuseOverlap(out, [opts.mainDir, opts.branchDir]);
   const main = await readManifest(opts.mainDir);
@@ -171,7 +178,9 @@ export async function compareSnapshots(
     added: [],
     removed: [],
     mismatched: [],
+    timings: { totalMs: 0, shots: [] },
   };
+  const shots: ShotTiming[] = [];
   const taken = new Set<string>();
   await mkdir(out, { recursive: true });
   for (const e of branch.snapshots) {
@@ -181,7 +190,8 @@ export async function compareSnapshots(
       continue;
     }
     const paths = { main: opts.mainDir, branch: opts.branchDir, out, varied };
-    const { row, changed } = await diffMatch(paths, before, e, dirFor(e, taken));
+    const { row, changed, diffMs } = await diffMatch(paths, before, e, dirFor(e, taken));
+    shots.push({ name: identity(e), diffMs });
     if (row.mismatch.length > 0) {
       result.mismatched.push(row);
       deps.warn?.(
@@ -192,6 +202,7 @@ export async function compareSnapshots(
   }
   for (const e of main.snapshots)
     if (!branchIds.has(identity(e))) result.removed.push(rowOf(e, varied));
-  await Bun.write(result.indexPath, renderCompareIndex(result));
+  result.timings = buildTimings(started, shots);
+  await Bun.write(result.indexPath, withTimings(renderCompareIndex(result), result.timings));
   return result;
 }

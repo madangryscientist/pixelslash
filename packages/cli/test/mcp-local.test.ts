@@ -78,7 +78,9 @@ describe("pixelslash mcp: the local fix loop", () => {
       "0",
     ]);
     expect(twin.code).toBe(0);
-    expect(body).toEqual(twin.out);
+    // The same run measured twice: the same report, each with its own timings.
+    expect(body["timings"]).toMatchObject({ totalMs: expect.any(Number) });
+    expect({ ...body, timings: null }).toEqual({ ...twin.out, timings: null });
     await client.close();
   }, 60_000);
 
@@ -87,7 +89,7 @@ describe("pixelslash mcp: the local fix loop", () => {
     const client = await connected(cwd);
     const r = await tool(client, "capture_local", { only: "index" });
     expect(r.isError).toBeFalsy();
-    const body: { shots: { name: string; file: string }[] } = JSON.parse(text(r));
+    const body: { shots: { name: string; file: string }[]; timings: unknown } = JSON.parse(text(r));
     const { shots } = body;
     expect(shots.map((s) => s.name)).toEqual(["index"]);
     expect(await Bun.file(shots[0]?.file ?? "").exists()).toBe(true);
@@ -96,7 +98,10 @@ describe("pixelslash mcp: the local fix loop", () => {
     expect((await tool(client, "capture_local", {})).isError).toBe(true);
     const twin = await cli(cwd, ["capture", "--only", "index"]);
     expect(twin.code).toBe(0);
-    expect(body).toEqual(twin.out);
+    expect(body.timings).toMatchObject({
+      shots: [{ name: expect.stringContaining("index"), captureMs: expect.any(Number) }],
+    });
+    expect({ ...body, timings: null }).toEqual({ ...twin.out, timings: null });
     await client.close();
   }, 60_000);
 

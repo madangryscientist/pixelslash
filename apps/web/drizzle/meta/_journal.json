@@ -148,6 +148,13 @@
       "when": 1792757516352,
       "tag": "0020_regular_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792772836705,
+      "tag": "0021_daily_dark_beast",
+      "breakpoints": true
     }
   ]
 }

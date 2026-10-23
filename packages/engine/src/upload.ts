@@ -1,5 +1,6 @@
 import { PLATFORM, baselinePng, fetchBaselines } from "./baselines-client.ts";
 import {
+  type BaselinePick,
   type CiResult,
   type DiffLocation,
   ENGINE_VERSION,
@@ -16,6 +17,7 @@ import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.t
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, pngPath, readManifest } from "./manifest.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
+import { elapsed, requestLog, timingsToSend, type ShotTiming, type Timings } from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
 
 const CONCURRENCY = 4;
@@ -31,6 +33,8 @@ export type UploadOptions = {
    * off. Default 2. It needs `recapture`: without one nothing is captured again.
    */
   flakeRetries?: number | undefined;
+  /** The CLI's own timings so far, such as its capture; sent with the build at finalize (ob 1791). */
+  timings?: Timings | undefined;
 };
 
 export type UploadDeps = {
@@ -54,7 +58,16 @@ export type UploadDeps = {
   describe?: ChangeNoter;
 };
 
-export type UploadResult = { buildId: string; snapshots: number; git: GitContext } & FlakeOutcome;
+export type UploadResult = {
+  buildId: string;
+  snapshots: number;
+  git: GitContext;
+  /**
+   * The run's timings (ob 1791): the CLI's own plus this upload's, finalize included. The server
+   * was sent the same figures up to the finalize, which cannot include its own duration.
+   */
+  timings: Timings;
+} & FlakeOutcome;
 
 /**
  * Finalise, and again while the server's diff runs out of budget with shots left (ob 1645). The
@@ -62,14 +75,19 @@ export type UploadResult = { buildId: string; snapshots: number; git: GitContext
  * CLI doing what a person would otherwise click. It goes on only while the count left falls, so a
  * build that is failing for another reason is tried once more and then given up, never looped.
  */
-async function finalise(client: Client, id: string, count: number): Promise<unknown> {
+async function finalise(
+  client: Client,
+  id: string,
+  count: number,
+  timings: Timings | undefined,
+): Promise<unknown> {
   let left = Infinity;
   for (;;) {
     const reply = await send(client, {
       step: "finalize",
       method: "POST",
       path: `/api/v1/builds/${id}/finalize`,
-      body: JSON.stringify({ snapshots: count }),
+      body: JSON.stringify({ snapshots: count, ...(timings ? { timings } : {}) }),
     });
     if (!isObj(reply) || reply.status !== "errored") return reply;
     const now = reply.unmeasured;
@@ -168,15 +186,18 @@ export async function uploadSnapshots(
     throw new UsageError(`server must be an http(s) URL: ${opts.server}`);
   const base = opts.server.replace(/\/+$/, "");
   const fetcher = deps.fetch ?? globalThis.fetch.bind(globalThis);
+  const started = performance.now();
   const manifest = await readManifest(opts.dir);
   const warn = deps.warn ?? (() => {});
   const ctx = await gitContext({ ...opts.git, env, warn });
+  const log = requestLog();
   const client: Client = {
     fetch: fetcher,
     base,
     token: opts.token,
     warn,
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
+    onRequest: (step, ms) => log.record(step, ms),
   };
   const { id, diffLocation } = await openBuild(client, ctx, opts.projectId);
   // A server from before ob 1727 has no baselines endpoint and diffs every build itself.
@@ -191,6 +212,7 @@ export async function uploadSnapshots(
     warn,
   });
   await clearFlakeOutput(opts.dir);
+  const timed: ShotTiming[] = [];
   const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
   const worker = async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
@@ -200,19 +222,16 @@ export async function uploadSnapshots(
       // A server project measures at finalise; here its diff only decides whether to re-capture
       // and what the judge describes, and is never sent as the shot's result.
       const mains = new Map<string, Buffer>();
-      const fetchMain = async (p: PickedShot) => {
-        const bytes = await baselinePng(client, p);
-        mains.set(p.id, bytes);
-        return bytes;
-      };
+      const timing: ShotTiming = { name: identity(e) };
       const results =
         pick && (ci || flakes.retries > 0 || deps.describe)
-          ? await measureShot(e, png, pick, fetchMain)
+          ? await measureTimed(client, { e, png, pick, mains }, timing)
           : [];
       if (results.length > 0) flakes.measured();
       const changed = results.find((r) => r.status === "changed");
       const flake = changed ? await flakes.check(e, png) : undefined;
-      const note = await changeNote(deps.describe, { e, file, changed, mains }, warn);
+      const note = await changeNote(deps.describe, { e, file, changed, mains }, warn, timing);
+      timed.push(timing);
       await send(client, {
         step: `upload ${identity(e)}`,
         method: "PUT",
@@ -222,9 +241,17 @@ export async function uploadSnapshots(
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  checkOutcome(client, id, await finalise(client, id, manifest.snapshots.length));
+  const sent = timingsToSend(opts.timings, started, log.finish(), timed);
+  checkOutcome(client, id, await finalise(client, id, manifest.snapshots.length, sent));
   const outcome = await flakes.finish(manifest.snapshots);
-  return { buildId: id, snapshots: manifest.snapshots.length, git: ctx, ...outcome };
+  const timings = timingsToSend(opts.timings, started, log.finish(), timed);
+  return {
+    buildId: id,
+    snapshots: manifest.snapshots.length,
+    git: ctx,
+    timings,
+    ...outcome,
+  };
 }
 
 /** The judge's sentence for a changed shot; a model that fails is said and the shot goes without. */
@@ -237,16 +264,44 @@ async function changeNote(
     mains: Map<string, Buffer>;
   },
   warn: (m: string) => void,
+  timing: ShotTiming,
 ): Promise<string | null> {
   const { e, file, changed, mains } = shot;
   const main = changed && mains.get(changed.baselineId);
   if (!describe || !changed || !main) return null;
+  const started = performance.now();
   try {
     return await describe({ file, main, diff: changed.diffResult });
   } catch (err) {
     warn(`judge: ${identity(e)}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
+  } finally {
+    timing.judgeMs = elapsed(started);
   }
+}
+
+/**
+ * `measureShot` with its diff time on `timing`, less the baseline downloads inside it (those are
+ * the `fetch baseline` requests). `mains` keeps the baselines for the judge.
+ */
+async function measureTimed(
+  client: Client,
+  shot: { e: SnapshotEntry; png: Buffer; pick: BaselinePick; mains: Map<string, Buffer> },
+  timing: ShotTiming,
+): Promise<CiResult[]> {
+  const { e, png, pick, mains } = shot;
+  let fetching = 0;
+  const fetchMain = async (p: PickedShot) => {
+    const started = performance.now();
+    const bytes = await baselinePng(client, p);
+    fetching += elapsed(started);
+    mains.set(p.id, bytes);
+    return bytes;
+  };
+  const started = performance.now();
+  const results = await measureShot(e, png, pick, fetchMain);
+  timing.diffMs = Math.max(0, elapsed(started) - fetching);
+  return results;
 }
 
 function snapshotMeta(e: SnapshotEntry) {

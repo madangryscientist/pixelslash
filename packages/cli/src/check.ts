@@ -12,6 +12,7 @@ import {
   loadConfig,
   onlyRoutes,
   openCaptureSession,
+  timingLine,
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
 import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
@@ -77,6 +78,7 @@ export function checkJson(result: CheckResult) {
     report: result.indexPath,
     flakeReport: result.flakeReport ?? null,
     dirs: result.dirs,
+    timings: result.timings,
     shots: result.shots,
   };
 }
@@ -110,6 +112,7 @@ export async function checkLocal(
   deps: SnapshotDeps & UploadDeps,
   watch: Watch = {},
 ): Promise<CheckResult> {
+  const started = performance.now();
   const retries = flakeRetries(flags["flake-retries"]);
   const cwd = deps.cwd ?? process.cwd();
   const config = await loadConfig(findConfig(flags.config, cwd));
@@ -120,7 +123,8 @@ export async function checkLocal(
   const session = await openCaptureSession(config, deps);
   try {
     const total = onlyRoutes(session, only).routes.length * config.variants.length;
-    return await checkAgainstServer(watched(session, watch, total), opts, deps);
+    // The total counts from the command's start, the browser launch included.
+    return await checkAgainstServer(watched(session, watch, total), opts, { ...deps, started });
   } catch (e) {
     if (e instanceof UploadError) throw new RemoteError(e.message);
     throw e;
@@ -140,5 +144,6 @@ export async function runCheck(
   const warn = deps.warn ?? ((m: string) => io.stderr.write(`${m}\n`));
   const result = await checkLocal(flags, only, { ...deps, warn });
   io.stdout.write(json ? `${JSON.stringify(checkJson(result), null, 2)}\n` : summary(result));
+  io.stderr.write(`${timingLine(result.timings)}\n`);
   return 0;
 }
