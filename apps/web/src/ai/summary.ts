@@ -9,6 +9,7 @@ import { projectOf } from "#/diff/build-writes";
 import { shotChips, shotLabeller } from "#/lib/shot-label";
 import { type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
 import { warn } from "#/lib/log";
+import { tooManyChanges } from "#/lib/summary-limit";
 import { MODEL_TIMEOUT_MS, ModelError, type ModelFetch, complete } from "./model";
 
 /**
@@ -200,12 +201,13 @@ async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<
     })
     .from(snapshots)
     .where(eq(snapshots.buildId, build.id));
+  // A build with many changes gets no summary and no call (ob 1833); its region labels are separate.
+  if (tooManyChanges(rows.filter((row) => row.diffStatus === "changed").length)) return null;
   const input = summaryInput(rows);
   if (!input.describable) return null;
   const raw = await complete(model, [{ type: "text", text: input.prompt }], build.id, {
     fetcher: deps.modelFetch,
     timeoutMs,
-    maxTokens: 400,
   });
   const now = deps.now ?? Date.now;
   return { model: model.model, at: now(), sentences: parseSummary(raw, input.refs) };
@@ -213,7 +215,7 @@ async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<
 
 /**
  * Summarise the build with the project's model and store it, or store none: no model, nothing
- * changed, no time left, or a failed or malformed call each leave `ai_summary` null, so the page
+ * changed, ten or more changed shots, no time left, or a failed or malformed call each leave `ai_summary` null, so the page
  * says "skip: no judge" rather than show a summary of something else. `startedAt` is when the run
  * began: the call spends only what is left of its `DIFF_BUDGET_MS`. Without it (the page's
  * Regenerate) the call has its own timeout, and a failure keeps the summary already stored: nothing

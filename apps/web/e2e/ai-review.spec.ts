@@ -63,6 +63,39 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
   await expect(page.locator('rect[data-ai-label="noise"]').first()).toBeAttached();
 });
 
+test("a build with 10 changed shots gets no summary, says why, and offers no Regenerate", async ({
+  page,
+}) => {
+  const { token, projectId } = await provision(page, "Big Co", "bigbuild");
+  const form = page.getByTestId("model-settings");
+  await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
+  await form.getByTestId("model-name").fill("deepseek-flash");
+  await form.getByTestId("model-key").fill("sk-e2e-model");
+  await form.getByTestId("model-save").click();
+  await expect(form.getByTestId("model-key-set")).toBeVisible();
+
+  const names = Array.from({ length: 10 }, (_, i) => `page-${i}`);
+  await uploadBuild(
+    token,
+    { branch: "main", commitSha: SHA_MAIN },
+    names.map((name) => ({ name, png: WHITE })),
+  );
+  await page.waitForTimeout(1100);
+  const buildId = await uploadBuild(
+    token,
+    { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
+    names.map((name) => ({ name, png: CHANGED })),
+  );
+  await open(page, `/projects/${projectId}/builds/${buildId}`);
+  const summary = page.getByTestId("build-summary");
+  await expect(summary.getByTestId("summary-too-many")).toHaveText(
+    "No AI summary: 10 changed shots (summaries are made for builds with fewer than 10).",
+  );
+  await expect(summary.getByTestId("summary-skip")).toHaveCount(0);
+  await expect(summary.getByTestId("summary-sentence")).toHaveCount(0);
+  await expect(summary.getByTestId("summary-regenerate")).toHaveCount(0);
+});
+
 test("with no model a changed shot is reviewed as plain pixels", async ({ page }) => {
   const { token, projectId } = await provision(page, "Plain Co", "plain");
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);

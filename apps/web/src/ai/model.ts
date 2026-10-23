@@ -24,6 +24,14 @@ type RegionCall = { buildId: string; fetcher?: ModelFetch | undefined; timeoutMs
 /** One region's call is given up after this at most, so a stuck endpoint cannot hold the build. */
 export const MODEL_TIMEOUT_MS = 20_000;
 
+/**
+ * The most tokens a reply may take. A reasoning model spends part of it thinking before it answers,
+ * and 200 left it nothing (`finish_reason: length`, empty content). 2000 fitted the four models
+ * probed; 4000 is headroom over that, not a typo. No provider-specific reasoning flag is
+ * portable, so the ceiling is the fix.
+ */
+export const MODEL_MAX_TOKENS = 4000;
+
 /** Every model call names this client, as the CLI's requests do. */
 const USER_AGENT = `pixelslash/${ENGINE_VERSION}`;
 
@@ -86,14 +94,22 @@ export function parseRegionAnswer(raw: string): RegionAnswer {
   };
 }
 
-/** The text of the first choice of a chat-completions reply. */
+/** `key` of `value` when it is an object, else null. */
+const prop = (value: unknown, key: string): unknown =>
+  typeof value === "object" && value ? Reflect.get(value, key) : null;
+
+/**
+ * The text of the first choice of a chat-completions reply. A reply cut off by the token ceiling
+ * with nothing usable says so: the reasoning ate the budget, and the log should name that. A
+ * `content: null` beside `reasoning_content` (kimi) is no content.
+ */
 function contentOf(body: unknown): string {
-  const choices: unknown = typeof body === "object" && body ? Reflect.get(body, "choices") : null;
+  const choices = prop(body, "choices");
   const choice: unknown = Array.isArray(choices) ? choices[0] : null;
-  const message: unknown =
-    typeof choice === "object" && choice ? Reflect.get(choice, "message") : null;
-  const content: unknown =
-    typeof message === "object" && message ? Reflect.get(message, "content") : null;
+  const content = prop(prop(choice, "message"), "content");
+  const empty = typeof content !== "string" || !content.trim();
+  if (empty && prop(choice, "finish_reason") === "length")
+    throw new ModelError("the model ran out of tokens before answering (finish_reason length)");
   if (typeof content !== "string") throw new ModelError("the reply had no message content");
   return content;
 }
@@ -124,7 +140,7 @@ export async function complete(
   endpoint: ModelEndpoint,
   content: Part[],
   buildId: string,
-  { fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS, maxTokens = 200 }: CallOptions = {},
+  { fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS, maxTokens = MODEL_MAX_TOKENS }: CallOptions = {},
 ): Promise<string> {
   let res: Response;
   try {

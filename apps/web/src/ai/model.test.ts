@@ -35,6 +35,46 @@ const down: ModelFetch = async () => {
   throw new Error("connect failed for sk-secret-value");
 };
 
+const replying =
+  (choice: object): ModelFetch =>
+  async () =>
+    Response.json({ choices: [choice] });
+const errorOf = async (fetcher: ModelFetch) => {
+  const e = await explainRegion(endpoint, images, { buildId: "build-1", fetcher }).catch(
+    (x: unknown) => x,
+  );
+  return e instanceof Error ? e.message : "";
+};
+
+describe("a reply cut off by the token ceiling (ob 1833)", () => {
+  const RAN_OUT = "the model ran out of tokens before answering (finish_reason length)";
+
+  test("empty, null or missing content with finish_reason length names the cause", async () => {
+    for (const message of [{ content: "" }, { content: null }, { content: "  " }, {}]) {
+      expect(await errorOf(replying({ finish_reason: "length", message }))).toBe(RAN_OUT);
+    }
+  });
+
+  test("kimi's null content beside reasoning_content is no content, not a crash", async () => {
+    const message = { content: null, reasoning_content: "Let me think about the images…" };
+    expect(await errorOf(replying({ finish_reason: "length", message }))).toBe(RAN_OUT);
+    expect(await errorOf(replying({ finish_reason: "stop", message }))).toBe(
+      "the reply had no message content",
+    );
+  });
+
+  test("a normal two-line reply still parses", async () => {
+    const fetcher = replying({
+      finish_reason: "stop",
+      message: { content: "LABEL noise\nWHY Edges moved." },
+    });
+    expect(await explainRegion(endpoint, images, { buildId: "build-1", fetcher })).toEqual({
+      label: "noise",
+      explanation: "Edges moved.",
+    });
+  });
+});
+
 describe("explainRegion", () => {
   test("a refused call and an unreachable endpoint fail without the key in the message", async () => {
     for (const fetcher of [refused, down]) {

@@ -5,6 +5,7 @@ import { useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { tabCounts } from "#/lib/build-tabs";
 import { formatDateTime } from "#/lib/format";
+import { noSummaryReason, tooManyChanges } from "#/lib/summary-limit";
 import { type ShotLabel, shotChips, shotLabeller } from "#/lib/shot-label";
 import { regenerateBuildSummary } from "#/server/model";
 
@@ -134,6 +135,39 @@ function Footer({
   );
 }
 
+/** The sentences, the reason there are none, or "skip: no judge" when a model made none. */
+function SummaryBody({
+  projectId,
+  build,
+  snapshots,
+  changed,
+  modelConfigured,
+  describable,
+}: {
+  projectId: string;
+  build: Build;
+  snapshots: SnapshotView[];
+  changed: number;
+  modelConfigured: boolean;
+  describable: boolean;
+}) {
+  // A summary stored before the limit existed is still true of its build, so it stays.
+  if (build.aiSummary)
+    return <Sentences projectId={projectId} build={build} snapshots={snapshots} />;
+  if (!describable) return null;
+  if (modelConfigured && tooManyChanges(changed))
+    return (
+      <p className="text-slate-600" data-testid="summary-too-many">
+        {noSummaryReason(changed)}
+      </p>
+    );
+  return (
+    <p className="text-slate-600" data-testid="summary-skip">
+      skip: no judge.
+    </p>
+  );
+}
+
 const DESCRIBED = new Set(["changed", "new", "removed"]);
 const VERDICTS = new Set(["changes", "passed", "failed"]);
 
@@ -157,6 +191,7 @@ export function BuildSummary({
   // before is not shown, and the run that finishes it writes the summary again.
   if (!VERDICTS.has(build.status)) return null;
   const describable = snapshots.some((shot) => DESCRIBED.has(shot.diffStatus ?? ""));
+  const changed = snapshots.filter((shot) => shot.diffStatus === "changed").length;
   return (
     <section
       className="mt-4 border-t border-slate-200 pt-4 text-sm text-slate-700"
@@ -165,20 +200,23 @@ export function BuildSummary({
       <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
         AI summary
       </h2>
-      {build.aiSummary ? (
-        <Sentences projectId={projectId} build={build} snapshots={snapshots} />
-      ) : (
-        describable && (
-          <p className="text-slate-600" data-testid="summary-skip">
-            skip: no judge.
-          </p>
-        )
-      )}
+      <SummaryBody
+        projectId={projectId}
+        build={build}
+        snapshots={snapshots}
+        changed={changed}
+        modelConfigured={modelConfigured}
+        describable={describable}
+      />
       <p className="mt-1 text-slate-600" data-testid="summary-counts">
         {describable ? "" : "Nothing changed. "}
         {measuredCounts(snapshots).join(" · ")}.
       </p>
-      <Footer projectId={projectId} build={build} canRegenerate={modelConfigured && describable} />
+      <Footer
+        projectId={projectId}
+        build={build}
+        canRegenerate={modelConfigured && describable && !tooManyChanges(changed)}
+      />
     </section>
   );
 }
