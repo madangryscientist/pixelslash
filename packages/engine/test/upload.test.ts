@@ -6,7 +6,17 @@ import { readManifest } from "../src/manifest.ts";
 import { uploadSnapshots } from "../src/upload.ts";
 import { CLIENT_VERSION } from "../src/version.ts";
 import { fakeServer, metaOf } from "./fake-server.ts";
-import { FP, cleanup, entry, git, gitOpts, repo, snapshotDir, tmp } from "./upload-fixtures.ts";
+import {
+  FP,
+  cleanup,
+  emptyCommits,
+  entry,
+  git,
+  gitOpts,
+  repo,
+  snapshotDir,
+  tmp,
+} from "./upload-fixtures.ts";
 
 afterAll(cleanup);
 
@@ -31,7 +41,7 @@ describe("gitContext", () => {
   test("the ancestors are the merge-base's first-parent history, up to 200", async () => {
     const { dir, fork } = await repo(1, 3);
     await git(dir, "checkout", "-q", "main");
-    for (let i = 0; i < 205; i++) await git(dir, "commit", "-q", "--allow-empty", "-m", `n${i}`);
+    await emptyCommits(dir, 205, "n");
     const tip = await git(dir, "rev-parse", "HEAD");
     await git(dir, "checkout", "-q", "feat");
     await git(dir, "merge", "-q", "--no-edit", "main");

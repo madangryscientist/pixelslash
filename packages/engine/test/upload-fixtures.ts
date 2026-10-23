@@ -31,6 +31,31 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
   return out.trim();
 }
 
+/**
+ * Appends `n` empty commits to the checked-out branch in one `git fast-import` stream. One spawn
+ * instead of `n`: a `git commit` per row is what made the 200-ancestor test hit Vitest's timeout.
+ */
+export async function emptyCommits(cwd: string, n: number, prefix: string) {
+  const ref = await git(cwd, "symbolic-ref", "HEAD");
+  const tip = await git(cwd, "rev-parse", "HEAD");
+  const head = `commit ${ref}\ncommitter t <t@example.com> 0 +0000\n`;
+  let stream = "";
+  for (let i = 0; i < n; i++) {
+    const msg = `${prefix}${i}`;
+    stream += `${head}data ${msg.length}\n${msg}\n${i ? "" : `from ${tip}\n`}`;
+  }
+  const proc = Bun.spawn(["git", "fast-import", "--quiet"], {
+    cwd,
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await proc.stdin.write(stream);
+  await proc.stdin.end();
+  if ((await proc.exited) !== 0)
+    throw new Error(`git fast-import: ${await new Response(proc.stderr).text()}`);
+}
+
 /** main has `mainCommits` commits; branch `feat` forks from the first and adds `featCommits`. */
 export async function repo(mainCommits: number, featCommits: number) {
   const dir = await tmp();
