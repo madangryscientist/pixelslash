@@ -55,10 +55,17 @@ function dirFor(e: SnapshotEntry, taken: Set<string>): string {
  * (`prefers: dark`), so it is named as such, and only when this compare varied it: a run that shot
  * everything in one scheme does not print it on every card. A Storybook global shows in the name.
  */
+export function shotKeyLabel(
+  k: { browser: string; viewport: string; theme: string },
+  varied: boolean,
+): string {
+  const base = `${k.browser} ${k.viewport}`;
+  return varied ? `${base} prefers: ${k.theme}` : base;
+}
+
 function shotLabel(e: SnapshotEntry, varied: boolean): string {
   const { width, height } = e.variant.viewport;
-  const base = `${e.variant.browser} ${width}x${height}`;
-  return varied ? `${base} prefers: ${e.variant.theme}` : base;
+  return shotKeyLabel({ ...e.variant, viewport: `${width}x${height}` }, varied);
 }
 
 function rowOf(e: SnapshotEntry, varied: boolean): CompareRow {

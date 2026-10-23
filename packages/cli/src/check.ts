@@ -36,8 +36,12 @@ const CHECK_FLAGS = [
 function summary(result: CheckResult): string {
   const lines: string[] = [];
   const { changed, unchanged, added, removed, mismatched } = result;
+  // A server before ob 1732 does not say what it would remove: say so rather than "0 removed".
+  const gone = result.removedReported
+    ? `${removed.length} removed`
+    : "removed not reported by this server";
   lines.push(
-    `pixelslash: ${changed.length} changed, ${unchanged.length} unchanged, ${added.length} new, ${removed.length} removed`,
+    `pixelslash: ${changed.length} changed, ${unchanged.length} unchanged, ${added.length} new, ${gone}`,
   );
   lines.push(...changeLines(result));
   if (mismatched.length > 0)
@@ -66,7 +70,7 @@ export function checkJson(result: CheckResult) {
       changed: result.changed.length,
       unchanged: result.unchanged.length,
       new: result.added.length,
-      removed: result.removed.length,
+      removed: result.removedReported ? result.removed.length : null,
       mismatched: result.mismatched.length,
       flaky: result.flaky.length,
     },
@@ -118,9 +122,7 @@ export async function checkLocal(
     const total = onlyRoutes(session, only).routes.length * config.variants.length;
     return await checkAgainstServer(watched(session, watch, total), opts, deps);
   } catch (e) {
-    // The client's errors say `upload failed`; this command uploads nothing.
-    if (e instanceof UploadError)
-      throw new RemoteError(e.message.replace(/^upload failed/, "check failed"));
+    if (e instanceof UploadError) throw new RemoteError(e.message);
     throw e;
   } finally {
     await session.close();

@@ -40,7 +40,7 @@ const PICKS: Record<string, object> = {
 };
 const GONE = { name: "gone", platform: "linux", browser: "chromium", viewport: "16x16" };
 
-function server() {
+function server(reportsRemoved = true) {
   return fakeServer((c: Call) => {
     if (c.method === "POST" && c.url.endsWith("/api/v1/baselines")) {
       const keys: unknown = Reflect.get(Object(c.body), "keys");
@@ -56,7 +56,7 @@ function server() {
             accepted: null,
           }),
         })),
-        removed: [{ ...GONE, theme: "light" }],
+        ...(reportsRemoved ? { removed: [{ ...GONE, theme: "light" }] } : {}),
       });
     }
     const id = /\/images\/orgs\/o\/(\w+)\.png/.exec(c.url)?.[1];
@@ -88,9 +88,9 @@ function session(): CaptureSession {
   };
 }
 
-async function check(only?: string[]) {
+async function check(only?: string[], reportsRemoved = true) {
   const { dir: cwd } = await repo(1, 1);
-  const fake = server();
+  const fake = server(reportsRemoved);
   const result = await checkAgainstServer(
     session(),
     {
@@ -115,6 +115,7 @@ describe("checkAgainstServer", () => {
     expect(names(result.unchanged)).toEqual(["same", "drift", "carried"]);
     expect(names(result.added)).toEqual(["new"]);
     expect(names(result.removed)).toEqual(["gone"]);
+    expect(result.removedReported).toBe(true);
     const index = await Bun.file(result.indexPath).text();
     expect(index).toContain("PixelSlash check");
     expect(index).toContain("a preview, not a stored result. Nothing was uploaded.");
@@ -122,6 +123,12 @@ describe("checkAgainstServer", () => {
     expect(changed?.regions.length).toBeGreaterThan(0);
     expect(await Bun.file(changed?.files.report ?? "").exists()).toBe(true);
     expect(await Bun.file(changed?.files.main ?? "").exists()).toBe(true);
+  });
+
+  test("a reply with no `removed` claims nothing: none are listed and it is not reported", async () => {
+    const { result } = await check(undefined, false);
+    expect(result.removed).toEqual([]);
+    expect(result.removedReported).toBe(false);
   });
 
   test("only reads the server: one baselines POST and image GETs, no PUT, no build", async () => {

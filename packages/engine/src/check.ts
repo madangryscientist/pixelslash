@@ -1,7 +1,8 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { type BaselinePick, type PickedShot, isBaselinePick, measureShot } from "./ci-diff.ts";
-import { type CheckShot, type RemovedKey, addRemoved, shotsOf } from "./check-rows.ts";
+import { type BaselinesReply, baselinePng, fetchBaselines } from "./baselines-client.ts";
+import { type BaselinePick, type PickedShot, measureShot } from "./ci-diff.ts";
+import { type CheckShot, addRemoved, shotsOf } from "./check-rows.ts";
 import { renderCompareIndex } from "./compare-report.ts";
 import { type SnapshotCompareResult, compareSnapshots } from "./compare-snapshots.ts";
 import { UploadError, UsageError } from "./errors.ts";
@@ -12,7 +13,7 @@ import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, pngPath } from "./manifest.ts";
 import { isHttpUrl } from "./routes.ts";
 import { type CaptureSession, type SnapshotEntry, captureInto, recapture } from "./snapshot.ts";
-import { type Client, isObj, send, sendPng } from "./upload-client.ts";
+import { type Client, isObj } from "./upload-client.ts";
 
 /**
  * `pixelslash check` (ob 1732): capture here, measure against the baselines the server would pick
@@ -52,64 +53,22 @@ export type CheckResult = SnapshotCompareResult & {
   dirs: { branch: string; main: string; report: string };
   /** Every shot once, in report order, with its files as absolute paths: `--json`'s list. */
   shots: CheckShot[];
+  /** False when the server did not say what it would remove: `removed` is then empty, not zero. */
+  removedReported: boolean;
 };
 
-/** Keys per baselines request, as `upload` sends them: the server takes up to 2000. */
-const KEYS_PER_REQUEST = 500;
-
-function keyOf(e: SnapshotEntry) {
-  const { width, height } = e.variant.viewport;
-  const { browser, theme } = e.variant;
-  return { name: e.name, platform: "linux", browser, viewport: `${width}x${height}`, theme };
-}
-
-const keyId = (k: RemovedKey) => [k.name, k.browser, k.viewport, k.theme].join(" / ");
-
-function isRemovedKey(v: unknown): v is RemovedKey {
-  return (
-    isObj(v) &&
-    ["name", "browser", "viewport", "theme"].every((k) => typeof Reflect.get(v, k) === "string")
-  );
-}
-
-function readReply(reply: unknown): { picks: BaselinePick[]; removed: RemovedKey[] } {
-  const sent: unknown[] = isObj(reply) && Array.isArray(reply.baselines) ? reply.baselines : [];
-  if (sent.length === 0 || !sent.every(isBaselinePick))
-    throw new UploadError("check failed: fetch baselines: the server's reply has no baselines");
-  // A server from before ob 1732 does not say what would be removed: nothing is claimed.
-  const named: unknown[] = isObj(reply) && Array.isArray(reply.removed) ? reply.removed : [];
-  return { picks: sent, removed: named.filter(isRemovedKey) };
-}
-
 /**
- * The server's pick for every shot and what it would remove. A key the baseline build has is
- * removed only when no request asked about it, so across requests that is what all of them name.
+ * The server's pick for every shot and what it would remove; `removed` is undefined from a server
+ * that does not say (before ob 1732).
  */
-async function preview(
+function preview(
   client: Client,
   ctx: GitContext,
   projectId: string | undefined,
   entries: SnapshotEntry[],
-): Promise<{ picks: BaselinePick[]; removed: RemovedKey[] }> {
-  const picks: BaselinePick[] = [];
-  let removed: RemovedKey[] | undefined;
-  for (let i = 0; i < entries.length; i += KEYS_PER_REQUEST) {
-    const reply = await send(client, {
-      step: "fetch baselines",
-      method: "POST",
-      path: "/api/v1/baselines",
-      body: JSON.stringify({
-        ...ctx,
-        ...(projectId ? { projectId } : {}),
-        keys: entries.slice(i, i + KEYS_PER_REQUEST).map(keyOf),
-      }),
-    });
-    const one = readReply(reply);
-    picks.push(...one.picks);
-    const ids = new Set(one.removed.map(keyId));
-    removed = removed ? removed.filter((k) => ids.has(keyId(k))) : one.removed;
-  }
-  return { picks, removed: removed ?? [] };
+): Promise<BaselinesReply> {
+  const body = { ...ctx, ...(projectId ? { projectId } : {}) };
+  return fetchBaselines(client, { path: "/api/v1/baselines", body }, entries);
 }
 
 function fingerprintOf(v: unknown, at: string): Fingerprint {
@@ -151,14 +110,7 @@ async function writeBaselines(
 ): Promise<void> {
   const images = new Map<string, Promise<Buffer>>();
   const fetchPng = (p: PickedShot) => {
-    const url = new URL(p.image_url, client.base);
-    const got =
-      images.get(p.id) ??
-      sendPng(client, {
-        step: `fetch baseline ${p.id}`,
-        method: "GET",
-        path: `${url.pathname}${url.search}`,
-      });
+    const got = images.get(p.id) ?? baselinePng(client, p);
     images.set(p.id, got);
     return got;
   };
@@ -196,17 +148,17 @@ export function onlyRoutes(session: CaptureSession, only: string[] | undefined):
 
 /** The git context, refused as a usage error: `check` reads the checkout and sends nothing. */
 async function gitOf(opts: Pick<CheckOptions, "git">, deps: CheckDeps): Promise<GitContext> {
-  const warn = deps.warn ?? (() => {});
   try {
     return await gitContext({
       ...opts.git,
       branch: undefined,
       pr: undefined,
       env: deps.env ?? process.env,
-      warn,
+      warn: deps.warn ?? (() => {}),
+      command: "check",
     });
   } catch (e) {
-    if (e instanceof UploadError) throw new UsageError(e.message.replace(/^upload/, "check"));
+    if (e instanceof UploadError) throw new UsageError(e.message);
     throw e;
   }
 }
@@ -239,6 +191,7 @@ function clientOf(opts: Pick<CheckOptions, "server" | "token">, deps: CheckDeps)
     token: opts.token,
     warn: deps.warn ?? (() => {}),
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
+    verb: "check",
   };
 }
 
@@ -310,5 +263,13 @@ export async function checkAgainstServer(
     }),
   );
   const shots = shotsOf(result, manifest.snapshots, dirs);
-  return { ...result, git: ctx, flaky: outcome.flaky, flakeReport: outcome.report, dirs, shots };
+  return {
+    ...result,
+    git: ctx,
+    flaky: outcome.flaky,
+    flakeReport: outcome.report,
+    dirs,
+    shots,
+    removedReported: removed !== undefined,
+  };
 }

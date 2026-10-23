@@ -1,10 +1,9 @@
+import { PLATFORM, baselinePng, fetchBaselines } from "./baselines-client.ts";
 import {
-  type BaselinePick,
   type CiResult,
   type DiffLocation,
   ENGINE_VERSION,
   type PickedShot,
-  isBaselinePick,
   measureShot,
 } from "./ci-diff.ts";
 import type { ChangeNoter } from "./change-note.ts";
@@ -17,10 +16,8 @@ import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.t
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, pngPath, readManifest } from "./manifest.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
-import { type Client, isObj, send, sendPng } from "./upload-client.ts";
+import { type Client, isObj, send } from "./upload-client.ts";
 
-/** The pinned capture image is Linux; the manifest carries no platform of its own. */
-const PLATFORM = "linux";
 const CONCURRENCY = 4;
 export type UploadOptions = {
   dir: string;
@@ -119,48 +116,6 @@ async function openBuild(
   return { id: body.id, diffLocation: at === "ci" || at === "server" ? at : undefined };
 }
 
-/** Keys per baselines request: the server takes up to 2000. */
-const KEYS_PER_REQUEST = 500;
-
-function snapshotKey(e: SnapshotEntry) {
-  const { name, platform, browser, viewport, theme } = snapshotMeta(e);
-  return { name, platform, browser, viewport, theme };
-}
-
-/** The server's pick for every shot, in manifest order. */
-async function fetchBaselines(
-  client: Client,
-  id: string,
-  entries: SnapshotEntry[],
-): Promise<{ diffLocation: DiffLocation; picks: BaselinePick[] }> {
-  const picks: BaselinePick[] = [];
-  let diffLocation: DiffLocation = "server";
-  for (let i = 0; i < entries.length; i += KEYS_PER_REQUEST) {
-    const reply = await send(client, {
-      step: "fetch baselines",
-      method: "POST",
-      path: `/api/v1/builds/${id}/baselines`,
-      body: JSON.stringify({ keys: entries.slice(i, i + KEYS_PER_REQUEST).map(snapshotKey) }),
-    });
-    const sent: unknown[] = isObj(reply) && Array.isArray(reply.baselines) ? reply.baselines : [];
-    if (sent.length === 0 || !sent.every(isBaselinePick))
-      throw new UploadError("upload failed: fetch baselines: the server's reply has no baselines");
-    if (isObj(reply) && reply.diff_location === "ci") diffLocation = "ci";
-    picks.push(...sent);
-  }
-  return { diffLocation, picks };
-}
-
-/** A baseline image, through the signed link the server gave, on the server the CLI was pointed at. */
-function baselinePng(client: Client, picked: PickedShot): Promise<Buffer> {
-  const url = new URL(picked.image_url, client.base);
-  return sendPng(client, {
-    step: `fetch baseline ${picked.id}`,
-    method: "GET",
-    path: `${url.pathname}${url.search}`,
-  });
-}
-
 /** What a shot sends beside its meta and PNG. */
 type ShotExtras = { results: CiResult[]; flake: FlakeCheck | undefined; note: string | null };
 
@@ -226,7 +181,7 @@ export async function uploadSnapshots(
   const { id, diffLocation } = await openBuild(client, ctx, opts.projectId);
   // A server from before ob 1727 has no baselines endpoint and diffs every build itself.
   const picked = diffLocation
-    ? await fetchBaselines(client, id, manifest.snapshots)
+    ? await fetchBaselines(client, { path: `/api/v1/builds/${id}/baselines` }, manifest.snapshots)
     : { diffLocation: "server", picks: [] };
   const ci = picked.diffLocation === "ci";
   const flakes = flakePass({

@@ -6,7 +6,8 @@ import type { SnapshotEntry } from "./snapshot.ts";
  * The CLI's half of a project that diffs in CI (ob 1727). The server picks each shot's baseline
  * (`POST /api/v1/builds/:id/baselines`) and this measures the shot against it, with the same
  * engine the server's own diff runs, so it can check and store the result without decoding a PNG.
- * Nothing here picks a baseline, compares environments or decides a carry: the server does.
+ * Nothing here picks a baseline: the server does. Deciding a carry, which compares environments, is
+ * `check`'s `settle()`, which mirrors the server's `diffOne`.
  */
 
 export type DiffLocation = "ci" | "server";

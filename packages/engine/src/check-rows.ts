@@ -1,14 +1,12 @@
 import { dirname, join } from "node:path";
+import type { RemovedKey } from "./baselines-client.ts";
 import type { CompareRow } from "./compare-report.ts";
-import type { SnapshotCompareResult } from "./compare-snapshots.ts";
+import { type SnapshotCompareResult, shotKeyLabel } from "./compare-snapshots.ts";
 import { identity } from "./manifest.ts";
 import type { Region } from "./regions.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 
 /** `pixelslash check`'s rows (ob 1732): what the server would remove, and `--json`'s shot list. */
-
-/** What the preview says a build would remove: a key the baseline build has and this one lacks. */
-export type RemovedKey = { name: string; browser: string; viewport: string; theme: string };
 
 export type CheckShot = {
   name: string;
@@ -23,10 +21,9 @@ export type CheckShot = {
 
 /** A removed key as a row; its scheme is named when the run's schemes vary, as `compare` does. */
 function removedRow(k: RemovedKey, varied: boolean): CompareRow {
-  const shot = `${k.browser} ${k.viewport}${varied ? ` prefers: ${k.theme}` : ""}`;
   return {
     name: k.name,
-    shot,
+    shot: shotKeyLabel(k, varied),
     report: undefined,
     changedPixels: 0,
     mismatch: [],
@@ -35,13 +32,17 @@ function removedRow(k: RemovedKey, varied: boolean): CompareRow {
   };
 }
 
-/** The removed keys as rows, those of the routes `--only` named; schemes named as `compare` does. */
+/**
+ * The removed keys as rows, those of the routes `--only` named; schemes named as `compare` does.
+ * `undefined` is a server that does not say, which adds nothing.
+ */
 export function addRemoved(
   result: SnapshotCompareResult,
-  removed: RemovedKey[],
+  removed: RemovedKey[] | undefined,
   entries: SnapshotEntry[],
   only: string[] | undefined,
 ): void {
+  if (!removed) return;
   const names = only ? new Set(only) : undefined;
   const schemes = new Set([...entries.map((e) => e.variant.theme), ...removed.map((k) => k.theme)]);
   for (const k of removed)

@@ -21,6 +21,8 @@ export type GitOptions = {
   pr: number | undefined;
   env: NodeJS.ProcessEnv;
   warn: (message: string) => void;
+  /** The command asking, for its messages. Default `upload`. */
+  command?: "upload" | "check";
 };
 
 /** stdout of `git <args>` trimmed, or undefined when git exits non-zero. */
@@ -55,8 +57,9 @@ async function mergeBase(opts: GitOptions): Promise<string | null> {
     const base = await git(cwd, ["merge-base", "HEAD", ref]);
     if (base) return base;
   }
+  const doing = opts.command === "check" ? "checking" : "uploading";
   opts.warn(
-    `warning: no merge-base with ${baseBranch} (not in this checkout, or a shallow clone); uploading without one`,
+    `warning: no merge-base with ${baseBranch} (not in this checkout, or a shallow clone); ${doing} without one`,
   );
   return null;
 }
@@ -64,7 +67,10 @@ async function mergeBase(opts: GitOptions): Promise<string | null> {
 /** Read the commit, branch, merge-base with the base branch and ancestor list from the local checkout. */
 export async function gitContext(opts: GitOptions): Promise<GitContext> {
   const commitSha = await git(opts.cwd, ["rev-parse", "--verify", "HEAD^{commit}"]);
-  if (!commitSha) throw new UploadError(`upload needs a git checkout with a commit: ${opts.cwd}`);
+  if (!commitSha)
+    throw new UploadError(
+      `${opts.command ?? "upload"} needs a git checkout with a commit: ${opts.cwd}`,
+    );
   const log = await git(opts.cwd, ["rev-list", `--max-count=${MAX_ANCESTORS + 1}`, "HEAD"]);
   return {
     commitSha,

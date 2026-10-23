@@ -20,6 +20,8 @@ export type Client = {
   token: string;
   warn: (message: string) => void;
   sleep: (ms: number) => Promise<void>;
+  /** The command speaking, for its errors and warnings: `check` fails as "check failed". Default `upload`. */
+  verb?: "upload" | "check";
 };
 /** `step` is what the CLI says failed: "open build", "upload <snapshot>", "finalize". */
 export type Call = {
@@ -93,13 +95,14 @@ async function attempt(client: Client, call: Call): Promise<Attempt> {
  * count is a no-op), and a repeated open at worst leaves an empty, unfinalised build behind.
  */
 export async function send(client: Client, call: Call): Promise<unknown> {
+  const verb = client.verb ?? "upload";
   for (let n = 1; ; n++) {
     const result = await attempt(client, call);
     if (result.ok) return result.body;
     const tries = n === 1 ? "" : ` (after ${n} tries)`;
     if (!result.transient || n === TRIES)
-      throw new UploadError(`upload failed: ${call.step}: ${result.message}${tries}`);
-    client.warn(`upload: ${call.step}: ${result.message}; trying again (${n + 1}/${TRIES})`);
+      throw new UploadError(`${verb} failed: ${call.step}: ${result.message}${tries}`);
+    client.warn(`${verb}: ${call.step}: ${result.message}; trying again (${n + 1}/${TRIES})`);
     await client.sleep(RETRY_DELAYS_MS[n - 1] ?? 0);
   }
 }
@@ -107,6 +110,7 @@ export async function send(client: Client, call: Call): Promise<unknown> {
 /** A PNG the API serves: a baseline image (ob 1727). */
 export async function sendPng(client: Client, call: Omit<Call, "png">): Promise<Buffer> {
   const body = await send(client, { ...call, png: true });
-  if (!Buffer.isBuffer(body)) throw new UploadError(`upload failed: ${call.step}: no image`);
+  if (!Buffer.isBuffer(body))
+    throw new UploadError(`${client.verb ?? "upload"} failed: ${call.step}: no image`);
   return body;
 }

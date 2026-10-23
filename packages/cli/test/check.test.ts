@@ -13,8 +13,11 @@ const pinned = { PIXELSLASH_IMAGE_VERSION: "test", PIXELSLASH_TOKEN: "psci_t" };
 
 type Seen = { method: string; path: string };
 
-/** A server that picks a red baseline for every shot, or refuses everything with `refuse`. */
-function server(refuse?: number) {
+/**
+ * A server that picks a red baseline for every shot, or refuses everything with `refuse`. With
+ * `reportsRemoved: false` its reply has no `removed`, as one from before ob 1732 has none.
+ */
+function server(refuse?: number, reportsRemoved = true) {
   const seen: Seen[] = [];
   const fetch = async (url: string, init?: RequestInit) => {
     const path = new URL(url).pathname;
@@ -33,7 +36,7 @@ function server(refuse?: number) {
         api_version: 1,
         diff_location: "server",
         baselines: keys.map((key) => ({ key, baseline, carry: null, accepted: null })),
-        removed: [],
+        ...(reportsRemoved ? { removed: [] } : {}),
       });
     }
     if (path.startsWith("/images/")) return new Response(solidPng(400, 300, [200, 0, 0, 255]));
@@ -93,6 +96,20 @@ describe("pixelslash check", () => {
     const at = lines.findIndex((l) => l.startsWith("pixelslash: "));
     expect(lines[at]).toBe("pixelslash: 1 changed, 0 unchanged, 0 new, 0 removed");
     expect(lines.slice(at + 1, at + 3)).toEqual(["changed:", "  index (chromium 400x300)"]);
+  }, 60_000);
+
+  test("a server that does not report removed shots is said so, and --json has a null count", async () => {
+    const [cwd, api] = [await project(), server(undefined, false)];
+    const deps = { fetch: api.fetch, cwd, env: pinned, listFonts: async () => [] };
+    const text = capture();
+    expect(await run(["check", "--server", SERVER, "--flake-retries", "0"], text.io, deps)).toBe(0);
+    expect(text.stdout).toContain(
+      "pixelslash: 1 changed, 0 unchanged, 0 new, removed not reported by this server\n",
+    );
+    expect(text.stdout).not.toContain("0 removed");
+    const json = capture();
+    await run(["check", "--server", SERVER, "--flake-retries", "0", "--json"], json.io, deps);
+    expect(JSON.parse(json.stdout)).toMatchObject({ counts: { changed: 1, removed: null } });
   }, 60_000);
 
   test("a refused token is exit 3, after nothing was written to the server", async () => {
