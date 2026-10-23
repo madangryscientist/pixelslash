@@ -113,8 +113,12 @@ the CT would seal keys under the `e2e` env's fixed test value). The Cloudflare p
 `dist/server/.dev.vars` at build time and `vite preview` reads it from there; the `e2e` env in
 `wrangler.jsonc`, and so the tests, are unchanged.
 
-Update to `origin/main` (pull, install, migrate, build, restart) from the desktop. It is not run
-automatically:
+Update to `origin/main` (pull, stop, install, migrate, build, restart) from the desktop. It is not
+run automatically. **A deploy has a short downtime:** `pixelslash-web` is stopped before the install
+and build, because the running workerd holds most of the CT's 2 GiB and a build beside it thrashes
+the CT for tens of minutes; with it stopped the whole update takes about 12 s and :3000 is down for
+that long. The stub stays up. If a step fails after the stop, the previous build is put back and the
+server is started on it, and the script exits 1.
 
 ```bash
 ssh -i ~/.ssh/id_ed25519_mac root@192.168.0.20 \
