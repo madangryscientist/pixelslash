@@ -121,6 +121,12 @@ function ModelFields({
           className="mt-0.5 w-full px-3"
         />
       </label>
+      <span className="block text-xs text-slate-500 sm:col-span-2">
+        OpenCode Go works for a personal self-host (
+        <code>https://opencode.ai/inference/go/openai/v1</code>, a Go model that takes images). A
+        deployed service should use OpenCode Zen or the provider's own API, because Go is licensed
+        for coding-agent traffic.
+      </span>
       <label className="block sm:col-span-2">
         <span className="text-slate-700">API key</span>
         <Input

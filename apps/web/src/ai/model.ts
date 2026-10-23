@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { ENGINE_VERSION } from "@pixelslash/engine/diff";
 import { AI_LABELS, type AiLabel } from "#/db/schema";
 
 /**
@@ -17,8 +18,20 @@ export type RegionAnswer = { label: AiLabel; explanation: string };
 /** The transport: the global `fetch`, or a test's stub. */
 export type ModelFetch = (url: string, init: RequestInit) => Promise<Response>;
 
+/** One region's call: the build it is for (ob 1794), and the transport and time it may take. */
+type RegionCall = { buildId: string; fetcher?: ModelFetch | undefined; timeoutMs?: number };
+
 /** One region's call is given up after this at most, so a stuck endpoint cannot hold the build. */
 export const MODEL_TIMEOUT_MS = 20_000;
+
+/** Every model call names this client, as the CLI's requests do. */
+const USER_AGENT = `pixelslash/${ENGINE_VERSION}`;
+
+/**
+ * OpenCode Go refuses a call without a stable session id (400 `MissingSessionID`), so a call to
+ * this host also names its build (ob 1794). No other endpoint is sent the header.
+ */
+const OPENCODE_HOST = "opencode.ai";
 
 /** An explanation is a sentence, not an essay: a longer one is cut. */
 const MAX_EXPLANATION = 280;
@@ -89,23 +102,35 @@ function contentOf(body: unknown): string {
 type Part = { type: "text"; text: string } | ReturnType<typeof image>;
 
 /**
- * One chat-completions call with one user message; the reply's text. Throws ModelError on any
- * failure (network, status, timeout, no content). The key goes only in the Authorization header,
- * and no error message carries it.
+ * The headers of one call. The key goes only in `authorization`. `x-opencode-session` is the build's
+ * id, sent only to OpenCode, so one build's calls share one session.
+ */
+function headersFor(endpoint: ModelEndpoint, buildId: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: `Bearer ${endpoint.apiKey}`,
+    "user-agent": USER_AGENT,
+  };
+  if (new URL(endpoint.baseUrl).hostname === OPENCODE_HOST) headers["x-opencode-session"] = buildId;
+  return headers;
+}
+
+/**
+ * One chat-completions call with one user message; the reply's text. `buildId` names the build the
+ * call is for (see `headersFor`). Throws ModelError on any failure (network, status, timeout, no
+ * content). The key goes only in the Authorization header, and no error message carries it.
  */
 export async function complete(
   endpoint: ModelEndpoint,
   content: Part[],
+  buildId: string,
   { fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS, maxTokens = 200 }: CallOptions = {},
 ): Promise<string> {
   let res: Response;
   try {
     res = await fetcher(`${endpoint.baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${endpoint.apiKey}`,
-      },
+      headers: headersFor(endpoint, buildId),
       body: JSON.stringify({
         model: endpoint.model,
         temperature: 0,
@@ -134,8 +159,7 @@ type CallOptions = {
 export async function explainRegion(
   endpoint: ModelEndpoint,
   images: RegionImages,
-  fetcher: ModelFetch = fetch,
-  timeoutMs = MODEL_TIMEOUT_MS,
+  { buildId, fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS }: RegionCall,
 ): Promise<RegionAnswer> {
   const raw = await complete(
     endpoint,
@@ -145,6 +169,7 @@ export async function explainRegion(
       image(images.branch),
       image(images.diff),
     ],
+    buildId,
     { fetcher, timeoutMs },
   );
   return parseRegionAnswer(raw);

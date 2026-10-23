@@ -33,34 +33,34 @@ const twoChanges = shot({
   ],
 });
 
-const BASE_URL = "http://model.test/v1";
+// OpenCode Go, so every call names its build as its session (ob 1794).
+const BASE_URL = "https://opencode.ai/inference/go/openai/v1";
 const KEY = "sk-test-not-a-real-key";
 
 type Sent = { url: string; auth: string | null; model: string; images: PNG[] };
 
 /**
  * An OpenAI-compatible endpoint that records each region call and answers with `reply(call index)`.
- * The build's text-only summary call (ob 1668) is answered apart and counted in `summaries`.
+ * The build's text-only summary call (ob 1668) is answered apart.
  */
 function stubModel(
   reply: (n: number) => string | Error | Response = () => "LABEL noise\nWHY Edges moved.",
 ) {
   const sent: Sent[] = [];
-  const summaries: string[] = [];
+  const sessions: (string | null)[] = [];
   const modelFetch: ModelFetch = async (input, init) => {
     const body = typeof init.body === "string" ? init.body : "";
+    sessions.push(new Headers(init.headers).get("x-opencode-session"));
     if (!body.includes("image_url")) {
-      summaries.push(body);
       const ref = /\\n(\[[CNR]\d+\])/.exec(body)?.[1] ?? "";
       return Response.json({ choices: [{ message: { content: `Something moved. ${ref}` } }] });
     }
     const images = [...body.matchAll(/data:image\/png;base64,([A-Za-z0-9+/=]+)/g)].map(([, b64]) =>
       PNG.sync.read(Buffer.from(b64 ?? "", "base64")),
     );
-    const headers = new Headers(init.headers);
     sent.push({
       url: input,
-      auth: headers.get("authorization"),
+      auth: new Headers(init.headers).get("authorization"),
       model: /"model":"([^"]+)"/.exec(body)?.[1] ?? "",
       images,
     });
@@ -69,7 +69,7 @@ function stubModel(
     if (answer instanceof Response) return answer;
     return Response.json({ choices: [{ message: { role: "assistant", content: answer } }] });
   };
-  return { sent, summaries, modelFetch };
+  return { sent, sessions, modelFetch };
 }
 
 async function withModel(ctx: Ctx, autoPassNoise: boolean) {
@@ -101,11 +101,13 @@ describe("explaining changed regions (ob 1473)", () => {
   test("one call per change region, each with that region's three crops only", async () => {
     const ctx = await context();
     await withModel(ctx, false);
-    const { sent, modelFetch } = stubModel((n) =>
+    const { sent, sessions, modelFetch } = stubModel((n) =>
       n === 0 ? "LABEL intended\nWHY A red block was added." : "LABEL unintended\nWHY Overlap.",
     );
     const build = await branchBuild(ctx, modelFetch);
     const row = await onlyShot(ctx, build);
+    // Both region calls and the summary call name the build as their session.
+    expect(sessions).toEqual([build.id, build.id, build.id]);
     const regions = (row.diffResult?.regions ?? []).filter((r) => r.kind === "change");
     expect(regions).toHaveLength(2);
     expect(sent).toHaveLength(2);

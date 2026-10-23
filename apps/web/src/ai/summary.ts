@@ -202,7 +202,7 @@ async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<
     .where(eq(snapshots.buildId, build.id));
   const input = summaryInput(rows);
   if (!input.describable) return null;
-  const raw = await complete(model, [{ type: "text", text: input.prompt }], {
+  const raw = await complete(model, [{ type: "text", text: input.prompt }], build.id, {
     fetcher: deps.modelFetch,
     timeoutMs,
     maxTokens: 400,

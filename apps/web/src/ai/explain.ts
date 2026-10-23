@@ -66,7 +66,7 @@ async function explainShot(
   deps: ExplainDeps,
   endpoint: { baseUrl: string; model: string; apiKey: string },
   shot: Shot,
-  timeoutMs: number,
+  { buildId, timeoutMs }: { buildId: string; timeoutMs: number },
 ): Promise<{ notes: AiRegionNote[]; whole: boolean; failure: string | null }> {
   const changes = (shot.diffResult?.regions ?? []).filter((r) => r.kind === "change");
   const asked: Box[] = changes.slice(0, MAX_REGIONS_PER_SHOT);
@@ -82,7 +82,11 @@ async function explainShot(
     asked.map(async (region, i) => {
       const crop = crops[i];
       if (!crop) throw new Error("region is outside the overlap");
-      const answer = await explainRegion(endpoint, crop, deps.modelFetch, timeoutMs);
+      const answer = await explainRegion(endpoint, crop, {
+        buildId,
+        fetcher: deps.modelFetch,
+        timeoutMs,
+      });
       const note: AiRegionNote = { x: region.x, y: region.y, w: region.w, h: region.h, ...answer };
       return note;
     }),
@@ -118,10 +122,10 @@ async function storeShot(
   deps: ExplainDeps,
   model: Model,
   shot: Shot,
-  { now, timeoutMs }: { now: () => number; timeoutMs: number },
+  { buildId, now, timeoutMs }: { buildId: string; now: () => number; timeoutMs: number },
 ): Promise<{ passed: boolean; failure: string | null }> {
   const endpoint = { baseUrl: model.baseUrl, model: model.model, apiKey: model.apiKey };
-  const { notes, whole, failure } = await explainShot(deps, endpoint, shot, timeoutMs);
+  const { notes, whole, failure } = await explainShot(deps, endpoint, shot, { buildId, timeoutMs });
   if (notes.length === 0) return { passed: false, failure };
   const autoPassed =
     model.autoPassNoise &&
@@ -172,7 +176,11 @@ export async function explainBuild(
       const began = now();
       const timeoutMs = Math.min(MODEL_TIMEOUT_MS, until - began);
       // An image missing from storage or a PNG that does not decode: this shot is reviewed as plain pixels.
-      const stored = await storeShot(deps, model, shot, { now, timeoutMs }).catch((e: unknown) => ({
+      const stored = await storeShot(deps, model, shot, {
+        buildId: build.id,
+        now,
+        timeoutMs,
+      }).catch((e: unknown) => ({
         passed: false,
         failure: messageOf(e),
       }));
