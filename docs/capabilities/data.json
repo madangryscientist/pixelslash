@@ -347,8 +347,8 @@
       "label": "Classifies renderer noise, does not fail on it",
       "ps": {
         "v": "y",
-        "note": "faint + uneven + both directions is noise; on the server, a project's own (or its org's) OpenAI-compatible model labels each changed region (intended, unintended, noise) with a sentence, and with Auto-pass noise on, a shot it labels all noise is accepted and listed as AI-filtered (ob 1473, ob 1789); reasoning models get a 4000-token ceiling, and the build summary is made only under 10 changed shots (ob 1833)",
-        "commit": "6f2580d"
+        "note": "faint + uneven + both directions is noise; on the server, a project's own (or its org's) OpenAI-compatible model labels each changed region (intended, unintended, noise) with a sentence, and with Auto-pass noise on, a shot it labels all noise is accepted and listed as AI-filtered (ob 1473, ob 1789); reasoning models get a 4000-token ceiling, and the build summary is made only under 10 changed shots (ob 1833); explaining runs on a queue after the diff, each call with its own time (ob 1875)",
+        "commit": "74e58b4"
       },
       "t": {
         "argos": "p",
