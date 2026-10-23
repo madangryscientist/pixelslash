@@ -27,7 +27,7 @@ test.describe("a light system", () => {
 
     // No flash: the document the server sends already carries the class, before any script runs.
     const html = await (await page.request.get("/")).text();
-    expect(html).toMatch(/<html[^>]*class="dark"/);
+    expect(html).toMatch(/<html[^>]*class="(?:[^"]* )?dark[ "]/);
 
     await page.reload();
     await expect(page.locator("html")).toHaveClass(/dark/);
@@ -36,7 +36,7 @@ test.describe("a light system", () => {
     await toggle.click();
     await expect(page.locator("html")).not.toHaveClass(/dark/);
     const light = await (await page.request.get("/")).text();
-    expect(light).not.toMatch(/<html[^>]*class="dark"/);
+    expect(light).not.toMatch(/<html[^>]*class="(?:[^"]* )?dark[ "]/);
   });
 });
 

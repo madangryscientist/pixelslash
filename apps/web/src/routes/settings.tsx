@@ -1,6 +1,15 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { Body, Callout, Input, Pill, SectionHeading, Select } from "@hackcove/ui";
+import {
+  Body,
+  Breadcrumbs,
+  Callout,
+  Input,
+  ListLayout,
+  Pill,
+  SectionHeading,
+  Select,
+} from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { Page, useHydrated } from "#/components/ui";
@@ -21,35 +30,37 @@ function AccountSettings() {
   const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
   return (
-    <Page title="Settings" crumbs={["Settings"]}>
-      <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <SectionHeading className="mb-1.5">API tokens</SectionHeading>
-        <Body as="p" className="mb-4">
-          The CLI and MCP server act as you with a personal token: they see the organizations and
-          projects you see here. It is shown once, when issued. For CI, issue a project's CI token
-          in its settings instead.
-        </Body>
-        {issued && (
-          <Callout
-            tone="warn"
-            role="status"
-            title="Copy this token now. It will not be shown again."
-            className="mb-4"
-          >
-            <CopyLine text={issued} hydrated={hydrated} testId="issued-token" className="mt-2" />
-          </Callout>
-        )}
-        <IssueForm onIssued={setIssued} />
-        <TokenTable tokens={tokens} now={now} hydrated={hydrated} />
-        <Body as="p" className="mt-6 mb-3">
-          Check a token from your machine with:
-        </Body>
-        <CopyLine
-          text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
-          hydrated={hydrated}
-          testId="token-usage"
-        />
-      </section>
+    <Page>
+      <ListLayout breadcrumbs={<Breadcrumbs crumbs={["Settings"]} />} title="Settings">
+        <section className="rounded-xl border border-slate-200 bg-white p-6">
+          <SectionHeading className="mb-1.5">API tokens</SectionHeading>
+          <Body as="p" className="mb-4">
+            The CLI and MCP server act as you with a personal token: they see the organizations and
+            projects you see here. It is shown once, when issued. For CI, issue a project's CI token
+            in its settings instead.
+          </Body>
+          {issued && (
+            <Callout
+              tone="warn"
+              role="status"
+              title="Copy this token now. It will not be shown again."
+              className="mb-4"
+            >
+              <CopyLine text={issued} hydrated={hydrated} testId="issued-token" className="mt-2" />
+            </Callout>
+          )}
+          <IssueForm onIssued={setIssued} />
+          <TokenTable tokens={tokens} now={now} hydrated={hydrated} />
+          <Body as="p" className="mt-6 mb-3">
+            Check a token from your machine with:
+          </Body>
+          <CopyLine
+            text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
+            hydrated={hydrated}
+            testId="token-usage"
+          />
+        </section>
+      </ListLayout>
     </Page>
   );
 }

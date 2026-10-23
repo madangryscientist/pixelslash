@@ -1,3 +1,4 @@
+import { SidebarLayout } from "@hackcove/ui";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ActionButton } from "#/components/action-button";
@@ -7,7 +8,7 @@ import { MembersPanel } from "#/components/org-members";
 import { type OrgToken, OrgTokensPanel } from "#/components/org-tokens";
 import { EmptyOrg } from "#/components/org-empty";
 import { ProjectTable, WaitingStrip } from "#/components/org-projects";
-import { type DialogKind, OrgHeader, OrgTabs, type Tab } from "#/components/org-tabs";
+import { type DialogKind, OrgHeader, type Tab } from "#/components/org-tabs";
 import { OrgRail } from "#/components/org-rail";
 import { Page, useHydrated } from "#/components/ui";
 import type { ModelView } from "#/db/models";
@@ -43,38 +44,39 @@ function Orgs() {
     selected ? invite({ data: { orgId: selected.id, login } }).then(refresh) : Promise.resolve();
 
   return (
-    <Page title="Organizations" full>
-      <div className="grid min-h-[calc(100vh-57px)] md:grid-cols-[232px_1fr]">
-        <OrgRail
-          orgs={orgs}
-          selectedId={selected?.id ?? null}
-          onNew={() => setDialog("org")}
-          hydrated={hydrated}
-        />
-        <div className="min-w-0 px-5 pt-7 pb-10 md:px-9">
-          {selected ? (
-            <OrgPanel
-              org={selected}
-              tokens={orgTokens.filter((t) => t.orgId === selected.id)}
-              model={orgModels.find((m) => m.orgId === selected.id) ?? null}
-              now={now}
-              serverUrl={serverUrl}
-              tab={search.tab ?? "projects"}
-              viewerLogin={viewer?.login ?? null}
-              hydrated={hydrated}
-              onDialog={setDialog}
-              onInvite={onInvite}
-              onWithdraw={(inviteRow) =>
-                withdrawOrgInvite({ data: { orgId: selected.id, inviteId: inviteRow.id } }).then(
-                  refresh,
-                )
-              }
-            />
-          ) : (
-            <NoOrgs hydrated={hydrated} onNew={() => setDialog("org")} />
-          )}
-        </div>
-      </div>
+    <Page bleed>
+      <SidebarLayout
+        rail={
+          <OrgRail
+            orgs={orgs}
+            selectedId={selected?.id ?? null}
+            onNew={() => setDialog("org")}
+            hydrated={hydrated}
+          />
+        }
+      >
+        {selected ? (
+          <OrgPanel
+            org={selected}
+            tokens={orgTokens.filter((t) => t.orgId === selected.id)}
+            model={orgModels.find((m) => m.orgId === selected.id) ?? null}
+            now={now}
+            serverUrl={serverUrl}
+            tab={search.tab ?? "projects"}
+            viewerLogin={viewer?.login ?? null}
+            hydrated={hydrated}
+            onDialog={setDialog}
+            onInvite={onInvite}
+            onWithdraw={(inviteRow) =>
+              withdrawOrgInvite({ data: { orgId: selected.id, inviteId: inviteRow.id } }).then(
+                refresh,
+              )
+            }
+          />
+        ) : (
+          <NoOrgs hydrated={hydrated} onNew={() => setDialog("org")} />
+        )}
+      </SidebarLayout>
       <OrgDialogs
         kind={dialog}
         org={selected}
@@ -230,8 +232,7 @@ function OrgPanel({
 }) {
   return (
     <>
-      <OrgHeader org={org} hydrated={hydrated} onDialog={onDialog} />
-      <OrgTabs org={org} tab={tab} />
+      <OrgHeader org={org} tab={tab} hydrated={hydrated} onDialog={onDialog} />
       {tab === "tokens" && (
         <OrgTokensPanel orgId={org.id} orgName={org.name} tokens={tokens} hydrated={hydrated} />
       )}

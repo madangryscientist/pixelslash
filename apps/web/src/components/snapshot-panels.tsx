@@ -1,4 +1,4 @@
-import { Pill } from "@hackcove/ui";
+import { Container, Pill } from "@hackcove/ui";
 import { type ReactNode, useEffect, useRef } from "react";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
@@ -176,7 +176,9 @@ export function ViewerBar({
   reviewable,
   busy,
   actions,
+  breadcrumbs,
 }: {
+  breadcrumbs: ReactNode;
   build: BuildView["build"];
   snapshot: SnapshotView;
   label: ShotLabel;
@@ -189,18 +191,21 @@ export function ViewerBar({
 }) {
   const why = reviewable ? undefined : `This build is ${build.status}; a new build is needed.`;
   return (
-    <div className="sticky top-0 z-10 border-b border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-2.5">
-        <ShotTitle build={build} snapshot={snapshot} label={label} />
-        <span className="flex-1" />
-        <span data-testid="review-position" className="text-sm text-slate-600 tabular-nums">
-          {reviewText(review)}
-        </span>
-        <span data-testid="position" className="text-sm text-slate-500 tabular-nums">
-          {position} of {total}
-        </span>
-        <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
-      </div>
+    <div className="sticky top-14 z-10 border-b border-slate-200 bg-white">
+      <Container className="py-2.5">
+        {breadcrumbs}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <ShotTitle build={build} snapshot={snapshot} label={label} />
+          <span className="flex-1" />
+          <span data-testid="review-position" className="text-sm text-slate-600 tabular-nums">
+            {reviewText(review)}
+          </span>
+          <span data-testid="position" className="text-sm text-slate-500 tabular-nums">
+            {position} of {total}
+          </span>
+          <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
+        </div>
+      </Container>
     </div>
   );
 }

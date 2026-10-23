@@ -122,7 +122,7 @@ export function IgnoreBoxSettings({
 }) {
   return (
     <section
-      className="mt-6 rounded-xl border border-slate-200 bg-white p-6"
+      className="rounded-xl border border-slate-200 bg-white p-6"
       data-testid="ignore-box-settings"
     >
       <SectionHeading className="mb-1.5">Ignore boxes drawn in review</SectionHeading>

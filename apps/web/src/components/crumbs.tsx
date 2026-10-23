@@ -1,6 +1,6 @@
+import { crumbLinkClass } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { crumbLinkClass } from "./shell";
 
 /** The crumbs the review pages share, so each page lists only the ones above it. */
 export function orgCrumb(org: { id: string; name: string }): ReactNode {

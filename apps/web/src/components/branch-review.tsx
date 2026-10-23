@@ -36,7 +36,7 @@ export function MainSummaryBox({ summary, status }: { summary: MainSummary; stat
   ];
   return (
     <div
-      className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4"
+      className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4"
       data-testid="branch-summary"
     >
       <div className="flex flex-wrap gap-6">
@@ -73,7 +73,7 @@ export function ModeTabs({
     { id: "since", label: "Since last build" },
   ];
   return (
-    <nav aria-label="Read the branch" className="mb-4 flex flex-wrap gap-2">
+    <nav aria-label="Read the branch" className="flex flex-wrap gap-2">
       {modes.map((mode) => (
         <Link
           key={mode.id}

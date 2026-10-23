@@ -1,3 +1,4 @@
+import { Breadcrumbs, Container, FullBleedLayout } from "@hackcove/ui";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
@@ -69,9 +70,13 @@ function useWalk(projectId: string, buildId: string) {
 function DecisionError({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <p role="alert" className="border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700">
-      {error}
-    </p>
+    <div className="border-b border-red-200 bg-red-50">
+      <Container>
+        <p role="alert" className="py-2 text-sm text-red-700">
+          {error}
+        </p>
+      </Container>
+    </div>
   );
 }
 
@@ -95,6 +100,38 @@ function ShotPanels({
       />
       <RerunShot project={project} build={build} snapshot={snapshot} />
     </>
+  );
+}
+
+/** The right-hand column: the side panel with its override, ignore-box and per-shot panels. */
+function SideColumn({
+  data,
+  flag,
+  ignore,
+  reviewable,
+}: {
+  data: ReturnType<typeof Route.useLoaderData>;
+  flag: ReturnType<typeof useFlagDraft>;
+  ignore: ReturnType<typeof useIgnoreDraft>;
+  reviewable: boolean;
+}) {
+  const { project, build, snapshot } = data;
+  return (
+    <SidePanel
+      projectId={project.id}
+      snapshot={snapshot}
+      options={data.diffOptions}
+      reviewable={reviewable}
+      status={build.status}
+      after={
+        <>
+          <DiffOverride {...data} />
+          <IgnoreBoxes {...data} draft={ignore} />
+        </>
+      }
+    >
+      <ShotPanels data={data} flag={flag} />
+    </SidePanel>
   );
 }
 
@@ -122,28 +159,36 @@ function SnapshotPage() {
   });
 
   return (
-    <Page
-      title={`${project.name} · ${snapshot.name}`}
-      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumb(project.id, build), snapshot.name]}
-      full
-    >
-      <ViewerBar
-        {...data}
-        label={label}
-        reviewable={reviewable}
-        busy={busy}
-        actions={{
-          onPrevious: previousId ? () => go(previousId) : null,
-          onNext: nextId ? () => go(nextId) : null,
-          onAccept: () => decide("accepted"),
-          onReject: () => decide("rejected"),
-          onFlag: flag.toggle,
-          flagOpen: flag.open,
-          onHelp: openHelp,
-        }}
-      />
-      <DecisionError error={error} />
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_17rem]">
+    <Page bleed>
+      <FullBleedLayout
+        panel={<SideColumn data={data} flag={flag} ignore={ignore} reviewable={reviewable} />}
+      >
+        <ViewerBar
+          {...data}
+          breadcrumbs={
+            <Breadcrumbs
+              crumbs={[
+                orgCrumb(org),
+                projectCrumb(project),
+                buildCrumb(project.id, build),
+                snapshot.name,
+              ]}
+            />
+          }
+          label={label}
+          reviewable={reviewable}
+          busy={busy}
+          actions={{
+            onPrevious: previousId ? () => go(previousId) : null,
+            onNext: nextId ? () => go(nextId) : null,
+            onAccept: () => decide("accepted"),
+            onReject: () => decide("rejected"),
+            onFlag: flag.toggle,
+            flagOpen: flag.open,
+            onHelp: openHelp,
+          }}
+        />
+        <DecisionError error={error} />
         <div className="min-w-0 space-y-3 p-4">
           <EdgeWarning result={snapshot.diffResult} />
           <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
@@ -160,22 +205,7 @@ function SnapshotPage() {
             />
           </RegionNotesProvider>
         </div>
-        <SidePanel
-          projectId={project.id}
-          snapshot={snapshot}
-          options={data.diffOptions}
-          reviewable={reviewable}
-          status={build.status}
-          after={
-            <>
-              <DiffOverride {...data} />
-              <IgnoreBoxes {...data} draft={ignore} />
-            </>
-          }
-        >
-          <ShotPanels data={data} flag={flag} />
-        </SidePanel>
-      </div>
+      </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}
     </Page>
   );

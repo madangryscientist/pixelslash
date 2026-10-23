@@ -1,3 +1,4 @@
+import { Breadcrumbs, ListLayout } from "@hackcove/ui";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
@@ -27,7 +28,7 @@ type Loaded = ReturnType<typeof Route.useLoaderData>;
 function BuildError({ project, build }: Pick<Loaded, "project" | "build">) {
   if (!build.error) return null;
   return (
-    <div role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+    <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">
       {build.error}
       {project.diffLocation === "ci" && build.status === "errored" && (
         <span data-testid="rerun-ci" className="mt-1 block font-medium">
@@ -64,57 +65,60 @@ function BuildPage() {
     }
   };
   return (
-    <Page
-      title={`${project.name} · ${build.branch}`}
-      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumbLabel(build)]}
-      wide
-    >
-      <BuildHeader
-        projectId={project.id}
-        defaultBranch={project.defaultBranch}
-        build={build}
-        snapshots={snapshots}
-        toReview={toReview}
-        reviewable={reviewable}
-        onAccept={acceptAll}
-        baseline={baseline}
+    <Page>
+      <ListLayout
+        breadcrumbs={
+          <Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), buildCrumbLabel(build)]} />
+        }
+        title={`${project.name} · ${build.branch}`}
       >
-        {build.branch !== project.defaultBranch && (
-          <BuildSummary
-            projectId={project.id}
-            build={build}
-            snapshots={snapshots}
-            modelConfigured={modelConfigured}
-          />
+        <BuildHeader
+          projectId={project.id}
+          defaultBranch={project.defaultBranch}
+          build={build}
+          snapshots={snapshots}
+          toReview={toReview}
+          reviewable={reviewable}
+          onAccept={acceptAll}
+          baseline={baseline}
+        >
+          {build.branch !== project.defaultBranch && (
+            <BuildSummary
+              projectId={project.id}
+              build={build}
+              snapshots={snapshots}
+              modelConfigured={modelConfigured}
+            />
+          )}
+        </BuildHeader>
+        <BuildError project={project} build={build} />
+        {error && (
+          <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+            {error}
+          </p>
         )}
-      </BuildHeader>
-      <BuildError project={project} build={build} />
-      {error && (
-        <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
-          {error}
+        {snapshots.length === 0 ? (
+          <p className="text-slate-600">This build holds no snapshots yet.</p>
+        ) : (
+          <>
+            <Tabs projectId={project.id} buildId={build.id} active={active} counts={counts} />
+            <TabBody
+              key={active}
+              projectId={project.id}
+              buildId={build.id}
+              tab={active}
+              snapshots={snapshots}
+              thumbs={thumbs}
+              baseline={baseline}
+            />
+          </>
+        )}
+        <p className="text-sm text-slate-500">
+          A rejection keeps the build failed until a new build arrives. New and removed shots are
+          listed for review and never block a build.
         </p>
-      )}
-      {snapshots.length === 0 ? (
-        <p className="text-slate-600">This build holds no snapshots yet.</p>
-      ) : (
-        <>
-          <Tabs projectId={project.id} buildId={build.id} active={active} counts={counts} />
-          <TabBody
-            key={active}
-            projectId={project.id}
-            buildId={build.id}
-            tab={active}
-            snapshots={snapshots}
-            thumbs={thumbs}
-            baseline={baseline}
-          />
-        </>
-      )}
-      <p className="text-sm text-slate-500">
-        A rejection keeps the build failed until a new build arrives. New and removed shots are
-        listed for review and never block a build.
-      </p>
-      <BuildOverrideChanges changes={thresholdChanges} />
+        <BuildOverrideChanges changes={thresholdChanges} />
+      </ListLayout>
     </Page>
   );
 }

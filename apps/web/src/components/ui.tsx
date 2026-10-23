@@ -1,4 +1,4 @@
-import { Input, PageHeading, Pill } from "@hackcove/ui";
+import { AppShell, Input, Pill } from "@hackcove/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
 import { ActionButton } from "./action-button";
@@ -38,36 +38,18 @@ export function ReviewChip({ state, by }: { state: string; by?: string | null })
 }
 
 /**
- * `data-hydrated` is false in the server HTML and true once React owns the page. The controls
- * disable themselves until then, and a browser test can wait for the same signal. `crumbs` are
- * the links above this page (org, project, build), shown in the header before its own title.
+ * The page frame. `data-hydrated` is false in the server HTML and true once React owns the page.
+ * The controls disable themselves until then, and a browser test can wait for the same signal.
+ * The page's layout (`ListLayout`, `SidebarLayout`, ...) goes inside; `bleed` is for the layouts
+ * that draw their own edge (`SidebarLayout`, `FullBleedLayout`).
  */
-export function Page({
-  title,
-  wide = false,
-  full = false,
-  crumbs,
-  children,
-}: {
-  title: string;
-  wide?: boolean;
-  /** Edge to edge with no page heading: the page draws its own (the organizations page). */
-  full?: boolean;
-  crumbs?: ReactNode[];
-  children: ReactNode;
-}) {
+export function Page({ bleed = false, children }: { bleed?: boolean; children: ReactNode }) {
   const hydrated = useHydrated();
   return (
-    <div className="app-canvas min-h-screen" data-hydrated={hydrated}>
-      <AppHeader crumbs={crumbs} wide={wide} full={full} />
-      {full ? (
-        <main>{children}</main>
-      ) : (
-        <main className={`mx-auto px-6 py-8 ${wide ? "max-w-6xl" : "max-w-3xl"}`}>
-          <PageHeading className="mb-6">{title}</PageHeading>
-          {children}
-        </main>
-      )}
+    <div className="app-canvas" data-hydrated={hydrated}>
+      <AppShell header={<AppHeader />} bleed={bleed}>
+        {children}
+      </AppShell>
     </div>
   );
 }

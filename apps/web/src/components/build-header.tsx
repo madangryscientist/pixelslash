@@ -119,7 +119,7 @@ export function BuildHeader({
   const approvedEarlier = snapshots.filter((shot) => shot.approvedEarlier).length;
   const next = firstToReview(snapshots);
   return (
-    <header className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+    <header className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="font-medium" data-testid="build-branch">
           {build.branch}

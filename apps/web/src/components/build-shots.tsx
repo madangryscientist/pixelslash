@@ -21,7 +21,7 @@ export function Tabs({
   counts: Record<BuildTab, number>;
 }) {
   return (
-    <nav aria-label="Shots in this build" className="mb-6 flex flex-wrap gap-2">
+    <nav aria-label="Shots in this build" className="flex flex-wrap gap-2">
       {BUILD_TABS.map((tab) => (
         <Link
           key={tab.id}

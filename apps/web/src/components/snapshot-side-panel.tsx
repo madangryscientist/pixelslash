@@ -278,7 +278,7 @@ export function SidePanel({
   children?: ReactNode;
 }) {
   return (
-    <aside className="space-y-6 border-slate-200 bg-white p-4 lg:border-l">
+    <div className="space-y-6">
       {!reviewable && (
         <p className="text-sm text-slate-600">
           This build is {status}; a new build is needed to review it.
@@ -292,6 +292,6 @@ export function SidePanel({
       <Environment snapshot={snapshot} />
       <Options snapshot={snapshot} options={options} />
       {after}
-    </aside>
+    </div>
   );
 }

@@ -19,7 +19,7 @@ export function OrgRail({
   hydrated: boolean;
 }) {
   return (
-    <aside className="border-b border-slate-200 bg-white px-3 py-5 md:border-r md:border-b-0">
+    <>
       <h2 className="mx-2.5 mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
         Organizations
       </h2>
@@ -74,6 +74,6 @@ export function OrgRail({
         </span>
         New organization
       </ActionButton>
-    </aside>
+    </>
   );
 }

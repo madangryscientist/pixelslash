@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Body, Callout, Pill, SectionHeading } from "@hackcove/ui";
+import { Body, Breadcrumbs, Callout, ListLayout, Pill, SectionHeading } from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
@@ -36,75 +36,77 @@ function ProjectSettings() {
     await router.invalidate();
   };
   return (
-    <Page
-      title={`${project.name} · settings`}
-      crumbs={[orgCrumb(org), projectCrumb(project), "Settings"]}
-    >
-      <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <SectionHeading className="mb-1.5">CI tokens</SectionHeading>
-        <Body as="p" className="mb-4">
-          CI uploads builds with a token. It is shown once, when issued; store it as a CI secret.
-        </Body>
-        {issued && (
-          <Callout
-            tone="warn"
-            role="status"
-            title="Copy this token now. It will not be shown again."
-            className="mb-4"
-          >
-            <CopyLine text={issued} hydrated={hydrated} testId="issued-token" className="mt-2" />
-          </Callout>
-        )}
-        <InlineForm
-          label="Token name, e.g. github-actions"
-          button="Issue token"
-          busyLabel="Issuing…"
-          emptyReason="Name the token first: where it will be used."
-          onSubmit={issue}
+    <Page>
+      <ListLayout
+        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), "Settings"]} />}
+        title={`${project.name} · settings`}
+      >
+        <section className="rounded-xl border border-slate-200 bg-white p-6">
+          <SectionHeading className="mb-1.5">CI tokens</SectionHeading>
+          <Body as="p" className="mb-4">
+            CI uploads builds with a token. It is shown once, when issued; store it as a CI secret.
+          </Body>
+          {issued && (
+            <Callout
+              tone="warn"
+              role="status"
+              title="Copy this token now. It will not be shown again."
+              className="mb-4"
+            >
+              <CopyLine text={issued} hydrated={hydrated} testId="issued-token" className="mt-2" />
+            </Callout>
+          )}
+          <InlineForm
+            label="Token name, e.g. github-actions"
+            button="Issue token"
+            busyLabel="Issuing…"
+            emptyReason="Name the token first: where it will be used."
+            onSubmit={issue}
+          />
+          <TokenTable tokens={tokens} hydrated={hydrated} />
+        </section>
+        <section className="rounded-xl border border-slate-200 bg-white p-6">
+          <SectionHeading className="mb-1.5">Default branch</SectionHeading>
+          <Body as="p" className="mb-4">
+            Builds on this branch are accepted without review and become the baseline for branch
+            builds. Builds on other branches wait for review.
+          </Body>
+          <InlineForm
+            label="Default branch, e.g. main"
+            button="Save"
+            busyLabel="Saving…"
+            emptyReason="Name the branch: the one you merge into."
+            initialValue={project.defaultBranch}
+            onSubmit={async (branch) => {
+              await saveDefaultBranch({ data: { projectId: project.id, branch } });
+              await router.invalidate();
+            }}
+          />
+        </section>
+        <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
+        <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
+        <IgnoreBoxSettings
+          projectId={project.id}
+          boxes={overrides.boxes}
+          trail={overrides.boxTrail}
+          hydrated={hydrated}
         />
-        <TokenTable tokens={tokens} hydrated={hydrated} />
-      </section>
-      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
-        <SectionHeading className="mb-1.5">Default branch</SectionHeading>
-        <Body as="p" className="mb-4">
-          Builds on this branch are accepted without review and become the baseline for branch
-          builds. Builds on other branches wait for review.
-        </Body>
-        <InlineForm
-          label="Default branch, e.g. main"
-          button="Save"
-          busyLabel="Saving…"
-          emptyReason="Name the branch: the one you merge into."
-          initialValue={project.defaultBranch}
-          onSubmit={async (branch) => {
-            await saveDefaultBranch({ data: { projectId: project.id, branch } });
-            await router.invalidate();
-          }}
+        <ModelSettings
+          scope={{ kind: "project", projectId: project.id }}
+          saved={model.source === "project" ? model.model : null}
+          source={model}
+          orgSettingsHref={`/orgs?org=${org.id}&tab=model`}
+          hydrated={hydrated}
         />
-      </section>
-      <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
-      <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
-      <IgnoreBoxSettings
-        projectId={project.id}
-        boxes={overrides.boxes}
-        trail={overrides.boxTrail}
-        hydrated={hydrated}
-      />
-      <ModelSettings
-        scope={{ kind: "project", projectId: project.id }}
-        saved={model.source === "project" ? model.model : null}
-        source={model}
-        orgSettingsHref={`/orgs?org=${org.id}&tab=model`}
-        hydrated={hydrated}
-      />
-      <UploadCommand serverUrl={serverUrl} hydrated={hydrated} />
+        <UploadCommand serverUrl={serverUrl} hydrated={hydrated} />
+      </ListLayout>
     </Page>
   );
 }
 
 function UploadCommand({ serverUrl, hydrated }: { serverUrl: string; hydrated: boolean }) {
   return (
-    <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
+    <section className="rounded-xl border border-slate-200 bg-white p-6">
       <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
       <Body as="p" className="mb-3">
         From CI or your machine, with the token in{" "}
@@ -157,7 +159,7 @@ function DiffLocationForm({
   };
   return (
     <section
-      className="mt-6 rounded-xl border border-slate-200 bg-white p-6"
+      className="rounded-xl border border-slate-200 bg-white p-6"
       data-testid="diff-location"
     >
       <SectionHeading className="mb-1.5">Diff location</SectionHeading>

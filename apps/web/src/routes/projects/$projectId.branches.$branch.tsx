@@ -1,3 +1,4 @@
+import { Breadcrumbs, ListLayout } from "@hackcove/ui";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import {
@@ -49,63 +50,64 @@ function BranchPage() {
     }
   };
   return (
-    <Page
-      title={`${project.name} · ${build.branch}`}
-      crumbs={[orgCrumb(org), projectCrumb(project), build.branch]}
-      wide
-    >
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm" data-testid="branch-meta">
-        <span className="text-slate-500">newest build</span>
-        <Link
-          to="/projects/$projectId/builds/$buildId"
-          params={{ projectId: project.id, buildId: build.id }}
-          className="font-mono text-violet-700 hover:underline"
-          data-testid="branch-head"
-        >
-          {short(build.commitSha)}
-        </Link>
-        {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
-        <StatusBadge status={build.status} />
-        <span className="text-slate-500">{formatDateTime(build.createdAt)}</span>
-        <span className="text-slate-500">
-          {buildCount} build{buildCount === 1 ? "" : "s"} on this branch
-        </span>
-        {build.mergeBaseSha && (
+    <Page>
+      <ListLayout
+        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), build.branch]} />}
+        title={`${project.name} · ${build.branch}`}
+      >
+        <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="branch-meta">
+          <span className="text-slate-500">newest build</span>
+          <Link
+            to="/projects/$projectId/builds/$buildId"
+            params={{ projectId: project.id, buildId: build.id }}
+            className="font-mono text-violet-700 hover:underline"
+            data-testid="branch-head"
+          >
+            {short(build.commitSha)}
+          </Link>
+          {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
+          <StatusBadge status={build.status} />
+          <span className="text-slate-500">{formatDateTime(build.createdAt)}</span>
           <span className="text-slate-500">
-            · merge-base with <code>{project.defaultBranch}</code>:{" "}
-            <code>{short(build.mergeBaseSha)}</code>
+            {buildCount} build{buildCount === 1 ? "" : "s"} on this branch
           </span>
+          {build.mergeBaseSha && (
+            <span className="text-slate-500">
+              · merge-base with <code>{project.defaultBranch}</code>:{" "}
+              <code>{short(build.mergeBaseSha)}</code>
+            </span>
+          )}
+        </div>
+        <MainSummaryBox summary={summary} status={build.status} />
+        <ModeTabs projectId={project.id} branch={build.branch} active={mode} />
+        {error && (
+          <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+            {error}
+          </p>
         )}
-      </div>
-      <MainSummaryBox summary={summary} status={build.status} />
-      <ModeTabs projectId={project.id} branch={build.branch} active={mode} />
-      {error && (
-        <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
-          {error}
-        </p>
-      )}
-      {mode === "main" ? (
-        <AgainstMain
-          projectId={project.id}
-          buildId={build.id}
-          defaultBranch={project.defaultBranch}
-          shots={againstMain}
-          summary={summary}
-          thumbs={thumbs}
-          reviewable={reviewable}
-          onReview={onReview}
-        />
-      ) : (
-        <SinceLastBuild
-          projectId={project.id}
-          buildId={build.id}
-          head={short(build.commitSha)}
-          previous={previous ? short(previous.commitSha) : null}
-          snapshots={snapshots}
-          thumbs={thumbs}
-          baseline={setsBaseline(data.firstBuild, snapshots)}
-        />
-      )}
+        {mode === "main" ? (
+          <AgainstMain
+            projectId={project.id}
+            buildId={build.id}
+            defaultBranch={project.defaultBranch}
+            shots={againstMain}
+            summary={summary}
+            thumbs={thumbs}
+            reviewable={reviewable}
+            onReview={onReview}
+          />
+        ) : (
+          <SinceLastBuild
+            projectId={project.id}
+            buildId={build.id}
+            head={short(build.commitSha)}
+            previous={previous ? short(previous.commitSha) : null}
+            snapshots={snapshots}
+            thumbs={thumbs}
+            baseline={setsBaseline(data.firstBuild, snapshots)}
+          />
+        )}
+      </ListLayout>
     </Page>
   );
 }

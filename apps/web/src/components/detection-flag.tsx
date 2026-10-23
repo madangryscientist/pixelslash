@@ -1,4 +1,4 @@
-import { Button, Input, Pill, buttonClass } from "@hackcove/ui";
+import { Button, Input, Pill, Section, buttonClass } from "@hackcove/ui";
 import { Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { ActionButton } from "#/components/action-button";
@@ -271,15 +271,18 @@ export function FlagPanel({
 export function ProjectFlags({ projectId, flags }: { projectId: string; flags: ProjectFlag[] }) {
   if (flags.length === 0) return null;
   return (
-    <section aria-labelledby="detection-flags" className="mt-8">
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <h2 id="detection-flags" className="text-[15px] font-semibold">
+    <Section
+      title={
+        <>
           Detection flags <span className="font-normal text-slate-500">{flags.length}</span>
-        </h2>
+        </>
+      }
+      actions={
         <a href={`/projects/${projectId}/flags.json`} download className={buttonClass("outline")}>
           Export JSON
         </a>
-      </div>
+      }
+    >
       <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
         {flags.map((flag) => (
           <li
@@ -301,6 +304,6 @@ export function ProjectFlags({ projectId, flags }: { projectId: string; flags: P
           </li>
         ))}
       </ul>
-    </section>
+    </Section>
   );
 }

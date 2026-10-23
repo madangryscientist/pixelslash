@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Body, buttonClass } from "@hackcove/ui";
+import { Breadcrumbs, ListLayout, buttonClass } from "@hackcove/ui";
 import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb } from "#/components/crumbs";
@@ -22,58 +22,63 @@ function ProjectPage() {
   const { project, org, builds, flags, now, serverUrl } = Route.useLoaderData();
   const hydrated = useHydrated();
   return (
-    <Page title={project.name} crumbs={[orgCrumb(org), project.name]} wide>
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <Body as="p">
-          {builds.length === 0
+    <Page>
+      <ListLayout
+        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), project.name]} />}
+        title={project.name}
+        subtitle={
+          builds.length === 0
             ? "No builds yet."
-            : `Builds newest first. ${builds.length} in this project.`}
-        </Body>
-        <div className="flex gap-2">
-          <Link
-            to="/projects/$projectId/flakes"
-            params={{ projectId: project.id }}
-            className={buttonClass("outline")}
-          >
-            Flakes
-          </Link>
-          <Link
-            to="/projects/$projectId/settings"
-            params={{ projectId: project.id }}
-            className={buttonClass("outline")}
-          >
-            Settings
-          </Link>
-        </div>
-      </div>
-      {builds.length === 0 ? (
-        <EmptyProject projectId={project.id} serverUrl={serverUrl} hydrated={hydrated} />
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <div
-            aria-hidden="true"
-            className={`hidden items-center gap-4 bg-slate-50 py-2.5 pr-4 pl-5 lg:grid ${COLUMNS} ${HEAD}`}
-          >
-            <span>Branch</span>
-            <span>Status</span>
-            <span>Snapshots</span>
-            <span>Review</span>
-            <span>When</span>
+            : `Builds newest first. ${builds.length} in this project.`
+        }
+        actions={
+          <>
+            <Link
+              to="/projects/$projectId/flakes"
+              params={{ projectId: project.id }}
+              className={buttonClass("outline")}
+            >
+              Flakes
+            </Link>
+            <Link
+              to="/projects/$projectId/settings"
+              params={{ projectId: project.id }}
+              className={buttonClass("outline")}
+            >
+              Settings
+            </Link>
+          </>
+        }
+      >
+        {builds.length === 0 ? (
+          <EmptyProject projectId={project.id} serverUrl={serverUrl} hydrated={hydrated} />
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div
+              aria-hidden="true"
+              className={`hidden items-center gap-4 bg-slate-50 py-2.5 pr-4 pl-5 lg:grid ${COLUMNS} ${HEAD}`}
+            >
+              <span>Branch</span>
+              <span>Status</span>
+              <span>Snapshots</span>
+              <span>Review</span>
+              <span>When</span>
+            </div>
+            <ul>
+              {builds.map((build) => (
+                <BuildRow
+                  key={build.id}
+                  projectId={project.id}
+                  defaultBranch={project.defaultBranch}
+                  build={build}
+                  now={now}
+                />
+              ))}
+            </ul>
           </div>
-          <ul>
-            {builds.map((build) => (
-              <BuildRow
-                key={build.id}
-                projectId={project.id}
-                defaultBranch={project.defaultBranch}
-                build={build}
-                now={now}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
-      <ProjectFlags projectId={project.id} flags={flags} />
+        )}
+        <ProjectFlags projectId={project.id} flags={flags} />
+      </ListLayout>
     </Page>
   );
 }

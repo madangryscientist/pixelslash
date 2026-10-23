@@ -35,7 +35,7 @@ export function ModelSettings({
 
   return (
     <section
-      className={`${project ? "mt-6 " : ""}rounded-xl border border-slate-200 bg-white p-6`}
+      className="rounded-xl border border-slate-200 bg-white p-6"
       data-testid="model-settings"
     >
       <SectionHeading className="mb-1.5">AI explanations</SectionHeading>

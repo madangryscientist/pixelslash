@@ -149,7 +149,7 @@ export function OverrideSettings({
 }) {
   return (
     <section
-      className="mt-6 rounded-xl border border-slate-200 bg-white p-6"
+      className="rounded-xl border border-slate-200 bg-white p-6"
       data-testid="diff-overrides"
     >
       <SectionHeading className="mb-1.5">Diff thresholds set in review</SectionHeading>

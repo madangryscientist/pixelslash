@@ -1,6 +1,6 @@
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { IconButton } from "@hackcove/ui";
-import { Children, type ReactNode, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { chooseTheme, currentTheme, subscribeToTheme } from "#/lib/theme";
 import { useHydrated } from "#/lib/use-hydrated";
 
@@ -46,37 +46,6 @@ function ThemeToggle() {
   );
 }
 
-/** A crumb that goes somewhere. The page's own crumb, the last, is plain text. */
-export const crumbLinkClass =
-  "rounded text-slate-500 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600";
-
-/** `org / project / build / snapshot`: links up to the last, which is where you are. */
-function Breadcrumbs({ crumbs }: { crumbs: ReactNode[] }) {
-  return (
-    <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
-      <ol className="flex min-w-0 items-center gap-2 text-sm">
-        {Children.map(crumbs, (crumb, index) => (
-          <li
-            aria-current={index === crumbs.length - 1 ? "page" : undefined}
-            className="flex min-w-0 items-center gap-2"
-          >
-            {index > 0 && (
-              <span aria-hidden="true" className="text-slate-400">
-                /
-              </span>
-            )}
-            <span
-              className={`min-w-0 truncate ${index === crumbs.length - 1 ? "font-medium text-slate-900" : ""}`}
-            >
-              {crumb}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
 /** The signed-in user and Sign out. A POST, so it works before hydration too. */
 function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }) {
   return (
@@ -113,45 +82,20 @@ function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }
 }
 
 /**
- * The bar on every page: the mark and wordmark, the breadcrumbs, the theme toggle and, when
- * someone is signed in, who they are and Sign out. The viewer comes from the root loader.
+ * The bar on every page, one row in the AppShell header: the mark and wordmark, the theme toggle
+ * and, when someone is signed in, who they are and Sign out. The viewer comes from the root loader.
  */
-export function AppHeader({
-  crumbs = [],
-  wide = false,
-  full = false,
-}: {
-  crumbs?: ReactNode[] | undefined;
-  wide?: boolean;
-  /** Edge to edge: the organizations page lays out its own rail and canvas. */
-  full?: boolean;
-}) {
+export function AppHeader() {
   const { viewer } = rootRoute.useLoaderData();
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div
-        className={`flex items-center gap-4 px-6 py-3 ${full ? "" : `mx-auto ${wide ? "max-w-6xl" : "max-w-3xl"}`}`}
-      >
-        <Link
-          to={viewer ? "/orgs" : "/"}
-          className="flex shrink-0 items-center gap-2 font-semibold"
-        >
-          <Logo />
-          PixelSlash
-        </Link>
-        {crumbs.length > 0 ? (
-          <>
-            <span aria-hidden="true" className="text-slate-400">
-              /
-            </span>
-            <Breadcrumbs crumbs={crumbs} />
-          </>
-        ) : (
-          <span className="flex-1" />
-        )}
-        <ThemeToggle />
-        {viewer && <UserMenu viewer={viewer} />}
-      </div>
-    </header>
+    <>
+      <Link to={viewer ? "/orgs" : "/"} className="flex items-center gap-2 font-semibold">
+        <Logo />
+        PixelSlash
+      </Link>
+      <span className="ml-auto" />
+      <ThemeToggle />
+      {viewer && <UserMenu viewer={viewer} />}
+    </>
   );
 }

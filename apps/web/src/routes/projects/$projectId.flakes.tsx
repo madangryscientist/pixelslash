@@ -1,4 +1,4 @@
-import { Button, Input, Pill } from "@hackcove/ui";
+import { Breadcrumbs, Button, Input, ListLayout, Pill } from "@hackcove/ui";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { ActionButton } from "#/components/action-button";
@@ -150,20 +150,22 @@ function FlakesPage() {
   const { project, org, flakes, now } = Route.useLoaderData();
   const open = flakes.filter((f) => f.status === "open").length;
   return (
-    <Page
-      title={`${project.name} · flakes`}
-      crumbs={[orgCrumb(org), projectCrumb(project), "Flakes"]}
-    >
-      <p className="mb-4 text-slate-600">
-        {flakes.length === 0
-          ? "No flakes. A shot is flaky when the CLI captured it again and the captures disagreed, or when a reviewer marked it."
-          : `${open} open, ${flakes.length - open} resolved. Open flakes first.`}
-      </p>
-      <ul className="space-y-4">
-        {flakes.map((flake) => (
-          <FlakeItem key={flake.id} projectId={project.id} flake={flake} now={now} />
-        ))}
-      </ul>
+    <Page>
+      <ListLayout
+        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), "Flakes"]} />}
+        title={`${project.name} · flakes`}
+        subtitle={
+          flakes.length === 0
+            ? "No flakes. A shot is flaky when the CLI captured it again and the captures disagreed, or when a reviewer marked it."
+            : `${open} open, ${flakes.length - open} resolved. Open flakes first.`
+        }
+      >
+        <ul className="flex flex-col gap-4">
+          {flakes.map((flake) => (
+            <FlakeItem key={flake.id} projectId={project.id} flake={flake} now={now} />
+          ))}
+        </ul>
+      </ListLayout>
     </Page>
   );
 }
