@@ -6,13 +6,22 @@ export type GitContext = {
   branch: string;
   /** Null when the base branch is not in the checkout (a shallow clone). */
   mergeBaseSha: string | null;
-  /** HEAD's parents, nearest first, at most `MAX_ANCESTORS`. */
+  /**
+   * The merge-base's first-parent ancestors, nearest first, at most `MAX_ANCESTORS`; HEAD's own
+   * (20) when there is no merge-base.
+   */
   ancestorShas: string[];
   prNumber: number | null;
 };
 
-/** The server accepts at most this many; the baseline pick walks them newest first. */
-export const MAX_ANCESTORS = 20;
+/**
+ * The server accepts at most this many; the baseline pick takes the nearest. Deep enough for a
+ * project that nx/turbo "affected" skipped for a long stretch of main (ob 1788).
+ */
+export const MAX_ANCESTORS = 200;
+
+/** With no merge-base there is no history to walk but HEAD's own, and it stays as it was. */
+const HEAD_ANCESTORS = 20;
 
 export type GitOptions = {
   cwd: string;
@@ -71,11 +80,20 @@ export async function gitContext(opts: GitOptions): Promise<GitContext> {
     throw new UploadError(
       `${opts.command ?? "upload"} needs a git checkout with a commit: ${opts.cwd}`,
     );
-  const log = await git(opts.cwd, ["rev-list", `--max-count=${MAX_ANCESTORS + 1}`, "HEAD"]);
+  const mergeBaseSha = await mergeBase(opts);
+  // A baseline is a build of the base branch at or before the merge-base, so that is where the
+  // list starts: first-parent follows main's own history (a squash or merge commit, not the
+  // branch merged into it). Without one, HEAD's parents are all there is to offer.
+  const log = await git(
+    opts.cwd,
+    mergeBaseSha
+      ? ["rev-list", "--first-parent", `--max-count=${MAX_ANCESTORS + 1}`, mergeBaseSha]
+      : ["rev-list", `--max-count=${HEAD_ANCESTORS + 1}`, "HEAD"],
+  );
   return {
     commitSha,
     branch: await branchName(opts),
-    mergeBaseSha: await mergeBase(opts),
+    mergeBaseSha,
     ancestorShas: (log ?? "").split("\n").filter(Boolean).slice(1),
     prNumber: opts.pr ?? prFromRef(opts.env.GITHUB_REF),
   };

@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray, lte, ne, or } from "drizzle-orm";
+import { type SQL, and, eq, inArray, lte, ne, or } from "drizzle-orm";
 import type { Db } from "./db";
 import type { Build } from "./builds";
+import { inChunks } from "./chunks";
 import { heldShot, notSkippedFlaky } from "./markers";
 import { builds, type IgnoreRect, snapshots } from "./schema";
 
@@ -11,7 +12,10 @@ import { builds, type IgnoreRect, snapshots } from "./schema";
  * 1. The same branch's previous shot, reviewed or not: the newest earlier build of this branch
  *    that holds the key and was not rejected. A re-run of one commit is therefore 0 changed, and
  *    the shot carries forward after a rebase or an amend too.
- * 2. Else the shot in the newest accepted build among the merge-base and its ancestors.
+ * 2. Else the shot in the accepted build at the nearest of the merge-base and its ancestors (the
+ *    CLI sends up to 200, so a project that CI skipped for a long stretch of main still finds its
+ *    last build; ob 1788). Within one commit, the newest build. Nothing newer than the merge-base
+ *    is ever in the list, so nothing newer is picked.
  *
  * A previous shot whose change is still undecided is not an accepted image, so it is a baseline
  * only for an unchanged shot, which then carries the open change (`carried_from`). A shot that
@@ -51,7 +55,7 @@ export type Baseline = {
    * shot carries it; a different one is compared against `accepted` instead.
    */
   carry: string | null;
-  /** The newest accepted shot in reach; read only when `carry` is set. Missing is `new`. */
+  /** The accepted shot at the nearest commit in reach; read only when `carry` is set. Missing is `new`. */
   accepted: BaselineSnapshot | undefined;
 };
 
@@ -62,7 +66,7 @@ export type Baselines = {
   removed: BaselineSnapshot[];
   /**
    * Snapshot key → the shot the branch is measured against for its final review (ob 1723): the
-   * newest accepted shot of another branch in reach, so of main at the merge-base. Unlike `byKey`
+   * accepted shot of another branch at the nearest commit in reach, so of main at the merge-base. Unlike `byKey`
    * it never takes this branch's own shots, accepted or not. A missing key is `new` against main.
    */
   main: Map<string, BaselineSnapshot>;
@@ -79,6 +83,8 @@ const emptyBaselines = (): Baselines => ({ byKey: new Map(), removed: [], main: 
 type Candidate = BaselineSnapshot & {
   branch: string;
   buildId: string;
+  commitSha: string;
+  createdAt: Date;
   buildStatus: string;
   diffStatus: string | null;
   reviewState: string;
@@ -115,78 +121,98 @@ const baselineOf = ({
   imageKey,
 });
 
+/** Statement parameters besides the commit list in `queryCandidates`' WHERE (see `inChunks`). */
+const OTHER_PARAMS = 12;
+
 /**
- * Every shot that may be a baseline, newest first: an accepted one (see `acceptedRow`; the default
- * branch auto-accepts, so a squash-merged build there counts), or any shot of this branch. Only from a
- * build that was not rejected.
+ * Every shot that may be a baseline: an accepted one (see `acceptedRow`; the default branch
+ * auto-accepts, so a squash-merged build there counts), or any shot of this branch. Only from a
+ * build that was not rejected. The commit list can outgrow D1's parameter cap, so it is read in
+ * parts and merged; `order` then puts the rows in the order the picks walk them.
  */
-function queryCandidates(db: Db, build: PickFor) {
+async function queryCandidates(db: Db, build: PickFor): Promise<Candidate[]> {
   const commits = [build.mergeBaseSha, ...build.ancestorShas].filter(
     (sha): sha is string => sha !== null,
   );
-  // The reach filter belongs in SQL: the same 128 MB isolate that runs the diff has no business
-  // reading every accepted snapshot the project has ever held.
-  const inReach = commits.length
-    ? or(eq(builds.branch, build.branch), inArray(builds.commitSha, commits))
-    : eq(builds.branch, build.branch);
-  return db
-    .select({
-      id: snapshots.id,
-      buildId: snapshots.buildId,
-      name: snapshots.name,
-      platform: snapshots.platform,
-      browser: snapshots.browser,
-      viewport: snapshots.viewport,
-      theme: snapshots.theme,
-      ignore: snapshots.ignore,
-      envFingerprint: snapshots.envFingerprint,
-      imageKey: snapshots.imageKey,
-      branch: builds.branch,
-      buildStatus: builds.status,
-      diffStatus: snapshots.diffStatus,
-      reviewState: snapshots.reviewState,
-      carriedFrom: snapshots.carriedFrom,
-    })
-    .from(snapshots)
-    .innerJoin(builds, eq(builds.id, snapshots.buildId))
-    .where(
-      and(
-        eq(builds.projectId, build.projectId),
-        ne(builds.id, build.id),
-        // A build created after this one cannot be its baseline. Two builds created in the same
-        // millisecond are indistinguishable by clock, so the id tiebreak below keeps that pick
-        // stable rather than dependent on the scan order.
-        lte(builds.createdAt, build.createdAt),
-        inArray(builds.status, ["changes", "passed"]),
-        or(
-          eq(builds.status, "passed"),
-          eq(snapshots.reviewState, "accepted"),
-          eq(builds.branch, build.branch),
+  const read = (reach: SQL | undefined) =>
+    db
+      .select({
+        id: snapshots.id,
+        buildId: snapshots.buildId,
+        name: snapshots.name,
+        platform: snapshots.platform,
+        browser: snapshots.browser,
+        viewport: snapshots.viewport,
+        theme: snapshots.theme,
+        ignore: snapshots.ignore,
+        envFingerprint: snapshots.envFingerprint,
+        imageKey: snapshots.imageKey,
+        branch: builds.branch,
+        commitSha: builds.commitSha,
+        createdAt: builds.createdAt,
+        buildStatus: builds.status,
+        diffStatus: snapshots.diffStatus,
+        reviewState: snapshots.reviewState,
+        carriedFrom: snapshots.carriedFrom,
+      })
+      .from(snapshots)
+      .innerJoin(builds, eq(builds.id, snapshots.buildId))
+      .where(
+        and(
+          eq(builds.projectId, build.projectId),
+          ne(builds.id, build.id),
+          // A build created after this one cannot be its baseline.
+          lte(builds.createdAt, build.createdAt),
+          inArray(builds.status, ["changes", "passed"]),
+          or(
+            eq(builds.status, "passed"),
+            eq(snapshots.reviewState, "accepted"),
+            eq(builds.branch, build.branch),
+          ),
+          // A removed row is a marker, not an image of that build: it can never be a baseline.
+          heldShot(),
+          // A flaky shot its config skips is never a baseline unless a reviewer accepted it (ob 1724).
+          notSkippedFlaky(),
+          // The reach filter belongs in SQL: the same 128 MB isolate that runs the diff has no
+          // business reading every accepted snapshot the project has ever held.
+          reach,
         ),
-        // A removed row is a marker, not an image of that build: it can never be a baseline.
-        heldShot(),
-        // A flaky shot its config skips is never a baseline unless a reviewer accepted it (ob 1724).
-        notSkippedFlaky(),
-        inReach,
-      ),
-    )
-    .orderBy(desc(builds.createdAt), desc(snapshots.id));
+      );
+  const own = await read(eq(builds.branch, build.branch));
+  const others = await inChunks(commits, OTHER_PARAMS, (part) =>
+    read(and(ne(builds.branch, build.branch), inArray(builds.commitSha, part))),
+  );
+  return order([...own, ...others], build, commits);
 }
 
-/** Newest first; a same-branch shot outranks a newer one from another branch. */
-function pickAccepted(candidates: Candidate[], build: PickFor): Map<string, Candidate> {
+/**
+ * This branch's own shots first, then the rest by how near their commit is to the merge-base (the
+ * list's order), and within one commit or one branch the newest build, then the newest shot. Both
+ * picks and `primaryBuild` take the first row they meet, so this is the whole ranking.
+ */
+function order(rows: Candidate[], build: PickFor, commits: string[]): Candidate[] {
+  const nearness = new Map(commits.map((sha, at) => [sha, at]));
+  const near = (row: Candidate) =>
+    row.branch === build.branch ? -1 : (nearness.get(row.commitSha) ?? commits.length);
+  return rows.toSorted(
+    (a, b) =>
+      near(a) - near(b) ||
+      b.createdAt.getTime() - a.createdAt.getTime() ||
+      b.id.localeCompare(a.id),
+  );
+}
+
+/** In `order`'s order: a same-branch shot outranks any other, then the nearest commit's. */
+function pickAccepted(candidates: Candidate[]): Map<string, Candidate> {
   const picked = new Map<string, Candidate>();
   for (const row of candidates) {
-    if (!acceptedRow(row)) continue;
     const key = snapshotKeyOf(row);
-    const held = picked.get(key);
-    const preferred = row.branch === build.branch && held?.branch !== build.branch;
-    if (!held || preferred) picked.set(key, row);
+    if (acceptedRow(row) && !picked.has(key)) picked.set(key, row);
   }
   return picked;
 }
 
-/** Newest first, from other branches only: what the branch changes against main (see `Baselines.main`). */
+/** In `order`'s order, from other branches only: what the branch changes against main (see `Baselines.main`). */
 function pickMain(candidates: Candidate[], build: PickFor): Map<string, BaselineSnapshot> {
   const picked = new Map<string, BaselineSnapshot>();
   for (const row of candidates) {
@@ -198,7 +224,7 @@ function pickMain(candidates: Candidate[], build: PickFor): Map<string, Baseline
 }
 
 function pick(candidates: Candidate[], build: PickFor): Map<string, Baseline> {
-  const accepted = pickAccepted(candidates, build);
+  const accepted = pickAccepted(candidates);
   const previous = new Map<string, Candidate>();
   for (const row of candidates) {
     const key = snapshotKeyOf(row);
@@ -217,7 +243,7 @@ function pick(candidates: Candidate[], build: PickFor): Map<string, Baseline> {
   return picked;
 }
 
-/** The build whose set of shots decides what was removed: the branch's previous one, else the newest accepted one in reach. */
+/** The build whose set of shots decides what was removed: the branch's previous one, else the accepted one at the nearest commit in reach. */
 function primaryBuild(build: PickFor, candidates: Candidate[]): string | null {
   const onBranch = candidates.find((row) => row.branch === build.branch);
   return (onBranch ?? candidates.find(acceptedRow))?.buildId ?? null;

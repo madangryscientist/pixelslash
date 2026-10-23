@@ -239,11 +239,11 @@ describe("upload API", () => {
       ).status;
     expect(await make("{")).toBe(400);
     expect(await make({ commitSha: "xyz", branch: "main" })).toBe(400);
-    expect(await make({ commitSha: SHA, branch: "main", ancestorShas: Array(21).fill(SHA) })).toBe(
+    expect(await make({ commitSha: SHA, branch: "main", ancestorShas: Array(201).fill(SHA) })).toBe(
       400,
     );
     expect(await make({ commitSha: SHA, branch: "main", prNumber: 0 })).toBe(400);
-    expect(await make({ commitSha: SHA, branch: "main", ancestorShas: Array(20).fill(SHA) })).toBe(
+    expect(await make({ commitSha: SHA, branch: "main", ancestorShas: Array(200).fill(SHA) })).toBe(
       201,
     );
   });

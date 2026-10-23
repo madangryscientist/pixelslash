@@ -41,7 +41,7 @@ export function projectName(v: unknown): string {
 /** A git object id: SHA-1 (40) or SHA-256 (64) hex. */
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const TOKEN = /^[\w.-]+$/;
-export const MAX_ANCESTORS = 20;
+export const MAX_ANCESTORS = 200;
 const MAX_TAGS = 50;
 const MAX_IGNORE = 200;
 

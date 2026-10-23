@@ -94,4 +94,20 @@ describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
     const after = await buildView(ctx.db, ctx.projectId, second.id);
     expect(after.snapshots.every((s) => s.diffStatus === "unchanged")).toBe(true);
   }, 300_000);
+
+  test("the merge-base and 200 ancestors reach the baseline query in parts (ob 1788)", async () => {
+    const old = await upload(ctx, { branch: "main", commit: sha(1001), shots: [{ png: white }] });
+    const history = Array.from({ length: 200 }, (_, i) => sha(1150 - i));
+    const branch = await upload(ctx, {
+      branch: "deep",
+      commit: sha(5000),
+      mergeBase: sha(1151),
+      ancestors: history,
+      shots: [{ png: red }],
+    });
+    expect((await rows(ctx, branch))[0]).toMatchObject({
+      diffStatus: "changed",
+      baselineKey: (await rows(ctx, old))[0]?.imageKey,
+    });
+  }, 60_000);
 });

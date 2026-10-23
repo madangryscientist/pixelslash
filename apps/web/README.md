@@ -73,8 +73,8 @@ PIXELSLASH_SERVER=http://127.0.0.1:3000 \
 ```
 
 Every `main` build is accepted without review. A branch build diffs each shot against the newest
-accepted one among the builds at its merge-base and its ancestor commits, so seed `main` at the
-merge-base once before reviewing a branch, or every shot on it reads "new".
+accepted one at the nearest of its merge-base and its ancestor commits (up to 200), so `main` needs a build at the
+merge-base or any of those ancestors before a branch is reviewed, or every shot on it reads "new".
 
 In hackcove, `bunx nx run storybook:visual-upload` does both: it uploads `origin/main`'s capture as
 `main` (once per main commit and server), then the branch's. It refuses a branch that is not based

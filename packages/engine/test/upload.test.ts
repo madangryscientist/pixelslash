@@ -21,13 +21,32 @@ describe("gitContext", () => {
       mergeBaseSha: fork,
       prNumber: null,
     });
-    expect(ctx.ancestorShas).toEqual((await git(dir, "rev-list", "HEAD")).split("\n").slice(1));
-    expect(ctx.ancestorShas).toHaveLength(2);
+    // The merge-base's own history, not the branch's: main's, nearest first.
+    expect(ctx.ancestorShas).toEqual(
+      (await git(dir, "rev-list", "--first-parent", fork)).split("\n").slice(1),
+    );
+    expect(ctx.ancestorShas).toHaveLength(0);
   });
 
-  test("ancestors stop at 20", async () => {
+  test("the ancestors are the merge-base's first-parent history, up to 200", async () => {
+    const { dir, fork } = await repo(1, 3);
+    await git(dir, "checkout", "-q", "main");
+    for (let i = 0; i < 205; i++) await git(dir, "commit", "-q", "--allow-empty", "-m", `n${i}`);
+    const tip = await git(dir, "rev-parse", "HEAD");
+    await git(dir, "checkout", "-q", "feat");
+    await git(dir, "merge", "-q", "--no-edit", "main");
+    const ctx = await gitContext(gitOpts(dir));
+    expect(ctx.mergeBaseSha).toBe(tip);
+    expect(ctx.ancestorShas).toHaveLength(200);
+    expect(ctx.ancestorShas[0]).toBe(await git(dir, "rev-parse", `${tip}~1`));
+    expect(ctx.ancestorShas).not.toContain(fork);
+  });
+
+  test("with no merge-base, HEAD's own 20 nearest parents", async () => {
     const { dir } = await repo(1, 25);
-    expect((await gitContext(gitOpts(dir))).ancestorShas).toHaveLength(20);
+    const ctx = await gitContext(gitOpts(dir, { baseBranch: "nope" }));
+    expect(ctx.ancestorShas).toHaveLength(20);
+    expect(ctx.ancestorShas[0]).toBe(await git(dir, "rev-parse", "HEAD~1"));
   });
 
   test("CI's env names the branch and the PR; flags win", async () => {
