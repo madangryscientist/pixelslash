@@ -25,6 +25,14 @@
       "command": "bun bench/src/run.ts",
       "cache": false
     },
+    "perf": {
+      "command": "bun bench/src/perf/run.ts",
+      "cache": false
+    },
+    "perf-check": {
+      "command": "bun bench/src/perf/run.ts --check",
+      "cache": false
+    },
     "check": {
       "command": "bun bench/src/check.ts",
       "cache": true,

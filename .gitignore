@@ -2,3 +2,4 @@ node_modules/
 .pixelslash/
 .nx/
 bench/imported/
+bench/perf-results/

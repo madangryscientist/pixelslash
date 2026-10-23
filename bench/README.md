@@ -11,6 +11,8 @@ bun run bench -- --calibration     # plus Argos's own 19 calibration cases, stre
 bun run bench -- --no-argos        # PixelSlash alone, prints the tables, writes nothing
 bun run bench -- --capture         # plus the capture stage: needs Docker, skipped with a message without it
 bun run bench:check                # regression guard: PixelSlash against the last results file
+bun run bench:perf                 # speed, before vs after on this machine (see "Speed"); on demand only
+bun run bench:perf:check           # the same comparison; exits 1 when a step is over 25% slower
 bunx nx run bench:corpus           # re-render the main corpus (needs chromium-headless-shell)
 bun bench/src/generate.ts --set holdout   # re-render the held-out corpus
 ```
@@ -77,6 +79,63 @@ a coin toss per capture (the carousel), so each arm takes three pairs instead of
 A page the image still flags is named in the results, with where the diff is and what its noise is.
 That is a finding, not a failure of the run: capture defaults are not changed here. Without Docker the
 stage prints `capture: skip: <why>` and the rest of the run goes on.
+
+## Speed: before vs after (`bench:perf`)
+
+`bun run bench:perf` answers one question: **did this branch get slower than main, on this machine,
+right now?** It is not part of the accuracy benchmark above and shares nothing with its guard.
+
+```bash
+bun run bench:perf                       # head against origin/main (else main), 10 rounds
+bun run bench:perf -- --base <ref>       # against any ref; --base HEAD compares a tree with itself
+bun run bench:perf -- --runs 5           # fewer rounds
+bun run bench:perf -- --only diff-phone,capture
+bun run bench:perf:check                 # same run; exit 1 if any step's head median is >25% slower
+```
+
+It times five steps, with the warm-up discarded, and reports the median and p95 in ms:
+
+| Step | What is timed |
+| --- | --- |
+| `diff-phone`, `diff-desktop`, `diff-long` | `diffPngs` (decode, diff, region clustering) on a 390x844, a 1440x900 and a 1440x6000 pair |
+| `capture` | the real Playwright settle path (`settleCapture` plus a full-page screenshot) of a fixed page served by `Bun.serve` on localhost |
+| `server-build` | the web app as the e2e starts it (production build, `vite preview`, a fresh local D1, GitHub stubbed): ten 800x600 shots uploaded and finalised, timed from the start of the build to the verdict |
+
+The fixtures are drawn from a fixed seed and written once per run, so base and head read the same
+bytes; none is over about 1 MB.
+
+**Why interleaved.** A speed number is only meaningful next to another taken at the same moment.
+The desktop is busy and its load drifts by minute, so a base measured ten minutes before the head
+would be comparing the machine's mood. The runner checks the base out into a temporary git
+worktree (`~/.cache/pixelslash-perf/base-<pid>`, not `/tmp`), runs `bun install` there, and then
+alternates base, head, base, head... for `--runs` rounds in one invocation. Each round's
+sample goes into the base or the head list, and the report compares their medians, so a slow patch
+of the machine hits both sides. The measuring code (`bench/src/perf/`) is copied into the base
+worktree, so the same probe times each tree's own engine and web app. The worktree is removed when
+the run ends, on failure, on SIGINT and on SIGTERM; a run that was killed with SIGKILL leaves its
+directory, and the next run removes it.
+
+**The check.** `bench:perf:check` fails (exit 1) naming the step and both medians when a step's head
+median is more than 25% above the base median *in that run*. It never reads an earlier run. With no
+`--base` and neither `origin/main` nor `main` available it prints the head timings alone, says no
+comparison was made, and exits 0. An unknown `--base` ref is a usage error (exit 2). Both root scripts
+run `bun bench/src/perf/run.ts` directly, so those exit codes reach the caller (through `nx run` every
+failure would read as 1). The head side times the working tree; the head SHA in the report and the
+results file carries `+dirty` when the tree has uncommitted changes.
+
+**How much to trust it.** Compared with itself (`--base HEAD`, 10 rounds) the diff and capture steps
+land within about 4% of each other on this desktop; `server-build` is the noisiest, up to about 15%,
+because it starts a server and a database, so a 25% limit leaves it only a little room. Re-run a
+step that fails before believing it (`--only server-build`).
+
+**On demand only.** Nothing here is in `bun run test`, `lint`, the gate or any land step: a speed
+run takes minutes and is only worth reading when the machine is quiet. Each run writes its numbers
+to `bench/perf-results/<time>.json`, which is gitignored; nothing is committed and nothing reads
+old results.
+
+To see the check fail, slow the diff on head only: `PIXELSLASH_PERF_SLOW_DIFF_MS=300 bun run
+bench:perf:check -- --base HEAD --only diff-phone` adds 300 ms inside the timed diff and fails on
+`diff-phone`.
 
 ## The regression guard
 
