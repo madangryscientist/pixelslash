@@ -1,5 +1,13 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "./db";
+import { warn } from "#/lib/log";
+import {
+  ModelKeySecretError,
+  ModelKeyUnreadableError,
+  isSealed,
+  openKey,
+  sealKey,
+} from "./model-key";
 import { getProject } from "./orgs";
 import { projectModels } from "./schema";
 
@@ -18,8 +26,37 @@ export type ProjectModelView = {
   autoPassNoise: boolean;
 };
 
-/** The model the project configured, key included, for the server's own call; null when none. */
-export async function projectModelFor(db: Db, projectId: string): Promise<ProjectModel | null> {
+/** Projects whose key could not be read and whose reason is already logged: once, not per call. */
+const logged = new Map<string, string>();
+
+/**
+ * The model the project configured, with its key in plain text, for the server's own call; null
+ * when none. The one place a stored key is decrypted (ob 1786). A key that cannot be (no secret, or
+ * the wrong one) is no model: the build is reviewed as plain pixels, and the reason is logged once.
+ */
+export async function projectModelFor(
+  db: Db,
+  projectId: string,
+  secret: string | undefined,
+): Promise<ProjectModel | null> {
+  const row = await storedModel(db, projectId);
+  if (!row) return null;
+  try {
+    const apiKey = await openKey(secret, row.apiKey);
+    logged.delete(projectId);
+    return { ...row, apiKey };
+  } catch (e) {
+    if (!(e instanceof ModelKeySecretError || e instanceof ModelKeyUnreadableError)) throw e;
+    if (logged.get(projectId) !== e.message) {
+      logged.set(projectId, e.message);
+      warn(`project ${projectId}: its model is not used: ${e.message}`);
+    }
+    return null;
+  }
+}
+
+/** The row as stored: the key is sealed, or plain text from before ob 1786. */
+async function storedModel(db: Db, projectId: string): Promise<ProjectModel | null> {
   const [row] = await db.select().from(projectModels).where(eq(projectModels.projectId, projectId));
   return row ?? null;
 }
@@ -71,19 +108,33 @@ export type ModelSettings = {
   /** Empty or left out keeps the stored key; a first save must give one. */
   apiKey?: string | undefined;
   autoPassNoise: boolean;
+  /** The server's `MODEL_KEY_SECRET`, which seals the key (ob 1786); never user input. */
+  modelKeySecret: string | undefined;
 };
 
 /**
- * The key to store: the one given, or the stored one when none was. The key belongs to the endpoint
- * it was given for: moving the URL without a new key would send the old endpoint's key to the new one.
+ * The key to store, sealed: the one given, or the stored one when none was (a plain-text one from
+ * before ob 1786 is sealed here). The key belongs to the endpoint it was given for: moving the URL
+ * without a new key would send the old endpoint's key to the new one. A save never stores plain text:
+ * with no `MODEL_KEY_SECRET` it fails. A kept key is left as stored if sealed, and sealed if it is
+ * still the plain text from before ob 1786; it is only ever opened in `projectModelFor`.
  */
-function keyToStore(current: ProjectModel | null, baseUrl: string, given: string | undefined) {
+async function keyToStore(
+  current: ProjectModel | null,
+  baseUrl: string,
+  given: string | undefined,
+  secret: string | undefined,
+) {
   const apiKey = given?.trim();
-  if (apiKey) return apiKey;
-  if (!current) throw new ModelSettingsError("give the model's API key");
-  if (current.baseUrl !== baseUrl)
-    throw new ModelSettingsError("a new base URL needs its key again");
-  return current.apiKey;
+  try {
+    if (apiKey) return await sealKey(secret, apiKey);
+    if (!current) throw new ModelSettingsError("give the model's API key");
+    if (current.baseUrl !== baseUrl)
+      throw new ModelSettingsError("a new base URL needs its key again");
+    return isSealed(current.apiKey) ? current.apiKey : await sealKey(secret, current.apiKey);
+  } catch (e) {
+    throw e instanceof ModelKeySecretError ? new ModelSettingsError(e.message) : e;
+  }
 }
 
 /** Save the project's model; any member may, as any member may issue a token. */
@@ -97,7 +148,12 @@ export async function setProjectModel(
   const baseUrl = modelBaseUrl(settings.baseUrl);
   const model = settings.model.trim();
   if (!model) throw new ModelSettingsError("name the model, e.g. deepseek-flash");
-  const apiKey = keyToStore(await projectModelFor(db, projectId), baseUrl, settings.apiKey);
+  const apiKey = await keyToStore(
+    await storedModel(db, projectId),
+    baseUrl,
+    settings.apiKey,
+    settings.modelKeySecret,
+  );
   const fields = { baseUrl, model, autoPassNoise: settings.autoPassNoise, apiKey };
   await db
     .insert(projectModels)

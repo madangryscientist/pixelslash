@@ -24,6 +24,8 @@ type SummaryDeps = {
   now?: (() => number) | undefined;
   /** The model's transport; a test passes a stub. Never a real endpoint in tests. */
   modelFetch?: ModelFetch | undefined;
+  /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
+  modelKeySecret?: string | undefined;
 };
 
 /** Sentences kept, and the length of one: a paragraph, not a report. */
@@ -183,7 +185,7 @@ const BUILD_VERDICTS = new Set(["changes", "passed", "failed"]);
 
 /** Ask the project's model about the build: null with no model or nothing to describe. Throws. */
 async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<AiSummary | null> {
-  const model = await projectModelFor(deps.db, build.projectId);
+  const model = await projectModelFor(deps.db, build.projectId, deps.modelKeySecret);
   if (!model || timeoutMs <= 0) return null;
   const rows = await deps.db
     .select({

@@ -3,6 +3,19 @@
 TanStack Start on Cloudflare Workers, D1 via Drizzle, R2 for the shots, GitHub sign-in. CI uploads
 builds with `pixelslash upload`; people review them here.
 
+## Secrets
+
+A deployment sets these with `wrangler secret put <NAME>` (or in `.dev.vars` locally; the names are
+in `.dev.vars.example`). Never in git.
+
+| Secret | What it is |
+| --- | --- |
+| `GITHUB_CLIENT_SECRET` | The GitHub OAuth app's secret, for sign-in. |
+| `IMAGE_SIGNING_SECRET` | Signs the short-lived image URLs. |
+| `MODEL_KEY_SECRET` | Base64 of 32 random bytes (`openssl rand -base64 32`). Seals each project's model API key at rest with AES-256-GCM (stored as `v1:<iv>:<ciphertext>`). Unset, saving a model key fails with "MODEL_KEY_SECRET is not set" and a stored key is not read, so builds are reviewed as plain pixels. A key saved before this existed is plain text until the project's model settings are next saved. Changing the secret makes the keys sealed under the old one unreadable: enter each key again. |
+
+The `e2e` env in `wrangler.jsonc` carries fixed test values for these; they are not secrets.
+
 ## Run it locally as a project's server
 
 A local server is a real PixelSlash server: a CLI pointed at it uploads, the server diffs, and the
@@ -92,10 +105,11 @@ public DNS. Real GitHub sign-in is a later ticket.
 | State | D1 and R2 in `apps/web/.wrangler/state` on the CT's disk, kept across restarts and updates. |
 | Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`vite preview` of the production build), from `deploy/lan/`. Both restart on failure and start on boot. |
 
-The build is the `e2e` environment's with two values replaced. `apps/web/.dev.vars.e2e` on the CT
+The build is the `e2e` environment's with three values replaced. `apps/web/.dev.vars.e2e` on the CT
 (mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://192.168.0.34:4174`, so the
 browser on another machine is sent to the stand-in at the CT's address rather than its own
-`localhost`, and a random `IMAGE_SIGNING_SECRET`. The Cloudflare plugin copies it into
+`localhost`, a random `IMAGE_SIGNING_SECRET`, and the deployment's `MODEL_KEY_SECRET` (without it
+the CT would seal keys under the `e2e` env's fixed test value). The Cloudflare plugin copies it into
 `dist/server/.dev.vars` at build time and `vite preview` reads it from there; the `e2e` env in
 `wrangler.jsonc`, and so the tests, are unchanged.
 

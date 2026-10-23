@@ -48,6 +48,8 @@ export type ApiDeps = {
   diff?: ProcessDeps["diff"];
   /** The transport to a project's model after the diff (ob 1473); a test passes a stub. */
   modelFetch?: ProcessDeps["modelFetch"];
+  /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
+  modelKeySecret?: ProcessDeps["modelKeySecret"];
 };
 
 /** A PNG over this is refused before it is read; a full-page shot is a few MB. */
@@ -160,10 +162,8 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // STALE_PROCESSING_MS, and a finalise sent again after that re-runs it (ob 1545). So does one sent
   // after `errored`.
   const blobs = orgBlobs(ctx.store, orgId);
-  const result = await processBuild(
-    { db: ctx.db, blobs, diff: ctx.diff, modelFetch: ctx.modelFetch },
-    done,
-  );
+  const { db, diff, modelFetch, modelKeySecret } = ctx;
+  const result = await processBuild({ db, blobs, diff, modelFetch, modelKeySecret }, done);
   return json({
     id: done.id,
     status: result.status,

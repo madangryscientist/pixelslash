@@ -26,6 +26,8 @@ export type ExplainDeps = {
   now?: (() => number) | undefined;
   /** The model's transport; a test passes a stub. Never a real endpoint in tests. */
   modelFetch?: ModelFetch | undefined;
+  /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
+  modelKeySecret?: string | undefined;
 };
 
 /** Regions explained per shot; a shot with more is explained in part and never auto-passed. */
@@ -162,7 +164,7 @@ export async function explainBuild(
   let passed = 0;
   let failure: string | null = null;
   try {
-    const model = await projectModelFor(deps.db, build.projectId);
+    const model = await projectModelFor(deps.db, build.projectId, deps.modelKeySecret);
     if (!model) return 0;
     let slowest = 0;
     for (const shot of await shotsToExplain(deps.db, build.id, only)) {

@@ -4,7 +4,7 @@ import { getProjectWithOrg } from "#/db/orgs";
 import { NoRecoveryError } from "#/diff/claim";
 import { RerunError, rerunShots } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database } from "./env";
+import { blobStore, database, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
 
@@ -29,7 +29,11 @@ export const rerunBuildShots = createServerFn({ method: "POST" })
     const build = await or404(getBuild(db, project.id, data.buildId));
     const blobs = orgBlobs(blobStore(), project.orgId);
     try {
-      return await rerunShots({ db, blobs }, build, data.snapshotId);
+      return await rerunShots(
+        { db, blobs, modelKeySecret: modelKeySecret() },
+        build,
+        data.snapshotId,
+      );
     } catch (error) {
       // A refusal is a message the page states, not a 500.
       if (error instanceof RerunError || error instanceof NoRecoveryError)

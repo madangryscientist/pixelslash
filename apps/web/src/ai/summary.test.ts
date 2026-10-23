@@ -5,6 +5,7 @@ import type { Build } from "#/db/builds";
 import { DIFF_BUDGET_MS } from "#/diff/budget";
 import { processBuild } from "#/diff/process";
 import { rerunShots } from "#/diff/rerun";
+import { TEST_MODEL_KEY_SECRET as SECRET } from "#/db/test-db";
 import { FINGERPRINT, type Ctx, type Shot, context, rows, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
 import type { BlobStore } from "#/storage/blobs";
@@ -59,6 +60,7 @@ async function withModel(ctx: Ctx) {
     model: "local-qwen",
     apiKey: KEY,
     autoPassNoise: false,
+    modelKeySecret: SECRET,
   });
 }
 
@@ -196,7 +198,12 @@ describe("a build's AI summary (ob 1668)", () => {
     for (const answer of answers) {
       const stub = stubModel(() => answer);
       const fresh = await getBuild(ctx.db, ctx.projectId, build.id);
-      expect(await summarizeBuild({ db: ctx.db, modelFetch: stub.modelFetch }, fresh)).toBe(false);
+      expect(
+        await summarizeBuild(
+          { db: ctx.db, modelFetch: stub.modelFetch, modelKeySecret: SECRET },
+          fresh,
+        ),
+      ).toBe(false);
       expect(stub.summaries()).toHaveLength(1);
       // Nothing was measured again: what is stored still describes the build.
       expect((await getBuild(ctx.db, ctx.projectId, build.id)).aiSummary?.sentences[0]?.text).toBe(
@@ -207,7 +214,7 @@ describe("a build's AI summary (ob 1668)", () => {
     const failing = stubModel(() => answers[1] ?? "");
     const [shotId] = await idsOf(ctx, build, "ui-card");
     await rerunShots(
-      { db: ctx.db, blobs: ctx.scoped, modelFetch: failing.modelFetch },
+      { db: ctx.db, blobs: ctx.scoped, modelFetch: failing.modelFetch, modelKeySecret: SECRET },
       await getBuild(ctx.db, ctx.projectId, build.id),
       shotId ?? null,
     );
@@ -229,7 +236,12 @@ describe("a build's AI summary (ob 1668)", () => {
     );
     expect(stub.summaries()).toHaveLength(0);
     expect(build.aiSummary).toBeNull();
-    expect(await summarizeBuild({ db: ctx.db, modelFetch: stub.modelFetch }, build)).toBe(false);
+    expect(
+      await summarizeBuild(
+        { db: ctx.db, modelFetch: stub.modelFetch, modelKeySecret: SECRET },
+        build,
+      ),
+    ).toBe(false);
     expect(stub.summaries()).toHaveLength(0);
   });
 
@@ -260,7 +272,12 @@ describe("a build's AI summary (ob 1668)", () => {
 
     const again = stubModel(() => "Second. [C1]");
     const stored = await getBuild(ctx.db, ctx.projectId, build.id);
-    expect(await summarizeBuild({ db: ctx.db, modelFetch: again.modelFetch }, stored)).toBe(true);
+    expect(
+      await summarizeBuild(
+        { db: ctx.db, modelFetch: again.modelFetch, modelKeySecret: SECRET },
+        stored,
+      ),
+    ).toBe(true);
     expect((await getBuild(ctx.db, ctx.projectId, build.id)).aiSummary?.sentences[0]?.text).toBe(
       "Second.",
     );
@@ -268,7 +285,7 @@ describe("a build's AI summary (ob 1668)", () => {
     const rerun = stubModel(() => "Third. [C1]");
     const [shotId] = await idsOf(ctx, build, "ui-card");
     await rerunShots(
-      { db: ctx.db, blobs: ctx.scoped, modelFetch: rerun.modelFetch },
+      { db: ctx.db, blobs: ctx.scoped, modelFetch: rerun.modelFetch, modelKeySecret: SECRET },
       stored,
       shotId ?? null,
     );
@@ -305,7 +322,10 @@ describe("a build's AI summary (ob 1668)", () => {
     expect(build.status).toBe("errored");
     expect(build.aiSummary).toBeNull();
     for (let i = 0; i < 5 && build.status === "errored"; i++) {
-      await processBuild({ db: ctx.db, blobs, now: () => t, modelFetch: stub.modelFetch }, build);
+      await processBuild(
+        { db: ctx.db, blobs, now: () => t, modelFetch: stub.modelFetch, modelKeySecret: SECRET },
+        build,
+      );
       build = await getBuild(ctx.db, ctx.projectId, build.id);
     }
     expect(build.status).toBe("changes");

@@ -1,5 +1,5 @@
 import { createOrg, createProject } from "#/db/orgs";
-import { testDb } from "#/db/test-db";
+import { TEST_MODEL_KEY_SECRET, testDb } from "#/db/test-db";
 import { issueCiToken } from "#/db/tokens";
 import { signInGithubUser } from "#/db/users";
 import type { BlobStore } from "#/storage/blobs";
@@ -52,7 +52,12 @@ export async function setup() {
   const acme = await tokenFor("Acme");
   const other = await tokenFor("Other");
   const blobs = memoryStore();
-  const deps: ApiDeps = { db, store: blobs.store, imageSecret: () => "test-image-secret" };
+  const deps: ApiDeps = {
+    db,
+    store: blobs.store,
+    imageSecret: () => "test-image-secret",
+    modelKeySecret: TEST_MODEL_KEY_SECRET,
+  };
   return { db, deps, blobs, acme, other };
 }
 

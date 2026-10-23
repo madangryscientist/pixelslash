@@ -63,6 +63,8 @@ export type ProcessDeps = {
   diff?: typeof diffPngs | undefined;
   /** The transport to the project's model (ob 1473); a test passes a stub. */
   modelFetch?: ModelFetch | undefined;
+  /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
+  modelKeySecret?: string | undefined;
 };
 
 /**

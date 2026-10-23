@@ -18,6 +18,13 @@ export function imageSigningSecret(): string {
   return secret;
 }
 
+/**
+ * Seals a project's model API key at rest (ob 1786); a deployment sets it with `wrangler secret put`.
+ * Unset is not an error here: saving a key then fails with a named error, and reading a sealed one
+ * means no model for that project (`projectModelFor`).
+ */
+export const modelKeySecret = (): string | undefined => env.MODEL_KEY_SECRET || undefined;
+
 /** The oldest CLI the API takes (`x.y.z`, ob 1729); empty takes any. Set in `vars`. */
 export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || undefined;
 

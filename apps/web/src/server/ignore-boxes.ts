@@ -9,7 +9,7 @@ import { NoRecoveryError } from "#/diff/claim";
 import { addBoxAndRediff, clearBoxAndRediff } from "#/diff/ignore-box";
 import { RerunError } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database } from "./env";
+import { blobStore, database, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
 import { scopeInput } from "./overrides";
 import { requireViewer } from "./session";
@@ -48,7 +48,11 @@ async function openBuild(projectId: string, buildId: string) {
   const db = database();
   const { project } = await or404(getProjectWithOrg(db, user.id, projectId));
   const build = await or404(getBuild(db, project.id, buildId));
-  return { user, build, deps: { db, blobs: orgBlobs(blobStore(), project.orgId) } };
+  return {
+    user,
+    build,
+    deps: { db, blobs: orgBlobs(blobStore(), project.orgId), modelKeySecret: modelKeySecret() },
+  };
 }
 
 export const addIgnoreBoxFn = createServerFn({ method: "POST" })

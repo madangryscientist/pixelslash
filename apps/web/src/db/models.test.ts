@@ -1,4 +1,6 @@
-import { describe, expect, test } from "vitest";
+import { Buffer } from "node:buffer";
+import { eq } from "drizzle-orm";
+import { describe, expect, test, vi } from "vitest";
 import { setup } from "#/api/test-support";
 import {
   ModelSettingsError,
@@ -8,6 +10,8 @@ import {
   setProjectModel,
 } from "./models";
 import { NotFoundError } from "./db";
+import { projectModels } from "./schema";
+import { TEST_MODEL_KEY_SECRET as SECRET } from "./test-db";
 import { signInGithubUser } from "./users";
 
 /** A project's model settings (ob 1473): the key is write-only and tied to its base URL. */
@@ -17,6 +21,12 @@ const settings = {
   model: "deepseek-flash",
   apiKey: "sk-one",
   autoPassNoise: false,
+  modelKeySecret: SECRET as string | undefined,
+};
+
+const rowOf = async (db: Awaited<ReturnType<typeof setup>>["db"], projectId: string) => {
+  const [row] = await db.select().from(projectModels).where(eq(projectModels.projectId, projectId));
+  return row;
 };
 
 describe("project model settings", () => {
@@ -41,7 +51,7 @@ describe("project model settings", () => {
       apiKey: "",
       autoPassNoise: true,
     });
-    expect(await projectModelFor(db, acme.project.id)).toMatchObject({
+    expect(await projectModelFor(db, acme.project.id, SECRET)).toMatchObject({
       apiKey: "sk-one",
       autoPassNoise: true,
     });
@@ -66,7 +76,7 @@ describe("project model settings", () => {
       ModelSettingsError,
     );
     await expect(save({ model: " " })).rejects.toBeInstanceOf(ModelSettingsError);
-    expect(await projectModelFor(db, acme.project.id)).toBeNull();
+    expect(await projectModelFor(db, acme.project.id, SECRET)).toBeNull();
   });
 
   test("a non-member can neither see nor set it, and removing it removes the key", async () => {
@@ -83,6 +93,103 @@ describe("project model settings", () => {
       NotFoundError,
     );
     await clearProjectModel(db, acme.user.id, acme.project.id);
-    expect(await projectModelFor(db, acme.project.id)).toBeNull();
+    expect(await projectModelFor(db, acme.project.id, SECRET)).toBeNull();
+  });
+});
+
+/** The key at rest (ob 1786): sealed under MODEL_KEY_SECRET, never plain text in the row. */
+describe("a project's model key at rest", () => {
+  const OTHER = Buffer.alloc(32, 9).toString("base64");
+
+  test("the row never holds the key's plain text, and projectModelFor returns the key", async () => {
+    const { db, acme } = await setup();
+    await setProjectModel(db, acme.user.id, acme.project.id, settings);
+    const row = await rowOf(db, acme.project.id);
+    expect(row?.apiKey).toMatch(/^v1:[\w+/=]+:[\w+/=]+$/);
+    expect(JSON.stringify(row)).not.toContain("sk-one");
+    expect((await projectModelFor(db, acme.project.id, SECRET))?.apiKey).toBe("sk-one");
+  });
+
+  test("a plain-text row from before still reads, and is sealed on the next save", async () => {
+    const { db, acme } = await setup();
+    await db.insert(projectModels).values({
+      projectId: acme.project.id,
+      baseUrl: "https://api.deepseek.com",
+      model: "deepseek-flash",
+      apiKey: "sk-old-plain",
+    });
+    expect((await projectModelFor(db, acme.project.id, SECRET))?.apiKey).toBe("sk-old-plain");
+    expect((await projectModelFor(db, acme.project.id, undefined))?.apiKey).toBe("sk-old-plain");
+    await setProjectModel(db, acme.user.id, acme.project.id, { ...settings, apiKey: "" });
+    const row = await rowOf(db, acme.project.id);
+    expect(row?.apiKey).toMatch(/^v1:/);
+    expect(JSON.stringify(row)).not.toContain("sk-old-plain");
+    expect((await projectModelFor(db, acme.project.id, SECRET))?.apiKey).toBe("sk-old-plain");
+  });
+
+  test("a save with no key leaves a sealed key as stored, without opening it", async () => {
+    const { db, acme } = await setup();
+    await setProjectModel(db, acme.user.id, acme.project.id, settings);
+    const sealed = (await rowOf(db, acme.project.id))?.apiKey;
+    const keep = { ...settings, apiKey: "", model: "other", modelKeySecret: OTHER };
+    await setProjectModel(db, acme.user.id, acme.project.id, keep);
+    expect(await rowOf(db, acme.project.id)).toMatchObject({ apiKey: sealed, model: "other" });
+  });
+
+  test("with no secret a save fails by name and stores nothing", async () => {
+    const { db, acme } = await setup();
+    await expect(
+      setProjectModel(db, acme.user.id, acme.project.id, {
+        ...settings,
+        modelKeySecret: undefined,
+      }),
+    ).rejects.toThrow("MODEL_KEY_SECRET is not set");
+    await expect(
+      setProjectModel(db, acme.user.id, acme.project.id, {
+        ...settings,
+        modelKeySecret: "not base64 of 32 bytes",
+      }),
+    ).rejects.toThrow("MODEL_KEY_SECRET must be base64 of 32 bytes");
+    expect(await rowOf(db, acme.project.id)).toBeUndefined();
+  });
+
+  test("a plain-text row is not re-saved without a secret, and stays plain text", async () => {
+    const { db, acme } = await setup();
+    await db.insert(projectModels).values({
+      projectId: acme.project.id,
+      baseUrl: "https://api.deepseek.com",
+      model: "deepseek-flash",
+      apiKey: "sk-old-plain",
+    });
+    await expect(
+      setProjectModel(db, acme.user.id, acme.project.id, {
+        ...settings,
+        apiKey: "",
+        modelKeySecret: undefined,
+      }),
+    ).rejects.toThrow("MODEL_KEY_SECRET is not set");
+    expect((await rowOf(db, acme.project.id))?.apiKey).toBe("sk-old-plain");
+  });
+
+  test("a sealed row without the secret, or under another, is no model, logged once, no key", async () => {
+    const { db, acme } = await setup();
+    await setProjectModel(db, acme.user.id, acme.project.id, settings);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await projectModelFor(db, acme.project.id, undefined)).toBeNull();
+      expect(await projectModelFor(db, acme.project.id, undefined)).toBeNull();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("MODEL_KEY_SECRET is not set");
+      expect(await projectModelFor(db, acme.project.id, OTHER)).toBeNull();
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(String(warn.mock.calls[1]?.[0])).toContain("cannot be decrypted");
+      for (const [line] of warn.mock.calls) {
+        const text = String(line);
+        for (const secret of [SECRET, OTHER, "sk-one", (await rowOf(db, acme.project.id))?.apiKey])
+          expect(text).not.toContain(secret ?? "");
+      }
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

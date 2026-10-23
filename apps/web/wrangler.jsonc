@@ -17,7 +17,8 @@
     },
   ],
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "pixelslash-blobs" }],
-  // GITHUB_CLIENT_SECRET is a secret (`wrangler secret put`, or `.dev.vars` locally).
+  // GITHUB_CLIENT_SECRET and MODEL_KEY_SECRET are secrets (`wrangler secret put`, or `.dev.vars` locally).
+  // MODEL_KEY_SECRET (ob 1786) is base64 of 32 random bytes and seals each project's model API key at rest.
   "vars": {
     "GITHUB_CLIENT_ID": "",
     "GITHUB_OAUTH_BASE": "https://github.com",
@@ -48,6 +49,8 @@
         "GITHUB_OAUTH_BASE": "http://localhost:4174",
         "GITHUB_API_BASE": "http://localhost:4174",
         "IMAGE_SIGNING_SECRET": "e2e-image-secret",
+        // A fixed test value (base64 of 32 zero bytes), never a real secret.
+        "MODEL_KEY_SECRET": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
       },
     },
   },

@@ -1,6 +1,10 @@
+import { Buffer } from "node:buffer";
 import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
+
+/** The tests' `MODEL_KEY_SECRET`: base64 of 32 fixed bytes. Never a real secret. */
+export const TEST_MODEL_KEY_SECRET = Buffer.alloc(32, 7).toString("base64");
 
 const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
 

@@ -5,6 +5,7 @@ import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#
 import type { Db } from "#/db/db";
 import type { SentFlake } from "#/db/flakes";
 import { type FlakyPolicy, snapshots } from "#/db/schema";
+import { TEST_MODEL_KEY_SECRET } from "#/db/test-db";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import type { ModelFetch } from "#/ai/model";
 import { processBuild } from "./process";
@@ -105,16 +106,29 @@ export async function upload(
     blobs = ctx.scoped,
     diff,
     modelFetch,
+    modelKeySecret = TEST_MODEL_KEY_SECRET,
   }: {
     now?: () => number;
     db?: Db;
     blobs?: BlobStore;
     diff?: typeof diffPngs | undefined;
     modelFetch?: ModelFetch | undefined;
+    /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
+    modelKeySecret?: string | null;
   } = {},
 ): Promise<Build> {
   const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
-  await processBuild({ db, blobs, now, diff, modelFetch: modelFetch ?? noModel }, done);
+  await processBuild(
+    {
+      db,
+      blobs,
+      now,
+      diff,
+      modelFetch: modelFetch ?? noModel,
+      modelKeySecret: modelKeySecret ?? undefined,
+    },
+    done,
+  );
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

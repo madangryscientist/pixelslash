@@ -10,6 +10,7 @@ import { snapshots } from "#/db/schema";
 import { DIFF_BUDGET_MS } from "#/diff/budget";
 import { rerunShots } from "#/diff/rerun";
 import { type Ctx, context, onlyShot, sha, upload } from "#/diff/test-builds";
+import { TEST_MODEL_KEY_SECRET as SECRET } from "#/db/test-db";
 import { RED, shot } from "#/diff/test-shots";
 import type { ModelFetch } from "./model";
 
@@ -77,6 +78,7 @@ async function withModel(ctx: Ctx, autoPassNoise: boolean) {
     model: "deepseek-flash",
     apiKey: KEY,
     autoPassNoise,
+    modelKeySecret: SECRET,
   });
 }
 
@@ -323,10 +325,9 @@ describe("explaining changed regions (ob 1473)", () => {
     expect(row.aiReview).not.toBeNull();
 
     const again = stubModel();
-    const decided = await getBuild(ctx.db, ctx.projectId, build.id);
     await rerunShots(
-      { db: ctx.db, blobs: ctx.scoped, modelFetch: again.modelFetch },
-      decided,
+      { db: ctx.db, blobs: ctx.scoped, modelFetch: again.modelFetch, modelKeySecret: SECRET },
+      await getBuild(ctx.db, ctx.projectId, build.id),
       row.id,
     );
     expect(again.sent).toHaveLength(0);

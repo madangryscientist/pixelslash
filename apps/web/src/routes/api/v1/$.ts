@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { handleApi } from "#/api/handler";
-import { blobStore, database, imageSigningSecret, minCliVersion } from "#/server/env";
+import {
+  blobStore,
+  database,
+  imageSigningSecret,
+  minCliVersion,
+  modelKeySecret,
+} from "#/server/env";
 
 const handle = ({ request }: { request: Request }) =>
   handleApi(request, {
@@ -8,6 +14,7 @@ const handle = ({ request }: { request: Request }) =>
     store: blobStore(),
     imageSecret: imageSigningSecret,
     minCliVersion: minCliVersion(),
+    modelKeySecret: modelKeySecret(),
   });
 
 export const Route = createFileRoute("/api/v1/$")({
