@@ -420,7 +420,7 @@
       "ps": {
         "v": "y",
         "note": "server diff picks it per snapshot (ob 1470); `check` previews that pick locally (ob 1732); the CLI sends the merge-base and 200 of its first-parent ancestors and the server takes the nearest, so a project CI skipped for many commits on main still finds its baseline (ob 1788)",
-        "commit": "8a1c4f5"
+        "commit": "67d3499"
       },
       "t": {
         "argos": "y",
