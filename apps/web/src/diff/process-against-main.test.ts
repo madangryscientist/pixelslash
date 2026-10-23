@@ -105,11 +105,13 @@ describe("a branch build against main", () => {
     const { ctx, mainBuild, second } = await twoBuilds();
     const onMain = (await byName(ctx, mainBuild)).get("a");
     const a = (await byName(ctx, second)).get("a");
-    // A's own baseline is build 1's shot; against main it is main's, measured into its own overlay.
+    // A's own baseline is build 1's shot; against main it is main's, measured and stored as a result.
     expect(a?.baselineKey).not.toBe(onMain?.imageKey);
     expect(a?.mainBaselineKey).toBe(onMain?.imageKey);
-    expect(a?.mainDiffKey).toMatch(/\.main\.diff\.png$/);
-    expect(await ctx.scoped.get(a?.mainDiffKey ?? "")).not.toBeNull();
+    expect(a?.mainDiffStatus).toBe("changed");
+    expect(a?.mainDiffResult?.changedPixels).toBeGreaterThan(0);
+    // No overlay is stored against main: the page draws its boxes from the result.
+    expect(await ctx.scoped.get(`${a?.imageKey.replace(/\.png$/, "")}.main.diff.png`)).toBeNull();
   });
 
   test("the first branch build reuses its own diff: its baseline already is main's", async () => {
@@ -119,7 +121,6 @@ describe("a branch build against main", () => {
     const a = (await byName(ctx, first)).get("a");
     expect(a).toMatchObject({ diffStatus: "changed", mainDiffStatus: "changed" });
     expect(a?.mainBaselineKey).toBe(a?.baselineKey);
-    expect(a?.mainDiffKey).toBe(a?.diffKey);
     expect(a?.mainDiffResult).toEqual(a?.diffResult);
   });
 
@@ -130,7 +131,6 @@ describe("a branch build against main", () => {
     for (const row of await rows(ctx, next)) {
       expect(row).toMatchObject({
         mainBaselineKey: null,
-        mainDiffKey: null,
         mainDiffStatus: null,
         mainDiffResult: null,
       });

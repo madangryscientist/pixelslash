@@ -10,7 +10,12 @@ import {
 import { TabBody } from "#/components/build-shots";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page, StatusBadge } from "#/components/ui";
-import { againstMainLines, mainSummary, sinceLastBuildLines } from "#/lib/branch-review";
+import {
+  type MainSummary,
+  againstMainLines,
+  mainSummary,
+  sinceLastBuildLines,
+} from "#/lib/branch-review";
 import { BUILD_TABS, setsBaseline, tabCounts } from "#/lib/build-tabs";
 import { formatDateTime } from "#/lib/format";
 import { getBranchPage } from "#/server/branch";
@@ -85,6 +90,7 @@ function BranchPage() {
           buildId={build.id}
           defaultBranch={project.defaultBranch}
           shots={againstMain}
+          summary={summary}
           thumbs={thumbs}
           reviewable={reviewable}
           onReview={onReview}
@@ -110,11 +116,11 @@ function AgainstMain({
   buildId,
   defaultBranch,
   shots,
+  summary,
   thumbs,
   reviewable,
   onReview,
-}: Parameters<typeof MainGroups>[0] & { defaultBranch: string }) {
-  const summary = mainSummary(shots, reviewable);
+}: Parameters<typeof MainGroups>[0] & { defaultBranch: string; summary: MainSummary }) {
   return (
     <section data-testid="mode-body-main">
       <p className="mb-4 text-sm text-slate-600">

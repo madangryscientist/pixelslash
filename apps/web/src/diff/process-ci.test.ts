@@ -2,6 +2,7 @@ import { ENGINE_VERSION } from "@pixelslash/engine/ci-diff";
 import { describe, expect, test } from "vitest";
 import { call, setup } from "#/api/test-support";
 import { getBuild } from "#/db/builds";
+import { reviewSnapshot } from "#/db/review";
 import { builds } from "#/db/schema";
 import { orgBlobs } from "#/storage/blobs";
 import { NoRecoveryError, processBuild } from "./process";
@@ -103,6 +104,35 @@ describe("a project that diffs in CI", () => {
       expect(r.build?.error).toMatch(/re-run the CI job/);
     });
   }
+
+  test("a shot that cannot reuse its own diff is not measured against main, and main is never diffed", async () => {
+    const held = await ciProject();
+    const deps = { ...held.deps, diff: noDiff };
+    const onMain = await run(
+      held,
+      held.acme.token,
+      { branch: "main", commit: sha(1), png: white },
+      deps,
+    );
+    const first = await run(held, held.acme.token, branch(2, red), deps);
+    // Against main as well as its own baseline, which is main's: the diff is copied.
+    expect(first.row).toMatchObject({ diffStatus: "changed", mainDiffStatus: "changed" });
+    await reviewSnapshot(held.db, {
+      projectId: held.acme.project.id,
+      snapshotId: first.row.id,
+      state: "accepted",
+      userId: held.acme.user.id,
+    });
+    // Its own baseline is now the branch's accepted shot: CI sent no result for main's.
+    const second = await run(held, held.acme.token, branch(3, redder), deps);
+    expect(second.row.baselineKey).not.toBe(onMain.row.imageKey);
+    expect(second.row).toMatchObject({
+      mainBaselineKey: onMain.row.imageKey,
+      mainDiffStatus: null,
+      mainDiffResult: null,
+    });
+    expect(second.build?.status).not.toBe("errored");
+  });
 
   test("an old CLI is refused by a ci project and accepted by a server one", async () => {
     const held = await ciProject();

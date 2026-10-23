@@ -54,7 +54,6 @@ const view = (name: string, over: Partial<SnapshotView> = {}): SnapshotView => (
   flakeId: null,
   flakyPolicy: null,
   mainBaselineKey: null,
-  mainDiffKey: null,
   mainDiffStatus: null,
   mainDiffResult: null,
   changeNote: null,

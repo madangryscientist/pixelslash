@@ -316,8 +316,9 @@ export const snapshots = sqliteTable(
      * merge-base. `main_baseline_key` is that shot's image, null when there is none (`new`).
      * `main_diff_status` null means not measured against main: a default-branch build, a row older
      * than these columns, a changed environment, or a CI project whose run sent no result for it.
-     * The columns mirror `baseline_key`, `diff_key`, `diff_status` and `diff_result`, and reuse
-     * them when the shot's own baseline already is that shot.
+     * The columns mirror `baseline_key`, `diff_status` and `diff_result`, and reuse them when the
+     * shot's own baseline already is that shot. `main_diff_key` is unused: nothing writes or reads
+     * it, the page draws its boxes from `main_diff_result`. It stays so migration 0013 stays additive.
      */
     mainBaselineKey: text("main_baseline_key"),
     mainDiffKey: text("main_diff_key"),

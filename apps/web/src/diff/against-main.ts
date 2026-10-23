@@ -4,31 +4,24 @@ import { type BaselineSnapshot, type Baselines, snapshotKeyOf } from "#/db/basel
 import type { Db } from "#/db/db";
 import { snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
-import { CiResultError } from "./ci-result";
 import type { Budget } from "./budget";
-import {
-  type Comparer,
-  type SnapshotRow,
-  ciComparer,
-  mainDiffKeyOf,
-  serverComparer,
-} from "./compare";
+import { type Comparer, type SnapshotRow, serverComparer } from "./compare";
 
 /**
  * A branch shot against main (ob 1723), for the branch page's final review: the newest accepted
  * shot of another branch at the merge-base (`Baselines.main`), measured once by the diff that
  * measured the shot against its own baseline, and stored beside that result. Nothing reads it to
- * decide a build: it is never a review state and never blocks.
+ * decide a build: it is never a review state and never blocks. Only the result is stored, not an
+ * overlay: the page draws its boxes from `mainDiffResult`.
  */
 
 type MainFields = Pick<
   typeof snapshots.$inferInsert,
-  "mainBaselineKey" | "mainDiffKey" | "mainDiffStatus" | "mainDiffResult"
+  "mainBaselineKey" | "mainDiffStatus" | "mainDiffResult"
 >;
 
 const notMeasured: MainFields = {
   mainBaselineKey: null,
-  mainDiffKey: null,
   mainDiffStatus: null,
   mainDiffResult: null,
 };
@@ -42,21 +35,16 @@ function reusable(shot: SnapshotRow, main: BaselineSnapshot): boolean {
   );
 }
 
-/**
- * Whether the stored result against main still stands for this pick, so a resumed run does not
- * measure it again. One copied from the shot's own diff stands only while that diff is against
- * main: a re-run that measured the shot against another baseline rewrote the overlay they share.
- */
+/** Whether the stored result against main still stands for this pick, so a resumed run does not measure it again. */
 export function mainStands(shot: SnapshotRow, main: BaselineSnapshot | undefined): boolean {
   if (shot.mainBaselineKey !== (main?.imageKey ?? null)) return false;
   if (!main) return shot.mainDiffStatus === "new";
   if (main.envFingerprint !== shot.envFingerprint) return shot.mainDiffStatus === null;
-  if (shot.mainDiffStatus === null) return false;
-  return shot.mainDiffKey !== shot.diffKey || reusable(shot, main);
+  return shot.mainDiffStatus !== null;
 }
 
 async function against(
-  compare: Comparer,
+  compare: Comparer | null,
   shot: SnapshotRow,
   main: BaselineSnapshot | undefined,
 ): Promise<MainFields> {
@@ -67,38 +55,29 @@ async function against(
   if (reusable(shot, main))
     return {
       mainBaselineKey: main.imageKey,
-      mainDiffKey: shot.diffKey,
       mainDiffStatus: shot.diffStatus,
       mainDiffResult: shot.diffResult,
     };
-  try {
-    const measured = await compare(shot, main);
-    return {
-      mainBaselineKey: main.imageKey,
-      mainDiffKey: await measured.diffKey(),
-      mainDiffStatus: measured.changed ? "changed" : "unchanged",
-      mainDiffResult: measured.diffResult,
-    };
-  } catch (e) {
-    // A CI run measures each shot against its own pick only; with no result for main the shot is
-    // not measured against main, and is never diffed here instead.
-    if (e instanceof CiResultError) return notMeasured;
-    throw e;
-  }
+  // A CI run measures each shot against its own pick only: one that cannot reuse its own diff is
+  // not measured against main, and is never diffed here instead.
+  if (!compare) return { ...notMeasured, mainBaselineKey: main.imageKey };
+  const measured = await compare(shot, main);
+  return {
+    mainBaselineKey: main.imageKey,
+    mainDiffStatus: measured.changed ? "changed" : "unchanged",
+    mainDiffResult: measured.diffResult,
+  };
 }
 
-/** Measure one shot against main and store it, dropping an overlay against main it no longer has. */
+/** Measure one shot against main and store it. */
 export async function diffAgainstMain(
-  deps: { db: Db; blobs: BlobStore },
-  compare: Comparer,
+  deps: { db: Db },
+  compare: Comparer | null,
   shot: SnapshotRow,
   main: BaselineSnapshot | undefined,
 ): Promise<void> {
   const fields = await against(compare, shot, main);
   await deps.db.update(snapshots).set(fields).where(eq(snapshots.id, shot.id));
-  const overlay = mainDiffKeyOf(shot.imageKey);
-  if (shot.mainDiffKey === overlay && fields.mainDiffKey !== overlay)
-    await deps.blobs.delete(overlay);
 }
 
 /**
@@ -112,7 +91,7 @@ export async function measureAgainstMain(
   baselines: Baselines,
   budget: Budget | null,
 ) {
-  const compare = budget ? serverComparer(deps, mainDiffKeyOf) : ciComparer(deps.blobs);
+  const compare = budget ? serverComparer(deps) : null;
   const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, buildId));
   for (const shot of rows) {
     // A partial re-run (ob 1738) measures only the shots it was given.

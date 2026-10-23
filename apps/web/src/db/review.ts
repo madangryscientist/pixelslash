@@ -111,7 +111,6 @@ export type SnapshotView = {
   flakyPolicy: FlakyPolicy | null;
   /** Against main (ob 1723): null status is not measured against main (see the schema). */
   mainBaselineKey: string | null;
-  mainDiffKey: string | null;
   mainDiffStatus: DiffStatus | null;
   mainDiffResult: DiffResult | null;
   /** The change in words, from the judge; null when nothing described it. */
@@ -165,7 +164,6 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       flakeId: snapshots.flakeId,
       flakyPolicy: snapshots.flakyPolicy,
       mainBaselineKey: snapshots.mainBaselineKey,
-      mainDiffKey: snapshots.mainDiffKey,
       mainDiffStatus: snapshots.mainDiffStatus,
       mainDiffResult: snapshots.mainDiffResult,
       changeNote: snapshots.changeNote,

@@ -4,6 +4,7 @@ import { Button, navTabClass } from "@hackcove/ui";
 import { ShotThumb } from "#/components/shot-card";
 import { ReviewChip, useHydrated } from "#/components/ui";
 import {
+  MAIN_GROUPS,
   type BranchShot,
   type ChangeLine,
   type MainGroup,
@@ -271,10 +272,9 @@ export function MainGroups({
   reviewable: boolean;
   onReview: (snapshotId: string, state: "accepted" | "rejected") => Promise<void>;
 }) {
-  const groups: MainGroup[] = ["rejected", "waiting", "accepted", "same", "unmeasured"];
   return (
     <>
-      {groups.map((group) => {
+      {MAIN_GROUPS.map((group) => {
         const rows = shots.filter((shot) => shot.mainGroup === group);
         if (rows.length === 0) return null;
         const list = (
