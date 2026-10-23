@@ -195,6 +195,11 @@ export function ShotCard({
             {labelSummary(shot.aiReview.regions)}
           </p>
         )}
+        {!shot.aiReview && shot.aiPending && (
+          <p className="mt-2 text-sm text-slate-500" data-testid="shot-ai-pending">
+            AI: explaining…
+          </p>
+        )}
         <p className="mt-2 text-sm text-slate-600">{line}</p>
       </Link>
       {/* Beside the card's link, not in it: a link inside a link is not HTML. */}

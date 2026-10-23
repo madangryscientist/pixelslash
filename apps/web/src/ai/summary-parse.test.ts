@@ -12,6 +12,8 @@ const row = (name: string, diffStatus: "changed" | "new" | "removed" | "unchange
   rebaselineNeeded: false,
   diffResult: null,
   aiReview: null,
+  aiPending: false,
+  aiError: null,
 });
 
 describe("summaryInput and parseSummary", () => {

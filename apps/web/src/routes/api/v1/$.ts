@@ -4,6 +4,7 @@ import {
   blobStore,
   database,
   defaultDiffLocation,
+  explainQueue,
   imageSigningSecret,
   minCliVersion,
   modelKeySecret,
@@ -16,6 +17,7 @@ const handle = ({ request }: { request: Request }) =>
     imageSecret: imageSigningSecret,
     minCliVersion: minCliVersion(),
     modelKeySecret: modelKeySecret(),
+    explainQueue: explainQueue(),
     defaultDiffLocation,
   });
 

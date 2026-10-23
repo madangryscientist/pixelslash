@@ -23,7 +23,7 @@ import {
   serverComparer,
 } from "./compare";
 import { measureAgainstMain } from "./against-main";
-import { Budget, runStart } from "./budget";
+import { Budget } from "./budget";
 import {
   type ProjectOfBuild,
   acceptDefaultBranchBuild,
@@ -33,9 +33,7 @@ import {
   projectOf,
 } from "./build-writes";
 import { withOverrides } from "./with-overrides";
-import { explainBuild } from "#/ai/explain";
-import { summarizeBuild } from "#/ai/summary";
-import type { ModelFetch } from "#/ai/model";
+import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
@@ -61,8 +59,8 @@ export type ProcessDeps = {
   now?: (() => number) | undefined;
   /** The engine's diff; a test passes one that throws to prove a CI build never calls it. */
   diff?: typeof diffPngs | undefined;
-  /** The transport to the project's model (ob 1473); a test passes a stub. */
-  modelFetch?: ModelFetch | undefined;
+  /** Where the changed shots go to be explained (ob 1875); a test passes one in memory. */
+  explainQueue?: ExplainQueue | undefined;
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
   modelKeySecret?: string | undefined;
 };
@@ -368,7 +366,6 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
   if (ci && build.status === "errored") throw new NoRecoveryError();
   if (!(await claim(deps.db, build, ci))) return heldElsewhere(deps.db, build, ci);
   try {
-    const startedAt = runStart(deps.now);
     await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
     const baselines: Baselines = await selectBaselines(
@@ -380,13 +377,10 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     await markRemoved(deps, build, baselines.removed);
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
-    // After the verdict, so a run the Worker stops while the model is asked has already given one.
-    const passed = await explainBuild(deps, build, { startedAt });
-    const final = passed === 0 ? status : await refreshBuildStatus(deps.db, build.id);
-    // Text for the reviewer (ob 1668), last: the verdict is written before the call, and it never
-    // throws, so a stopped call or a failed write cannot change the verdict or mark the build errored.
-    await summarizeBuild(deps, build, { startedAt });
-    return { status: final, error: null, unmeasured: 0 };
+    // After the verdict, and off the request (ob 1875): the model explains each shot, then writes
+    // the summary (ob 1668), from the queue. It never throws, so it cannot mark the build errored.
+    await queueExplain(deps, build);
+    return { status, error: null, unmeasured: 0 };
   } catch (e) {
     await markErrored(deps.db, build, e);
     // The ceiling's count includes shots a changed baseline sends back to be measured again, which

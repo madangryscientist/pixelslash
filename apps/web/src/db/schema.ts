@@ -198,6 +198,13 @@ export const builds = sqliteTable(
     processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
     /** The project model's summary of what changed (ob 1668); null when none was made. Text only. */
     aiSummary: text("ai_summary", { mode: "json" }).$type<AiSummary>(),
+    /**
+     * When the build's summary was queued behind its shots' explanations (ob 1875); null when none is
+     * due, or once it is written or failed. Older than `EXPLAIN_STALE_MS` is given up.
+     */
+    aiSummaryQueuedAt: integer("ai_summary_queued_at", { mode: "timestamp_ms" }),
+    /** When a consumer took the queued summary to write (ob 1875); the summary stays pending meanwhile. */
+    aiSummaryClaimedAt: integer("ai_summary_claimed_at", { mode: "timestamp_ms" }),
     /** The CLI's step timings, sent at finalize (ob 1791); null when the client sent none. */
     timings: text("timings", { mode: "json" }).$type<BuildTimings>(),
     createdAt: createdAt(),
@@ -334,6 +341,13 @@ export const snapshots = sqliteTable(
     changeNote: text("change_note"),
     /** The project's model on each `change` region (ob 1473); null when no model explained one. */
     aiReview: text("ai_review", { mode: "json" }).$type<AiReview>(),
+    /**
+     * When the shot was queued for the project's model (ob 1875): explaining runs after the
+     * finalise, off the queue. Null when nothing is waiting; older than `EXPLAIN_STALE_MS` is given up.
+     */
+    aiQueuedAt: integer("ai_queued_at", { mode: "timestamp_ms" }),
+    /** Why the model explained no region of this shot, once it stopped trying (ob 1875); null otherwise. */
+    aiError: text("ai_error"),
     createdAt: createdAt(),
   },
   (t) => [

@@ -10,6 +10,7 @@ import { RerunErrored } from "#/components/rerun";
 import { Page } from "#/components/ui";
 import { BUILD_TABS, type BuildTab, defaultTab, setsBaseline, tabCounts } from "#/lib/build-tabs";
 import { awaitsDecision } from "#/lib/snapshot-groups";
+import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { acceptBuild, getBuildPage } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
@@ -42,28 +43,44 @@ function BuildError({ project, build }: Pick<Loaded, "project" | "build">) {
   );
 }
 
-function BuildPage() {
-  const { project, org, build, snapshots, thumbs, firstBuild, thresholdChanges, modelConfigured } =
-    Route.useLoaderData();
-  const search = Route.useSearch();
+/** Accept every shot of the build, and why it could not be. */
+function useAcceptAll(projectId: string, buildId: string) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const acceptAll = async () => {
+    setError(null);
+    try {
+      await acceptBuild({ data: { projectId, buildId } });
+      await router.invalidate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return { error, acceptAll };
+}
+
+function BuildPage() {
+  const {
+    project,
+    org,
+    build,
+    snapshots,
+    summaryPending,
+    thumbs,
+    firstBuild,
+    thresholdChanges,
+    modelConfigured,
+  } = Route.useLoaderData();
+  const search = Route.useSearch();
   const counts = tabCounts(snapshots);
   const baseline = setsBaseline(firstBuild, snapshots);
   const active = search.tab ?? defaultTab(counts);
   // Only a shot holding a change blocks a build (verdictOf); new, removed and unchanged ones do not
   // need a decision, unless an unchanged one carries the branch's open change (ob 1712).
   const toReview = snapshots.filter(awaitsDecision).length;
+  useRefreshWhile(summaryPending || snapshots.some((shot) => shot.aiPending));
   const reviewable = build.status === "changes" || build.status === "passed";
-  const acceptAll = async () => {
-    setError(null);
-    try {
-      await acceptBuild({ data: { projectId: project.id, buildId: build.id } });
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const { error, acceptAll } = useAcceptAll(project.id, build.id);
   return (
     <Page>
       <ListLayout
@@ -88,6 +105,7 @@ function BuildPage() {
               build={build}
               snapshots={snapshots}
               modelConfigured={modelConfigured}
+              pending={summaryPending}
             />
           )}
         </BuildHeader>

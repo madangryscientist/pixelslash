@@ -7,8 +7,10 @@ import type { SentFlake } from "#/db/flakes";
 import { type FlakyPolicy, snapshots } from "#/db/schema";
 import { TEST_MODEL_KEY_SECRET } from "#/db/test-db";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
+import type { ConsumerDeps } from "#/ai/explain-queue";
+import { type MemoryQueue, memoryQueue } from "#/ai/explain-queue-kit";
 import type { ModelFetch } from "#/ai/model";
-import { processBuild } from "./process";
+import { type ProcessDeps, processBuild } from "./process";
 
 /** Uploading and diffing whole builds, as the CI API does. Tests only. */
 
@@ -90,12 +92,46 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
 /** A test that names no model transport reaches none: the call fails instead of going out. */
 const noModel: ModelFetch = () => Promise.reject(new Error("no model transport in this test"));
 
+/** The explain queue's consumer for a test: the test's one org store, and no real model. */
+export const consumerDeps = ({
+  db,
+  blobs,
+  now,
+  modelFetch,
+  modelKeySecret = TEST_MODEL_KEY_SECRET,
+}: {
+  db: Db;
+  blobs: BlobStore;
+  now?: (() => number) | undefined;
+  modelFetch?: ModelFetch | undefined;
+  modelKeySecret?: string | undefined;
+}): ConsumerDeps => ({
+  db,
+  blobs: () => blobs,
+  now,
+  modelFetch: modelFetch ?? noModel,
+  modelKeySecret,
+});
+
+/** Run a diff (a finalise, a re-run) with an explain queue, then drain it, as the Worker would. */
+export async function explaining<T>(
+  deps: Parameters<typeof consumerDeps>[0],
+  run: (deps: ProcessDeps) => Promise<T>,
+): Promise<T> {
+  const explain = memoryQueue();
+  const { db, blobs, now, modelKeySecret = TEST_MODEL_KEY_SECRET } = deps;
+  const result = await run({ db, blobs, now, modelKeySecret, explainQueue: explain.queue });
+  await explain.drain(consumerDeps(deps));
+  return result;
+}
+
 /**
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
  * front of the diff only, so a failure there is not the store the assertions read back from;
  * `blobs` does the same for the images; `diff` stands in for the engine's diff; `modelFetch` for
- * the project's model.
+ * the project's model. The explain queue (ob 1875) is drained before it returns, unless the test
+ * passes its own `queue` to drain when it chooses.
  */
 export async function upload(
   ctx: Uploads,
@@ -107,6 +143,7 @@ export async function upload(
     diff,
     modelFetch,
     modelKeySecret = TEST_MODEL_KEY_SECRET,
+    queue,
   }: {
     now?: () => number;
     db?: Db;
@@ -115,20 +152,18 @@ export async function upload(
     modelFetch?: ModelFetch | undefined;
     /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
     modelKeySecret?: string | null;
+    queue?: MemoryQueue;
   } = {},
 ): Promise<Build> {
   const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
+  const explain = queue ?? memoryQueue();
+  const secret = modelKeySecret ?? undefined;
   await processBuild(
-    {
-      db,
-      blobs,
-      now,
-      diff,
-      modelFetch: modelFetch ?? noModel,
-      modelKeySecret: modelKeySecret ?? undefined,
-    },
+    { db, blobs, now, diff, explainQueue: explain.queue, modelKeySecret: secret },
     done,
   );
+  if (!queue)
+    await explain.drain(consumerDeps({ db, blobs, now, modelFetch, modelKeySecret: secret }));
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

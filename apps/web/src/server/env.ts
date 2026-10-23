@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import type { GithubConfig } from "#/auth/github";
 import type { Db } from "#/db/db";
+import type { ExplainQueue } from "#/ai/explain-queue";
 import { diffLocationOf } from "#/db/orgs";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
@@ -10,6 +11,9 @@ import { type BlobStore, r2BlobStore } from "#/storage/blobs";
 export const database = (): Db => drizzle(env.DB);
 
 export const blobStore = (): BlobStore => r2BlobStore(env.BLOBS);
+
+/** The queue a run's changed shots are explained from (ob 1875); its consumer is `src/server.ts`. */
+export const explainQueue = (): ExplainQueue => env.EXPLAIN;
 
 /** Signs the short-lived image URLs; a deployment sets it with `wrangler secret put`. */
 export function imageSigningSecret(): string {

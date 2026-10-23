@@ -3,7 +3,7 @@
   "name": "pixelslash-web",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
+  "main": "src/server.ts",
   "observability": { "enabled": true },
   "upload_source_maps": true,
   // The ids are placeholders: creating the real D1 database and R2 bucket is the first
@@ -17,6 +17,21 @@
     },
   ],
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "pixelslash-blobs" }],
+  // The explain queue (ob 1875): a finalise sends one job per changed shot, and `src/server.ts`'s
+  // `queue` explains it with the project's model off the request. The code stops at 3 tries and
+  // stores why; max_retries is above it so the queue never drops a job the code has not settled.
+  // One job per invocation: an invocation holds six connections, and one shot's calls fill them.
+  "queues": {
+    "producers": [{ "binding": "EXPLAIN", "queue": "pixelslash-explain" }],
+    "consumers": [
+      {
+        "queue": "pixelslash-explain",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 4,
+      },
+    ],
+  },
   // GITHUB_CLIENT_SECRET and MODEL_KEY_SECRET are secrets (`wrangler secret put`, or `.dev.vars` locally).
   // MODEL_KEY_SECRET (ob 1786) is base64 of 32 random bytes and seals each project's model API key at rest.
   "vars": {
@@ -43,6 +58,17 @@
         },
       ],
       "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "pixelslash-blobs" }],
+      "queues": {
+        "producers": [{ "binding": "EXPLAIN", "queue": "pixelslash-explain" }],
+        "consumers": [
+          {
+            "queue": "pixelslash-explain",
+            "max_batch_size": 1,
+            "max_batch_timeout": 1,
+            "max_retries": 4,
+          },
+        ],
+      },
       "vars": {
         "GITHUB_CLIENT_ID": "e2e-client",
         "GITHUB_CLIENT_SECRET": "e2e-secret",

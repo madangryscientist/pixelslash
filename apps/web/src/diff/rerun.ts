@@ -10,9 +10,7 @@ import { NoRecoveryError, claimForRerun } from "./claim";
 import type { SnapshotRow } from "./compare";
 import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
-import { explainBuild } from "#/ai/explain";
-import { summarizeBuild } from "#/ai/summary";
-import { runStart } from "./budget";
+import { queueExplain } from "#/ai/explain-queue";
 
 /**
  * Partial re-runs (ob 1738): measure again only the shots of a build that errored, or one shot
@@ -53,10 +51,10 @@ const resultOf = (row: SnapshotRow) =>
  * overlay keys stay, so the run can drop an overlay it no longer writes.
  */
 async function clearResults(db: Db, targets: SnapshotRow[]): Promise<void> {
-  // The seven cleared fields are bound beside the ids.
+  // The nine cleared fields are bound beside the ids.
   for (const part of chunk(
     targets.map((t) => t.id),
-    7,
+    9,
   ))
     await db
       .update(snapshots)
@@ -68,6 +66,8 @@ async function clearResults(db: Db, targets: SnapshotRow[]): Promise<void> {
         mainBaselineKey: null,
         mainDiffStatus: null,
         aiReview: null,
+        aiQueuedAt: null,
+        aiError: null,
       })
       .where(inArray(snapshots.id, part));
 }
@@ -158,7 +158,6 @@ export async function rediffShots(
     throw new RerunError(`build is ${build.status}: a diff run holds it or it has no verdict yet`);
   const ids = targets.map((t) => t.id);
   try {
-    const startedAt = runStart(deps.now);
     await clearResults(deps.db, targets);
     const held = rows.filter((row) => !isMarker(row));
     const baselines = await selectBaselines(deps.db, build, new Set(held.map(snapshotKeyOf)));
@@ -166,12 +165,9 @@ export async function rediffShots(
     await measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines);
     await settleReviews(deps.db, { build, project }, targets);
     const status = await refreshBuildStatus(deps.db, build.id);
-    const passed = await explainBuild(deps, build, { startedAt, only: ids });
-    const final = passed === 0 ? status : await refreshBuildStatus(deps.db, build.id);
-    // Text for the reviewer (ob 1668), last: the verdict is written before the call, and it never
-    // throws, so a stopped call or a failed write cannot change the verdict or mark the build errored.
-    await summarizeBuild(deps, build, { startedAt });
-    return { status: final, error: null, unmeasured: 0 };
+    // The moved shots are explained again, and the summary written, off the request (ob 1875).
+    await queueExplain(deps, build, { only: ids });
+    return { status, error: null, unmeasured: 0 };
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await reopenReviews(deps.db, ids);

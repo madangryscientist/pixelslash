@@ -43,8 +43,9 @@ export function labelSummary(notes: AiRegionNote[]): string {
 }
 
 /**
- * The side panel's section: each changed region's label and sentence, or, for a changed shot the
- * model did not explain (no model, or the call failed), that it is reviewed as plain pixels.
+ * The side panel's section: each changed region's label and sentence; "explaining…" while the shot
+ * waits on the explain queue (ob 1875); or, for a changed shot the model did not explain (no model,
+ * or the calls failed, and why), that it is reviewed as plain pixels.
  */
 export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
   const review = snapshot.aiReview;
@@ -55,9 +56,22 @@ export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
         <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
           AI explanation
         </h2>
-        <p className="text-sm text-slate-600" data-testid="ai-skip">
-          skip: no judge. Review the pixels.
-        </p>
+        {snapshot.aiPending ? (
+          <p className="text-sm text-slate-600" data-testid="ai-pending">
+            explaining…
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-slate-600" data-testid="ai-skip">
+              skip: no judge. Review the pixels.
+            </p>
+            {snapshot.aiError && (
+              <p className="mt-1 text-xs text-slate-500" data-testid="ai-error">
+                {snapshot.aiError}
+              </p>
+            )}
+          </>
+        )}
       </section>
     );
   }

@@ -5,7 +5,16 @@ import { DIFF_BUDGET_MS } from "#/diff/budget";
 import { processBuild } from "#/diff/process";
 import { rerunShots } from "#/diff/rerun";
 import { TEST_MODEL_KEY_SECRET as SECRET } from "#/db/test-db";
-import { FINGERPRINT, type Ctx, context, rows, sha, upload } from "#/diff/test-builds";
+import {
+  FINGERPRINT,
+  type Ctx,
+  consumerDeps,
+  context,
+  explaining,
+  rows,
+  sha,
+  upload,
+} from "#/diff/test-builds";
 import type { BlobStore } from "#/storage/blobs";
 import {
   KEY,
@@ -18,6 +27,9 @@ import {
   white,
   withModel,
 } from "./summary-test-kit";
+import { consumeExplain } from "./explain-queue";
+import { memoryQueue } from "./explain-queue-kit";
+import type { ModelFetch } from "./model";
 import { summarizeBuild } from "./summary";
 
 /**
@@ -73,6 +85,48 @@ describe("a build's AI summary (ob 1668)", () => {
     );
     expect(stored?.sentences[1]?.shots).toEqual(await idsOf(ctx, build, "fresh"));
     expect(stored?.sentences[2]?.shots).toEqual(await idsOf(ctx, build, "gone"));
+  });
+
+  test("the summary is written once, after the build's last shot is explained (ob 1875)", async () => {
+    const ctx = await context();
+    await withModel(ctx);
+    const stub = stubModel();
+    // Which kind of call came when: a region's crops, or the summary's text.
+    const order: string[] = [];
+    const modelFetch: ModelFetch = (input, init) => {
+      order.push(
+        typeof init.body === "string" && init.body.includes("image_url") ? "region" : "summary",
+      );
+      return stub.modelFetch(input, init);
+    };
+    await upload(ctx, { branch: "main", commit: sha(1), shots: card(white) });
+    const queue = memoryQueue();
+    const build = await upload(
+      ctx,
+      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: card(red) },
+      { modelFetch, queue },
+    );
+    expect(build.aiSummary).toBeNull();
+    const jobs = queue.waiting.splice(0);
+    expect(jobs.map((job) => job.body.kind)).toEqual(["shot", "shot", "shot"]);
+    const deps = consumerDeps({ db: ctx.db, blobs: ctx.scoped, modelFetch });
+    // Whether the build had a summary after each shot settled.
+    const summarized: boolean[] = [];
+    for (const job of jobs) {
+      await consumeExplain(deps, [
+        { body: job.body, attempts: 1, ack: () => undefined, retry: () => undefined },
+      ]);
+      summarized.push((await getBuild(ctx.db, ctx.projectId, build.id)).aiSummary !== null);
+    }
+    expect(summarized).toEqual([false, false, true]);
+    // Three shots of one region each, then one summary that saw all three notes.
+    expect(order).toEqual(["region", "region", "region", "summary"]);
+    expect(promptOf(stub.summaries()[0] ?? "")).toContain(NOTE);
+    // Delivered again, a settled shot asks nothing and writes no second summary.
+    await consumeExplain(deps, [
+      { body: jobs[0]?.body, attempts: 1, ack: () => undefined, retry: () => undefined },
+    ]);
+    expect(order).toHaveLength(4);
   });
 
   test("the summary changes no verdict and no review", async () => {
@@ -147,10 +201,10 @@ describe("a build's AI summary (ob 1668)", () => {
     // A re-run measured the shot again: a summary of the old result would describe something else.
     const failing = stubModel(() => answers[1] ?? "");
     const [shotId] = await idsOf(ctx, build, "ui-card");
-    await rerunShots(
-      { db: ctx.db, blobs: ctx.scoped, modelFetch: failing.modelFetch, modelKeySecret: SECRET },
-      await getBuild(ctx.db, ctx.projectId, build.id),
-      shotId ?? null,
+    await explaining(
+      { db: ctx.db, blobs: ctx.scoped, modelFetch: failing.modelFetch },
+      async (deps) =>
+        rerunShots(deps, await getBuild(ctx.db, ctx.projectId, build.id), shotId ?? null),
     );
     expect(failing.summaries()).toHaveLength(1);
     expect((await getBuild(ctx.db, ctx.projectId, build.id)).aiSummary).toBeNull();
@@ -218,10 +272,8 @@ describe("a build's AI summary (ob 1668)", () => {
 
     const rerun = stubModel(() => "Third. [C1]");
     const [shotId] = await idsOf(ctx, build, "ui-card");
-    await rerunShots(
-      { db: ctx.db, blobs: ctx.scoped, modelFetch: rerun.modelFetch, modelKeySecret: SECRET },
-      stored,
-      shotId ?? null,
+    await explaining({ db: ctx.db, blobs: ctx.scoped, modelFetch: rerun.modelFetch }, (deps) =>
+      rerunShots(deps, stored, shotId ?? null),
     );
     expect(rerun.summaries()).toHaveLength(1);
     expect((await getBuild(ctx.db, ctx.projectId, build.id)).aiSummary?.sentences[0]?.text).toBe(
@@ -256,9 +308,8 @@ describe("a build's AI summary (ob 1668)", () => {
     expect(build.status).toBe("errored");
     expect(build.aiSummary).toBeNull();
     for (let i = 0; i < 5 && build.status === "errored"; i++) {
-      await processBuild(
-        { db: ctx.db, blobs, now: () => t, modelFetch: stub.modelFetch, modelKeySecret: SECRET },
-        build,
+      await explaining({ db: ctx.db, blobs, now: () => t, modelFetch: stub.modelFetch }, (deps) =>
+        processBuild(deps, build),
       );
       build = await getBuild(ctx.db, ctx.projectId, build.id);
     }

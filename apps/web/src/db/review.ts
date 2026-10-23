@@ -6,6 +6,7 @@ import {
   groupOf,
   skippedFlaky,
 } from "#/lib/snapshot-groups";
+import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { inChunks } from "./chunks";
 import { notSkippedFlaky } from "./markers";
@@ -117,6 +118,10 @@ export type SnapshotView = {
   changeNote: string | null;
   /** The project model's label and sentence per changed region (ob 1473); null when none was given. */
   aiReview: AiReview | null;
+  /** Queued for the model and not yet answered (ob 1875). */
+  aiPending: boolean;
+  /** Why the model has no explanation for it, when it tried and failed (ob 1875). */
+  aiError: string | null;
   createdAt: Date;
 };
 
@@ -124,6 +129,8 @@ export type BuildView = {
   build: typeof builds.$inferSelect;
   /** Ordered as the review walks them: changed, new, removed, unchanged, re-baseline, unmeasured. */
   snapshots: SnapshotView[];
+  /** The build's summary is waiting on its shots' explanations (ob 1875). */
+  summaryPending: boolean;
 };
 
 /**
@@ -168,6 +175,8 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       mainDiffResult: snapshots.mainDiffResult,
       changeNote: snapshots.changeNote,
       aiReview: snapshots.aiReview,
+      aiQueuedAt: snapshots.aiQueuedAt,
+      aiError: snapshots.aiError,
       createdAt: snapshots.createdAt,
     })
     .from(snapshots)
@@ -175,9 +184,13 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
     .where(eq(snapshots.buildId, buildId));
   const approved = await approvedEarlier(db, build);
   const roots = await carriedRootBuilds(db, buildId);
+  const now = Date.now();
   const ordered = rows
-    .map(({ reviewer, ...row }) => ({
+    .map(({ reviewer, aiQueuedAt, ...row }) => ({
       ...row,
+      aiPending: explaining(aiQueuedAt, now),
+      // Queued so long ago that its consumer died: named, not left explaining.
+      aiError: row.aiError ?? (aiQueuedAt && !explaining(aiQueuedAt, now) ? STALE_FAILURE : null),
       reviewedBy: reviewer,
       carriedFromBuild: (row.carriedFrom && roots.get(row.carriedFrom)) ?? null,
       approvedEarlier: approved.get(row.id) ?? null,
@@ -191,7 +204,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
         a.viewport.localeCompare(b.viewport) ||
         a.theme.localeCompare(b.theme),
     );
-  return { build, snapshots: ordered };
+  return { build, snapshots: ordered, summaryPending: explaining(build.aiSummaryQueuedAt, now) };
 }
 
 export type BuildCounts = Record<SnapshotGroup, number> & {

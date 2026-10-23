@@ -15,6 +15,7 @@ import { Page } from "#/components/ui";
 import { ignoreAreas } from "#/lib/ignore-areas";
 import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
+import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { useReviewKeys } from "#/lib/use-review-keys";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
 
@@ -145,6 +146,7 @@ function SnapshotPage() {
   const ignore = useIgnoreDraft(snapshot.id);
   const ignored = ignoreAreas(snapshot, data.uploadedIgnore, ignore.rect);
   const label = useMemo(() => shotLabeller(names)(snapshot.name), [names, snapshot.name]);
+  useRefreshWhile(snapshot.aiPending);
 
   const go = useWalk(project.id, build.id);
   const openHelp = useCallback(() => setHelp(true), []);

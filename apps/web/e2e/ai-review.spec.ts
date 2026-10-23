@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import {
+  CHANGED,
+  SHA_MAIN,
+  SHA_WORK,
+  WHITE,
+  explained,
+  open,
+  provision,
+  uploadBuild,
+} from "./api-upload";
 import { STUB } from "./ports";
 
 /**
@@ -30,6 +39,7 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
   );
 
   await open(page, `/projects/${projectId}/builds/${buildId}`);
+  await explained(page);
   await expect(page.getByTestId("build-status")).toHaveText("passed");
   const filtered = page.getByTestId("group-ai-filtered");
   await expect(filtered).toContainText("AI-filtered (1)");
@@ -87,6 +97,7 @@ test("a build with 10 changed shots gets no summary, says why, and offers no Reg
     names.map((name) => ({ name, png: CHANGED })),
   );
   await open(page, `/projects/${projectId}/builds/${buildId}`);
+  await explained(page);
   const summary = page.getByTestId("build-summary");
   await expect(summary.getByTestId("summary-too-many")).toHaveText(
     "No AI summary: 10 changed shots (summaries are made for builds with fewer than 10).",
@@ -155,6 +166,7 @@ test("a project without its own model uses the org's, and its own overrides it",
     [{ name: "hero", png: CHANGED }],
   );
   await open(page, `/projects/${projectId}/builds/${buildId}`);
+  await explained(page);
   await expect(page.getByTestId("build-status")).toHaveText("passed");
   await expect(page.getByTestId("group-ai-filtered")).toContainText("AI-filtered (1)");
   await expect(page.getByTestId("summary-model")).toContainText("org-flash");

@@ -155,6 +155,13 @@
       "when": 1792772836705,
       "tag": "0021_daily_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1792787382528,
+      "tag": "0022_public_darkhawk",
+      "breakpoints": true
     }
   ]
 }

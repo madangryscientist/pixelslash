@@ -143,6 +143,7 @@ function SummaryBody({
   changed,
   modelConfigured,
   describable,
+  pending,
 }: {
   projectId: string;
   build: Build;
@@ -150,6 +151,7 @@ function SummaryBody({
   changed: number;
   modelConfigured: boolean;
   describable: boolean;
+  pending: boolean;
 }) {
   // A summary stored before the limit existed is still true of its build, so it stays.
   if (build.aiSummary)
@@ -159,6 +161,13 @@ function SummaryBody({
     return (
       <p className="text-slate-600" data-testid="summary-too-many">
         {noSummaryReason(changed)}
+      </p>
+    );
+  // Written once every shot is explained (ob 1875); a big build gets none.
+  if (pending)
+    return (
+      <p className="text-slate-600" data-testid="summary-pending">
+        explaining…
       </p>
     );
   return (
@@ -181,11 +190,14 @@ export function BuildSummary({
   build,
   snapshots,
   modelConfigured,
+  pending,
 }: {
   projectId: string;
   build: Build;
   snapshots: SnapshotView[];
   modelConfigured: boolean;
+  /** The summary waits on its shots' explanations. */
+  pending: boolean;
 }) {
   // A build still measuring, or one that stopped, has no verdict to summarise: what it held
   // before is not shown, and the run that finishes it writes the summary again.
@@ -207,6 +219,7 @@ export function BuildSummary({
         changed={changed}
         modelConfigured={modelConfigured}
         describable={describable}
+        pending={pending}
       />
       <p className="mt-1 text-slate-600" data-testid="summary-counts">
         {describable ? "" : "Nothing changed. "}
@@ -215,7 +228,8 @@ export function BuildSummary({
       <Footer
         projectId={projectId}
         build={build}
-        canRegenerate={modelConfigured && describable && !tooManyChanges(changed)}
+        // While the queue writes it, a Regenerate would summarise notes not all in yet.
+        canRegenerate={modelConfigured && describable && !tooManyChanges(changed) && !pending}
       />
     </section>
   );

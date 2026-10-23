@@ -1,10 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Build } from "#/db/builds";
 import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
 import type { AiSummary, AiSummarySentence } from "#/db/diff-json";
 import { builds, snapshots } from "#/db/schema";
-import { DIFF_BUDGET_MS } from "#/diff/budget";
 import { projectOf } from "#/diff/build-writes";
 import { shotChips, shotLabeller } from "#/lib/shot-label";
 import { type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
@@ -185,9 +184,9 @@ export function parseSummary(raw: string, refs: Map<string, string[]>): AiSummar
 const BUILD_VERDICTS = new Set(["changes", "passed", "failed"]);
 
 /** Ask the project's model about the build: null with no model or nothing to describe. Throws. */
-async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<AiSummary | null> {
+async function ask(deps: SummaryDeps, build: Build): Promise<AiSummary | null> {
   const model = await projectModelFor(deps.db, build.projectId, deps.modelKeySecret);
-  if (!model || timeoutMs <= 0) return null;
+  if (!model) return null;
   const rows = await deps.db
     .select({
       id: snapshots.id,
@@ -207,7 +206,7 @@ async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<
   if (!input.describable) return null;
   const raw = await complete(model, [{ type: "text", text: input.prompt }], build.id, {
     fetcher: deps.modelFetch,
-    timeoutMs,
+    timeoutMs: MODEL_TIMEOUT_MS,
   });
   const now = deps.now ?? Date.now;
   return { model: model.model, at: now(), sentences: parseSummary(raw, input.refs) };
@@ -215,40 +214,41 @@ async function ask(deps: SummaryDeps, build: Build, timeoutMs: number): Promise<
 
 /**
  * Summarise the build with the project's model and store it, or store none: no model, nothing
- * changed, ten or more changed shots, no time left, or a failed or malformed call each leave `ai_summary` null, so the page
- * says "skip: no judge" rather than show a summary of something else. `startedAt` is when the run
- * began: the call spends only what is left of its `DIFF_BUDGET_MS`. Without it (the page's
- * Regenerate) the call has its own timeout, and a failure keeps the summary already stored: nothing
- * was measured again, so it still describes the build. A default-branch build is accepted on
+ * changed, ten or more changed shots, or a failed or malformed call each leave `ai_summary` null, so the page
+ * says "skip: no judge" rather than show a summary of something else. The call has the whole
+ * `MODEL_TIMEOUT_MS`: it runs off the explain queue (ob 1875) or from the page's Regenerate, never in
+ * the finalise. A failure keeps what is stored: after a run that is nothing (`queueExplain` cleared
+ * it), and on Regenerate the summary still describes the build. A default-branch build is accepted on
  * finalise and reviewed by no one, so it is not summarised. Returns whether a summary was stored.
  * Never throws; a failure is logged without the key.
  */
 export async function summarizeBuild(
   deps: SummaryDeps,
   build: Build,
-  { startedAt }: { startedAt?: number } = {},
+  { queuedAt }: { queuedAt?: Date } = {},
 ): Promise<boolean> {
-  const now = deps.now ?? Date.now;
-  const timeoutMs =
-    startedAt === undefined
-      ? MODEL_TIMEOUT_MS
-      : Math.min(MODEL_TIMEOUT_MS, startedAt + DIFF_BUDGET_MS - now());
   try {
     const project = await projectOf(deps.db, build);
     if (build.branch === project.defaultBranch) return false;
-    const summary = await ask(deps, build, timeoutMs).catch((e: unknown) => {
+    const summary = await ask(deps, build).catch((e: unknown) => {
       warn(`build ${build.id}: the project's model made no summary: ${messageOf(e)}`);
       return null;
     });
-    if (!summary && startedAt === undefined) return false;
+    if (!summary) return false;
     // Only a build with a verdict is summarised: one that errored meanwhile is left for its next run.
     const [current] = await deps.db
       .select({ status: builds.status })
       .from(builds)
       .where(eq(builds.id, build.id));
     if (!current || !BUILD_VERDICTS.has(current.status)) return false;
-    await deps.db.update(builds).set({ aiSummary: summary }).where(eq(builds.id, build.id));
-    return summary !== null;
+    // From the queue, only against the queueing it claimed: a re-run since then queued it anew.
+    const stillClaimed = queuedAt ? eq(builds.aiSummaryQueuedAt, queuedAt) : undefined;
+    const written = await deps.db
+      .update(builds)
+      .set({ aiSummary: summary })
+      .where(and(eq(builds.id, build.id), stillClaimed))
+      .returning({ id: builds.id });
+    return written.length > 0;
   } catch (e) {
     warn(`build ${build.id}: the summary was not stored: ${messageOf(e)}`);
     return false;

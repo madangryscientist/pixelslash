@@ -37,8 +37,8 @@ export type ApiDeps = {
   minCliVersion?: string | undefined;
   /** The engine's diff for finalise; a test passes one that throws (ob 1727). */
   diff?: ProcessDeps["diff"];
-  /** The transport to a project's model after the diff (ob 1473); a test passes a stub. */
-  modelFetch?: ProcessDeps["modelFetch"];
+  /** Where a finalised build's changed shots go to be explained (ob 1875). */
+  explainQueue?: ProcessDeps["explainQueue"];
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
   modelKeySecret?: ProcessDeps["modelKeySecret"];
   /** Where a project made through the API diffs (ob 1787). */
@@ -108,9 +108,10 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // A kill by the runtime itself is not caught here; the build reads `processing` until it is older than
   // STALE_PROCESSING_MS, and a finalise sent again after that re-runs it (ob 1545). So does one sent
   // after `errored`.
+  // The model's explanations are not in it: they are queued once the verdict is written (ob 1875).
   const blobs = orgBlobs(ctx.store, orgId);
-  const { db, diff, modelFetch, modelKeySecret } = ctx;
-  const result = await processBuild({ db, blobs, diff, modelFetch, modelKeySecret }, done);
+  const { db, diff, explainQueue, modelKeySecret } = ctx;
+  const result = await processBuild({ db, blobs, diff, explainQueue, modelKeySecret }, done);
   return json({
     id: done.id,
     status: result.status,

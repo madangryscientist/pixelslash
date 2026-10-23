@@ -14,7 +14,7 @@ import { NoRecoveryError } from "#/diff/claim";
 import { saveAndRediff } from "#/diff/override";
 import { RerunError } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database, modelKeySecret } from "./env";
+import { blobStore, database, explainQueue, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
 
@@ -57,7 +57,7 @@ export const saveDiffOverride = createServerFn({ method: "POST" })
     const blobs = orgBlobs(blobStore(), project.orgId);
     try {
       return await saveAndRediff(
-        { db, blobs, modelKeySecret: modelKeySecret() },
+        { db, blobs, modelKeySecret: modelKeySecret(), explainQueue: explainQueue() },
         { userId: user.id, build, target, options: data.options },
       );
     } catch (error) {

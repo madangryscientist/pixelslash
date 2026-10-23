@@ -1,101 +1,31 @@
-import { Buffer } from "node:buffer";
 import { cropBox } from "@pixelslash/engine/region-crops";
 import { eq } from "drizzle-orm";
-import { PNG } from "pngjs";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";
-import { setProjectModel } from "#/db/models";
 import { reviewSnapshot } from "#/db/review";
 import { snapshots } from "#/db/schema";
-import { DIFF_BUDGET_MS } from "#/diff/budget";
 import { rerunShots } from "#/diff/rerun";
-import { type Ctx, context, onlyShot, sha, upload } from "#/diff/test-builds";
-import { TEST_MODEL_KEY_SECRET as SECRET } from "#/db/test-db";
+import { context, onlyShot, sha, upload, explaining } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
+import {
+  BASE_URL,
+  BOTTOM_RIGHT,
+  branchBuild,
+  H,
+  KEY,
+  pixel,
+  stubModel,
+  TOP_LEFT,
+  W,
+  white,
+  withModel,
+} from "./explain-test-kit";
 import type { ModelFetch } from "./model";
 
 /**
  * Explaining changed regions with the project's own model (ob 1473), against a stubbed
  * OpenAI-compatible endpoint: nothing here reaches a real one.
  */
-
-const W = 200;
-const H = 100;
-const TOP_LEFT = { x: 10, y: 10, w: 16, h: 12 };
-const BOTTOM_RIGHT = { x: 150, y: 60, w: 20, h: 20 };
-const white = shot({ width: W, height: H });
-const twoChanges = shot({
-  width: W,
-  height: H,
-  blocks: [
-    { ...TOP_LEFT, rgb: RED },
-    { ...BOTTOM_RIGHT, rgb: RED },
-  ],
-});
-
-// OpenCode Go, so every call names its build as its session (ob 1794).
-const BASE_URL = "https://opencode.ai/inference/go/openai/v1";
-const KEY = "sk-test-not-a-real-key";
-
-type Sent = { url: string; auth: string | null; model: string; images: PNG[] };
-
-/**
- * An OpenAI-compatible endpoint that records each region call and answers with `reply(call index)`.
- * The build's text-only summary call (ob 1668) is answered apart.
- */
-function stubModel(
-  reply: (n: number) => string | Error | Response = () => "LABEL noise\nWHY Edges moved.",
-) {
-  const sent: Sent[] = [];
-  const sessions: (string | null)[] = [];
-  const modelFetch: ModelFetch = async (input, init) => {
-    const body = typeof init.body === "string" ? init.body : "";
-    sessions.push(new Headers(init.headers).get("x-opencode-session"));
-    if (!body.includes("image_url")) {
-      const ref = /\\n(\[[CNR]\d+\])/.exec(body)?.[1] ?? "";
-      return Response.json({ choices: [{ message: { content: `Something moved. ${ref}` } }] });
-    }
-    const images = [...body.matchAll(/data:image\/png;base64,([A-Za-z0-9+/=]+)/g)].map(([, b64]) =>
-      PNG.sync.read(Buffer.from(b64 ?? "", "base64")),
-    );
-    sent.push({
-      url: input,
-      auth: new Headers(init.headers).get("authorization"),
-      model: /"model":"([^"]+)"/.exec(body)?.[1] ?? "",
-      images,
-    });
-    const answer = reply(sent.length - 1);
-    if (answer instanceof Error) throw answer;
-    if (answer instanceof Response) return answer;
-    return Response.json({ choices: [{ message: { role: "assistant", content: answer } }] });
-  };
-  return { sent, sessions, modelFetch };
-}
-
-async function withModel(ctx: Ctx, autoPassNoise: boolean) {
-  await setProjectModel(ctx.db, ctx.userId, ctx.projectId, {
-    baseUrl: BASE_URL,
-    model: "deepseek-flash",
-    apiKey: KEY,
-    autoPassNoise,
-    modelKeySecret: SECRET,
-  });
-}
-
-/** Main all white, then a branch build with two separate red blocks: two `change` regions. */
-async function branchBuild(ctx: Ctx, modelFetch: ModelFetch) {
-  await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
-  return upload(
-    ctx,
-    { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: twoChanges }] },
-    { modelFetch },
-  );
-}
-
-const pixel = (img: PNG, x: number, y: number) => {
-  const at = (y * img.width + x) * 4;
-  return [img.data[at], img.data[at + 1], img.data[at + 2]];
-};
 
 describe("explaining changed regions (ob 1473)", () => {
   test("one call per change region, each with that region's three crops only", async () => {
@@ -197,24 +127,6 @@ describe("explaining changed regions (ob 1473)", () => {
     expect(build.status).toBe("changes");
   });
 
-  test("a diff that used the run's budget leaves nothing for the model", async () => {
-    const ctx = await context();
-    await withModel(ctx, true);
-    const { sent, modelFetch } = stubModel();
-    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
-    // Each reading of the clock is a second later; the diff's reads are enough to spend the budget.
-    let t = 0;
-    const now = () => (t += DIFF_BUDGET_MS / 4);
-    const build = await upload(
-      ctx,
-      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: twoChanges }] },
-      { modelFetch, now },
-    );
-    expect(sent).toHaveLength(0);
-    expect((await onlyShot(ctx, build)).aiReview).toBeNull();
-    expect(build).toMatchObject({ status: "changes", error: null });
-  });
-
   test("one region that is not noise keeps the shot for a person, opted in or not", async () => {
     const ctx = await context();
     await withModel(ctx, true);
@@ -226,24 +138,6 @@ describe("explaining changed regions (ob 1473)", () => {
     expect(row.aiReview?.autoPassed).toBe(false);
     expect(row.reviewState).toBe("pending");
     expect(build.status).toBe("changes");
-  });
-
-  test("a failed call stores no explanation and the build still gets its verdict", async () => {
-    const ctx = await context();
-    await withModel(ctx, true);
-    const { sent, modelFetch } = stubModel(() => new Response("nope", { status: 401 }));
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const build = await branchBuild(ctx, modelFetch);
-    expect(sent).toHaveLength(2);
-    // One line per build says why, so a wrong key can be found; it never carries the key.
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]?.[0])).toContain("the model answered 401");
-    expect(String(warn.mock.calls[0]?.[0])).not.toContain(KEY);
-    warn.mockRestore();
-    const row = await onlyShot(ctx, build);
-    expect(row.aiReview).toBeNull();
-    expect(row.reviewState).toBe("pending");
-    expect(build).toMatchObject({ status: "changes", error: null });
   });
 
   test("an answer in the wrong shape is a failed call, not a made-up label", async () => {
@@ -327,10 +221,9 @@ describe("explaining changed regions (ob 1473)", () => {
     expect(row.aiReview).not.toBeNull();
 
     const again = stubModel();
-    await rerunShots(
-      { db: ctx.db, blobs: ctx.scoped, modelFetch: again.modelFetch, modelKeySecret: SECRET },
-      await getBuild(ctx.db, ctx.projectId, build.id),
-      row.id,
+    await explaining(
+      { db: ctx.db, blobs: ctx.scoped, modelFetch: again.modelFetch },
+      async (deps) => rerunShots(deps, await getBuild(ctx.db, ctx.projectId, build.id), row.id),
     );
     expect(again.sent).toHaveLength(0);
     expect((await onlyShot(ctx, build)).aiReview).toEqual(row.aiReview);
