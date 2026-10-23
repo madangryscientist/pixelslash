@@ -347,7 +347,7 @@
       "label": "Classifies renderer noise, does not fail on it",
       "ps": {
         "v": "y",
-        "note": "faint + uneven + both directions is noise; on the server, a project's own OpenAI-compatible model labels each changed region (intended, unintended, noise) with a sentence, and with Auto-pass noise on, a shot it labels all noise is accepted and listed as AI-filtered (ob 1473)",
+        "note": "faint + uneven + both directions is noise; on the server, a project's own (or its org's) OpenAI-compatible model labels each changed region (intended, unintended, noise) with a sentence, and with Auto-pass noise on, a shot it labels all noise is accepted and listed as AI-filtered (ob 1473, ob 1789)",
         "commit": "7fdb921"
       },
       "t": {
@@ -635,7 +635,7 @@
       "label": "AI judgement against a design system",
       "ps": {
         "v": "y",
-        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745); on the server, a project's own OpenAI-compatible model writes one summary of the build from its measurements and region notes, never its images, each sentence linking to the shots it names (ob 1668)",
+        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745); on the server, a project's own (or its org's) OpenAI-compatible model writes one summary of the build from its measurements and region notes, never its images, each sentence linking to the shots it names (ob 1668)",
         "commit": "b2149e9"
       },
       "t": {

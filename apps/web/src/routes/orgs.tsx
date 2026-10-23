@@ -1,18 +1,20 @@
-import { Link, createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ActionButton } from "#/components/action-button";
-import { Avatar } from "#/components/avatar";
 import { FieldDialog } from "#/components/dialog";
+import { ModelSettings } from "#/components/model-settings";
 import { MembersPanel } from "#/components/org-members";
 import { type OrgToken, OrgTokensPanel } from "#/components/org-tokens";
 import { EmptyOrg } from "#/components/org-empty";
-import { ProjectTable, WaitingStrip, plural } from "#/components/org-projects";
+import { ProjectTable, WaitingStrip } from "#/components/org-projects";
+import { type DialogKind, OrgHeader, OrgTabs, type Tab } from "#/components/org-tabs";
 import { OrgRail } from "#/components/org-rail";
 import { Page, useHydrated } from "#/components/ui";
+import type { ModelView } from "#/db/models";
 import type { OrgOverview } from "#/db/orgs";
 import { getOrgs, invite, newOrg, newProject, withdrawOrgInvite } from "#/server/fns";
 
-type OrgsSearch = { org?: string; tab?: "members" | "tokens" };
+type OrgsSearch = { org?: string; tab?: "members" | "tokens" | "model" };
 
 const rootRoute = getRouteApi("__root__");
 
@@ -20,17 +22,16 @@ export const Route = createFileRoute("/orgs")({
   validateSearch: (search: Record<string, unknown>): OrgsSearch => {
     const out: OrgsSearch = {};
     if (typeof search.org === "string" && search.org) out.org = search.org;
-    if (search.tab === "members" || search.tab === "tokens") out.tab = search.tab;
+    if (search.tab === "members" || search.tab === "tokens" || search.tab === "model")
+      out.tab = search.tab;
     return out;
   },
   loader: () => getOrgs(),
   component: Orgs,
 });
 
-type DialogKind = "project" | "org" | "invite";
-
 function Orgs() {
-  const { orgs, orgTokens, now, serverUrl } = Route.useLoaderData();
+  const { orgs, orgTokens, orgModels, now, serverUrl } = Route.useLoaderData();
   const search = Route.useSearch();
   const { viewer } = rootRoute.useLoaderData();
   const router = useRouter();
@@ -55,6 +56,7 @@ function Orgs() {
             <OrgPanel
               org={selected}
               tokens={orgTokens.filter((t) => t.orgId === selected.id)}
+              model={orgModels.find((m) => m.orgId === selected.id) ?? null}
               now={now}
               serverUrl={serverUrl}
               tab={search.tab ?? "projects"}
@@ -171,42 +173,6 @@ function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
   );
 }
 
-const TAB =
-  "-mb-px border-b-2 px-0.5 pb-2.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600";
-
-type Tab = "projects" | "members" | "tokens";
-
-function OrgTabs({ org, tab }: { org: OrgOverview; tab: Tab }) {
-  return (
-    <nav aria-label="Organization" className="mb-5 flex gap-6 border-b border-slate-200">
-      <Link
-        to="/orgs"
-        search={{ org: org.id }}
-        aria-current={tab === "projects" ? "page" : undefined}
-        className={`${TAB} ${tab === "projects" ? "border-violet-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-      >
-        Projects <span className="ml-1 text-slate-400">{org.projects.length}</span>
-      </Link>
-      <Link
-        to="/orgs"
-        search={{ org: org.id, tab: "members" }}
-        aria-current={tab === "members" ? "page" : undefined}
-        className={`${TAB} ${tab === "members" ? "border-violet-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-      >
-        Members <span className="ml-1 text-slate-400">{org.members.length}</span>
-      </Link>
-      <Link
-        to="/orgs"
-        search={{ org: org.id, tab: "tokens" }}
-        aria-current={tab === "tokens" ? "page" : undefined}
-        className={`${TAB} ${tab === "tokens" ? "border-violet-600 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-      >
-        Tokens
-      </Link>
-    </nav>
-  );
-}
-
 function ProjectsPanel({
   org,
   now,
@@ -240,6 +206,7 @@ function ProjectsPanel({
 function OrgPanel({
   org,
   tokens,
+  model,
   now,
   serverUrl,
   tab,
@@ -251,6 +218,7 @@ function OrgPanel({
 }: {
   org: OrgOverview;
   tokens: OrgToken[];
+  model: ModelView | null;
   now: Date;
   serverUrl: string;
   tab: Tab;
@@ -260,34 +228,20 @@ function OrgPanel({
   onInvite: (login: string) => Promise<unknown>;
   onWithdraw: (invite: OrgOverview["invites"][number]) => Promise<unknown>;
 }) {
-  const pending = org.invites.length;
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="text-2xl font-bold tracking-tight">{org.name}</h1>
-        <div className="flex items-center gap-3 text-sm text-slate-500">
-          <span className="flex" aria-hidden="true">
-            {org.members.slice(0, 4).map((member) => (
-              <Avatar key={member.userId} login={member.login} ring />
-            ))}
-          </span>
-          <span data-testid="org-people">
-            {plural(org.members.length, "member")}
-            {" · "}
-            {pending} {pending === 1 ? "invite" : "invites"} pending
-          </span>
-        </div>
-        <span className="flex-1" />
-        <ActionButton variant="outline" waiting={!hydrated} onClick={() => onDialog("invite")}>
-          Invite
-        </ActionButton>
-        <ActionButton waiting={!hydrated} onClick={() => onDialog("project")}>
-          + New project
-        </ActionButton>
-      </div>
+      <OrgHeader org={org} hydrated={hydrated} onDialog={onDialog} />
       <OrgTabs org={org} tab={tab} />
       {tab === "tokens" && (
         <OrgTokensPanel orgId={org.id} orgName={org.name} tokens={tokens} hydrated={hydrated} />
+      )}
+      {tab === "model" && (
+        <ModelSettings
+          key={org.id}
+          scope={{ kind: "org", orgId: org.id }}
+          saved={model}
+          hydrated={hydrated}
+        />
       )}
       {tab === "members" && (
         <MembersPanel

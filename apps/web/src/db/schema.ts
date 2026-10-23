@@ -118,6 +118,22 @@ export const projectModels = sqliteTable("project_models", {
   createdAt: createdAt(),
 });
 
+/**
+ * An org's own model (ob 1789): the same settings as `project_models`, used by every project of the
+ * org that has no row of its own. The key is sealed exactly as the project's is (ob 1786), and only
+ * `src/db/models.ts` reads it.
+ */
+export const orgModels = sqliteTable("org_models", {
+  orgId: text("org_id")
+    .primaryKey()
+    .references(() => orgs.id, { onDelete: "cascade" }),
+  baseUrl: text("base_url").notNull(),
+  model: text("model").notNull(),
+  apiKey: text("api_key").notNull(),
+  autoPassNoise: integer("auto_pass_noise", { mode: "boolean" }).notNull().default(false),
+  createdAt: createdAt(),
+});
+
 /** A CI token is shown once at issue; only its SHA-256 and a display prefix are stored. */
 export const ciTokens = sqliteTable(
   "ci_tokens",

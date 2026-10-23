@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { summarizeBuild } from "#/ai/summary";
 import { getBuild } from "#/db/builds";
-import { clearProjectModel, setProjectModel } from "#/db/models";
+import { clearOrgModel, clearProjectModel, setOrgModel, setProjectModel } from "#/db/models";
 import { getProjectWithOrg } from "#/db/orgs";
 import { database, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
@@ -15,15 +15,19 @@ function optionalText(input: unknown, key: string): string {
   return text;
 }
 
-/** The project's own vision model (ob 1473). The key is written here and never read back. */
-export const saveProjectModel = createServerFn({ method: "POST" })
-  .validator((d: unknown) => ({
-    projectId: field(d, "projectId"),
+/** The settings fields of a model form, shared by a project's and an org's. */
+function modelInput(d: unknown) {
+  return {
     baseUrl: optionalText(d, "baseUrl"),
     model: field(d, "model"),
     apiKey: optionalText(d, "apiKey"),
     autoPassNoise: typeof d === "object" && d !== null && Reflect.get(d, "autoPassNoise") === true,
-  }))
+  };
+}
+
+/** The project's own vision model (ob 1473). The key is written here and never read back. */
+export const saveProjectModel = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({ projectId: field(d, "projectId"), ...modelInput(d) }))
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const { projectId, ...settings } = data;
@@ -40,6 +44,24 @@ export const removeProjectModel = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     await or404(clearProjectModel(database(), user.id, data.projectId));
+  });
+
+/** The org's model (ob 1789), used by its projects that have none of their own. Same write-only key. */
+export const saveOrgModel = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({ orgId: field(d, "orgId"), ...modelInput(d) }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    const { orgId, ...settings } = data;
+    await or404(
+      setOrgModel(database(), user.id, orgId, { ...settings, modelKeySecret: modelKeySecret() }),
+    );
+  });
+
+export const removeOrgModel = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({ orgId: field(d, "orgId") }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(clearOrgModel(database(), user.id, data.orgId));
   });
 
 /**

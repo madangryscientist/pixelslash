@@ -90,7 +90,13 @@ function ProjectSettings() {
         trail={overrides.boxTrail}
         hydrated={hydrated}
       />
-      <ModelSettings projectId={project.id} saved={model} hydrated={hydrated} />
+      <ModelSettings
+        scope={{ kind: "project", projectId: project.id }}
+        saved={model.source === "project" ? model.model : null}
+        source={model}
+        orgSettingsHref={`/orgs?org=${org.id}&tab=model`}
+        hydrated={hydrated}
+      />
       <UploadCommand serverUrl={serverUrl} hydrated={hydrated} />
     </Page>
   );

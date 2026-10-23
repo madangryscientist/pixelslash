@@ -260,15 +260,17 @@ The honesty rules are the same as the report's:
 4. **Local unless told to upload.** Without `--upload`, page shots never leave
    the machine. With it, they go only to the server the project is configured
    for (ours or self-hosted) and nowhere else. The one exception is opt-in per
-   project: when a project's settings name its own AI model (an
-   OpenAI-compatible endpoint), the server sends that endpoint the three crops
+   project: when a project's settings (or, for a project without its own, its
+   org's) name an AI model (an OpenAI-compatible endpoint), the server sends
+   that endpoint the three crops
    of each `change` region (baseline, branch and diff, cut to the region plus
    16 px) and, for the build summary, text only (shot names, counts and those
    region notes). It never sends a whole shot, and no other server-side call
    carries pixels. Tokens (Figma, CI upload) come from env or a token file,
    never git; a project's model key is entered in its settings and stored by
    the server. *Amended 2026-10-19: was "Local only"; the hosted review app
-   needs uploads. Amended 2026-10-23: the project's own model (ob 1473, 1668).*
+   needs uploads. Amended 2026-10-23: the project's own model (ob 1473, 1668);
+   a project without one uses its org's (ob 1789).*
 5. **The local pair mode does not start a dev server.** `--live` / `--local`
    URLs must already be up; a down URL fails. *Amended 2026-10-19: the pinned
    capture image may start the app from a command named in its config.*

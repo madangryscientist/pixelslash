@@ -2,26 +2,79 @@ import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { Body, Input, SectionHeading } from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
-import type { ProjectModelView } from "#/db/models";
-import { removeProjectModel, saveProjectModel } from "#/server/model";
+import type { ModelView, ModelSource } from "#/db/models";
+import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
 
 /** The documented example; any OpenAI-compatible endpoint works. */
 const EXAMPLE = { baseUrl: "https://api.deepseek.com", model: "deepseek-flash" };
 
+/** Whose model the form sets: a project's own (ob 1473), or the org's, which its projects share (ob 1789). */
+export type ModelScope = { kind: "project"; projectId: string } | { kind: "org"; orgId: string };
+
 /**
- * The project's own vision model (ob 1473): each changed region of a branch build is sent to it as
- * three crops, and its label and sentence are shown with the region. The key is write-only: once
- * saved, the page shows that one is set, never the key.
+ * A vision model: each changed region of a branch build is sent to it as three crops, and its label
+ * and sentence are shown with the region. The key is write-only: once saved, the page shows that one
+ * is set, never the key. A project's form also says which model applies to it.
  */
 export function ModelSettings({
-  projectId,
+  scope,
   saved,
+  source,
+  orgSettingsHref,
   hydrated,
 }: {
-  projectId: string;
-  saved: ProjectModelView | null;
+  scope: ModelScope;
+  saved: ModelView | null;
+  /** The project form's resolution: its own model, the org's, or none. */
+  source?: ModelSource;
+  orgSettingsHref?: string;
   hydrated: boolean;
 }) {
+  const project = scope.kind === "project";
+  const { fields, setFields, busy, error, save, remove } = useModelForm(scope, saved);
+
+  return (
+    <section
+      className={`${project ? "mt-6 " : ""}rounded-xl border border-slate-200 bg-white p-6`}
+      data-testid="model-settings"
+    >
+      <SectionHeading className="mb-1.5">AI explanations</SectionHeading>
+      {source && <ModelInUse source={source} orgSettingsHref={orgSettingsHref} />}
+      <Body as="p" className="mb-4">
+        Any OpenAI-compatible vision endpoint. For each changed region of a branch build, the server
+        sends that region&apos;s baseline, new and diff crops to this model only, and shows its
+        label (intended, unintended or noise) and one sentence next to the region. With no model, or
+        when a call fails, the shot is reviewed as plain pixels. Nothing is sent until this is
+        saved.
+      </Body>
+      <form onSubmit={save} className="grid gap-3 text-sm sm:grid-cols-2">
+        <ModelFields
+          fields={fields}
+          setFields={setFields}
+          keySet={!!saved}
+          hydrated={hydrated}
+          owner={project ? "project" : "org"}
+        />
+        <ModelActions
+          fields={fields}
+          saved={saved}
+          busy={busy}
+          hydrated={hydrated}
+          onRemove={remove}
+          label={removeLabel(scope, source)}
+        />
+        {error && (
+          <p role="alert" className="text-sm text-red-700 sm:col-span-2">
+            {error}
+          </p>
+        )}
+      </form>
+    </section>
+  );
+}
+
+/** The form's state and its two writes, to the project's or the org's server functions. */
+function useModelForm(scope: ModelScope, saved: ModelView | null) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>({
     baseUrl: saved?.baseUrl ?? "",
@@ -47,39 +100,55 @@ export function ModelSettings({
   };
   const save = (event: FormEvent) => {
     event.preventDefault();
-    void run("save", () => saveProjectModel({ data: { projectId, ...fields } }));
+    void run("save", () =>
+      scope.kind === "project"
+        ? saveProjectModel({ data: { projectId: scope.projectId, ...fields } })
+        : saveOrgModel({ data: { orgId: scope.orgId, ...fields } }),
+    );
   };
-  const remove = () => void run("remove", () => removeProjectModel({ data: { projectId } }));
+  const remove = () =>
+    void run("remove", () =>
+      scope.kind === "project"
+        ? removeProjectModel({ data: { projectId: scope.projectId } })
+        : removeOrgModel({ data: { orgId: scope.orgId } }),
+    );
+  return { fields, setFields, busy, error, save, remove };
+}
 
+/** The remove button's words: a project with an org model behind it falls back to that model. */
+function removeLabel(scope: ModelScope, source: ModelSource | undefined): string {
+  if (scope.kind === "project" && source?.org) return "Use the org's model instead";
+  return "Remove model and key";
+}
+
+/** Which model this project's builds use, and why: the answer a settings page owes (ob 1789). */
+function ModelInUse({
+  source,
+  orgSettingsHref,
+}: {
+  source: ModelSource;
+  orgSettingsHref: string | undefined;
+}) {
+  const orgLink = orgSettingsHref ? (
+    <a href={orgSettingsHref} className="underline">
+      org settings
+    </a>
+  ) : (
+    "org settings"
+  );
   return (
-    <section
-      className="mt-6 rounded-xl border border-slate-200 bg-white p-6"
-      data-testid="model-settings"
-    >
-      <SectionHeading className="mb-1.5">AI explanations</SectionHeading>
-      <Body as="p" className="mb-4">
-        Any OpenAI-compatible vision endpoint. For each changed region of a branch build, the server
-        sends that region&apos;s baseline, new and diff crops to this model only, and shows its
-        label (intended, unintended or noise) and one sentence next to the region. With no model, or
-        when a call fails, the shot is reviewed as plain pixels. Nothing is sent until this is
-        saved.
-      </Body>
-      <form onSubmit={save} className="grid gap-3 text-sm sm:grid-cols-2">
-        <ModelFields fields={fields} setFields={setFields} keySet={!!saved} hydrated={hydrated} />
-        <ModelActions
-          fields={fields}
-          saved={saved}
-          busy={busy}
-          hydrated={hydrated}
-          onRemove={remove}
-        />
-        {error && (
-          <p role="alert" className="text-sm text-red-700 sm:col-span-2">
-            {error}
-          </p>
-        )}
-      </form>
-    </section>
+    <p className="mb-3 text-sm font-medium" data-testid="model-in-use" data-source={source.source}>
+      {source.source === "org" && (
+        <>
+          Using the org&apos;s model ({source.model.model}). Set a model below to override it for
+          this project; change the org&apos;s in its {orgLink}.
+        </>
+      )}
+      {source.source === "project" && "This project's model"}
+      {source.source === "none" && (
+        <>No model. Set one below, or once for every project in its {orgLink}.</>
+      )}
+    </p>
   );
 }
 
@@ -90,11 +159,13 @@ function ModelFields({
   setFields,
   keySet,
   hydrated,
+  owner,
 }: {
   fields: Fields;
   setFields: (update: (f: Fields) => Fields) => void;
   keySet: boolean;
   hydrated: boolean;
+  owner: "project" | "org";
 }) {
   const set = (patch: Partial<Fields>) => setFields((f) => ({ ...f, ...patch }));
   return (
@@ -140,7 +211,7 @@ function ModelFields({
           className="mt-0.5 w-full px-3"
         />
         <span className="block text-xs text-slate-500">
-          Stored for this project and never shown again. A new base URL needs its key again.
+          Stored for this {owner} and never shown again. A new base URL needs its key again.
         </span>
       </label>
       <label className="flex items-start gap-2 sm:col-span-2">
@@ -170,12 +241,14 @@ function ModelActions({
   busy,
   hydrated,
   onRemove,
+  label,
 }: {
   fields: Fields;
-  saved: ProjectModelView | null;
+  saved: ModelView | null;
   busy: "save" | "remove" | null;
   hydrated: boolean;
   onRemove: () => void;
+  label: string;
 }) {
   const missing =
     !fields.baseUrl.trim() || !fields.model.trim() || (!saved && !fields.apiKey.trim());
@@ -203,7 +276,7 @@ function ModelActions({
             className="text-red-700!"
             data-testid="model-remove"
           >
-            Remove model and key
+            {label}
           </ActionButton>
           <span className="text-xs text-slate-500" data-testid="model-key-set">
             Key set for {saved.baseUrl}

@@ -5,7 +5,7 @@ import { snapshotDiffOptions } from "#/db/builds";
 import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
 import { isMarker } from "#/db/markers";
-import { projectModelView } from "#/db/models";
+import { listOrgModelViews, projectModelSource } from "#/db/models";
 import { settingsOverrides, snapshotIgnoreBoxes, snapshotOverrides } from "#/db/override-export";
 import { uploadedIgnoreSource } from "#/db/ignore-boxes";
 import { overrideChanges } from "#/db/overrides";
@@ -85,7 +85,8 @@ export const getOrgs = createServerFn().handler(async () => {
   const db = database();
   const orgs = await listOrgs(db, user.id);
   const orgTokens = await listOrgTokens(db, user.id);
-  return { orgs, orgTokens, now: new Date(), serverUrl: getRequestUrl().origin };
+  const orgModels = await listOrgModelViews(db, user.id);
+  return { orgs, orgTokens, orgModels, now: new Date(), serverUrl: getRequestUrl().origin };
 });
 
 export const newOrg = createServerFn({ method: "POST" })
@@ -131,7 +132,7 @@ export const getProjectSettings = createServerFn()
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const tokens = await listCiTokens(db, user.id, project.id);
     const overrides = await settingsOverrides(db, user.id, project.id);
-    const model = await projectModelView(db, user.id, project.id);
+    const model = await projectModelSource(db, user.id, project.id);
     return { org, project, tokens, overrides, model, serverUrl: getRequestUrl().origin };
   });
 
@@ -205,7 +206,7 @@ export const getBuildPage = createServerFn()
     /** Review-UI threshold changes to this build's tests (ob 1495), newest first. */
     const names = [...new Set(view.snapshots.map((shot) => shot.name))];
     const thresholdChanges = await overrideChanges(db, user.id, project.id, names);
-    const modelConfigured = (await projectModelView(db, user.id, project.id)) !== null;
+    const modelConfigured = (await projectModelSource(db, user.id, project.id)).source !== "none";
     return { org, project, ...view, thumbs, firstBuild, thresholdChanges, modelConfigured };
   });
 
