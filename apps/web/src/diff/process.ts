@@ -34,6 +34,7 @@ import {
 } from "./build-writes";
 import { withOverrides } from "./with-overrides";
 import { explainBuild } from "#/ai/explain";
+import { summarizeBuild } from "#/ai/summary";
 import type { ModelFetch } from "#/ai/model";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
@@ -378,9 +379,12 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
     // After the verdict, so a run the Worker stops while the model is asked has already given one.
-    if ((await explainBuild(deps, build, { startedAt })) === 0)
-      return { status, error: null, unmeasured: 0 };
-    return { status: await refreshBuildStatus(deps.db, build.id), error: null, unmeasured: 0 };
+    const passed = await explainBuild(deps, build, { startedAt });
+    const final = passed === 0 ? status : await refreshBuildStatus(deps.db, build.id);
+    // Text for the reviewer (ob 1668), last: the verdict is written before the call, and it never
+    // throws, so a stopped call or a failed write cannot change the verdict or mark the build errored.
+    await summarizeBuild(deps, build, { startedAt });
+    return { status: final, error: null, unmeasured: 0 };
   } catch (e) {
     await markErrored(deps.db, build, e);
     // The ceiling's count includes shots a changed baseline sends back to be measured again, which

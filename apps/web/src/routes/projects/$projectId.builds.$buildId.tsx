@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
+import { BuildSummary } from "#/components/build-summary";
 import { TabBody, Tabs } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { BuildOverrideChanges } from "#/components/override-trail";
@@ -20,8 +21,28 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId")({
   component: BuildPage,
 });
 
+type Loaded = ReturnType<typeof Route.useLoaderData>;
+
+/** Why the build has no verdict, and how to measure it again. */
+function BuildError({ project, build }: Pick<Loaded, "project" | "build">) {
+  if (!build.error) return null;
+  return (
+    <div role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+      {build.error}
+      {project.diffLocation === "ci" && build.status === "errored" && (
+        <span data-testid="rerun-ci" className="mt-1 block font-medium">
+          This project diffs in CI, so the server cannot measure it again: re-run the CI job.
+        </span>
+      )}
+      {project.diffLocation === "server" && build.status === "errored" && (
+        <RerunErrored projectId={project.id} buildId={build.id} />
+      )}
+    </div>
+  );
+}
+
 function BuildPage() {
-  const { project, org, build, snapshots, thumbs, firstBuild, thresholdChanges } =
+  const { project, org, build, snapshots, thumbs, firstBuild, thresholdChanges, modelConfigured } =
     Route.useLoaderData();
   const search = Route.useSearch();
   const router = useRouter();
@@ -57,20 +78,17 @@ function BuildPage() {
         reviewable={reviewable}
         onAccept={acceptAll}
         baseline={baseline}
-      />
-      {build.error && (
-        <div role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
-          {build.error}
-          {project.diffLocation === "ci" && build.status === "errored" && (
-            <span data-testid="rerun-ci" className="mt-1 block font-medium">
-              This project diffs in CI, so the server cannot measure it again: re-run the CI job.
-            </span>
-          )}
-          {project.diffLocation === "server" && build.status === "errored" && (
-            <RerunErrored projectId={project.id} buildId={build.id} />
-          )}
-        </div>
-      )}
+      >
+        {build.branch !== project.defaultBranch && (
+          <BuildSummary
+            projectId={project.id}
+            build={build}
+            snapshots={snapshots}
+            modelConfigured={modelConfigured}
+          />
+        )}
+      </BuildHeader>
+      <BuildError project={project} build={build} />
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm">
           {error}

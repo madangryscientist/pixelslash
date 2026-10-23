@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
+import { summarizeBuild } from "#/ai/summary";
+import { getBuild } from "#/db/builds";
 import { clearProjectModel, setProjectModel } from "#/db/models";
+import { getProjectWithOrg } from "#/db/orgs";
 import { database } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
@@ -32,4 +35,20 @@ export const removeProjectModel = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     await or404(clearProjectModel(database(), user.id, data.projectId));
+  });
+
+/**
+ * The build page's Regenerate (ob 1668): summarise the build again with the project's model. A
+ * build still being measured has no summary to make; a failed call keeps the one stored.
+ */
+export const regenerateBuildSummary = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({ projectId: field(d, "projectId"), buildId: field(d, "buildId") }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    const db = database();
+    const { project } = await or404(getProjectWithOrg(db, user.id, data.projectId));
+    const build = await or404(getBuild(db, project.id, data.buildId));
+    if (build.status !== "changes" && build.status !== "passed" && build.status !== "failed")
+      throw new Error(`build is ${build.status}: it has no verdict to summarise yet`);
+    return { stored: await summarizeBuild({ db }, build) };
   });

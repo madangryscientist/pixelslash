@@ -203,7 +203,8 @@ export const getBuildPage = createServerFn()
     /** Review-UI threshold changes to this build's tests (ob 1495), newest first. */
     const names = [...new Set(view.snapshots.map((shot) => shot.name))];
     const thresholdChanges = await overrideChanges(db, user.id, project.id, names);
-    return { org, project, ...view, thumbs, firstBuild, thresholdChanges };
+    const modelConfigured = (await projectModelView(db, user.id, project.id)) !== null;
+    return { org, project, ...view, thumbs, firstBuild, thresholdChanges, modelConfigured };
   });
 
 export const getSnapshotPage = createServerFn()

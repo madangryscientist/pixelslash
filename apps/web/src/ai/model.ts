@@ -46,7 +46,7 @@ export class ModelError extends Error {
 }
 
 const image = (png: Uint8Array) => ({
-  type: "image_url",
+  type: "image_url" as const,
   image_url: { url: `data:image/png;base64,${Buffer.from(png).toString("base64")}` },
 });
 
@@ -85,17 +85,19 @@ function contentOf(body: unknown): string {
   return content;
 }
 
+/** One part of a chat message: text, or an image as a data URL. */
+type Part = { type: "text"; text: string } | ReturnType<typeof image>;
+
 /**
- * Ask the model about one region: one call, three images. Throws on any failure (network, status,
- * timeout, an answer in the wrong shape); the caller stores nothing for that region. The key goes
- * only in the Authorization header, and no error message carries it.
+ * One chat-completions call with one user message; the reply's text. Throws ModelError on any
+ * failure (network, status, timeout, no content). The key goes only in the Authorization header,
+ * and no error message carries it.
  */
-export async function explainRegion(
+export async function complete(
   endpoint: ModelEndpoint,
-  images: RegionImages,
-  fetcher: ModelFetch = fetch,
-  timeoutMs = MODEL_TIMEOUT_MS,
-): Promise<RegionAnswer> {
+  content: Part[],
+  { fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS, maxTokens = 200 }: CallOptions = {},
+): Promise<string> {
   let res: Response;
   try {
     res = await fetcher(`${endpoint.baseUrl}/chat/completions`, {
@@ -107,18 +109,8 @@ export async function explainRegion(
       body: JSON.stringify({
         model: endpoint.model,
         temperature: 0,
-        max_tokens: 200,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: REGION_PROMPT },
-              image(images.main),
-              image(images.branch),
-              image(images.diff),
-            ],
-          },
-        ],
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content }],
       }),
       signal: AbortSignal.timeout(Math.min(timeoutMs, MODEL_TIMEOUT_MS)),
     });
@@ -126,5 +118,34 @@ export async function explainRegion(
     throw new ModelError(`the model did not answer: ${e instanceof Error ? e.name : "error"}`);
   }
   if (!res.ok) throw new ModelError(`the model answered ${res.status}`);
-  return parseRegionAnswer(contentOf(await res.json().catch(() => null)));
+  return contentOf(await res.json().catch(() => null));
+}
+
+type CallOptions = {
+  fetcher?: ModelFetch | undefined;
+  timeoutMs?: number | undefined;
+  maxTokens?: number | undefined;
+};
+
+/**
+ * Ask the model about one region: one call, three images. Throws on any failure (see `complete`) or
+ * an answer in the wrong shape; the caller stores nothing for that region.
+ */
+export async function explainRegion(
+  endpoint: ModelEndpoint,
+  images: RegionImages,
+  fetcher: ModelFetch = fetch,
+  timeoutMs = MODEL_TIMEOUT_MS,
+): Promise<RegionAnswer> {
+  const raw = await complete(
+    endpoint,
+    [
+      { type: "text", text: REGION_PROMPT },
+      image(images.main),
+      image(images.branch),
+      image(images.diff),
+    ],
+    { fetcher, timeoutMs },
+  );
+  return parseRegionAnswer(raw);
 }

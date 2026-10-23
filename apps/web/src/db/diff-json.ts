@@ -109,3 +109,17 @@ export type AiReview = {
   /** The project opted in and every `change` region was labelled noise: accepted without a reviewer. */
   autoPassed: boolean;
 };
+
+/** One sentence of a build's summary and the shots it describes, for links. */
+export type AiSummarySentence = { text: string; shots: string[] };
+
+/**
+ * The project model's summary of a build (ob 1668): written from the stored measurements and region
+ * notes, never from the images. It is text for the reviewer and decides nothing.
+ */
+export type AiSummary = {
+  model: string;
+  /** Epoch ms of the summary. */
+  at: number;
+  sentences: AiSummarySentence[];
+};

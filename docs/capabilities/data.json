@@ -635,7 +635,7 @@
       "label": "AI judgement against a design system",
       "ps": {
         "v": "y",
-        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745)",
+        "note": "local mlx or ollama, DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745); on the server, a project's own OpenAI-compatible model writes one summary of the build from its measurements and region notes, never its images, each sentence linking to the shots it names (ob 1668)",
         "commit": "42fce7b"
       },
       "t": {

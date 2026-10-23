@@ -86,6 +86,9 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
   return build;
 }
 
+/** A test that names no model transport reaches none: the call fails instead of going out. */
+const noModel: ModelFetch = () => Promise.reject(new Error("no model transport in this test"));
+
 /**
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
@@ -111,7 +114,7 @@ export async function upload(
   } = {},
 ): Promise<Build> {
   const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
-  await processBuild({ db, blobs, now, diff, modelFetch }, done);
+  await processBuild({ db, blobs, now, diff, modelFetch: modelFetch ?? noModel }, done);
   return getBuild(ctx.db, ctx.projectId, done.id);
 }
 

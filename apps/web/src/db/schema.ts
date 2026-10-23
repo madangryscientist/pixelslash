@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 import type {
   AiReview,
+  AiSummary,
   DiffOptions,
   DiffRegion,
   DiffResult,
@@ -195,24 +196,14 @@ export const builds = sqliteTable(
      * cannot write `errored`, so this is how a `processing` build is told from a dead one.
      */
     processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
+    /** The project model's summary of what changed (ob 1668); null when none was made. Text only. */
+    aiSummary: text("ai_summary", { mode: "json" }).$type<AiSummary>(),
     createdAt: createdAt(),
   },
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],
 );
 
-export type {
-  AiLabel,
-  AiRegionNote,
-  AiReview,
-  DiffOptions,
-  DiffRegion,
-  DiffResult,
-  IgnoreRect,
-  OptionSource,
-  RegionKind,
-  ResolvedDiff,
-  UiIgnoreBox,
-} from "./diff-json";
+export type * from "./diff-json";
 export { AI_LABELS } from "./diff-json";
 
 export const DIFF_STATUSES = ["changed", "new", "removed", "unchanged"] as const;

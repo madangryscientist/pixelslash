@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button, buttonClass } from "@hackcove/ui";
 import { StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
@@ -98,6 +98,7 @@ export function BuildHeader({
   reviewable,
   onAccept,
   baseline,
+  children,
 }: {
   projectId: string;
   defaultBranch: string;
@@ -108,6 +109,8 @@ export function BuildHeader({
   onAccept: () => Promise<void>;
   /** The project's first build: it sets the baseline, so there is nothing to review or accept. */
   baseline: boolean;
+  /** Shown last in the header: the build's AI summary (ob 1668). */
+  children?: ReactNode;
 }) {
   const skipped = snapshots.filter(skippedFlaky).length;
   const changed = snapshots.filter((shot) => holdsChange(shot) && !skippedFlaky(shot));
@@ -166,6 +169,7 @@ export function BuildHeader({
           </div>
         </div>
       )}
+      {children}
     </header>
   );
 }

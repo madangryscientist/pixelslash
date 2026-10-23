@@ -37,13 +37,22 @@ const KEY = "sk-test-not-a-real-key";
 
 type Sent = { url: string; auth: string | null; model: string; images: PNG[] };
 
-/** An OpenAI-compatible endpoint that records each call and answers with `reply(call index)`. */
+/**
+ * An OpenAI-compatible endpoint that records each region call and answers with `reply(call index)`.
+ * The build's text-only summary call (ob 1668) is answered apart and counted in `summaries`.
+ */
 function stubModel(
   reply: (n: number) => string | Error | Response = () => "LABEL noise\nWHY Edges moved.",
 ) {
   const sent: Sent[] = [];
+  const summaries: string[] = [];
   const modelFetch: ModelFetch = async (input, init) => {
     const body = typeof init.body === "string" ? init.body : "";
+    if (!body.includes("image_url")) {
+      summaries.push(body);
+      const ref = /\\n(\[[CNR]\d+\])/.exec(body)?.[1] ?? "";
+      return Response.json({ choices: [{ message: { content: `Something moved. ${ref}` } }] });
+    }
     const images = [...body.matchAll(/data:image\/png;base64,([A-Za-z0-9+/=]+)/g)].map(([, b64]) =>
       PNG.sync.read(Buffer.from(b64 ?? "", "base64")),
     );
@@ -59,7 +68,7 @@ function stubModel(
     if (answer instanceof Response) return answer;
     return Response.json({ choices: [{ message: { role: "assistant", content: answer } }] });
   };
-  return { sent, modelFetch };
+  return { sent, summaries, modelFetch };
 }
 
 async function withModel(ctx: Ctx, autoPassNoise: boolean) {
@@ -284,7 +293,7 @@ describe("explaining changed regions (ob 1473)", () => {
     let decided = false;
     const { modelFetch: answer } = stubModel();
     const modelFetch: ModelFetch = async (input, init) => {
-      if (!decided) {
+      if (!decided && typeof init.body === "string" && init.body.includes("image_url")) {
         decided = true;
         const [row] = await ctx.db
           .select()

@@ -11,6 +11,7 @@ import type { SnapshotRow } from "./compare";
 import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
 import { explainBuild } from "#/ai/explain";
+import { summarizeBuild } from "#/ai/summary";
 import { runStart } from "./budget";
 
 /**
@@ -165,9 +166,12 @@ export async function rediffShots(
     await measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines);
     await settleReviews(deps.db, { build, project }, targets);
     const status = await refreshBuildStatus(deps.db, build.id);
-    if ((await explainBuild(deps, build, { startedAt, only: ids })) === 0)
-      return { status, error: null, unmeasured: 0 };
-    return { status: await refreshBuildStatus(deps.db, build.id), error: null, unmeasured: 0 };
+    const passed = await explainBuild(deps, build, { startedAt, only: ids });
+    const final = passed === 0 ? status : await refreshBuildStatus(deps.db, build.id);
+    // Text for the reviewer (ob 1668), last: the verdict is written before the call, and it never
+    // throws, so a stopped call or a failed write cannot change the verdict or mark the build errored.
+    await summarizeBuild(deps, build, { startedAt });
+    return { status: final, error: null, unmeasured: 0 };
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await reopenReviews(deps.db, ids);
