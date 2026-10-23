@@ -11,9 +11,11 @@ import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
 import { refreshBuildStatus } from "#/db/review";
 import { snapshots } from "#/db/schema";
+import { recordRun, runFields } from "#/db/server-timings";
 import type { BlobStore } from "#/storage/blobs";
 import { CiResultError } from "./ci-result";
 import { NoRecoveryError, claim, dead } from "./claim";
+import { RunTimer } from "./run-timer";
 import {
   type Comparer,
   type Measured,
@@ -357,6 +359,10 @@ async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<Process
  *
  * The verdict write is inside the try (ob 1561): a status write that throws must end the build at
  * `errored` with the reason, never leave it looking like it is still being measured.
+ *
+ * The run times itself (ob 1792): the verdict, or the error, stores when the run ended, how long it
+ * waited and how long the diff took, before the explanations are queued, so the queue's own timings
+ * are written after these and never over them.
  */
 export async function processBuild(deps: ProcessDeps, build: Build): Promise<ProcessResult> {
   if (build.status !== "processing" && build.status !== "errored")
@@ -364,7 +370,9 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
   const project = await projectOf(deps.db, build);
   const ci = project.diffLocation === "ci";
   if (ci && build.status === "errored") throw new NoRecoveryError();
-  if (!(await claim(deps.db, build, ci))) return heldElsewhere(deps.db, build, ci);
+  const timer = new RunTimer(deps.now ?? Date.now, build, build.processingStartedAt !== null);
+  if (!(await claim(deps.db, build, { ci, startedAt: timer.startedAt })))
+    return heldElsewhere(deps.db, build, ci);
   try {
     await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
@@ -373,16 +381,17 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
       build,
       new Set(rows.map(snapshotKeyOf)),
     );
-    await measureAll(deps, { build, project }, rows, baselines);
+    await timer.diff(() => measureAll(deps, { build, project }, rows, baselines));
     await markRemoved(deps, build, baselines.removed);
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
+    await recordRun(deps.db, build.id, timer.ended());
     // After the verdict, and off the request (ob 1875): the model explains each shot, then writes
     // the summary (ob 1668), from the queue. It never throws, so it cannot mark the build errored.
     await queueExplain(deps, build);
     return { status, error: null, unmeasured: 0 };
   } catch (e) {
-    await markErrored(deps.db, build, e);
+    await markErrored(deps.db, build, e, runFields(timer.ended()));
     // The ceiling's count includes shots a changed baseline sends back to be measured again, which
     // a count of rows with no result would miss.
     const unmeasured = e instanceof DiffCeilingError ? e.unmeasured : 0;

@@ -10,6 +10,7 @@ import type {
   IgnoreRect,
   ResolvedDiff,
 } from "./diff-json";
+import { serverTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
 
 export const createdAt = () =>
@@ -207,6 +208,8 @@ export const builds = sqliteTable(
     aiSummaryClaimedAt: integer("ai_summary_claimed_at", { mode: "timestamp_ms" }),
     /** The CLI's step timings, sent at finalize (ob 1791); null when the client sent none. */
     timings: text("timings", { mode: "json" }).$type<BuildTimings>(),
+    /** How long the server's own steps took (ob 1792). */
+    ...serverTimingColumns,
     createdAt: createdAt(),
   },
   (t) => [index("builds_project_idx").on(t.projectId, t.createdAt)],

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatDay, formatRelative } from "./format";
+import { formatDay, formatDuration, formatRelative } from "./format";
 
 const now = new Date("2026-10-21T12:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -24,4 +24,12 @@ describe("formatRelative", () => {
 
 test("formatDay is the UTC day and month", () => {
   expect(formatDay(new Date("2026-10-19T23:59:00Z"))).toBe("19 Oct");
+});
+
+test("formatDuration reads in the unit a person thinks in", () => {
+  expect(formatDuration(0)).toBe("0 ms");
+  expect(formatDuration(840.4)).toBe("840 ms");
+  expect(formatDuration(1_240)).toBe("1.2 s");
+  expect(formatDuration(18_400)).toBe("18 s");
+  expect(formatDuration(75_000)).toBe("1 min 15 s");
 });

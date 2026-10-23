@@ -6,10 +6,12 @@ import type { Build } from "#/db/builds";
 import { isMarker } from "#/db/markers";
 import { refreshBuildStatus } from "#/db/review";
 import { snapshots } from "#/db/schema";
+import { recordRun, runFields } from "#/db/server-timings";
 import { NoRecoveryError, claimForRerun } from "./claim";
 import type { SnapshotRow } from "./compare";
 import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
+import { RunTimer } from "./run-timer";
 import { queueExplain } from "#/ai/explain-queue";
 
 /**
@@ -154,7 +156,8 @@ export async function rediffShots(
   const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
   const targets = snapshotIds.map((id) => targetOf(rows, id));
   if (targets.length === 0) throw new RerunError("no shot to re-diff");
-  if (!(await claimForRerun(deps.db, build)))
+  const timer = new RunTimer(deps.now ?? Date.now, build, true);
+  if (!(await claimForRerun(deps.db, build, timer.startedAt)))
     throw new RerunError(`build is ${build.status}: a diff run holds it or it has no verdict yet`);
   const ids = targets.map((t) => t.id);
   try {
@@ -162,16 +165,19 @@ export async function rediffShots(
     const held = rows.filter((row) => !isMarker(row));
     const baselines = await selectBaselines(deps.db, build, new Set(held.map(snapshotKeyOf)));
     const cleared = targets.map((t) => ({ ...t, diffStatus: null, rebaselineNeeded: false }));
-    await measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines);
+    await timer.diff(() =>
+      measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines),
+    );
     await settleReviews(deps.db, { build, project }, targets);
     const status = await refreshBuildStatus(deps.db, build.id);
+    await recordRun(deps.db, build.id, timer.ended());
     // The moved shots are explained again, and the summary written, off the request (ob 1875).
     await queueExplain(deps, build, { only: ids });
     return { status, error: null, unmeasured: 0 };
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await reopenReviews(deps.db, ids);
-    await markErrored(deps.db, build, e);
+    await markErrored(deps.db, build, e, runFields(timer.ended()));
     return { status: "errored", error: e instanceof Error ? e.message : String(e), unmeasured: 0 };
   }
 }

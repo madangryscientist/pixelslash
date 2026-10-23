@@ -57,6 +57,16 @@ Every run that captures, diffs, judges or uploads records how long each step too
 - The snapshot dir's `manifest.json` (see [Snapshot capture](#snapshot-capture-the-pinned-image)) carries no timings: it has no timestamps, so two captures of the same build still write the same bytes.
 - Timings leave the machine only with `--upload`, in the finalize body, to the server you named (`timings` there, [API](#api)). The server stores them with the build and ignores a body without them; a malformed `timings` is dropped, not a 400. The finalize cannot include its own duration, so the server's copy is the figures up to the finalize; the stderr line and `upload.batches` on the machine count it. A batch's `ms` is the summed time of its requests, which run up to four at a time, so it can exceed the upload's `totalMs`.
 
+### Server timings
+
+The hosted app times its own steps on every build, in whole milliseconds, in the same D1 as the build and nowhere else (no outside telemetry). They are columns on the build, so the diff run and the explain queue each write theirs without reading the other's:
+
+- `queueMs` (shown as "before diff"): the build's creation to the diff run's claim, so the CLI's uploads and any wait; the diff runs inside the finalize request, so there is no queue in it. Absent on a re-run (a resume after a stop, or a reviewer re-diffing a shot), whose build was created long before; the build is then marked `rerun`.
+- `diffMs`: the diff, also when it ended in an error. `explainMs`: the queue's explanations, from the diff's end to the last shot settling. `summaryMs`: the build summary. A step the build did not run (no model, nothing to explain) is absent, never `0`.
+- The end is `finishedAt`, moved by each AI step that finishes after the diff; the total is `finishedAt` minus the claim, so it is the build's whole server run. A new run clears the previous run's `explainMs` and `summaryMs`.
+
+The build page shows them under its header, with the CLI's step timings when the upload carried them. The org's **Timings** tab shows, per project, the median and 95th percentile of each step (nearest rank) over builds that finished in the last 30 days, newest 5000 at most; a smoke org has none, and a build that took a second run (`rerun`) is left out, since it holds the numbers of its last run only. Neither changes a verdict, a budget or the 25 s limit.
+
 ## Start a repo: `pixelslash init`
 
 ```

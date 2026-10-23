@@ -8,6 +8,7 @@ export default defineConfig({
     "./src/db/schema-overrides.ts",
     "./src/db/schema-org-tokens.ts",
     "./src/db/schema-invites.ts",
+    "./src/db/schema-timings.ts",
   ],
   out: "./drizzle",
 });

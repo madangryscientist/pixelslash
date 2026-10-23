@@ -5,6 +5,7 @@ import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
 import { refreshBuildStatus } from "#/db/review";
 import { builds, projects, snapshots } from "#/db/schema";
+import { msBetween, recordExplained } from "#/db/server-timings";
 import { projectOf } from "#/diff/build-writes";
 import { warn } from "#/lib/log";
 import type { BlobStore } from "#/storage/blobs";
@@ -189,8 +190,7 @@ export async function consumeExplain(
       } catch (e) {
         if (!last) return delivery.retry({ delaySeconds: RETRY_DELAY_S * delivery.attempts });
         warn(`build ${job.buildId}: explaining stopped: ${messageOf(e)}`);
-        if (job.kind === "shot")
-          await giveUpShot(deps.db, job, messageOf(e)).catch(() => undefined);
+        if (job.kind === "shot") await giveUpShot(deps, job, messageOf(e)).catch(() => undefined);
         await summarizeWhenExplained(deps, job.buildId).catch(() => undefined);
         delivery.ack();
       }
@@ -199,12 +199,18 @@ export async function consumeExplain(
 }
 
 /** Only the job's own queueing: a re-run that queued the shot again keeps its mark. */
-async function giveUpShot(db: Db, job: ShotJob, failure: string): Promise<void> {
-  await db
+async function giveUpShot(deps: ConsumerDeps, job: ShotJob, failure: string): Promise<void> {
+  const settled = await deps.db
     .update(snapshots)
     .set({ aiQueuedAt: null, aiError: failure })
-    .where(and(eq(snapshots.id, job.snapshotId), eq(snapshots.aiQueuedAt, new Date(job.queuedAt))));
+    .where(and(eq(snapshots.id, job.snapshotId), eq(snapshots.aiQueuedAt, new Date(job.queuedAt))))
+    .returning({ id: snapshots.id });
+  if (settled.length > 0) await recordSettled(deps, job);
 }
+
+/** A shot of the job's queueing settled: the build's explanation step has run until now (ob 1792). */
+const recordSettled = (deps: ConsumerDeps, job: ShotJob) =>
+  recordExplained(deps.db, job.buildId, { queuedAt: job.queuedAt, now: (deps.now ?? Date.now)() });
 
 /** The build's org and its project's model; null when either is gone. */
 async function ownerOf(deps: ConsumerDeps, buildId: string) {
@@ -234,10 +240,12 @@ async function explainJob(
   const outcome = await outcomeOf(deps, shot, job.buildId, last);
   if (outcome === "retry") return "retry";
   // Only this queueing's job settles the shot: a re-run that queued it again owns the new one.
-  await deps.db
+  const settled = await deps.db
     .update(snapshots)
     .set({ aiQueuedAt: null, aiError: outcome.aiError })
-    .where(and(eq(snapshots.id, shot.id), eq(snapshots.aiQueuedAt, shot.aiQueuedAt)));
+    .where(and(eq(snapshots.id, shot.id), eq(snapshots.aiQueuedAt, shot.aiQueuedAt)))
+    .returning({ id: snapshots.id });
+  if (settled.length > 0) await recordSettled(deps, job);
   if (outcome.passed) await refreshBuildStatus(deps.db, job.buildId);
   return "done";
 }
@@ -315,12 +323,19 @@ async function summarizeWhenExplained(deps: ConsumerDeps, buildId: string): Prom
     .returning({ projectId: builds.projectId, queuedAt: builds.aiSummaryQueuedAt });
   if (!held?.queuedAt) return;
   const queuedAt = held.queuedAt;
+  const now = deps.now ?? Date.now;
+  const began = now();
   try {
     await summarizeBuild(deps, await getBuild(deps.db, held.projectId, buildId), { queuedAt });
   } finally {
     await deps.db
       .update(builds)
-      .set({ aiSummaryQueuedAt: null, aiSummaryClaimedAt: null })
+      .set({
+        aiSummaryQueuedAt: null,
+        aiSummaryClaimedAt: null,
+        summaryMs: msBetween(began, now()),
+        finishedAt: new Date(),
+      })
       .where(and(eq(builds.id, buildId), eq(builds.aiSummaryQueuedAt, queuedAt)));
   }
 }

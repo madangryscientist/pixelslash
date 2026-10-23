@@ -2,6 +2,7 @@ import { Breadcrumbs, ListLayout } from "@hackcove/ui";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
+import { BuildTimings } from "#/components/build-timings";
 import { BuildSummary } from "#/components/build-summary";
 import { TabBody, Tabs } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
@@ -109,6 +110,7 @@ function BuildPage() {
             />
           )}
         </BuildHeader>
+        <BuildTimings build={build} />
         <BuildError project={project} build={build} />
         {error && (
           <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">

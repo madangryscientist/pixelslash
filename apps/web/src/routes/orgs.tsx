@@ -6,6 +6,7 @@ import { FieldDialog } from "#/components/dialog";
 import { ModelSettings } from "#/components/model-settings";
 import { MembersPanel } from "#/components/org-members";
 import { type OrgToken, OrgTokensPanel } from "#/components/org-tokens";
+import { TimingsPanel } from "#/components/org-timings";
 import { EmptyOrg } from "#/components/org-empty";
 import { ProjectTable, WaitingStrip } from "#/components/org-projects";
 import { type DialogKind, OrgHeader, type Tab } from "#/components/org-tabs";
@@ -13,9 +14,11 @@ import { OrgRail } from "#/components/org-rail";
 import { Page, useHydrated } from "#/components/ui";
 import type { ModelView } from "#/db/models";
 import type { OrgOverview } from "#/db/orgs";
+import type { ProjectTimings } from "#/db/timings-stats";
 import { getOrgs, invite, newOrg, newProject, withdrawOrgInvite } from "#/server/fns";
+import { getOrgTimings } from "#/server/timings";
 
-type OrgsSearch = { org?: string; tab?: "members" | "tokens" | "model" };
+type OrgsSearch = { org?: string; tab?: "members" | "tokens" | "model" | "timings" };
 
 const rootRoute = getRouteApi("__root__");
 
@@ -23,16 +26,33 @@ export const Route = createFileRoute("/orgs")({
   validateSearch: (search: Record<string, unknown>): OrgsSearch => {
     const out: OrgsSearch = {};
     if (typeof search.org === "string" && search.org) out.org = search.org;
-    if (search.tab === "members" || search.tab === "tokens" || search.tab === "model")
+    if (
+      search.tab === "members" ||
+      search.tab === "tokens" ||
+      search.tab === "model" ||
+      search.tab === "timings"
+    )
       out.tab = search.tab;
     return out;
   },
-  loader: () => getOrgs(),
+  // The org is a dep only on the Timings tab, which reads its builds; switching org elsewhere stays a re-render.
+  loaderDeps: ({ search }) => ({
+    org: search.tab === "timings" ? search.org : undefined,
+    timings: search.tab === "timings",
+  }),
+  loader: async ({ deps }) => {
+    const data = await getOrgs();
+    // The Timings tab reads the builds' numbers; the other tabs do not pay for them.
+    const timingsOf = data.orgs.find((org) => org.id === deps.org) ?? data.orgs[0];
+    const timings: ProjectTimings[] | null =
+      deps.timings && timingsOf ? await getOrgTimings({ data: { orgId: timingsOf.id } }) : null;
+    return { ...data, timings };
+  },
   component: Orgs,
 });
 
 function Orgs() {
-  const { orgs, orgTokens, orgModels, now, serverUrl } = Route.useLoaderData();
+  const { orgs, orgTokens, orgModels, timings, now, serverUrl } = Route.useLoaderData();
   const search = Route.useSearch();
   const { viewer } = rootRoute.useLoaderData();
   const router = useRouter();
@@ -60,6 +80,7 @@ function Orgs() {
             org={selected}
             tokens={orgTokens.filter((t) => t.orgId === selected.id)}
             model={orgModels.find((m) => m.orgId === selected.id) ?? null}
+            timings={timings}
             now={now}
             serverUrl={serverUrl}
             tab={search.tab ?? "projects"}
@@ -209,6 +230,7 @@ function OrgPanel({
   org,
   tokens,
   model,
+  timings,
   now,
   serverUrl,
   tab,
@@ -221,6 +243,7 @@ function OrgPanel({
   org: OrgOverview;
   tokens: OrgToken[];
   model: ModelView | null;
+  timings: ProjectTimings[] | null;
   now: Date;
   serverUrl: string;
   tab: Tab;
@@ -244,6 +267,7 @@ function OrgPanel({
           hydrated={hydrated}
         />
       )}
+      {tab === "timings" && timings && <TimingsPanel projects={timings} />}
       {tab === "members" && (
         <MembersPanel
           org={org}

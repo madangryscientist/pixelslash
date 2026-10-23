@@ -202,7 +202,9 @@ describe("build status", () => {
     expect(branch.status).toBe("errored");
     expect(branch.error).toBe("d1 blip");
     // The verdict write failed; the reason was written instead, so nothing is left measuring.
-    expect(store.writes).toEqual([{ status: "errored", error: "d1 blip" }]);
+    // The same write carries the run's timings (ob 1792).
+    expect(store.writes).toHaveLength(1);
+    expect(store.writes[0]).toMatchObject({ status: "errored", error: "d1 blip" });
   });
 
   test("new and removed shots do not block", async () => {

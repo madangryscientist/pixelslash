@@ -35,13 +35,18 @@ export class NoRecoveryError extends Error {
  * Take the build for one diff run, or learn that someone else holds it. One conditional UPDATE,
  * so of two concurrent calls only one wins. A build is claimable when it errored, when it was
  * finalised and no run has started (null), or when its run began more than the bound ago. A CI
- * project's build is claimable only by its first run.
+ * project's build is claimable only by its first run. `startedAt` is the run's start, which its
+ * timings (ob 1792) are counted from.
  */
-export async function claim(db: Db, build: Build, ci: boolean): Promise<boolean> {
+export async function claim(
+  db: Db,
+  build: Build,
+  { ci, startedAt }: { ci: boolean; startedAt: Date },
+): Promise<boolean> {
   if (ci) {
     const first = await db
       .update(builds)
-      .set({ processingStartedAt: new Date() })
+      .set({ processingStartedAt: startedAt })
       .where(
         and(
           eq(builds.id, build.id),
@@ -55,7 +60,7 @@ export async function claim(db: Db, build: Build, ci: boolean): Promise<boolean>
   const cutoff = new Date(Date.now() - STALE_PROCESSING_MS);
   const claimed = await db
     .update(builds)
-    .set({ status: "processing", error: null, processingStartedAt: new Date() })
+    .set({ status: "processing", error: null, processingStartedAt: startedAt })
     .where(
       and(
         eq(builds.id, build.id),
@@ -82,10 +87,10 @@ export const dead = (build: Build) =>
  * Take a build with a verdict (`changes`, `passed`, `failed`) to re-diff a shot a reviewer picked
  * (ob 1738). One conditional UPDATE, like `claim`, so a re-run never races another run.
  */
-export async function claimForRerun(db: Db, build: Build): Promise<boolean> {
+export async function claimForRerun(db: Db, build: Build, startedAt: Date): Promise<boolean> {
   const claimed = await db
     .update(builds)
-    .set({ status: "processing", error: null, processingStartedAt: new Date() })
+    .set({ status: "processing", error: null, processingStartedAt: startedAt })
     .where(and(eq(builds.id, build.id), inArray(builds.status, ["changes", "passed", "failed"])))
     .returning({ id: builds.id });
   return claimed.length > 0;

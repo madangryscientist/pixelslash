@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { Build } from "#/db/builds";
+import type { runFields } from "#/db/server-timings";
 import type { Db } from "#/db/db";
 import { type DiffLocation, builds, projects, snapshots } from "#/db/schema";
 import type { ProcessDeps } from "./process";
@@ -59,9 +60,18 @@ export async function acceptDefaultBranchBuild(
     .where(and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId)));
 }
 
-export async function markErrored(db: Db, build: Build, e: unknown): Promise<void> {
+/** `timings`: the server timings (ob 1792) the end of the run writes with its error, if it has any. */
+export async function markErrored(
+  db: Db,
+  build: Build,
+  e: unknown,
+  timings: Partial<ReturnType<typeof runFields>> = {},
+): Promise<void> {
   const error = e instanceof Error ? e.message : String(e);
-  await db.update(builds).set({ status: "errored", error }).where(eq(builds.id, build.id));
+  await db
+    .update(builds)
+    .set({ ...timings, status: "errored", error })
+    .where(eq(builds.id, build.id));
 }
 
 /**

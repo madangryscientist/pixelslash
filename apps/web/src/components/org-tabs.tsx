@@ -54,7 +54,7 @@ export function OrgHeader({
   );
 }
 
-export type Tab = "projects" | "members" | "tokens" | "model";
+export type Tab = "projects" | "members" | "tokens" | "model" | "timings";
 
 function TabLink({
   org,
@@ -94,6 +94,9 @@ function OrgTabs({ org, tab }: { org: OrgOverview; tab: Tab }) {
       </TabLink>
       <TabLink org={org} tab="model" current={tab}>
         AI model
+      </TabLink>
+      <TabLink org={org} tab="timings" current={tab}>
+        Timings
       </TabLink>
     </nav>
   );
