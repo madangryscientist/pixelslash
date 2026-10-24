@@ -39,12 +39,7 @@
  * Without these a divider would be a light-theme colour on a dark surface. They sit here, not in a
  * fork of the theme: delete a rule when the theme ships it. The theme already ships the text-red,
  * border-amber and violet-hover rules with the same values, so they are not repeated.
- * `border-red-200` stays: the theme ships 0.45 there, and the app keeps the 0.4 it has used since
- * 0.1.0 on purpose.
  */
-.dark .border-red-200 {
-  border-color: rgba(243, 139, 168, 0.4);
-}
 .dark .divide-slate-100 > :not(:last-child) {
   border-color: #282839; /* what border-slate-100 maps to */
 }
