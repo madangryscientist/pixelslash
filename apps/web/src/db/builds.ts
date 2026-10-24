@@ -1,3 +1,4 @@
+import type { Composition } from "@pixelslash/engine/composition-entry";
 import { and, count, eq } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
 import { sha256Hex } from "#/lib/crypto";
@@ -39,6 +40,8 @@ export type SnapshotInput = {
   flaky?: FlakyPolicy | null;
   /** The judge's sentence on what changed (ob 1745); shown, never used to decide anything. */
   changeNote?: string | null;
+  /** A composition-only project's findings (ob 1850); shown, never used to decide anything. */
+  composition?: Composition | null;
 };
 
 /** The build exists but can no longer change. */
@@ -105,6 +108,12 @@ export type SentSnapshot = {
   flake?: SentFlake | null;
 };
 
+/** What a shot carries only to be shown: the judge's note and the composition findings. */
+const shown = (input: SnapshotInput) => ({
+  changeNote: input.changeNote ?? null,
+  composition: input.composition ?? null,
+});
+
 /**
  * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
  * the blob key comes from that identity, so the second PNG overwrites the first in place.
@@ -129,7 +138,7 @@ export async function putSnapshot(
     imageKey,
     ciResults: ci && (await putMasks(blobs, stem, ci)),
     flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
-    changeNote: input.changeNote ?? null,
+    ...shown(input),
   };
   const [row] = await db
     .insert(snapshots)

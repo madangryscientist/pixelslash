@@ -35,11 +35,21 @@ export {
   parseConfig,
   resolveDiff,
   type CaptureConfig,
+  type CompositionConfig,
   type FlakyPolicy,
   type Route,
   type Variant,
 } from "./config.ts";
 export { maskLocators, measureIgnore } from "./page-areas.ts";
+export {
+  CUSTOM_ATTRIBUTE,
+  parseCompositionEntry,
+  type Composition,
+  type Gap,
+  type GapKind,
+  type SpecialCase,
+} from "./composition.ts";
+export { gapsList, type GapGroup, type GapsList } from "./composition-report.ts";
 export { parseDiffOption } from "./diff-options.ts";
 export type { Fingerprint } from "./fingerprint.ts";
 export { fontSetHash, imageId } from "./fingerprint.ts";

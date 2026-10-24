@@ -40,7 +40,13 @@ export async function provision(page: Page, org = "Flake Co", project = "flaky")
 /** `png()`'s buffer may sit on a shared buffer, which `Blob` does not take: copy it out. */
 const pngBlob = (buf: Buffer) => new Blob([new Uint8Array(buf)], { type: "image/png" });
 
-export type Shot = { name: string; png: Buffer; flaky?: "review" | "skip" };
+export type Shot = {
+  name: string;
+  png: Buffer;
+  flaky?: "review" | "skip";
+  /** The shot's composition findings, sent as the CLI sends them (ob 1850). */
+  composition?: object;
+};
 
 /** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
 function shotForm(shot: Shot): FormData {
@@ -54,6 +60,7 @@ function shotForm(shot: Shot): FormData {
     tags: ["web"],
     fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
   };
+  if (shot.composition) meta["composition"] = shot.composition;
   if (shot.flaky) {
     meta["flaky"] = shot.flaky;
     meta["flake"] = {

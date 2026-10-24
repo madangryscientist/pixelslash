@@ -169,6 +169,13 @@
       "when": 1792793186275,
       "tag": "0023_early_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792830469581,
+      "tag": "0024_shocking_blue_shield",
+      "breakpoints": true
     }
   ]
 }

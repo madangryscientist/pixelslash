@@ -31,6 +31,11 @@ export function changeCrop(regions: Region[], overlapW: number, overlapH: number
 
 const pct = (n: number) => `${n.toFixed(3)}%`;
 
+/** The slab's style: the whole image `size`, offset and scaled so the window shows only `crop`. */
+export function slabStyle(size: { width: number; height: number }, crop: Crop): string {
+  return `left:${pct((-crop.x / crop.w) * 100)};top:${pct((-crop.y / crop.h) * 100)};width:${pct((size.width / crop.w) * 100)};height:${pct((size.height / crop.h) * 100)}`;
+}
+
 /**
  * One shot cropped to `crop` with CSS alone, so no new file is written: `inner` (the overlays,
  * positioned as percentages of the whole image) rides in a slab sized and offset like the full
@@ -41,6 +46,6 @@ export function cropFigure(
   crop: Crop,
   inner: string,
 ): string {
-  const slab = `left:${pct((-crop.x / crop.w) * 100)};top:${pct((-crop.y / crop.h) * 100)};width:${pct((shot.width / crop.w) * 100)};height:${pct((shot.height / crop.h) * 100)}`;
+  const slab = slabStyle(shot, crop);
   return `<figure><figcaption>${shot.label}</figcaption><a class="crop" href="${shot.src}" style="aspect-ratio:${crop.w}/${crop.h}"><span class="slab" style="${slab}"><img src="${shot.src}" alt="${shot.label} (changed region)">${inner}</span></a></figure>`;
 }

@@ -7,6 +7,7 @@ import {
   featuresBeside,
   parseFeatures,
 } from "./config-feature.ts";
+import { type CompositionConfig, parseComposition } from "./config-composition.ts";
 import { type FlakyPolicy, parseFlake, parseFlaky } from "./config-flake.ts";
 import { type Stabilise, parseStabilise } from "./config-stabilise.ts";
 import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
@@ -26,6 +27,7 @@ export { DEFAULT_FLAKE_RETRIES, FLAKY_POLICIES, type FlakyPolicy } from "./confi
 export { parseFlaky, resolveFlaky } from "./config-flake.ts";
 export type { Stabilise } from "./config-stabilise.ts";
 export type { Feature, FeatureRef } from "./config-feature.ts";
+export type { CompositionConfig, CustomDeclared } from "./config-composition.ts";
 
 export type Variant = {
   name: string;
@@ -83,6 +85,8 @@ export type CaptureConfig = {
   stabilise: Stabilise;
   /** What `pixelslash dev` builds a target against (ob 1741), keyed by route or story name. */
   features: Record<string, Feature>;
+  /** Composition-only (ob 1850): every element styled outside this library is reported at capture. */
+  composition: CompositionConfig | undefined;
 };
 
 export const CONFIG_NAMES = [
@@ -288,6 +292,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
       variants.map((vr) => vr.name),
       bad,
     ),
+    composition: parseComposition(raw.composition, bad),
   };
 }
 
@@ -351,11 +356,12 @@ export async function loadConfig(path: string): Promise<CaptureConfig> {
   return besideConfig(parseConfig(isObj(mod) ? mod.default : undefined), path);
 }
 
-/** A relative `setup`, spec or ref is relative to the config file, not to wherever capture was run from. */
+/** A relative `setup`, spec or ref (and the composition library's lookup) is relative to the config file, not to wherever capture was run from. */
 function besideConfig(c: CaptureConfig, path: string): CaptureConfig {
   return {
     ...c,
     features: featuresBeside(c.features, dirname(path)),
+    ...(c.composition && { composition: { ...c.composition, from: dirname(path) } }),
     ...(c.setup !== undefined && { setup: resolve(dirname(path), c.setup) }),
   };
 }

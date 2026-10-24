@@ -2,6 +2,7 @@ import { Breadcrumbs, Container, FullBleedLayout } from "@hackcove/ui";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
+import { CompositionPanel } from "#/components/composition";
 import { DiffOverride } from "#/components/diff-override";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
@@ -201,11 +202,13 @@ function SnapshotPage() {
               diffUrl={images.diff}
               result={snapshot.diffResult}
               removed={snapshot.diffStatus === "removed"}
+              composition={snapshot.composition}
               marks={flag.marks}
               onDraw={flag.onDraw ?? ignore.onDraw}
               ignored={ignored}
             />
           </RegionNotesProvider>
+          <CompositionPanel composition={snapshot.composition} />
         </div>
       </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}

@@ -10,6 +10,7 @@ import {
   type Scale,
   Viewport,
 } from "#/components/snapshot-frame";
+import { type Composition, CompositionBoxes } from "#/components/composition";
 import { SnapshotOverlay } from "#/components/snapshot-overlay";
 import { SnapshotSlider } from "#/components/snapshot-slider";
 import { useHydrated } from "#/components/ui";
@@ -82,9 +83,11 @@ function Marked({
   marks,
   onDraw,
   ignored,
+  composition,
 }: { width: number; height: number } & Marking) {
   return (
     <>
+      {composition && <CompositionBoxes width={width} height={height} composition={composition} />}
       {ignored.length > 0 && <IgnoreAreas width={width} height={height} areas={ignored} />}
       {marks.length > 0 && <FlagMarks width={width} height={height} marks={marks} />}
       {onDraw && <DrawLayer width={width} height={height} onDraw={onDraw} />}
@@ -106,6 +109,7 @@ function Pane({
   marks,
   onDraw,
   ignored,
+  composition,
 }: {
   label: string;
   caption: string | null;
@@ -138,6 +142,7 @@ function Pane({
                 marks={marks}
                 onDraw={onDraw}
                 ignored={ignored}
+                composition={composition}
               />
             )}
           </div>
@@ -158,6 +163,8 @@ type Marking = {
   marks: IgnoreRect[];
   onDraw: ((rect: IgnoreRect) => void) | null;
   ignored: IgnoreArea[];
+  /** The branch's composition findings (ob 1850), drawn on the branch pane only. */
+  composition?: Composition | null | undefined;
 };
 
 type Shots = {
@@ -176,6 +183,7 @@ function SideBySide({
   branchUrl,
   result,
   removed,
+  composition,
   regions,
   scale,
   crop,
@@ -206,6 +214,7 @@ function SideBySide({
         boxes={regions}
         scale={scale}
         crop={crop}
+        composition={composition}
         {...marking}
       />
     </div>

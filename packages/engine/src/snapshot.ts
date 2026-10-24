@@ -4,6 +4,13 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { PNG } from "pngjs";
 import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
 import {
+  loadLibrary,
+  measureComposition,
+  type Composition,
+  type CompositionLibrary,
+} from "./composition.ts";
+import { writeGapsReport } from "./composition-report.ts";
+import {
   resolveDiff,
   resolveFlaky,
   resolveIgnore,
@@ -64,6 +71,12 @@ export type SnapshotEntry = {
   /** Relative to the manifest's directory. */
   file: string;
   fingerprint: Fingerprint;
+  /**
+   * A composition-only project's findings for this shot (ob 1850): what is styled outside the
+   * library, and the declared special cases. Absent for any other project, and in manifests
+   * written before the field existed.
+   */
+  composition?: Composition;
 };
 
 /** `manifest.json` in the snapshot dir. No timestamps: two runs of the same build write the same bytes. */
@@ -80,6 +93,8 @@ export type SnapshotResult = {
   manifestPath: string;
   /** How long each shot took to capture (load, settle, screenshot), in capture order. Not in the manifest: that stays byte-for-byte reproducible. */
   shots: ShotTiming[];
+  /** `gaps.html` beside the manifest, for a composition-only project. */
+  gapsPath?: string;
 };
 
 export { toImageRects };
@@ -144,11 +159,21 @@ type Shot = {
   ignore: Ignore[];
   /** What the config's `setup` left signed in, if it has one. */
   session: Session | undefined;
+  /** The library a composition-only project is measured against; undefined for any other project. */
+  library: CompositionLibrary | undefined;
   warn: (m: string) => void;
 };
 
-/** One capture of a shot: its PNG, its ignore areas in image px, and the page's load + settle time. */
-export type Shoot = { png: Buffer; ignore: IgnoreRect[]; settleMs?: number };
+/**
+ * One capture of a shot: its PNG, its ignore areas in image px, the page's load + settle time, and
+ * (composition-only projects) what is styled outside the library.
+ */
+export type Shoot = {
+  png: Buffer;
+  ignore: IgnoreRect[];
+  settleMs?: number;
+  composition?: Composition;
+};
 
 /**
  * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
@@ -190,6 +215,13 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
     // The PNG's size from its IHDR chunk, without decoding the image.
     const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
     const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
+    const composition =
+      shot.library &&
+      (await measureComposition(page, shot.library, {
+        scale: stabilise.deviceScaleFactor,
+        image: size,
+        warn: shot.warn,
+      }));
     return {
       png: paintRects(
         png,
@@ -198,6 +230,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
       ),
       ignore,
       settleMs,
+      ...(composition && { composition }),
     };
   } catch (e) {
     if (e instanceof CaptureError) throw e;
@@ -234,6 +267,8 @@ export async function openCaptureSession(
       "warning: capturing outside the pinned PixelSlash image; local fonts skew rendering. Fingerprint recorded as bare.",
     );
   const fonts = await fontSetHash(deps.listFonts ?? fcList);
+  // Read before the app starts, so a library that is not installed fails first.
+  const library = config.composition && (await loadLibrary(config.composition));
   let stopApp: StopApp | undefined;
   let browser: Browser | undefined;
   const close = async () => {
@@ -268,6 +303,7 @@ export async function openCaptureSession(
           stabilise: config.stabilise,
           ignore: resolveIgnore(config, route, variant),
           session,
+          library,
           warn,
         }),
       close,
@@ -299,7 +335,7 @@ export async function captureInto(session: CaptureSession, out: string): Promise
     for (const route of routes) {
       const file = `${route.name}/${variant.name}.png`;
       const started = performance.now();
-      const { png, ignore } = await session.shoot(route, variant);
+      const { png, ignore, composition } = await session.shoot(route, variant);
       const captureMs = elapsed(started);
       await mkdir(join(out, route.name), { recursive: true });
       await Bun.write(join(out, file), png);
@@ -313,6 +349,7 @@ export async function captureInto(session: CaptureSession, out: string): Promise
         flaky: resolveFlaky(config, route),
         file,
         fingerprint,
+        ...(composition && { composition }),
       };
       snapshots.push(entry);
       shots.push({ name: identity(entry), captureMs });
@@ -321,7 +358,9 @@ export async function captureInto(session: CaptureSession, out: string): Promise
   const manifest: SnapshotManifest = { version: 1, snapshots };
   const manifestPath = join(out, "manifest.json");
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  return { manifest, manifestPath, shots };
+  if (!config.composition) return { manifest, manifestPath, shots };
+  const gapsPath = await writeGapsReport(out, manifest, config.composition.name);
+  return { manifest, manifestPath, shots, gapsPath };
 }
 
 /**

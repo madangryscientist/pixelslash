@@ -1,6 +1,7 @@
 import { join, resolve, sep } from "node:path";
 import { type FlakyPolicy, parseFlaky } from "./config-flake.ts";
 import { type MaskRect, parseArea } from "./config-areas.ts";
+import { parseCompositionEntry } from "./composition-entry.ts";
 import { parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
@@ -41,6 +42,12 @@ function policy(v: unknown, where: string): FlakyPolicy {
   return parseFlaky(v, where, bad) ?? "review";
 }
 
+/** A composition-only project's findings; an entry without them (any other project, an older manifest) has no field. */
+function compositionOf(v: unknown, where: string): Pick<SnapshotEntry, "composition"> {
+  const composition = parseCompositionEntry(v, where, bad);
+  return composition ? { composition } : {};
+}
+
 function entry(v: unknown, i: number): SnapshotEntry {
   const where = `snapshots[${i}]`;
   if (!isObj(v)) bad(where, "must be an object");
@@ -73,6 +80,7 @@ function entry(v: unknown, i: number): SnapshotEntry {
       browser: str(fingerprint.browser, `${where}.fingerprint.browser`),
       fonts: str(fingerprint.fonts, `${where}.fingerprint.fonts`),
     },
+    ...compositionOf(v.composition, `${where}.composition`),
   };
 }
 

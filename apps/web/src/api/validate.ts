@@ -1,3 +1,4 @@
+import { composition } from "#/api/validate-composition";
 import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
 import type { FlakeInput } from "#/db/flakes";
@@ -178,6 +179,7 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
       fonts: text(fp.fonts, "fingerprint.fonts", 300),
     },
     changeNote: changeNote(m.changeNote),
+    composition: composition(m.composition, bad),
   };
 }
 

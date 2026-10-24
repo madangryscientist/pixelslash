@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, test } from "vitest";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import { libraryProject, PAGES } from "../../engine/test/composition-fixtures.ts";
 import { run } from "../src/run.ts";
 import { FIXTURES, capture, cleanup, tmp } from "./support.ts";
 
@@ -103,4 +105,45 @@ describe("pixelslash capture", () => {
     expect(await run(["capture", "--config", config], bad.io, pinned)).toBe(2);
     expect(bad.stderr).toMatch(/variants\[0\]\.browser/);
   });
+});
+
+describe("pixelslash capture, composition-only (ob 1850)", () => {
+  test("prints the gap list's counts and link, puts the findings in --json, and still exits 0", async () => {
+    const project = await libraryProject();
+    const server = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: (req) =>
+        new Response(Reflect.get(PAGES, new URL(req.url).pathname.slice(1)) ?? "", {
+          headers: { "content-type": "text/html" },
+        }),
+    });
+    try {
+      const config = join(project, "pixelslash.config.json");
+      await Bun.write(
+        config,
+        JSON.stringify({
+          baseUrl: `http://127.0.0.1:${server.port}`,
+          routes: ["/stray", "/marked"],
+          variants: [{ name: "desktop", viewport: { width: 800, height: 400 } }],
+          composition: { library: "@acme/ui", name: "Acme UI" },
+        }),
+      );
+      const out = join(project, "out");
+      const cap = capture();
+      expect(await run(["capture", "--config", config, "--out", out], cap.io, pinned)).toBe(0);
+      expect(cap.stdout).toContain(
+        `gaps: 1 styled outside the library, 1 special case: file://${join(out, "gaps.html")}`,
+      );
+      const json = capture();
+      const argv = ["capture", "--config", config, "--out", out, "--json"];
+      expect(await run(argv, json.io, pinned)).toBe(0);
+      const parsed = JSON.parse(json.stdout);
+      expect(parsed.gaps).toBe(join(out, "gaps.html"));
+      expect(parsed.shots[0].composition.gaps[0].classes).toEqual(["mt-7"]);
+    } finally {
+      await server.stop(true);
+      await rm(project, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

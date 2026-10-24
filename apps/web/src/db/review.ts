@@ -1,3 +1,4 @@
+import type { Composition } from "@pixelslash/engine/composition-entry";
 import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import {
   SNAPSHOT_GROUPS,
@@ -116,6 +117,8 @@ export type SnapshotView = {
   mainDiffResult: DiffResult | null;
   /** The change in words, from the judge; null when nothing described it. */
   changeNote: string | null;
+  /** A composition-only project's gaps and special cases (ob 1850); null for any other project. */
+  composition: Composition | null;
   /** The project model's label and sentence per changed region (ob 1473); null when none was given. */
   aiReview: AiReview | null;
   /** Queued for the model and not yet answered (ob 1875). */
@@ -174,6 +177,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       mainDiffStatus: snapshots.mainDiffStatus,
       mainDiffResult: snapshots.mainDiffResult,
       changeNote: snapshots.changeNote,
+      composition: snapshots.composition,
       aiReview: snapshots.aiReview,
       aiQueuedAt: snapshots.aiQueuedAt,
       aiError: snapshots.aiError,

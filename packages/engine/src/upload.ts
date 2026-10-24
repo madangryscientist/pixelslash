@@ -316,5 +316,6 @@ function snapshotMeta(e: SnapshotEntry) {
     ignore: e.ignore,
     fingerprint: e.fingerprint,
     flaky: e.flaky,
+    ...(e.composition && { composition: e.composition }),
   };
 }

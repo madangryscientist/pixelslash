@@ -10,6 +10,7 @@ import type {
   IgnoreRect,
   ResolvedDiff,
 } from "./diff-json";
+import type { Composition } from "@pixelslash/engine/composition-entry";
 import { serverTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
 
@@ -351,6 +352,12 @@ export const snapshots = sqliteTable(
     aiQueuedAt: integer("ai_queued_at", { mode: "timestamp_ms" }),
     /** Why the model explained no region of this shot, once it stopped trying (ob 1875); null otherwise. */
     aiError: text("ai_error"),
+    /**
+     * A composition-only project's findings for the shot (ob 1850), as its manifest carries them:
+     * what is styled outside the design-system library, and the declared special cases, boxed in
+     * image px. Shown only; nothing reads it for a review state. Null for any other project.
+     */
+    composition: text("composition", { mode: "json" }).$type<Composition>(),
     createdAt: createdAt(),
   },
   (t) => [

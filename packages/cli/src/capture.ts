@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   UsageError,
   buildTimings,
@@ -57,11 +58,15 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
 }
 
 /** `--json` and `capture_local`: every shot taken, with its PNG's absolute path. */
-export function captureJson(out: string, { manifest, manifestPath, timings }: TimedSnapshotResult) {
+export function captureJson(
+  out: string,
+  { manifest, manifestPath, timings, gapsPath }: TimedSnapshotResult,
+) {
   return {
     measured: "local",
     uploaded: false,
     manifest: manifestPath,
+    ...(gapsPath && { gaps: gapsPath }),
     timings,
     shots: manifest.snapshots.map((e) => ({
       name: e.name,
@@ -70,6 +75,7 @@ export function captureJson(out: string, { manifest, manifestPath, timings }: Ti
       viewport: `${e.variant.viewport.width}x${e.variant.viewport.height}`,
       theme: e.variant.theme,
       file: join(out, e.file),
+      ...(e.composition && { composition: e.composition }),
     })),
   };
 }
@@ -98,6 +104,15 @@ function printCaptured(result: SnapshotResult, io: Io): void {
   io.stdout.write(`pixelslash: ${result.manifest.snapshots.length} snapshots\n`);
   if (first) io.stdout.write(`fingerprint: ${JSON.stringify(first.fingerprint)}\n`);
   io.stdout.write(`manifest: ${result.manifestPath}\n`);
+  if (result.gapsPath) io.stdout.write(`${gapsLine(result)}\n`);
+}
+
+/** A composition-only capture's gap list (ob 1850): the counts and the page. Not a verdict; the exit stays 0. */
+function gapsLine({ manifest, gapsPath = "" }: SnapshotResult): string {
+  const found = manifest.snapshots.flatMap((e) => (e.composition ? [e.composition] : []));
+  const gaps = found.reduce((n, c) => n + c.gaps.length, 0);
+  const special = found.reduce((n, c) => n + c.special.length, 0);
+  return `gaps: ${gaps} styled outside the library, ${special} special ${special === 1 ? "case" : "cases"}: ${pathToFileURL(gapsPath).href}`;
 }
 
 /**
