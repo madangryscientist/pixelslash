@@ -636,7 +636,7 @@
       "ps": {
         "v": "y",
         "note": "local mlx or ollama, or a hosted model through a tool-less `opencode run` when `PIXELSLASH_OPENCODE_MODEL` names one (ob 1941); DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict (ob 1741); `upload --judge` writes one sentence per changed shot, shown on the build and branch pages (ob 1745); on the server, a project's own (or its org's) OpenAI-compatible model writes one summary of the build from its measurements and region notes, never its images, each sentence linking to the shots it names (ob 1668)",
-        "commit": "b2149e9"
+        "commit": "fa01c58"
       },
       "t": {
         "argos": "n",
