@@ -8,6 +8,7 @@ import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import {
   bunSpawn,
+  JudgeError,
   judgePage,
   pngNames,
   resolveJudge,
@@ -52,6 +53,8 @@ export type CompareResult = {
   fresh: Violation[];
   reportPath: string;
   skipped: boolean;
+  /** Why the judge was skipped, when it was: "no judge", or the named reason a configured one failed. */
+  skipReason?: string;
   manifest?: RunManifest;
   out: string;
   changedPixels?: number;
@@ -59,7 +62,7 @@ export type CompareResult = {
   timings?: Timings;
 };
 
-type Verdict = { already: Violation[]; fresh: Violation[]; skipped: boolean };
+type Verdict = { already: Violation[]; fresh: Violation[]; skipped: boolean; skipReason?: string };
 
 export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Promise<CompareResult> {
   const started = performance.now();
@@ -72,6 +75,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
   const already: Violation[] = [];
   const fresh: Violation[] = [];
   let skipped = false;
+  let skipReason: string | undefined;
   try {
     for (const path of routes) {
       const slug = routeSlug(path);
@@ -81,6 +85,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
       already.push(...one.already);
       fresh.push(...one.fresh);
       skipped = one.skipped;
+      skipReason = one.skipReason;
     }
   } finally {
     await browser?.close();
@@ -89,6 +94,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
   const timings = buildTimings(started, shots);
   await Bun.write(reportPath, withTimings(renderIndex(rows, pixel), timings));
   const result: CompareResult = { already, fresh, reportPath, skipped, out: opts.out, timings };
+  if (skipReason) result.skipReason = skipReason;
   if (pixel) result.changedPixels = rows.reduce((n, r) => n + r.changedPixels, 0);
   return result;
 }
@@ -104,6 +110,7 @@ function routeRow(path: string, slug: string, one: CompareResult): RouteRow {
     already: one.already.length,
     fresh: one.fresh.length,
     skipped: one.skipped,
+    skipReason: one.skipReason,
     changedPixels: one.manifest?.changedPixels ?? 0,
   };
 }
@@ -154,12 +161,19 @@ async function judgePair(
   deps: Deps,
 ): Promise<Verdict> {
   const kind = resolveJudge(deps);
-  if (kind == null) return { already: [], fresh: [], skipped: true };
+  if (kind == null) return { already: [], fresh: [], skipped: true, skipReason: "no judge" };
   const input = { dsDir: ds, components, spawn: deps.spawn ?? bunSpawn, kind };
-  const already = await judgePage(join(out, "live.png"), input);
-  const localHits = await judgePage(join(out, "local.png"), input);
-  const liveNames = new Set(already.map((v) => v.component));
-  return { already, fresh: localHits.filter((v) => !liveNames.has(v.component)), skipped: false };
+  try {
+    const already = await judgePage(join(out, "live.png"), input);
+    const localHits = await judgePage(join(out, "local.png"), input);
+    const liveNames = new Set(already.map((v) => v.component));
+    return { already, fresh: localHits.filter((v) => !liveNames.has(v.component)), skipped: false };
+  } catch (error) {
+    // A configured opencode judge that did not answer skips the judge, like having none: the
+    // pair has no verdict and invents no violations.
+    if (!(error instanceof JudgeError)) throw error;
+    return { already: [], fresh: [], skipped: true, skipReason: `judge ${error.reason}` };
+  }
 }
 
 export async function compare(
@@ -230,7 +244,13 @@ export async function compare(
   await Bun.write(
     reportPath,
     withTimings(
-      renderReport({ already: verdict.already, fresh: verdict.fresh, components }),
+      renderReport({
+        already: verdict.already,
+        fresh: verdict.fresh,
+        components,
+        // "no judge" keeps the report as it was; a judge that was configured and failed is said.
+        skipReason: verdict.skipReason === "no judge" ? undefined : verdict.skipReason,
+      }),
       timings,
     ),
   );

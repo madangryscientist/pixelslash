@@ -10,6 +10,7 @@ export type RouteRow = {
   already: number;
   fresh: number;
   skipped: boolean;
+  skipReason?: string | undefined;
   changedPixels: number;
 };
 
@@ -221,7 +222,7 @@ export function renderPixelReport(input: {
 
 function routeStatus(r: RouteRow, pixel: boolean): string {
   if (pixel) return `${r.changedPixels} changed pixels`;
-  if (r.skipped) return "skip: no judge";
+  if (r.skipped) return `skip: ${r.skipReason ?? "no judge"}`;
   return `${r.already} already on Main · ${r.fresh} new on Branch`;
 }
 
@@ -274,6 +275,8 @@ export function renderReport(input: {
   already: Violation[];
   fresh: Violation[];
   components: string[];
+  /** Set when the judge did not run: the report says so instead of claiming no violations. */
+  skipReason?: string | undefined;
 }): string {
   const shots = `<section><h2>Pages</h2>
     <div class="pair">
@@ -314,12 +317,12 @@ export function renderReport(input: {
 <body>
   <header>
     <h1>PixelSlash</h1>
-    <p>${input.already.length} already on Main · ${input.fresh.length} new on Branch</p>
+    <p>${input.skipReason ? `skip: ${esc(input.skipReason)} · nothing was judged` : `${input.already.length} already on Main · ${input.fresh.length} new on Branch`}</p>
   </header>
   ${shots}
   ${rasters}
-  ${renderViolations("Already on Main", input.already, "No violations on Main.", "already")}
-  ${renderViolations("New on Branch", input.fresh, "No new violations", "new")}
+  ${input.skipReason ? "" : renderViolations("Already on Main", input.already, "No violations on Main.", "already")}
+  ${input.skipReason ? "" : renderViolations("New on Branch", input.fresh, "No new violations", "new")}
 </body>
 </html>
 `;

@@ -1,6 +1,6 @@
 # PixelSlash
 
-Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch. Local mlx, else ollama. A standalone Bun CLI.
+Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch. Local mlx, else ollama, or opencode when you name a model. A standalone Bun CLI.
 
 ```
 bun install
@@ -33,6 +33,14 @@ With `--ds` or `--file`, one URL run captures both at the page width, then check
 Install ollama and `ollama pull qwen2.5vl` (7b latest). Fallback if that does not fit: `ollama pull qwen2.5vl:3b && ollama cp qwen2.5vl:3b qwen2.5vl`. The CLI still spawns `qwen2.5vl`.
 
 If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still writes (shots + DS, no fake violations), stdout prints `skip: no judge`, and the process exits 0. DS-match judge is optional and is not required for screenshot pixel runs.
+
+**The opencode judge (ob 1941).** Set `PIXELSLASH_OPENCODE_MODEL=<provider/model>` and every judge (the DS judge, `dev --judge`, `upload --judge`) runs `opencode run -m <model>` instead of mlx or ollama, with the shot and the DS raster as `--file`s. Unset, nothing changes: mlx, else ollama, else `skip: no judge`. No model is built in; the model is your choice, and it must read images. Check the terms of the plan behind it: OpenCode Go, for one, is for personal use only.
+
+- **The key** is opencode's own: `OPENCODE_API_KEY` in the environment, or the `auth.json` opencode keeps under `~/.local/share/opencode/` (a mounted file in the capture image). PixelSlash never reads, logs or stores it, and the capture image does not contain one. Unlike mlx and ollama this is a hosted model, so the shot and the DS raster leave the machine for that provider: it is opt-in by the variable, and invariant 4 (`--upload`) is about PixelSlash's own server, not about this.
+- **Tool-less.** A screenshot is untrusted input (text in it may say "run this command"), so the run is not allowed to call any tool. It never passes `--auto`, and it runs a private agent whose permissions deny every action (`{action:"*", resource:"*", effect:"deny"}`, injected through `OPENCODE_CONFIG_CONTENT`), in `--standalone` mode, from the shot's directory. `packages/engine/test/judge-opencode.test.ts` asserts the argv and the config; a prompt that asks that agent to run a shell command creates no file and emits no tool event, where the same prompt under `build --auto` does.
+- **When it fails** the run names why and skips the judge, as `skip: no judge` does: `skip: judge binary missing`, `judge timeout` (300 s), `judge exit` (non-zero; stderr's tail is in the message) or `judge empty answer`. The report is still written, says nothing was judged and invents no violations; exit 0.
+- The runner is exported from the engine as `askOpencode(prompt, images, { model })` for other callers.
+- **In the capture image** `docker/capture/Dockerfile` installs opencode `2.1.4` (build arg `OPENCODE_VERSION`) from a tarball pinned by sha256, so `opencode` is on the PATH; pass the key at run time (`-e OPENCODE_API_KEY=…`) with `-e PIXELSLASH_OPENCODE_MODEL=…`. Capture does not use it,.
 
 A one-pair run without a design system writes `--out/report.html` (open as `file://`): the changed-pixel count, the region and speck counts, both sizes, and Main, Branch and Diff. A changed shot (a `change` region survives) leads with those three **cropped to the changed region** — the union of the `change` regions plus 24px, clipped to the overlap of the two shots, scaled up with CSS so no extra file is written — and the full frame sits behind a `Full frame` click, where the Diff carries the region boxes (yellow for a change, dashed grey for noise). A shot with no `change` region keeps the full frame as is. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 

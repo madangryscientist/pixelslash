@@ -21,7 +21,13 @@ export {
 } from "./capture.ts";
 export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
-export type { ProcLike, SpawnProc } from "./judge.ts";
+export {
+  askOpencode,
+  JudgeError,
+  OPENCODE_MODEL_ENV,
+  type ProcLike,
+  type SpawnProc,
+} from "./judge.ts";
 export { importPngs, type ImportOptions, type ImportResult } from "./import-pngs.ts";
 export { isHttpUrl, loadRoutes } from "./routes.ts";
 export type { RunManifest } from "./run.ts";

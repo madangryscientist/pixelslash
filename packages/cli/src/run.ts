@@ -85,7 +85,7 @@ function summary(cli: Cli, result: CompareResult, io: Io): number {
     return 0;
   }
   if (result.skipped) {
-    io.stdout.write(`skip: no judge\n${link}`);
+    io.stdout.write(`skip: ${result.skipReason ?? "no judge"}\n${link}`);
     return 0;
   }
   const n = result.fresh.length;
