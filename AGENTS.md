@@ -258,6 +258,14 @@ The honesty rules are the same as the report's:
    that nothing we have is unique; if that changes, it is because a landing changed it, and the
    landing updates the text.
 
+## Speed record: `bench/PERF.md`
+
+`bench/PERF.md` is the running record of the diff engine's speed work: the baseline, every lever
+tried and its measured effect, and the current best per page. A ticket that runs `bench:perf` for
+a change updates it **in the same commit**: a run-log entry with the table, the lever's row in
+the levers table, and the dashboard if the best time moved. Only compare numbers from the same
+run; never mix numbers from different runs into one percentage.
+
 ## Repo invariants
 
 1. **The report never claims more than was measured.** When shot sizes differ,
