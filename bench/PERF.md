@@ -31,6 +31,8 @@ Best known wall time per page, and the baseline it's measured against (the same 
 Source: the ob 1932 run, 2026-10-24. The production engine (CLI and web) is still ts. The C#
 engine is bench-only so far.
 
+The phase-by-phase breakdown behind the [Bottlenecks](#bottlenecks) section.
+
 Where the best long-page time goes now (cs parallel, 223.5 ms):
 
 | Phase | ms | Share | Next lever |
@@ -53,6 +55,45 @@ Where the production ts long-page time goes (sequential, 986.2 ms):
 | startup | 102.4 | 10% | `bun build --compile` (ob 1942) |
 | rest | 39.9 | 4% | — |
 | anti_alias | 21.7 | 2% | — |
+
+## Bottlenecks
+
+Every run is five stages. Each one is a bottleneck we name, measure and target separately:
+
+1. **Load**: read the two PNGs and decode them to RGBA. The bench splits it into read,
+   inflate (zlib), unfilter (undoing PNG's row filters) and other (allocation, colour
+   conversion).
+2. **Diff**: compare the pixels (pixcmp), find anti-aliasing (aa), and group changed pixels
+   into regions.
+3. **Encode**: write the overlay PNG. Only ts does this; the bench contract doesn't ask for it.
+4. **Startup**: start the process and load the engine.
+5. **Rest**: spawn, JSON out, exit.
+
+Per stage, in ms (share of wall). The ob 1932 run, ts sequential (how production runs it),
+cs in its best config: sequential on phone, parallel decode on desktop and long. Stages don't sum exactly to wall,
+because each is its own median.
+
+| Stage | ts phone | ts desktop | ts long | cs phone | cs desktop | cs long |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Load | 18.7 (10%) | 43.6 (16%) | 242.1 (25%) | **29.0 (35%)** | **36.2 (37%)** | 92.3 (41%) |
+| Diff | 32.3 (18%) | 52.6 (20%) | 274.9 (28%) | 19.8 (24%) | 27.6 (28%) | **97.0 (43%)** |
+| Encode | 17.2 (10%) | 53.0 (20%) | **321.2 (33%)** | – | – | – |
+| Startup | **103.1 (57%)** | **104.0 (39%)** | 102.4 (10%) | 24.0 (29%) | 24.2 (25%) | 23.7 (11%) |
+| Rest | 9.0 (5%) | 10.3 (4%) | 39.9 (4%) | 8.4 (10%) | 8.8 (9%) | 9.2 (4%) |
+| **Wall** | 180.5 | 264.3 | 986.2 | 81.8 | 97.5 | 223.5 |
+
+Bold is the biggest stage in each column. Where each one lies, and what is aimed at it:
+
+| Bottleneck | Hot spot inside it | Biggest where | Lever | Ticket |
+| --- | --- | --- | --- | --- |
+| **Startup** | Bun loading the engine's imports (a flat ~103 ms) | ts on small pages: 57% of phone, 39% of desktop | `bun build --compile`; for cs, AOT / ReadyToRun | ob 1942 (ts); cs not ticketed |
+| **Encode** | deflating the overlay PNG | ts long: 33%, the biggest ts stage | skip it where nothing reads it; a lower deflate level; sharp or WASM | ob 1942 |
+| **Load** | **unfilter**: 52% of ts decode, 60% of cs decode. Inflate is 26% (ts) and 17% (cs) | cs on every page (35–41%); ts long (25%) | a SIMD native decoder (libspng, Wuffs, Skia); WASM for workerd; parallel decode on by default | ob 1942 |
+| **Diff** | **regions** (ts 127 ms, cs 56 ms on long), then pixcmp (ts 126 ms, cs 38 ms). aa is small | cs long: 43%, now the biggest cs stage | a faster region pass; SIMD pixel compare | **not ticketed** |
+| Rest | spawn and JSON | never above 10% | — | — |
+
+So once ob 1942 lands, **Diff is the bottleneck with no ticket**: it is already the largest cs
+stage on the long page, and nothing targets it yet.
 
 ## Levers: tried and queued
 
