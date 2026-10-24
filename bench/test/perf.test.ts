@@ -60,6 +60,7 @@ describe("parseArgs", () => {
       only: [...STEP_IDS],
       impls: [],
       timeoutMs: DEFAULT_TIMEOUT_MS,
+      decode: null,
     });
   });
 
@@ -73,6 +74,7 @@ describe("parseArgs", () => {
       only: ["diff-long", "capture"],
       impls: [],
       timeoutMs: DEFAULT_TIMEOUT_MS,
+      decode: null,
     });
   });
 

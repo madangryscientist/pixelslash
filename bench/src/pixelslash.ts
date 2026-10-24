@@ -1,18 +1,21 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { diffPngs } from "@pixelslash/engine";
+import { diffPngs, type PixelDiff } from "@pixelslash/engine";
 import { caseKey, type CorpusCase } from "./corpus.ts";
+import type { Rect } from "./regions.ts";
 import type { ToolResult } from "./types.ts";
+
+/** The engine's own regions, not noise ones: those are kept in the result but are not "changed". */
+export function changeRegions(diff: PixelDiff): Rect[] {
+  return diff.regions.filter((r) => r.kind === "change").map(({ x, y, w, h }) => ({ x, y, w, h }));
+}
 
 /** PixelSlash's diff at its defaults: perceptual threshold, anti-aliased edges set aside, a size mismatch is a change (packages/engine/src/diff.ts). */
 export function pixelslashDiff(base: Buffer, head: Buffer): ToolResult {
   const started = performance.now();
   const diff = diffPngs(base, head);
   const ms = performance.now() - started;
-  // The engine's own regions, not noise ones: those are kept in the result but are not "changed".
-  const regions = diff.regions
-    .filter((r) => r.kind === "change")
-    .map(({ x, y, w, h }) => ({ x, y, w, h }));
+  const regions = changeRegions(diff);
   return {
     changed: diff.changed,
     regions,

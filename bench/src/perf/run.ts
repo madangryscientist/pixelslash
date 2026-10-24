@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, type Args } from "./args.ts";
 import { writeFixtures } from "./fixtures.ts";
-import { implDump, implFailures, implTable, measureImpls } from "./impl.ts";
+import { implDump, implFailures, implTable, measureImpls, phaseTable } from "./impl.ts";
 import { say, warn } from "../say.ts";
 import { compare, regressionLine, summarise, type Comparison, type Summary } from "./stats.ts";
 import { buildWeb, freePort } from "./step-build.ts";
@@ -197,6 +197,7 @@ async function mainImpls(args: Args): Promise<number> {
     fixtures,
     rounds: args.runs,
     timeoutMs: args.timeoutMs,
+    decode: args.decode ?? undefined,
     progress: (line) => warn(`impl: ${line}`),
   });
   say("");
@@ -207,11 +208,19 @@ async function mainImpls(args: Args): Promise<number> {
     "decode, diff and self (their sum) are each implementation's own ms, median; wall is the whole process.",
   );
   say(implTable(measured, args.only));
+  const phases = phaseTable(measured, args.only);
+  if (phases !== "") {
+    say("");
+    say(
+      `phases are each implementation's own ms; startup is spawn to first engine code, rest is wall - startup - decode - diff.${args.decode === "parallel" ? " With --decode parallel the decode_* phases are summed work over both files and decode is the wall." : ""}`,
+    );
+    say(phases);
+  }
   mkdirSync(RESULTS_DIR, { recursive: true });
   const file = join(RESULTS_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
   writeFileSync(
     file,
-    `${JSON.stringify({ runs: args.runs, impls: implDump(measured) }, null, 2)}\n`,
+    `${JSON.stringify({ runs: args.runs, decode: args.decode, impls: implDump(measured) }, null, 2)}\n`,
   );
   say(`numbers: ${file}`);
   const failed = implFailures(measured);

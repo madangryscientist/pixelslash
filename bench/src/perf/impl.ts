@@ -5,15 +5,29 @@
  * and the wall time of the process is reported beside them. Implementations take turns (A B A B ...)
  * for every step in every round, as the ref comparison does, so a slow patch of the machine lands on
  * all of them.
+ *
+ * An implementation that reports `phases` (ob 1932) also gets a phase table: the decode split, each
+ * diff phase, `startup` (spawn stamp to its first code) and `rest` (wall minus startup, decode and
+ * diff: reading the files' directory entries, writing JSON, exit). A dash is a phase it does not report.
  */
 import { join } from "node:path";
-import { describeFailure, invokeImpl, type ImplFailure } from "../impl/invoke.ts";
+import { describeFailure, invokeImpl, type DecodeMode, type ImplFailure } from "../impl/invoke.ts";
 import { branchFile, mainFile } from "./fixtures.ts";
 import { median, percentile } from "./stats.ts";
 import { STEP_LABELS, type StepId } from "./steps.ts";
 import { running } from "./worktree.ts";
 
-type ImplSamples = { decode: number[]; diff: number[]; wall: number[] };
+type ImplSamples = {
+  decode: number[];
+  diff: number[];
+  wall: number[];
+  /** Spawn stamp to the first engine code; empty when the implementation does not report it. */
+  startup: number[];
+  /** wall - startup - decode - diff; empty with `startup`. */
+  rest: number[];
+  /** One list per phase name the implementation reported. */
+  phases: Record<string, number[]>;
+};
 
 /** One implementation on one step: its samples, or the failure that ended it (the rest of its rounds are skipped). */
 type ImplStep = { samples: ImplSamples; failure: ImplFailure | null };
@@ -23,12 +37,16 @@ export type ImplMeasured = {
   steps: Map<StepId, ImplStep>;
 };
 
-const empty = (): ImplStep => ({ samples: { decode: [], diff: [], wall: [] }, failure: null });
+const empty = (): ImplStep => ({
+  samples: { decode: [], diff: [], wall: [], startup: [], rest: [], phases: {} },
+  failure: null,
+});
 
 type MeasureOptions = {
   fixtures: string;
   rounds: number;
   timeoutMs: number;
+  decode?: DecodeMode | undefined;
   progress?: (line: string) => void;
 };
 
@@ -45,7 +63,7 @@ async function sampleOnce(
     m.command,
     join(opts.fixtures, mainFile(step)),
     join(opts.fixtures, branchFile(step)),
-    { timeoutMs: opts.timeoutMs, running },
+    { timeoutMs: opts.timeoutMs, running, decode: opts.decode },
   );
   if (!run.ok) slot.failure = run.failure;
   else if (run.output.verdict !== "changed")
@@ -54,6 +72,14 @@ async function sampleOnce(
     slot.samples.decode.push(run.output.decode_ms);
     slot.samples.diff.push(run.output.diff_ms);
     slot.samples.wall.push(run.wallMs);
+    const { startup_ms: startup, phases } = run.output;
+    if (startup !== undefined) {
+      slot.samples.startup.push(startup);
+      slot.samples.rest.push(run.wallMs - startup - run.output.decode_ms - run.output.diff_ms);
+    }
+    for (const [name, value] of Object.entries(phases ?? {})) {
+      (slot.samples.phases[name] ??= []).push(value);
+    }
   }
 }
 
@@ -113,6 +139,61 @@ export function implTable(measured: ImplMeasured[], steps: StepId[]): string {
     });
   });
   return lines.join("\n");
+}
+
+/** The phases in the order a diff runs them; a name an implementation adds is shown after these. */
+const PHASE_ORDER = [
+  "decode_read",
+  "decode_inflate",
+  "decode_unfilter",
+  "decode_other",
+  "pixel_compare",
+  "anti_alias",
+  "regions",
+  "overlay_encode",
+];
+
+/** A phase table per step, when any implementation reported phases. Medians, ms; `-` is not reported. */
+export function phaseTable(measured: ImplMeasured[], steps: StepId[]): string {
+  const blocks: string[] = [];
+  for (const step of steps) {
+    const slots = measured.map((m) => m.steps.get(step));
+    const reported = new Set(slots.flatMap((s) => Object.keys(s?.samples.phases ?? {})));
+    const hasStartup = slots.some((s) => (s?.samples.startup.length ?? 0) > 0);
+    if (reported.size === 0 && !hasStartup) continue;
+    const names = [
+      ...PHASE_ORDER.filter((n) => reported.has(n)),
+      ...[...reported].filter((n) => !PHASE_ORDER.includes(n)).toSorted(),
+    ];
+    const cell = (xs: number[] | undefined): string =>
+      xs && xs.length > 0 ? ms(median(xs)) : "-".padStart(9);
+    const header = ["decode", ...names, "startup", "rest", "wall"];
+    const lines = [`${STEP_LABELS[step]}: phases (median ms)`];
+    lines.push(
+      `  ${"implementation".padEnd(34)} ${header.map((h) => h.padStart(Math.max(9, h.length))).join(" ")}`,
+    );
+    measured.forEach((m, i) => {
+      const slot = m.steps.get(step);
+      const name = `#${i + 1} ${m.command}`.slice(0, 34).padEnd(34);
+      if (!slot || slot.samples.wall.length === 0) {
+        lines.push(`  ${name} no samples`);
+        return;
+      }
+      const { samples } = slot;
+      const cells = [
+        cell(samples.decode),
+        ...names.map((n) => cell(samples.phases[n])),
+        cell(samples.startup),
+        cell(samples.rest),
+        cell(samples.wall),
+      ];
+      lines.push(
+        `  ${name} ${cells.map((c, j) => c.padStart(Math.max(9, header[j]?.length ?? 9))).join(" ")}`,
+      );
+    });
+    blocks.push(lines.join("\n"));
+  }
+  return blocks.join("\n\n");
 }
 
 /** decode_ms + diff_ms of each sample, the number two implementations are compared on. */

@@ -1,11 +1,12 @@
 /** Command line of `bun bench/src/perf/run.ts` (ob 1790). */
 import { argvReader, positiveInt } from "../impl/flags.ts";
-import { DEFAULT_TIMEOUT_MS } from "../impl/invoke.ts";
+import { DEFAULT_TIMEOUT_MS, type DecodeMode } from "../impl/invoke.ts";
 import { IMPL_STEP_IDS, isStep, STEP_IDS, type StepId } from "./steps.ts";
 
 export const USAGE =
   "usage: bun bench/src/perf/run.ts [--check] [--base <ref>] [--runs <n>] [--only <step,...>]\n" +
-  "       bun bench/src/perf/run.ts --impl <cmd> [--impl <cmd> ...] [--runs <n>] [--only <step,...>] [--timeout-ms <n>]";
+  "       bun bench/src/perf/run.ts --impl <cmd> [--impl <cmd> ...] [--runs <n>] [--only <step,...>] [--timeout-ms <n>]\n" +
+  "                                [--decode parallel|sequential]";
 
 export const DEFAULT_RUNS = 10;
 
@@ -19,6 +20,8 @@ export type Args = {
   /** Outside implementations of the diff contract to time against each other instead of two refs. */
   impls: string[];
   timeoutMs: number;
+  /** `--decode` handed to each implementation; null leaves it to the implementation's default (sequential). */
+  decode: DecodeMode | null;
 };
 
 type Parsed = { args: Args; onlyGiven: boolean };
@@ -32,6 +35,11 @@ const VALUED: Record<string, (p: Parsed, raw: string) => void> = {
   "--runs": (p, raw) => void (p.args.runs = positiveInt("--runs", raw)),
   "--impl": (p, raw) => void p.args.impls.push(raw),
   "--timeout-ms": (p, raw) => void (p.args.timeoutMs = positiveInt("--timeout-ms", raw)),
+  "--decode": (p, raw) => {
+    if (raw !== "parallel" && raw !== "sequential")
+      throw new Error(`--decode must be parallel or sequential, got ${raw}\n${USAGE}`);
+    p.args.decode = raw;
+  },
   "--only": (p, raw) => {
     p.onlyGiven = true;
     const ids = raw.split(",");
@@ -51,6 +59,7 @@ export function parseArgs(argv: string[]): Args {
       only: [...STEP_IDS],
       impls: [],
       timeoutMs: DEFAULT_TIMEOUT_MS,
+      decode: null,
     },
     onlyGiven: false,
   };
@@ -67,7 +76,10 @@ export function parseArgs(argv: string[]): Args {
 
 /** `--impl` compares implementations, not refs, and only the diff steps have a contract to time. */
 function withImpls(args: Args, onlyGiven: boolean): Args {
-  if (args.impls.length === 0) return args;
+  if (args.impls.length === 0) {
+    if (args.decode !== null) throw new Error(`--decode applies to --impl only\n${USAGE}`);
+    return args;
+  }
   if (args.check || args.base !== null)
     throw new Error(`--impl compares implementations; --check and --base compare refs\n${USAGE}`);
   if (!onlyGiven) return { ...args, only: [...IMPL_STEP_IDS] };

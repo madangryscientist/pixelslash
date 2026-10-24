@@ -18,7 +18,14 @@ export type ImplOutput = {
   decode_ms: number;
   /** Its own time from decoded pixels to verdict and regions, in ms. */
   diff_ms: number;
+  /** Optional (ob 1932): ms from the harness's spawn stamp (`PS_BENCH_SPAWN_AT`) to the first line of engine code. */
+  startup_ms?: number;
+  /** Optional (ob 1932): ms per named phase of `decode_ms` and `diff_ms`; an engine reports the ones it can. */
+  phases?: Record<string, number>;
 };
+
+/** The spawn stamp the harness puts in the child's environment: epoch ms, fractional. */
+export const SPAWN_AT_ENV = "PS_BENCH_SPAWN_AT";
 
 const isMs = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
 const isCoord = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0;
@@ -42,11 +49,36 @@ export function parseImplOutput(text: string): ImplOutput {
     throw new Error(`stdout is not JSON: ${shown === "" ? "(empty)" : JSON.stringify(shown)}`);
   }
   if (!isRecord(raw) || Array.isArray(raw)) throw new Error("stdout is not a JSON object");
-  const { verdict, regions, decode_ms, diff_ms } = raw;
+  const { verdict, regions, decode_ms, diff_ms, startup_ms, phases } = raw;
   if (verdict !== "changed" && verdict !== "unchanged")
     throw new Error(`verdict must be "changed" or "unchanged", got ${JSON.stringify(verdict)}`);
   if (!Array.isArray(regions)) throw new Error("regions must be an array");
   if (!isMs(decode_ms)) throw new Error("decode_ms must be a number >= 0");
   if (!isMs(diff_ms)) throw new Error("diff_ms must be a number >= 0");
-  return { verdict, regions: regions.map(parseRegion), decode_ms, diff_ms };
+  const out: ImplOutput = { verdict, regions: regions.map(parseRegion), decode_ms, diff_ms };
+  return { ...out, ...parseTimings(startup_ms, phases) };
+}
+
+/** The optional startup_ms and phases (ob 1932): only the ones present. */
+function parseTimings(
+  startup: unknown,
+  phases: unknown,
+): Pick<ImplOutput, "startup_ms" | "phases"> {
+  const out: Pick<ImplOutput, "startup_ms" | "phases"> = {};
+  if (startup !== undefined) {
+    if (!isMs(startup)) throw new Error("startup_ms must be a number >= 0");
+    out.startup_ms = startup;
+  }
+  if (phases !== undefined) out.phases = parsePhases(phases);
+  return out;
+}
+
+function parsePhases(raw: unknown): Record<string, number> {
+  if (!isRecord(raw) || Array.isArray(raw)) throw new Error("phases must be an object");
+  const phases: Record<string, number> = {};
+  for (const [name, ms] of Object.entries(raw)) {
+    if (!isMs(ms)) throw new Error(`phases.${name} must be a number >= 0`);
+    phases[name] = ms;
+  }
+  return phases;
 }

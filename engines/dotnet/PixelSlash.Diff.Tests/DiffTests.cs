@@ -134,4 +134,86 @@ public class DiffTests
         Assert.Equal(image.Width * image.Height * 4, image.Data.Length);
         Assert.False(PixelDiff.Run(image, Contract.Decode(path)).Changed);
     }
+
+    [Fact]
+    public void PhaseTimingsArePresentAndNonNegative()
+    {
+        var main = Solid(64, 48, 255, 255, 255);
+        var head = Paint(Paint(main, 10, 12, 8, 5, 0, 0, 0), 30, 20, 6, 6, 128, 128, 128);
+        var phases = new DiffPhases();
+        var timed = PixelDiff.Run(main, head, phases: phases);
+        Assert.All([phases.PixelCompare, phases.AntiAlias, phases.Regions], ms => Assert.True(ms >= 0));
+        Assert.True(phases.PixelCompare > 0 && phases.Regions > 0);
+        // Timing is only a measurement: the verdict and regions are the untimed run's.
+        var plain = PixelDiff.Run(main, head);
+        Assert.Equal(plain.Changed, timed.Changed);
+        Assert.Equal(plain.Regions, timed.Regions);
+
+        var path = Path.Combine(RepoRoot(), "fixtures", "ds", "button.png");
+        var (_, times) = PngDecode.Read(path);
+        var map = Contract.PhaseMap(times, phases);
+        string[] expected = ["decode_read", "decode_inflate", "decode_unfilter", "decode_other", "pixel_compare", "anti_alias", "regions"];
+        Assert.Equal(expected.Order(), map.Keys.Order());
+        Assert.All(map.Values, ms => Assert.True(ms >= 0));
+        using var doc = JsonDocument.Parse(Contract.Json(timed, 1, 2, map, 3.5));
+        Assert.Equal(3.5, doc.RootElement.GetProperty("startup_ms").GetDouble());
+        foreach (var name in expected) Assert.True(doc.RootElement.GetProperty("phases").GetProperty(name).GetDouble() >= 0);
+        // The contract's other fields do not move when phases are absent.
+        using var bare = JsonDocument.Parse(Contract.Json(timed, 1, 2));
+        Assert.False(bare.RootElement.TryGetProperty("phases", out _));
+        Assert.False(bare.RootElement.TryGetProperty("startup_ms", out _));
+    }
+
+    [Fact]
+    public void TheTimedDecodeIsByteIdenticalToStbsOwn()
+    {
+        var root = RepoRoot();
+        var files = new[] { "bench/corpus", "bench/corpus-holdout", "fixtures/ds" }
+            .SelectMany(dir => Directory.EnumerateFiles(Path.Combine(root, dir), "*.png", SearchOption.AllDirectories))
+            .ToList();
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            var (image, times) = PngDecode.Read(file);
+            var stb = Contract.Decode(file);
+            Assert.True((stb.Width, stb.Height) == (image.Width, image.Height), file);
+            Assert.True(stb.Data.AsSpan().SequenceEqual(image.Data), file);
+            Assert.True(times.Total >= 0);
+        }
+        Assert.Contains(files, f => PngDecode.Read(f).Times.Split);
+    }
+
+    [Fact]
+    public void APngOutsideTheTimedPathFallsBackToStbUnsplit()
+    {
+        // 1x1, 8-bit greyscale: not RGB or RGBA, so it goes through ImageResult.FromMemory whole.
+        const string grey = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNoAAAAggCBd81ytgAAAABJRU5ErkJggg==";
+        var path = Path.Combine(Path.GetTempPath(), $"ps1932-{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(path, Convert.FromBase64String(grey));
+        try
+        {
+            var (image, times) = PngDecode.Read(path);
+            Assert.False(times.Split);
+            Assert.Equal(0, times.Inflate + times.Unfilter);
+            Assert.Equal(Contract.Decode(path).Data, image.Data);
+            Assert.DoesNotContain("decode_inflate", Contract.PhaseMap(times, new DiffPhases()).Keys);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json" }, true, false)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "sequential" }, true, false)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "parallel" }, true, true)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "both" }, false, false)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode" }, false, false)]
+    [InlineData(new string[] { "diff", "a.png", "b.png" }, false, false)]
+    public void TheDecodeSwitchIsParsed(string[] args, bool valid, bool parallel)
+    {
+        Assert.Equal(valid, Contract.TryParse(args, out _, out _, out var got));
+        Assert.Equal(parallel, got);
+    }
 }

@@ -11,6 +11,8 @@ import {
 } from "./regions.ts";
 import { labelShifts, type ShiftOptions } from "./shift.ts";
 import { clearsFloors } from "./summary.ts";
+import { clipRects, ignoreMask } from "./ignore-mask.ts";
+import { clock, reportLoop, type DiffProbe, type Raster } from "./diff-probe.ts";
 
 export type DiffOptions = {
   /**
@@ -63,8 +65,6 @@ export const DEFAULT_THRESHOLD = 0.01;
 
 /** Largest YIQ delta (squared, weighted) between black and white. */
 const MAX_YIQ_DELTA = 35215;
-
-type Raster = { data: Uint8Array; width: number; height: number };
 
 function lumaIq(data: Uint8Array, i: number): [number, number, number] {
   let r = data[i] ?? 0;
@@ -161,54 +161,28 @@ type Counts = {
   field: DiffField;
 };
 
-/** The ignore rects clipped to a `width` x `height` overlap; empty ones and repeats are dropped. */
-function clipRects(rects: IgnoreRect[], width: number, height: number): IgnoreRect[] {
-  const out: IgnoreRect[] = [];
-  for (const r of rects) {
-    const x = Math.max(0, Math.floor(r.x));
-    const y = Math.max(0, Math.floor(r.y));
-    const right = Math.min(width, Math.ceil(r.x + r.width));
-    const bottom = Math.min(height, Math.ceil(r.y + r.height));
-    if (right <= x || bottom <= y) continue;
-    const clipped = { x, y, width: right - x, height: bottom - y };
-    const seen = out.some(
-      (o) => o.x === x && o.y === y && o.width === clipped.width && o.height === clipped.height,
-    );
-    if (!seen) out.push(clipped);
-  }
-  return out;
-}
-
-/** A per-pixel flag over the overlap, set inside any rect, and how many pixels that is. */
-function ignoreMask(rects: IgnoreRect[], width: number, height: number) {
-  const mask = new Uint8Array(width * height);
-  let count = 0;
-  for (const r of rects) {
-    for (let y = r.y; y < r.y + r.height; y++) {
-      const row = mask.subarray(y * width + r.x, y * width + r.x + r.width);
-      count += row.length - row.reduce((n, flag) => n + flag, 0);
-      row.fill(1);
-    }
-  }
-  return { mask, count };
-}
-
 type Overlap = {
   width: number;
   height: number;
   maxDelta: number;
   skip: Uint8Array;
   field: DiffField;
+  /** Milliseconds spent in the anti-alias test; only counted when a probe is attached. */
+  antialiasMs: { total: number } | null;
 };
 
 /** Classify the pixel at overlap index `at` into `o.field`; ignored pixels never get here. */
-function classify(a: PNG, b: PNG, at: number, o: Overlap) {
+function classify(a: Raster, b: Raster, at: number, o: Overlap) {
   const x = at % o.width;
   const y = (at - x) / o.width;
   const delta = colourDelta(a.data, (y * a.width + x) << 2, b.data, (y * b.width + x) << 2);
   const field = o.field;
   if (Math.abs(delta) <= o.maxDelta) return "same";
-  if (isAntialiased(a, x, y, b) || isAntialiased(b, x, y, a)) {
+  const timer = o.antialiasMs;
+  const started = timer ? performance.now() : 0;
+  const edge = isAntialiased(a, x, y, b) || isAntialiased(b, x, y, a);
+  if (timer) timer.total += performance.now() - started;
+  if (edge) {
     field.kind[at] = PIXEL_ANTIALIASED;
     return "antialiased";
   }
@@ -223,11 +197,16 @@ function classify(a: PNG, b: PNG, at: number, o: Overlap) {
  * an ignore area are dropped before classification, so no region or speck can start in one.
  */
 function diffOverlap(
-  a: PNG,
-  b: PNG,
+  a: Raster,
+  b: Raster,
   overlay: PNG,
-  { threshold, ignore }: { threshold: number; ignore: DiffIgnore },
+  {
+    threshold,
+    ignore,
+    probe,
+  }: { threshold: number; ignore: DiffIgnore; probe: DiffProbe | undefined },
 ): Counts {
+  const loopStarted = clock(probe);
   const width = Math.min(a.width, b.width);
   const height = Math.min(a.height, b.height);
   const field = newField(width, height);
@@ -239,6 +218,7 @@ function diffOverlap(
     maxDelta: MAX_YIQ_DELTA * threshold * threshold,
     skip: skip.mask,
     field,
+    antialiasMs: probe ? { total: 0 } : null,
   };
   const counts: Counts = {
     changedPixels: 0,
@@ -247,10 +227,20 @@ function diffOverlap(
     ignored,
     field,
   };
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (o.skip[y * width + x]) continue;
-      const kind = classify(a, b, y * width + x, o);
+  const scanned = scanOverlap(a, b, overlay, o);
+  counts.changedPixels = scanned.changedPixels;
+  counts.antialiased = scanned.antialiased;
+  if (probe && o.antialiasMs) reportLoop(probe, o.antialiasMs.total, loopStarted);
+  return counts;
+}
+
+/** The per-pixel loop of `diffOverlap`: classify each pixel and paint the changed ones. */
+function scanOverlap(a: Raster, b: Raster, overlay: PNG, o: Overlap) {
+  const counts = { changedPixels: 0, antialiased: 0 };
+  for (let y = 0; y < o.height; y++) {
+    for (let x = 0; x < o.width; x++) {
+      if (o.skip[y * o.width + x]) continue;
+      const kind = classify(a, b, y * o.width + x, o);
       if (kind === "antialiased") counts.antialiased++;
       if (kind !== "changed") continue;
       counts.changedPixels++;
@@ -261,7 +251,7 @@ function diffOverlap(
 }
 
 /** The regions with `shift` labels applied; none when the sizes differ (there is no common grid). */
-function labelRegions(regions: Region[], a: PNG, b: PNG, options: DiffOptions): Region[] {
+function labelRegions(regions: Region[], a: Raster, b: Raster, options: DiffOptions): Region[] {
   if (a.width !== b.width || a.height !== b.height) return regions;
   return labelShifts(
     regions,
@@ -283,8 +273,40 @@ export function diffPngs(
   options: DiffOptions = {},
   ignore: DiffIgnore = {},
 ): PixelDiff {
-  const a = PNG.sync.read(main);
-  const b = PNG.sync.read(branch);
+  return diffRasters(PNG.sync.read(main), PNG.sync.read(branch), options, { ignore });
+}
+
+/** Region grouping, the shift labels and the floors, timed as `regions` when a probe is attached. */
+function groupRegions(
+  field: DiffField,
+  [a, b]: [Raster, Raster],
+  {
+    ignoredPixels,
+    options,
+    probe,
+  }: { ignoredPixels: number; options: DiffOptions; probe: DiffProbe | undefined },
+) {
+  const started = clock(probe);
+  const found = findRegions(field, options);
+  // The ratio floor is a share of what was measured: ignored pixels are not part of the denominator.
+  const measured = field.width * field.height - ignoredPixels;
+  const sizeChanged = a.width !== b.width || a.height !== b.height;
+  const regions = labelRegions(found.regions, a, b, options);
+  const changed = sizeChanged || clearsFloors(regions, measured, options);
+  probe?.("regions", clock(probe) - started);
+  return { regions, specks: found.specks, changed };
+}
+
+/**
+ * `diffPngs` from decoded pixels: the benchmark decodes (and times the decoding) itself, and may
+ * decode both at once. A `probe` is told how long each phase took; without one nothing is timed.
+ */
+export function diffRasters(
+  a: Raster,
+  b: Raster,
+  options: DiffOptions = {},
+  { ignore = {}, probe }: { ignore?: DiffIgnore; probe?: DiffProbe } = {},
+): PixelDiff {
   const overlay = new PNG({
     width: Math.max(a.width, b.width),
     height: Math.max(a.height, b.height),
@@ -292,22 +314,25 @@ export function diffPngs(
   const { changedPixels, antialiased, ignoredPixels, ignored, field } = diffOverlap(a, b, overlay, {
     threshold: options.threshold ?? DEFAULT_THRESHOLD,
     ignore,
+    probe,
   });
-  const found = findRegions(field, options);
-  const { specks } = found;
-  // The ratio floor is a share of what was measured: ignored pixels are not part of the denominator.
-  const measured = field.width * field.height - ignoredPixels;
-  const sizeChanged = a.width !== b.width || a.height !== b.height;
-  const regions = labelRegions(found.regions, a, b, options);
+  const { regions, specks, changed } = groupRegions(field, [a, b], {
+    ignoredPixels,
+    options,
+    probe,
+  });
+  const encodeStarted = clock(probe);
+  const encoded = PNG.sync.write(overlay);
+  probe?.("overlay_encode", clock(probe) - encodeStarted);
   return {
-    changed: sizeChanged || clearsFloors(regions, measured, options),
+    changed,
     ignoredPixels,
     ignored,
     changedPixels,
     antialiased,
     regions,
     specks,
-    overlay: PNG.sync.write(overlay),
+    overlay: encoded,
     width: overlay.width,
     height: overlay.height,
     mainWidth: a.width,

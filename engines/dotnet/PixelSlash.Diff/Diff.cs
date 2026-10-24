@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace PixelSlash.Diff;
 
 /// <summary>Decoded RGBA, 8 bits a channel, rows top to bottom.</summary>
@@ -5,6 +7,18 @@ public sealed record Raster(byte[] Data, int Width, int Height);
 
 /// <summary>What the contract asks for: the verdict and the boxes of the `change` regions.</summary>
 public sealed record DiffResult(bool Changed, IReadOnlyList<Region> Regions, int ChangedPixels, int Antialiased);
+
+/// <summary>
+/// Where a diff spent its time, in ms (ob 1932): the YIQ threshold loop without the anti-alias test,
+/// the anti-alias test, and the region grouping with the speck, noise and shift rules. There is no
+/// overlay image, so no overlay_encode phase.
+/// </summary>
+public sealed class DiffPhases
+{
+    public double PixelCompare;
+    public double AntiAlias;
+    public double Regions;
+}
 
 /// <summary>
 /// The pixel diff of packages/engine/src/diff.ts at its defaults: YIQ distance with alpha over
@@ -20,8 +34,11 @@ public static class PixelDiff
     /// <summary>Largest YIQ delta (squared, weighted) between black and white.</summary>
     public const double MaxYiqDelta = 35215;
 
-    public static DiffResult Run(Raster a, Raster b, double threshold = DefaultThreshold)
+    /// <param name="phases">When given, filled with the time of each phase; null costs one check per pixel that reaches the anti-alias test.</param>
+    public static DiffResult Run(Raster a, Raster b, double threshold = DefaultThreshold, DiffPhases? phases = null)
     {
+        var loopStarted = phases is null ? 0 : Stopwatch.GetTimestamp();
+        long antialiasTicks = 0;
         var width = Math.Min(a.Width, b.Width);
         var height = Math.Min(a.Height, b.Height);
         var field = new DiffField(width, height);
@@ -35,7 +52,18 @@ public static class PixelDiff
                 var at = y * width + x;
                 var delta = ColourDelta(a.Data, (y * a.Width + x) << 2, b.Data, (y * b.Width + x) << 2);
                 if (Math.Abs(delta) <= maxDelta) continue;
-                if (IsAntialiased(a, x, y, b) || IsAntialiased(b, x, y, a))
+                bool edge;
+                if (phases is null)
+                {
+                    edge = IsAntialiased(a, x, y, b) || IsAntialiased(b, x, y, a);
+                }
+                else
+                {
+                    var started = Stopwatch.GetTimestamp();
+                    edge = IsAntialiased(a, x, y, b) || IsAntialiased(b, x, y, a);
+                    antialiasTicks += Stopwatch.GetTimestamp() - started;
+                }
+                if (edge)
                 {
                     field.Kind[at] = DiffField.Antialiased;
                     antialiased++;
@@ -48,10 +76,18 @@ public static class PixelDiff
             }
         }
 
+        var regionsStarted = phases is null ? 0 : Stopwatch.GetTimestamp();
+        if (phases is not null)
+        {
+            var loopTicks = regionsStarted - loopStarted;
+            phases.AntiAlias = antialiasTicks * 1000.0 / Stopwatch.Frequency;
+            phases.PixelCompare = (loopTicks - antialiasTicks) * 1000.0 / Stopwatch.Frequency;
+        }
         var regions = Regions.Find(field);
         var sizeChanged = a.Width != b.Width || a.Height != b.Height;
         if (!sizeChanged) regions = Shift.Label(regions, a, b, maxDelta);
         var surviving = regions.Where(r => r.Kind == RegionKind.Change).Sum(r => r.ChangedPixels);
+        if (phases is not null) phases.Regions = (Stopwatch.GetTimestamp() - regionsStarted) * 1000.0 / Stopwatch.Frequency;
         return new DiffResult(sizeChanged || surviving > 0, regions, changedPixels, antialiased);
     }
 

@@ -184,6 +184,60 @@ It prints **one JSON object** on stdout and nothing else (stderr is free for log
 }
 ```
 
+**Optional: `startup_ms` and `phases` (ob 1932).** An implementation may also print where its
+time went; an output without them still conforms, and nothing reads them but the perf table:
+
+```jsonc
+{
+  "startup_ms": 41.2,                        // spawn stamp to its first line of engine code
+  "phases": {                                // ms per named phase, each >= 0
+    "decode_read": 0.4, "decode_inflate": 9.1, "decode_unfilter": 2.3, "decode_other": 1.0,
+    "pixel_compare": 5.0, "anti_alias": 1.2, "regions": 0.6, "overlay_encode": 3.1
+  }
+}
+```
+
+```json
+{
+  "startup_ms": { "type": "number", "minimum": 0 },
+  "phases": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0 } }
+}
+```
+
+`decode_ms` and `diff_ms` keep their meaning and stay required. The phase names:
+
+| phase | inside | what it is |
+| --- | --- | --- |
+| `decode_read` | `decode_ms` | reading both files |
+| `decode_inflate` | `decode_ms` | the zlib stream |
+| `decode_unfilter` | `decode_ms` | the per-row PNG filters |
+| `decode_other` | `decode_ms` | the remainder: chunk walk, copying out, colour-type conversion, and whatever the decoder hides |
+| `pixel_compare` | `diff_ms` | the YIQ threshold loop |
+| `anti_alias` | `diff_ms` | the anti-alias test on pixels over the threshold; an engine that cannot separate it leaves it out and `pixel_compare` includes it |
+| `regions` | `diff_ms` | 24 px grouping plus the speck, noise and shift rules |
+| `overlay_encode` | `diff_ms` | the overlay PNG; only an engine that encodes one reports it |
+
+An engine reports the phases it can and leaves out the rest. The `diff_*` phases and `decode_*`
+phases add up to their `_ms` apart from the clock reads between them; the sums are the check that
+nothing is unaccounted for.
+
+`startup_ms` is measured from a stamp: the harness puts the epoch time in ms (fractional) in the
+environment variable `PS_BENCH_SPAWN_AT` just before it spawns the process, and an engine reports
+the epoch time of its first line of engine code minus that. That is the process spawn, the runtime's
+boot and module load. It is used instead of timing a no-op run of the same command (which would
+need a second contract verb, and would measure a different process): it is the same process, in the
+same run. An engine run by hand has no stamp and omits `startup_ms`. The perf table then gives
+`rest` = wall - `startup_ms` - `decode_ms` - `diff_ms`: exit, the JSON write, and the harness's own
+pipe read.
+
+**`--decode parallel|sequential` (ob 1932).** The harness appends it after `--json` when
+`bench:perf -- --impl ... --decode <mode>` is given; an implementation that supports it decodes the
+base and head at the same time for `parallel` and one after the other for `sequential`, its default.
+The verdict and regions are the same either way (a test holds that for the TypeScript implementation
+on both corpora). In parallel `decode_ms` is the wall time of the decode, and the `decode_*` phases
+are summed work over both files, so they add up to more than `decode_ms`. An implementation that
+does not know the flag may exit 2, which the harness reports as a failure.
+
 Extra fields are ignored. `regions` holds only the regions that **changed** (no "shift" or other
 kinds), may be empty, and is empty when the verdict is `unchanged`. `decode_ms` and `diff_ms` are
 **self-timed inside the process**, so start-up (a JVM, a dotnet runtime, a dynamic linker) is not in
@@ -199,12 +253,18 @@ reported against that case, by name, and the run goes on with the next one.
 `<impl>` is a command line split on whitespace (no quoting), so `./target/release/pxdiff` and
 `bun bench/src/impl/ts-diff.ts` both work. It runs from the repo root.
 
-**The reference implementation** is `bench/src/impl/ts-diff.ts`: the TypeScript engine's
-`diffPngs` behind the contract. It is the baseline, and the first thing to run to check the
-harness. Two caveats about its clocks: the engine does not expose decode separately, so `decode_ms`
-is a separate decode of both PNGs and `diff_ms` is the rest of `diffPngs` (it also encodes the
-overlay image, which the contract does not ask for, so a leaner engine is not being beaten by
-work it never did). And a cold process is slower than the warm in-process loop of `bench:perf`
+**The reference implementation** is `bench/src/impl/ts-diff.ts`: the TypeScript engine's diff
+behind the contract. It is the baseline, and the first thing to run to check the harness. It decodes
+the two files itself (`ts-decode.ts`, pngjs, with its read, inflate and unfilter steps timed by
+patching two methods of pngjs's synchronous path on the module's own prototype, not by swapping
+the decoder) and hands the pixels to the engine's `diffRasters`, the call `diffPngs` makes after its
+own decode. `diffPngs` is that decode plus `diffRasters`, so the verdict and regions are the engine's
+and the CLI's output does not move. `diff_ms` is the `diffRasters` call, which also encodes the
+overlay image the contract does not ask for (reported as `overlay_encode`, so a leaner engine is not
+being beaten by work it never did). The engine's timing hook is an optional callback that is
+`undefined` in production. `--decode parallel` decodes the head on a Bun `Worker` while the base
+decodes on the main thread; the worker's start-up is inside `decode_ms`, because the decode waits for
+it, and it is why parallel can lose on a small image. And a cold process is slower than the warm in-process loop of `bench:perf`
 (roughly 1.7x here, from JIT warm-up), so numbers from the two modes are not comparable.
 
 ### Scoring: `bench -- --impl`
@@ -236,7 +296,12 @@ Compares **implementations**, not git refs (the ref comparison above is unchange
 existing phone, desktop and long diff fixtures, one process per measurement, interleaved
 (implementation A, then B, per step, per round) after one discarded warm-up round. For each step
 the table shows the medians of `decode_ms`, `diff_ms`, their sum (`self`), the wall time around
-the process, `self`'s p95 and each implementation's `self` against the first. A failing
+the process, `self`'s p95 and each implementation's `self` against the first. When an
+implementation reports `phases`, a second table per step gives its medians for the decode, each
+phase, `startup`, `rest` and `wall` (a `-` where an implementation does not report one), and
+`--decode parallel|sequential` is handed to every implementation. The numbers in
+`bench/perf-results/` carry the same lists per sample (`startup`, `rest` and `phases`), and the
+decode mode. A failing
 implementation shows `FAILED: <reason>` for that step, the others are still timed, and the exit
 code is 1. Two copies of the same implementation land within noise of each other. It cannot be
 combined with `--check` or `--base`; `--only` takes the `diff-*` steps. It is on demand only, like
@@ -263,9 +328,26 @@ corpora, row for row, and its verdict and region boxes matched on every one of t
 Nothing keeps that true: a change to the TS diff (`diff.ts`, `regions.ts`, `shift.ts`) is not
 ported by itself, so port it and run the bench with both `--impl`s again. Two differences in what it does:
 it has no ignore areas (the contract has none), and it does not encode an overlay image, which the
-reference's `diff_ms` includes. The parity is for 8-bit PNGs, which is every shot in both corpora
+reference's `diff_ms` includes (the reference reports it as `overlay_encode`; C# has no such phase). The parity is for 8-bit PNGs, which is every shot in both corpora
 and what a browser screenshot is: StbImageSharp and pngjs round a 16-bit sample down to 8 bits
 differently, so a 16-bit pair can differ by one level before the diff starts.
+
+**Phases in C# (ob 1932).** `Stopwatch` brackets the same boundaries as the TypeScript side, with
+`anti_alias` timed on its own (a clock read around each test, so the `pixel_compare` loop minus it
+is reported). StbImageSharp's `ImageResult.FromMemory` is one call, so `PngDecode.cs` takes the steps
+stb itself takes, through stb's code: it walks the chunks, inflates through stb's public zlib entry
+point and unfilters through `stbi__create_png_image_raw`, which stb made public but with an internal
+first parameter type, so that one call is by reflection. No decoder is added or swapped, and a test
+holds the output byte-identical to `FromMemory` for every PNG in both corpora and `fixtures/ds`. The
+thin path takes only 8-bit, non-interlaced RGB or RGBA without tRNS; any other PNG goes through
+`FromMemory` whole, reports `decode_read` and `decode_other` only, and leaves out the inflate and
+unfilter phases. `--decode parallel` is `Task.WhenAll` over the two files (each read and decode on its own task).
+
+Two things the C# split cannot show cleanly, so read `decode_other` with them in mind. The runtime
+starts in tier-0 JIT, so the first image through a freshly started process pays for compiling
+stb's row loops, and that time lands in whichever phase runs the code first (mostly `decode_other`
+and `decode_unfilter`); a long-lived process would not. And `decode_other` includes the copy out of
+stb's buffer and the RGB to RGBA expansion, which stb does inside `FromMemory` too.
 
 ## The regression guard
 

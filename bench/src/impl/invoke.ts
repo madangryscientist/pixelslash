@@ -1,7 +1,10 @@
 /** Run one implementation on one pair (ob 1909): the command, a timeout, and a named failure instead of a throw. */
-import { parseImplOutput, type ImplOutput } from "./contract.ts";
+import { parseImplOutput, SPAWN_AT_ENV, type ImplOutput } from "./contract.ts";
 
 export const DEFAULT_TIMEOUT_MS = 60_000;
+
+/** `--decode`: both files at once, or one after the other (an implementation's default). */
+export type DecodeMode = "parallel" | "sequential";
 
 /** Why one invocation gave no usable answer. */
 export type ImplFailure =
@@ -32,21 +35,28 @@ export function splitCommand(command: string): string[] {
 
 type Tracked = Set<ReturnType<typeof Bun.spawn>>;
 
-/** `<command> diff <base> <head> --json`, one process. Never throws on the implementation's account. */
+/**
+ * `<command> diff <base> <head> --json [--decode <mode>]`, one process. Never throws on the
+ * implementation's account. The spawn stamp goes in the child's environment (`PS_BENCH_SPAWN_AT`, epoch
+ * ms) for an implementation that reports `startup_ms`.
+ */
 export async function invokeImpl(
   command: string,
   basePng: string,
   headPng: string,
-  options: { timeoutMs?: number; running?: Tracked } = {},
+  options: { timeoutMs?: number; running?: Tracked; decode?: DecodeMode | undefined } = {},
 ): Promise<ImplRun> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const started = performance.now();
   const wall = () => performance.now() - started;
   let proc: ReturnType<typeof Bun.spawn>;
   try {
-    proc = Bun.spawn([...splitCommand(command), "diff", basePng, headPng, "--json"], {
+    const argv = [...splitCommand(command), "diff", basePng, headPng, "--json"];
+    if (options.decode) argv.push("--decode", options.decode);
+    proc = Bun.spawn(argv, {
       stdout: "pipe",
       stderr: "pipe",
+      env: { ...process.env, [SPAWN_AT_ENV]: String(performance.timeOrigin + performance.now()) },
     });
   } catch (e) {
     return { ok: false, failure: { kind: "start", message: errorText(e) }, wallMs: wall() };
