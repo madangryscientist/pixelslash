@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
+import { DEFAULT_TIMEOUT_MS } from "../src/impl/invoke.ts";
 import { DEFAULT_RUNS, parseArgs } from "../src/perf/args.ts";
 import { STEP_IDS } from "../src/perf/steps.ts";
 import {
@@ -57,6 +58,8 @@ describe("parseArgs", () => {
       base: null,
       runs: DEFAULT_RUNS,
       only: [...STEP_IDS],
+      impls: [],
+      timeoutMs: DEFAULT_TIMEOUT_MS,
     });
   });
 
@@ -68,6 +71,8 @@ describe("parseArgs", () => {
       base: "v1",
       runs: 3,
       only: ["diff-long", "capture"],
+      impls: [],
+      timeoutMs: DEFAULT_TIMEOUT_MS,
     });
   });
 

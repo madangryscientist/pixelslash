@@ -1,8 +1,11 @@
 /** Command line of `bun bench/src/perf/run.ts` (ob 1790). */
-import { isStep, STEP_IDS, type StepId } from "./steps.ts";
+import { argvReader, positiveInt } from "../impl/flags.ts";
+import { DEFAULT_TIMEOUT_MS } from "../impl/invoke.ts";
+import { IMPL_STEP_IDS, isStep, STEP_IDS, type StepId } from "./steps.ts";
 
 export const USAGE =
-  "usage: bun bench/src/perf/run.ts [--check] [--base <ref>] [--runs <n>] [--only <step,...>]";
+  "usage: bun bench/src/perf/run.ts [--check] [--base <ref>] [--runs <n>] [--only <step,...>]\n" +
+  "       bun bench/src/perf/run.ts --impl <cmd> [--impl <cmd> ...] [--runs <n>] [--only <step,...>] [--timeout-ms <n>]";
 
 export const DEFAULT_RUNS = 10;
 
@@ -13,30 +16,65 @@ export type Args = {
   base: string | null;
   runs: number;
   only: StepId[];
+  /** Outside implementations of the diff contract to time against each other instead of two refs. */
+  impls: string[];
+  timeoutMs: number;
+};
+
+type Parsed = { args: Args; onlyGiven: boolean };
+
+const SWITCHES: Record<string, (p: Parsed) => void> = {
+  "--check": (p) => void (p.args.check = true),
+};
+
+const VALUED: Record<string, (p: Parsed, raw: string) => void> = {
+  "--base": (p, raw) => void (p.args.base = raw),
+  "--runs": (p, raw) => void (p.args.runs = positiveInt("--runs", raw)),
+  "--impl": (p, raw) => void p.args.impls.push(raw),
+  "--timeout-ms": (p, raw) => void (p.args.timeoutMs = positiveInt("--timeout-ms", raw)),
+  "--only": (p, raw) => {
+    p.onlyGiven = true;
+    const ids = raw.split(",");
+    const bad = ids.filter((id) => !isStep(id));
+    if (bad.length > 0)
+      throw new Error(`unknown step: ${bad.join(", ")} (steps: ${STEP_IDS.join(", ")})`);
+    p.args.only = STEP_IDS.filter((s) => ids.includes(s));
+  },
 };
 
 export function parseArgs(argv: string[]): Args {
-  const args: Args = { check: false, base: null, runs: DEFAULT_RUNS, only: [...STEP_IDS] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const a = argv[i] ?? "";
-    const value = (): string => {
-      const v = argv[(i += 1)];
-      if (v === undefined || v.startsWith("--")) throw new Error(`${a} needs a value\n${USAGE}`);
-      return v;
-    };
-    if (a === "--check") args.check = true;
-    else if (a === "--base") args.base = value();
-    else if (a === "--runs") {
-      const n = Number(value());
-      if (!Number.isInteger(n) || n < 1) throw new Error(`--runs needs a whole number, 1 or more`);
-      args.runs = n;
-    } else if (a === "--only") {
-      const ids = value().split(",");
-      const bad = ids.filter((id) => !isStep(id));
-      if (bad.length > 0)
-        throw new Error(`unknown step: ${bad.join(", ")} (steps: ${STEP_IDS.join(", ")})`);
-      args.only = STEP_IDS.filter((s) => ids.includes(s));
-    } else throw new Error(`unknown argument: ${a}\n${USAGE}`);
+  const parsed: Parsed = {
+    args: {
+      check: false,
+      base: null,
+      runs: DEFAULT_RUNS,
+      only: [...STEP_IDS],
+      impls: [],
+      timeoutMs: DEFAULT_TIMEOUT_MS,
+    },
+    onlyGiven: false,
+  };
+  const reader = argvReader(argv, USAGE);
+  for (let a = reader.next(); a !== undefined; a = reader.next()) {
+    const flag = SWITCHES[a];
+    const valued = VALUED[a];
+    if (flag) flag(parsed);
+    else if (valued) valued(parsed, reader.value(a));
+    else throw new Error(`unknown argument: ${a}\n${USAGE}`);
   }
+  return withImpls(parsed.args, parsed.onlyGiven);
+}
+
+/** `--impl` compares implementations, not refs, and only the diff steps have a contract to time. */
+function withImpls(args: Args, onlyGiven: boolean): Args {
+  if (args.impls.length === 0) return args;
+  if (args.check || args.base !== null)
+    throw new Error(`--impl compares implementations; --check and --base compare refs\n${USAGE}`);
+  if (!onlyGiven) return { ...args, only: [...IMPL_STEP_IDS] };
+  const outside = args.only.filter((s) => !IMPL_STEP_IDS.some((i) => i === s));
+  if (outside.length > 0)
+    throw new Error(
+      `--impl times the diff steps only (${IMPL_STEP_IDS.join(", ")}), not ${outside.join(", ")}`,
+    );
   return args;
 }

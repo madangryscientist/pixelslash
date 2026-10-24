@@ -10,9 +10,11 @@ bun run bench -- --refresh-argos   # ask VM 101 about the pairs the cache lacks,
 bun run bench -- --calibration     # plus Argos's own 19 calibration cases, streamed from the VM
 bun run bench -- --no-argos        # PixelSlash alone, prints the tables, writes nothing
 bun run bench -- --capture         # plus the capture stage: needs Docker, skipped with a message without it
+bun run bench -- --impl "<cmd>"    # score an outside implementation (see "The diff contract"); writes nothing
 bun run bench:check                # regression guard: PixelSlash against the last results file
 bun run bench:perf                 # speed, before vs after on this machine (see "Speed"); on demand only
 bun run bench:perf:check           # the same comparison; exits 1 when a step is over 25% slower
+bun run bench:perf -- --impl "<cmd>" --impl "<cmd>"   # time implementations against each other
 bunx nx run bench:corpus           # re-render the main corpus (needs chromium-headless-shell)
 bun bench/src/generate.ts --set holdout   # re-render the held-out corpus
 ```
@@ -136,6 +138,109 @@ old results.
 To see the check fail, slow the diff on head only: `PIXELSLASH_PERF_SLOW_DIFF_MS=300 bun run
 bench:perf:check -- --base HEAD --only diff-phone` adds 300 ms inside the timed diff and fails on
 `diff-phone`.
+
+## The diff contract: comparing an engine in another language
+
+A Rust, Go or C# engine can be scored and timed here without touching this repo's code, if it
+answers one command:
+
+```
+<impl> diff <base.png> <head.png> --json
+```
+
+It prints **one JSON object** on stdout and nothing else (stderr is free for logs):
+
+```jsonc
+{
+  "verdict": "changed",                      // "changed" | "unchanged"
+  "regions": [{ "x": 10, "y": 40, "w": 200, "h": 32 }],   // changed regions, base-image pixels
+  "decode_ms": 3.1,                          // the implementation's own clock: reading + decoding both PNGs
+  "diff_ms": 12.4                            // its own clock: comparing and clustering into regions
+}
+```
+
+```json
+{
+  "type": "object",
+  "required": ["verdict", "regions", "decode_ms", "diff_ms"],
+  "properties": {
+    "verdict": { "enum": ["changed", "unchanged"] },
+    "regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["x", "y", "w", "h"],
+        "properties": {
+          "x": { "type": "integer", "minimum": 0 },
+          "y": { "type": "integer", "minimum": 0 },
+          "w": { "type": "integer", "minimum": 1 },
+          "h": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "decode_ms": { "type": "number", "minimum": 0 },
+    "diff_ms": { "type": "number", "minimum": 0 }
+  }
+}
+```
+
+Extra fields are ignored. `regions` holds only the regions that **changed** (no "shift" or other
+kinds), may be empty, and is empty when the verdict is `unchanged`. `decode_ms` and `diff_ms` are
+**self-timed inside the process**, so start-up (a JVM, a dotnet runtime, a dynamic linker) is not in
+them; the harness measures wall time around the whole process separately.
+
+**Exit codes.** `0`: the JSON was printed (whatever the verdict; "changed" is not an error). Any
+other code is a failure of that pair and its stderr's first line is reported. By convention `1` is
+an unreadable or undecodable image and `2` is bad usage; the harness treats all non-zero codes
+alike. A wrong object, text that is not JSON, a process that cannot start and a process that runs
+past the timeout (`--timeout-ms`, default 60000; it is killed) are failures too. A failure is
+reported against that case, by name, and the run goes on with the next one.
+
+`<impl>` is a command line split on whitespace (no quoting), so `./target/release/pxdiff` and
+`bun bench/src/impl/ts-diff.ts` both work. It runs from the repo root.
+
+**The reference implementation** is `bench/src/impl/ts-diff.ts`: the TypeScript engine's
+`diffPngs` behind the contract. It is the baseline, and the first thing to run to check the
+harness. Two caveats about its clocks: the engine does not expose decode separately, so `decode_ms`
+is a separate decode of both PNGs and `diff_ms` is the rest of `diffPngs` (it also encodes the
+overlay image, which the contract does not ask for, so a leaner engine is not being beaten by
+work it never did). And a cold process is slower than the warm in-process loop of `bench:perf`
+(roughly 1.7x here, from JIT warm-up), so numbers from the two modes are not comparable.
+
+### Scoring: `bench -- --impl`
+
+```bash
+bun run bench -- --impl "bun bench/src/impl/ts-diff.ts"
+bun run bench -- --impl ./pxdiff --timeout-ms 20000
+```
+
+Runs the implementation over every pair in both corpora and scores it with the same rules as
+PixelSlash's own diff, in the PixelSlash columns of the usual tables; Argos's column is the cache,
+as before. The reference implementation gives the same accuracy numbers as plain `bun run bench`.
+Without `--impl` nothing changes. With it:
+
+- it **writes nothing**: `bench/results/*.json` stay the `bench:check` baseline and are never
+  overwritten by an outside implementation;
+- a failing pair is listed by case name with its reason and left out of the scores; the exit code
+  is 1 if any pair failed (a run where every pair failed stops with that message);
+- it cannot be combined with `--calibration`, `--capture` or `--refresh-argos` (that one writes the Argos cache).
+
+### Timing: `bench:perf -- --impl`
+
+```bash
+bun run bench:perf -- --impl "bun bench/src/impl/ts-diff.ts" --impl ./pxdiff
+bun run bench:perf -- --impl ./a --impl ./b --only diff-long --runs 5
+```
+
+Compares **implementations**, not git refs (the ref comparison above is unchanged). Each takes the
+existing phone, desktop and long diff fixtures, one process per measurement, interleaved
+(implementation A, then B, per step, per round) after one discarded warm-up round. For each step
+the table shows the medians of `decode_ms`, `diff_ms`, their sum (`self`), the wall time around
+the process, `self`'s p95 and each implementation's `self` against the first. A failing
+implementation shows `FAILED: <reason>` for that step, the others are still timed, and the exit
+code is 1. Two copies of the same implementation land within noise of each other. It cannot be
+combined with `--check` or `--base`; `--only` takes the `diff-*` steps. It is on demand only, like
+the rest of `bench:perf`, and numbers go to the gitignored `bench/perf-results/`.
 
 ## The regression guard
 

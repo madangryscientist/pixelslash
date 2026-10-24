@@ -4,18 +4,21 @@
  * measured back to back on this machine.
  *
  *   bun bench/src/perf/run.ts [--check] [--base <ref>] [--runs <n>] [--only <step,...>]
+ *   bun bench/src/perf/run.ts --impl <cmd> [--impl <cmd> ...] [--runs <n>] [--only <step,...>]
  *
  * The base (`--base`, else `origin/main`, else `main`) is checked out into a temporary git worktree,
  * and the base and this tree take turns (A B A B ...) for `--runs` rounds, so drift and background
  * load land on both. Nothing is compared against an earlier run, and nothing is committed: the
  * run's numbers go to bench/perf-results/, which git ignores. On demand only: never in
- * `bun run test`, the gate or a land.
+ * `bun run test`, the gate or a land. With `--impl` (ob 1909) it times outside implementations of the
+ * diff contract (bench/README.md) against each other instead of two refs; see ./impl.ts.
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, type Args } from "./args.ts";
 import { writeFixtures } from "./fixtures.ts";
+import { implDump, implFailures, implTable, measureImpls } from "./impl.ts";
 import { say, warn } from "../say.ts";
 import { compare, regressionLine, summarise, type Comparison, type Summary } from "./stats.ts";
 import { buildWeb, freePort } from "./step-build.ts";
@@ -184,7 +187,42 @@ async function measure(
 const dump = (m: Samples) => Object.fromEntries(m);
 const summary = (samples: Samples, step: StepId): Summary => summarise(samples.get(step) ?? []);
 
+/** `--impl`: the implementations take turns on the diff fixtures; exit 1 if any of them failed. */
+async function mainImpls(args: Args): Promise<number> {
+  const scratch = join(CACHE_ROOT, `run-${process.pid}`);
+  cleanups.push(() => rmSync(scratch, { recursive: true, force: true }));
+  const fixtures = join(scratch, "fixtures");
+  writeFixtures(fixtures);
+  const measured = await measureImpls(args.impls, args.only, {
+    fixtures,
+    rounds: args.runs,
+    timeoutMs: args.timeoutMs,
+    progress: (line) => warn(`impl: ${line}`),
+  });
+  say("");
+  say(
+    `perf: ${args.impls.length} implementation${args.impls.length === 1 ? "" : "s"}, ${args.runs} rounds interleaved (A B A B ...) after a warm-up round, this machine, this run.`,
+  );
+  say(
+    "decode, diff and self (their sum) are each implementation's own ms, median; wall is the whole process.",
+  );
+  say(implTable(measured, args.only));
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  const file = join(RESULTS_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+  writeFileSync(
+    file,
+    `${JSON.stringify({ runs: args.runs, impls: implDump(measured) }, null, 2)}\n`,
+  );
+  say(`numbers: ${file}`);
+  const failed = implFailures(measured);
+  if (failed.length === 0) return 0;
+  say("");
+  for (const f of failed) say(`FAIL ${f}`);
+  return 1;
+}
+
 async function main(args: Args): Promise<number> {
+  if (args.impls.length > 0) return mainImpls(args);
   await sweepStale(HEAD_ROOT);
   const baseSha = await pickBase(HEAD_ROOT, args.base);
   // The head side times the working tree, so say when that is more than the commit.

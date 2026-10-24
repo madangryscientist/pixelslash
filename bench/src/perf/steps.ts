@@ -7,6 +7,8 @@ export const STEP_IDS = [
   "capture",
   "server-build",
 ] as const;
+/** The steps an outside implementation of the diff contract can be timed on (ob 1909). */
+export const IMPL_STEP_IDS = ["diff-phone", "diff-desktop", "diff-long"] as const;
 export type StepId = (typeof STEP_IDS)[number];
 
 export const STEP_LABELS: Record<StepId, string> = {
