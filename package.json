@@ -21,6 +21,7 @@
     "bench:import-flags": "bun bench/src/import-flags.ts"
   },
   "devDependencies": {
+    "@nx/dotnet": "23.3.0",
     "@types/bun": "1.4.3",
     "@types/pngjs": "^6.0.5",
     "nx": "23.3.0",

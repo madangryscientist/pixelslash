@@ -54,6 +54,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
+| `PixelSlash.Diff`, `PixelSlash.Diff.Tests` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract, and its xunit tests. Inferred by `@nx/dotnet` (named after the `.csproj`); `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
 
 `bunfig.toml` sets `[install] linker = "isolated"`: a package sees its own
 declared dependencies and the root's, not another package's. Declare what a
@@ -69,8 +70,19 @@ bun install                       # FIRST: a fresh worktree has no node_modules,
 bun run typecheck                 # nx run-many -t typecheck  (tsc, strict)
 bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
-bun run test                      # nx run-many -t test  (Vitest under the Bun runtime)
+bun run test                      # nx run-many -t test  (Vitest under the Bun runtime, and xunit for engines/dotnet)
 ```
+
+**The gate needs the .NET SDK** since `engines/dotnet` (ob 1910): `bun run test` builds and tests
+`PixelSlash.Diff.Tests` with `dotnet`. The version is pinned twice, in `.tool-versions` (mise
+activates it in this directory, with no `mise trust` needed) and in `global.json` (what `dotnet`
+itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
+"dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
+network once. The SDK is for the gate and the bench only: it is not in the capture image or on
+the self-host. The `@nx/dotnet` plugin in `nx.json` reads the .NET projects when Nx builds its
+graph, so without an SDK **every** `nx` command fails ("Failed to register MSBuild"), not only the
+dotnet ones. `NX_DOTNET_DISABLE=true` turns the plugin off: the TS projects then run as before and
+the two dotnet projects are not in the graph.
 
 One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
 `.nx/`; add `--skip-nx-cache` to force a rerun. There is no Nx Cloud and no

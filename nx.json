@@ -9,12 +9,21 @@
       "{workspaceRoot}/tsconfig.base.json",
       "{workspaceRoot}/.oxlintrc.json",
       "{workspaceRoot}/scripts/check-slop.ts",
-      "{workspaceRoot}/nx.json"
+      "{workspaceRoot}/nx.json",
+      "{workspaceRoot}/global.json",
+      "{workspaceRoot}/.tool-versions",
+      "{workspaceRoot}/engines/dotnet/Directory.Build.*"
     ]
   },
   "targetDefaults": {
     "typecheck": { "cache": true, "inputs": ["default", "^default"] },
     "lint": { "cache": true, "inputs": ["default", "^default"] },
     "test": { "cache": true, "inputs": ["default", "^default", "{workspaceRoot}/fixtures/**/*"] }
-  }
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/dotnet",
+      "options": { "build": { "dependsOn": ["restore", "^build"] } }
+    }
+  ]
 }

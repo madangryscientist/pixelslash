@@ -242,6 +242,31 @@ code is 1. Two copies of the same implementation land within noise of each other
 combined with `--check` or `--base`; `--only` takes the `diff-*` steps. It is on demand only, like
 the rest of `bench:perf`, and numbers go to the gitignored `bench/perf-results/`.
 
+### The C# implementation: `engines/dotnet`
+
+`engines/dotnet/PixelSlash.Diff` is the TypeScript engine's diff ported to C# (.NET 10) behind the
+contract: the same YIQ threshold, anti-alias test, 24 px region grouping, speck, noise and shift
+rules, and the same overlap-only rule for shots of different sizes. PNGs are decoded with
+StbImageSharp (Unlicense or MIT). `engines/dotnet/PixelSlash.Diff.Tests` holds its xunit tests on
+tiny rasters. Both are Nx projects through `@nx/dotnet`, named after their `.csproj`, so
+`bun run test` builds and runs them. It needs the .NET SDK that `global.json` pins (see AGENTS.md).
+
+```bash
+bunx nx build PixelSlash.Diff --configuration release   # or: dotnet build engines/dotnet/PixelSlash.Diff -c Release
+bun run bench -- --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
+bun run bench:perf -- --impl "bun bench/src/impl/ts-diff.ts" \
+  --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
+```
+
+When it landed (ob 1910), its accuracy tables matched the reference implementation's on both
+corpora, row for row, and its verdict and region boxes matched on every one of the 157 pairs.
+Nothing keeps that true: a change to the TS diff (`diff.ts`, `regions.ts`, `shift.ts`) is not
+ported by itself, so port it and run the bench with both `--impl`s again. Two differences in what it does:
+it has no ignore areas (the contract has none), and it does not encode an overlay image, which the
+reference's `diff_ms` includes. The parity is for 8-bit PNGs, which is every shot in both corpora
+and what a browser screenshot is: StbImageSharp and pngjs round a 16-bit sample down to 8 bits
+differently, so a 16-bit pair can differ by one level before the diff starts.
+
 ## The regression guard
 
 `bun run bench:check` (an Nx target, `bench:check`) runs PixelSlash on both corpora, reads the
