@@ -1,0 +1,25 @@
+# The localhost opencode helper on 127.0.0.1:4180 (opencode-helper.ts): the AI explain step's model
+# when the LAN switch is on. Installed and enabled by update.sh only then. The provider key is the
+# 0600 token file below, read by the helper at start; it is not in this file. See apps/web/README.md,
+# "The AI explain step through opencode".
+[Unit]
+Description=PixelSlash opencode helper for the AI explain step
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pixelslash
+WorkingDirectory=/home/pixelslash/pixelslash/apps/web
+Environment=PATH=/home/pixelslash/.bun/bin:/home/pixelslash/.opencode/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PIXELSLASH_OPENCODE_KEY_FILE=/home/pixelslash/.config/pixelslash/opencode.key
+ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/opencode-helper.ts
+# The CT has 2 GiB and workerd holds most of it: an opencode run (about 350 MB) must not push the
+# review app out. Over the cap the run is killed and the call is a named ai_error.
+MemoryMax=500M
+PrivateTmp=true
+NoNewPrivileges=true
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

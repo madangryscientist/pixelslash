@@ -6,7 +6,7 @@ export default defineConfig({
   resolve: { alias: { "#": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {
     environment: "node",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "deploy/**/*.test.ts"],
     globalSetup: ["../../scripts/test-tmp-scope.ts"],
   },
 });

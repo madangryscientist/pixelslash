@@ -65,6 +65,16 @@ describe("the opencode judge: the call", () => {
     expect(opts.timeout).toBeGreaterThan(0);
   });
 
+  test("a call with no images runs in the directory it is given", async () => {
+    const { spawn, seen } = recorder(() => proc(ANSWER));
+    await askOpencode("summarise", [], { model: MODEL, spawn, cwd: "/work/call-1" });
+    const { cmd, opts } = seen[0]!;
+    expect(cmd).not.toContain("--file");
+    expect(cmd.at(-1)).toBe("summarise");
+    expect(opts.cwd).toBe("/work/call-1");
+    expect(opts.env!.PWD).toBe("/work/call-1");
+  });
+
   test("runs as an agent that denies every action on every resource", async () => {
     const { spawn, seen } = recorder(() => proc(ANSWER));
     await askOpencode("p", ["/x/a.png"], { model: MODEL, spawn });

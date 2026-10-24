@@ -24,6 +24,8 @@ type SpawnOptions = {
   stdout: "pipe";
   stderr: "pipe";
   timeout: number;
+  /** Kills the process when it aborts (the localhost opencode helper ties a run to its request). */
+  signal?: AbortSignal;
   cwd?: string;
   env?: Record<string, string | undefined>;
 };
@@ -139,16 +141,17 @@ export async function askVision(
 
 /**
  * `opencode run` over `images` with the tool-less judge agent: the answer, or a `JudgeError` that
- * names why there is none. `model` is `provider/model`.
+ * names why there is none. `model` is `provider/model`. The run's working directory is `cwd`, or the
+ * images' directory; a call with no images must name one.
  */
 export function askOpencode(
   prompt: string,
   images: string[],
-  input: { model: string; spawn: SpawnProc },
+  input: { model: string; spawn: SpawnProc; cwd?: string },
 ): Promise<string> {
   return runOpencode(
     opencodeArgv(input.model, prompt, images),
-    dirname(images[0] ?? "."),
+    input.cwd ?? dirname(images[0] ?? "."),
     input.spawn,
   );
 }
