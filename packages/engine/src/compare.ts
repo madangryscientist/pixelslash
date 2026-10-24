@@ -214,6 +214,7 @@ export async function compare(
       specks: manifest.specks,
       ignoredPixels: manifest.ignoredPixels,
       ignored: manifest.ignored,
+      settledBy: manifest.settledBy,
       main: written.main,
       branch: written.branch,
     });

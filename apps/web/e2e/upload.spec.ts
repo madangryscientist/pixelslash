@@ -126,13 +126,16 @@ async function checkServerDiff(
   );
   expect(second).toMatchObject({ status: "passed", diff_status: "unchanged" });
   expect(second?.baseline_key).toBe(row?.image_key);
-  expect(second?.diff_key).toMatch(/\.diff\.png$/);
+  // The second upload is byte-equal to its baseline (ob 1948): settled with no overlay written.
+  expect(second?.diff_key).toBeNull();
   const result: unknown = JSON.parse(second?.diff_result ?? "{}");
-  expect(result).toMatchObject({ sizeChanged: false, width: 1, height: 1, changedPixels: 0 });
-  const diffOut = join(await tempDir("ps-e2e-diff-"), "diff.png");
-  const object = `pixelslash-blobs/orgs/${row?.org_id}/${second?.diff_key}`;
-  await wrangler("r2", "object", "get", object, "--file", diffOut);
-  expect((await readFile(diffOut)).subarray(0, 8)).toEqual(PNG.subarray(0, 8));
+  expect(result).toMatchObject({
+    sizeChanged: false,
+    width: 1,
+    height: 1,
+    changedPixels: 0,
+    settledBy: "identical-bytes",
+  });
 }
 
 test("the CLI uploads a snapshot dir; rows and R2 objects land under the right org", async ({

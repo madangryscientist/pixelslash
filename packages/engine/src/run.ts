@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { diffPngs, type DiffIgnore, type DiffOptions, type IgnoreRect } from "./diff.ts";
 import type { Region, Specks } from "./regions.ts";
@@ -17,6 +17,8 @@ export type RunManifest = {
   ignoredPixels: number;
   /** The ignore areas the diff skipped, clipped to the overlap. */
   ignored: IgnoreRect[];
+  /** `identical-bytes` when both shots were the same bytes and nothing was diffed (ob 1948); absent when measured. */
+  settledBy?: "identical-bytes";
   createdAt: string;
   label?: string;
   /** The diff options the run was compared with; absent when none were set. */
@@ -68,6 +70,7 @@ export async function writeRunFiles(
     specks: diff.specks,
     ignoredPixels: diff.ignoredPixels,
     ignored: diff.ignored,
+    ...(diff.settledBy === "identical-bytes" && { settledBy: diff.settledBy }),
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
   if (input.label) manifest.label = input.label;
@@ -75,7 +78,9 @@ export async function writeRunFiles(
   await mkdir(dest, { recursive: true });
   await Bun.write(join(dest, "main.png"), input.main);
   await Bun.write(join(dest, "branch.png"), input.branch);
-  await Bun.write(join(dest, "diff.png"), diff.overlay);
+  // A pair of identical bytes draws no diff image; the report says so instead of showing one.
+  if (diff.overlay) await Bun.write(join(dest, "diff.png"), diff.overlay);
+  else await rm(join(dest, "diff.png"), { force: true });
   await Bun.write(join(dest, "manifest.json"), JSON.stringify(manifest));
   return {
     manifest,

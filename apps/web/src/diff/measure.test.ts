@@ -123,7 +123,10 @@ describe("failures", () => {
       branch: "feat/x",
       commit: sha(2),
       mergeBase: sha(1),
-      shots: [{ png: blank }],
+      // Not the baseline's bytes: identical ones are settled without reading it (ob 1948).
+      shots: [
+        { png: shot({ width: W, height: H, blocks: [{ x: 1, y: 1, w: 2, h: 2, rgb: RED }] }) },
+      ],
     });
     expect(branch.status).toBe("errored");
     expect(branch.error).toContain("missing from storage");

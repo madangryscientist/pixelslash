@@ -1,7 +1,8 @@
 import type { Composition } from "@pixelslash/engine/composition-entry";
+import { readPngSize } from "@pixelslash/engine/diff";
 import { and, count, eq } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
-import { sha256Hex } from "#/lib/crypto";
+import { sha256Bytes, sha256Hex } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
 import { type SentFlake, labelFlake } from "./flakes";
@@ -136,6 +137,8 @@ export async function putSnapshot(
     ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
     imageKey,
+    imageSha256: await sha256Bytes(png),
+    imageSize: readPngSize(new Uint8Array(png)),
     ciResults: ci && (await putMasks(blobs, stem, ci)),
     flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
     ...shown(input),

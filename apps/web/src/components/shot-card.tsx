@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Pill } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
+import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import type { SnapshotView } from "#/db/review";
 import { labelSummary } from "#/components/ai-notes";
 import { FlakyBadge } from "#/components/flake";
@@ -113,7 +114,8 @@ function approvedEarlierLine(shot: SnapshotView): string | null {
 
 const unchangedLine = (shot: SnapshotView) => {
   if (awaitsDecision(shot)) return CARRIED;
-  return approvedEarlierLine(shot) ?? (shot.carriedFrom ? CARRIED : "no change");
+  const settled = shot.diffResult?.settledBy ? IDENTICAL_NOTE : "no change";
+  return approvedEarlierLine(shot) ?? (shot.carriedFrom ? CARRIED : settled);
 };
 
 /** The measured change, in the words the reviewer needs; nothing invented. */

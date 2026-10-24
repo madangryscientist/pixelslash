@@ -95,11 +95,12 @@ bun run bench:perf -- --only diff-phone,capture
 bun run bench:perf:check                 # same run; exit 1 if any step's head median is >25% slower
 ```
 
-It times five steps, with the warm-up discarded, and reports the median and p95 in ms:
+It times six steps, with the warm-up discarded, and reports the median and p95 in ms:
 
 | Step | What is timed |
 | --- | --- |
 | `diff-phone`, `diff-desktop`, `diff-long` | `diffPngs` (decode, diff, region clustering) on a 390x844, a 1440x900 and a 1440x6000 pair |
+| `diff-identical` | `diffPngs` on the long page twice, the same file: the byte-equal shortcut (ob 1948) answers without decoding, so a tree without it pays the whole diff for "no change" |
 | `capture` | the real Playwright settle path (`settleCapture` plus a full-page screenshot) of a fixed page served by `Bun.serve` on localhost |
 | `server-build` | the web app as the e2e starts it (production build, `vite preview`, a fresh local D1, GitHub stubbed): ten 800x600 shots uploaded and finalised, timed from the start of the build to the verdict |
 

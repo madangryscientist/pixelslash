@@ -274,6 +274,15 @@ export const snapshots = sqliteTable(
       .default(sql`'[]'`),
     envFingerprint: text("env_fingerprint").notNull(),
     imageKey: text("image_key").notNull(),
+    /**
+     * The sha256 (hex) of the uploaded PNG's bytes and its size from the IHDR (ob 1948), computed at
+     * upload. Two shots with the same hash are the same bytes, so the diff stores them unchanged
+     * without reading either blob; the size is what such a result needs of them. Null on a shot
+     * uploaded before this existed (never backfilled) and on a removed marker: the diff then reads
+     * the blobs, as it always did.
+     */
+    imageSha256: text("image_sha256"),
+    imageSize: text("image_size", { mode: "json" }).$type<{ width: number; height: number }>(),
     baselineKey: text("baseline_key"),
     diffKey: text("diff_key"),
     diffStatus: text("diff_status", { enum: DIFF_STATUSES }),

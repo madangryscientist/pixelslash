@@ -81,6 +81,7 @@ export {
   type DiffOptions,
   type IgnoreRect,
   type PixelDiff,
+  type SettledBy,
 } from "./diff.ts";
 export type { DiffPhase, DiffProbe, Raster } from "./diff-probe.ts";
 export {

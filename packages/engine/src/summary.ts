@@ -31,6 +31,8 @@ export type DiffSummary = {
   branchWidth: number;
   branchHeight: number;
   sizeChanged: boolean;
+  /** Present only when both shots were the same bytes: nothing was decoded or compared (ob 1948). */
+  settledBy?: "identical-bytes";
 };
 
 /** The one summary of a diff, so the server and the CLI store the same thing for the same pair. */
@@ -52,6 +54,7 @@ export function summarizeDiff(result: PixelDiff): DiffSummary {
     branchHeight: result.branchHeight,
     sizeChanged:
       result.mainWidth !== result.branchWidth || result.mainHeight !== result.branchHeight,
+    ...(result.settledBy === "identical-bytes" && { settledBy: result.settledBy }),
   };
 }
 

@@ -135,8 +135,13 @@ async function storeUncompared(
           aiReview: null,
         },
   );
-  // Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot.
-  if (shot.diffKey === diffKeyOf(shot.imageKey)) await deps.blobs.delete(shot.diffKey);
+  await dropOwnOverlay(deps, shot);
+}
+
+/** Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot. */
+async function dropOwnOverlay(deps: ProcessDeps, shot: SnapshotRow): Promise<void> {
+  if (shot.diffKey && shot.diffKey === diffKeyOf(shot.imageKey))
+    await deps.blobs.delete(shot.diffKey);
 }
 
 /** Store a comparison: the shot it was against, and the open change it carries, if any (ob 1712). */
@@ -147,10 +152,11 @@ async function storeDiff(
   against: { baseline: BaselineSnapshot; carriedFrom: string | null },
 ): Promise<void> {
   const { baseline, carriedFrom } = against;
+  const diffKey = await measured.diffKey();
   await storeSnapshot(deps.db, shot.id, {
     baselineKey: baseline.imageKey,
     baselineSnapshotId: baseline.id,
-    diffKey: await measured.diffKey(),
+    diffKey,
     diffStatus: measured.changed ? "changed" : "unchanged",
     diffResult: measured.diffResult,
     rebaselineNeeded: false,
@@ -161,6 +167,9 @@ async function storeDiff(
     // An explanation was of the result this one replaces (ob 1473).
     aiReview: null,
   });
+  // A shot measured again may have had an overlay (against another baseline) that this one, the
+  // same bytes, no longer needs (ob 1948).
+  if (!diffKey) await dropOwnOverlay(deps, shot);
 }
 
 async function measureAgainst(

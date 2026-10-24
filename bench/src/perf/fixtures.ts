@@ -14,6 +14,9 @@ export const DIFF_SIZES = {
   "diff-long": { width: 1440, height: 6000 },
 } as const;
 
+/** The long page twice, byte for byte: what a build's unchanged shots are (ob 1948). */
+export const IDENTICAL_STEP = "diff-identical";
+
 export const BUILD_SHOTS = 10;
 export const BUILD_SIZE = { width: 800, height: 600 };
 
@@ -81,6 +84,10 @@ export function writeFixtures(dir: string): void {
     writeFileSync(join(dir, mainFile(name)), page(width, height, 100 + i, false));
     writeFileSync(join(dir, branchFile(name)), page(width, height, 100 + i, true));
   });
+  const long = DIFF_SIZES["diff-long"];
+  const identical = page(long.width, long.height, 100 + 2, false);
+  writeFileSync(join(dir, mainFile(IDENTICAL_STEP)), identical);
+  writeFileSync(join(dir, branchFile(IDENTICAL_STEP)), identical);
   for (let i = 0; i < BUILD_SHOTS; i += 1) {
     const { width, height } = BUILD_SIZE;
     const name = buildShotName(i);

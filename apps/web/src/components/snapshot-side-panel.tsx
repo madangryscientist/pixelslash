@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { AiExplanation } from "#/components/ai-notes";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions, OptionSource } from "#/db/schema";
@@ -33,6 +34,13 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function sizeLine(result: NonNullable<SnapshotView["diffResult"]>, main: string, branch: string) {
+  if (result.settledBy) return `${IDENTICAL_NOTE}; both shots are ${main}.`;
+  if (!result.sizeChanged)
+    return `Both shots are ${main}; compared at ${result.width}×${result.height}.`;
+  return `Main ${main} · Branch ${branch} · compared at ${result.width}×${result.height} (the overlap). The rest was not painted as changed.`;
+}
+
 /** Both sizes whenever they differ; the overlap is what the diff measured (invariant 1). */
 function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
   const result = snapshot.diffResult;
@@ -46,9 +54,7 @@ function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
   if (result) {
     const main = `${result.mainWidth}×${result.mainHeight}`;
     const branch = `${result.branchWidth}×${result.branchHeight}`;
-    line = result.sizeChanged
-      ? `Main ${main} · Branch ${branch} · compared at ${result.width}×${result.height} (the overlap). The rest was not painted as changed.`
-      : `Both shots are ${main}; compared at ${result.width}×${result.height}.`;
+    line = sizeLine(result, main, branch);
   }
   return (
     <p data-testid="sizes" className="mt-2 text-sm text-slate-600">
@@ -88,6 +94,15 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
         <dl className="mt-2 space-y-1 text-sm empty:hidden">
           <Provenance snapshot={snapshot} />
         </dl>
+        <SizeLine snapshot={snapshot} />
+      </section>
+    );
+  }
+  if (result.settledBy) {
+    return (
+      <section>
+        <Heading>Measured</Heading>
+        <p className="text-sm font-medium">Not measured: identical bytes</p>
         <SizeLine snapshot={snapshot} />
       </section>
     );
@@ -147,6 +162,14 @@ function sourceText(source: OptionSource | undefined, config: number | undefined
  * default. A server-measured shot carries what it was measured with (overrides included); a CI
  * shot only the config's.
  */
+function ignoreLine(snapshot: SnapshotView): string {
+  const n = snapshot.ignore.length;
+  if (n > 0) return `${n} ignore area${n === 1 ? "" : "s"} skipped.`;
+  return snapshot.diffResult?.settledBy
+    ? "No ignore areas."
+    : "No ignore areas: every pixel was measured.";
+}
+
 function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffOptions }) {
   const resolved = snapshot.resolvedDiff;
   const used = resolved?.options ?? options;
@@ -185,11 +208,7 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
       ) : (
         list
       )}
-      <p className="mt-2 text-sm text-slate-600">
-        {snapshot.ignore.length === 0
-          ? "No ignore areas: every pixel was measured."
-          : `${snapshot.ignore.length} ignore area${snapshot.ignore.length === 1 ? "" : "s"} skipped.`}
-      </p>
+      <p className="mt-2 text-sm text-slate-600">{ignoreLine(snapshot)}</p>
     </section>
   );
 }

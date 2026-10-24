@@ -1,8 +1,9 @@
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
+import { IDENTICAL_NOTE, identicalBody } from "./identical-note.ts";
 import { describeDiffOptions } from "./diff-options.ts";
 import { stem, type Violation } from "./judge.ts";
 import type { Region, Specks } from "./regions.ts";
-import { changeCrop, CROP_CSS, CROP_PADDING, cropFigure } from "./report-crop.ts";
+import { BOX_CSS, changeCrop, CROP_CSS, CROP_PADDING, cropFigure } from "./report-crop.ts";
 
 export type RouteRow = {
   path: string;
@@ -164,17 +165,20 @@ export function renderPixelReport(input: {
   ignoredPixels?: number;
   /** The ignore areas, clipped to the overlap, in image px. */
   ignored?: IgnoreRect[];
+  /** `identical-bytes`: both shots were the same file, nothing was decoded or diffed (ob 1948). */
+  settledBy?: "identical-bytes" | undefined;
   main: { width: number; height: number };
   branch: { width: number; height: number };
 }): string {
   const title = input.path ? `PixelSlash ${esc(input.path)}` : "PixelSlash";
-  const count = input.path
-    ? `${esc(input.path)} · ${input.changedPixels} changed pixels`
-    : `${input.changedPixels} changed pixels`;
+  const identical = input.settledBy === "identical-bytes";
+  const result = identical ? IDENTICAL_NOTE : `${input.changedPixels} changed pixels`;
+  const count = input.path ? `${esc(input.path)} · ${result}` : result;
   const ignored = input.ignored ?? [];
   const notes = headerNotes(input);
   const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
-  const body = reportBody(input, ignored);
+  const body = identical ? identicalBody() : reportBody(input, ignored);
+  const summary = identical ? "" : `<p>${esc(regionSummary(input.regions, input.specks))}</p>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -192,23 +196,16 @@ export function renderPixelReport(input: {
     figcaption { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #aaa; margin-bottom: 6px; }
     img { display: block; width: 100%; height: auto; background: #000; }
     .frame { position: relative; }
-    .ignore { position: absolute; box-sizing: border-box; pointer-events: auto; border: 1px solid #5ec8ff; background: repeating-linear-gradient(45deg, rgba(94,200,255,.55) 0 3px, rgba(0,0,0,.35) 3px 7px); }
-    .box { position: absolute; box-sizing: border-box; min-width: 6px; min-height: 6px; pointer-events: auto; }
-    .box.change { border: 2px solid #ffd400; }
-    .box.noise { border: 1px dashed #8a8a8a; }
-    .box.shift { border: 2px dotted #4dd0e1; }
     ${CROP_CSS}
-    .regions { margin: 12px 0 0; padding: 0 0 0 20px; color: #ccc; font-size: 12px; }
-    .regions .noise { color: #888; }
-    .regions .shift { color: #4dd0e1; }
+    ${BOX_CSS}
   </style>
 </head>
 <body>
   <header>
     <h1>PixelSlash</h1>
     <p>${count}</p>
-    ${notes.options}${notes.floored}
-    <p>${esc(regionSummary(input.regions, input.specks))}</p>
+    ${identical ? "" : notes.options}${notes.floored}
+    ${summary}
     <p>${sizes}</p>
     ${notes.ignoredLine}
   </header>

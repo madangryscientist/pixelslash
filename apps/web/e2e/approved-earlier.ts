@@ -24,7 +24,7 @@ export async function expectApprovedEarlier(
   );
   // The shot unchanged against main has nothing to say about an approval.
   await expect(page.getByTestId("snapshot-row").filter({ hasText: "home" })).toContainText(
-    /no change$/,
+    /identical to baseline: same bytes, not diffed$/,
   );
   await capture(page, "08-approved-earlier-build");
   await about.getByRole("link").click();

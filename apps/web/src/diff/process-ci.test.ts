@@ -39,7 +39,9 @@ describe("a project that diffs in CI", () => {
       const view = (r: typeof onCi) => ({
         build: r.build?.status,
         diffStatus: r.row.diffStatus,
-        diffResult: r.row.diffResult,
+        // The server settles identical bytes without measuring (ob 1948), which the CLI's wire
+        // result never says; everything it does say is the same.
+        diffResult: r.row.diffResult && { ...r.row.diffResult, settledBy: undefined },
         carries: r.row.carriedFrom !== null,
         reviewState: r.row.reviewState,
         baseline: r.row.baselineKey !== null,

@@ -1,4 +1,4 @@
-import { type DiffSummary, ENGINE_VERSION, diffPngs, summarizeDiff } from "./diff.ts";
+import { type DiffSummary, ENGINE_VERSION, measurePngs, summarizeDiff } from "./diff.ts";
 import type { MaskRect } from "./config-areas.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 
@@ -54,7 +54,8 @@ export type CiResult = {
 export type MeasuredShot = Pick<SnapshotEntry, "diff" | "ignore">;
 
 function measure(shot: MeasuredShot, png: Buffer, picked: PickedShot, main: Buffer): CiResult {
-  const result = diffPngs(main, png, shot.diff, { main: picked.ignore, branch: shot.ignore });
+  // Always measured, never the identical-bytes shortcut: the upload carries a mask for every result.
+  const result = measurePngs(main, png, shot.diff, { main: picked.ignore, branch: shot.ignore });
   return {
     baselineId: picked.id,
     status: result.changed ? "changed" : "unchanged",

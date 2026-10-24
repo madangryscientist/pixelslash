@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { diffPngs } from "./diff.ts";
 import { UsageError } from "./errors.ts";
@@ -124,7 +124,8 @@ async function diffMatch(
   await mkdir(dest, { recursive: true });
   await Bun.write(join(dest, "main.png"), mainPng);
   await Bun.write(join(dest, "branch.png"), branchPng);
-  await Bun.write(join(dest, "diff.png"), diff.overlay);
+  if (diff.overlay) await Bun.write(join(dest, "diff.png"), diff.overlay);
+  else await rm(join(dest, "diff.png"), { force: true });
   await Bun.write(
     join(dest, "report.html"),
     renderPixelReport({

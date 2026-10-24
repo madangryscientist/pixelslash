@@ -71,7 +71,8 @@ describe("baseline selection", () => {
       baselineKey: mainShot?.imageKey,
       rebaselineNeeded: false,
     });
-    expect(branchShot?.diffKey).toMatch(/\.diff\.png$/);
+    // The same bytes as main's: settled without a diff, so there is no overlay (ob 1948).
+    expect(branchShot?.diffKey).toBeNull();
   });
 
   test("an acceptance on the branch carries forward after a rebase", async () => {

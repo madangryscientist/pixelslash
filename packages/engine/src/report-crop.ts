@@ -49,3 +49,13 @@ export function cropFigure(
   const slab = slabStyle(shot, crop);
   return `<figure><figcaption>${shot.label}</figcaption><a class="crop" href="${shot.src}" style="aspect-ratio:${crop.w}/${crop.h}"><span class="slab" style="${slab}"><img src="${shot.src}" alt="${shot.label} (changed region)">${inner}</span></a></figure>`;
 }
+
+/** How the ignore areas and the region boxes are drawn over a shot, and the region list under it. */
+export const BOX_CSS = `.ignore { position: absolute; box-sizing: border-box; pointer-events: auto; border: 1px solid #5ec8ff; background: repeating-linear-gradient(45deg, rgba(94,200,255,.55) 0 3px, rgba(0,0,0,.35) 3px 7px); }
+    .box { position: absolute; box-sizing: border-box; min-width: 6px; min-height: 6px; pointer-events: auto; }
+    .box.change { border: 2px solid #ffd400; }
+    .box.noise { border: 1px dashed #8a8a8a; }
+    .box.shift { border: 2px dotted #4dd0e1; }
+    .regions { margin: 12px 0 0; padding: 0 0 0 20px; color: #ccc; font-size: 12px; }
+    .regions .noise { color: #888; }
+    .regions .shift { color: #4dd0e1; }`;

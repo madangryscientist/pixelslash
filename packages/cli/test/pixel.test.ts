@@ -152,10 +152,12 @@ describe("pixel run", () => {
     expect(cap.stdout).toMatch(/0 changed pixels/);
     const manifest = await readManifest(join(out, "manifest.json"));
     expect(manifest.changedPixels).toBe(0);
-    expect(existsSync(join(out, "diff.png"))).toBe(true);
+    // Byte-equal pngs settle without a diff (ob 1948): no overlay is written.
+    expect(manifest.settledBy).toBe("identical-bytes");
+    expect(existsSync(join(out, "diff.png"))).toBe(false);
     expect(cap.stdout).toContain("report.html");
     const html = await Bun.file(join(out, "report.html")).text();
-    expect(html).toContain("0 changed pixels");
+    expect(html).toContain("identical to baseline: same bytes, not diffed");
     expect(html).toContain("Main 120x40");
     expect(html).toContain("Branch 120x40");
   });

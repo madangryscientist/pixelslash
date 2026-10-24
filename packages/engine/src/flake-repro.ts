@@ -80,7 +80,7 @@ export function measureRepro(shots: Shoot[], options: DiffOptions): Repro {
       regions: diff.regions,
       width: diff.branchWidth,
       height: diff.branchHeight,
-      overlay: diff.overlay,
+      ...(diff.overlay && { overlay: diff.overlay }),
     });
   }
   const differing = runs.filter((r) => r.differed);

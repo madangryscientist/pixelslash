@@ -79,6 +79,8 @@ export type DiffResult = {
   branchHeight: number;
   /** The shots are different sizes: `changed`, and only the overlap was measured. */
   sizeChanged: boolean;
+  /** Set when the shots were the same bytes, so nothing was decoded or diffed (ob 1948). */
+  settledBy?: "identical-bytes";
 };
 
 /** What the project's model said a `change` region is (ob 1473). */

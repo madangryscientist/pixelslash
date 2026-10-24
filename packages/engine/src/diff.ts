@@ -12,7 +12,10 @@ import {
 import { labelShifts, type ShiftOptions } from "./shift.ts";
 import { clearsFloors } from "./summary.ts";
 import { clipRects, ignoreMask } from "./ignore-mask.ts";
+import { identicalBytes } from "./identical.ts";
 import { clock, reportLoop, type DiffProbe, type Raster } from "./diff-probe.ts";
+
+export { identicalResult, readPngSize } from "./identical.ts";
 
 export type DiffOptions = {
   /**
@@ -36,6 +39,12 @@ export type IgnoreRect = { x: number; y: number; width: number; height: number }
  */
 export type DiffIgnore = { main?: IgnoreRect[]; branch?: IgnoreRect[] };
 
+/**
+ * `measured`: the pixels were decoded and compared. `identical-bytes`: both PNGs were the same
+ * bytes, so nothing was decoded, compared or drawn. Never claims more than was done.
+ */
+export type SettledBy = "measured" | "identical-bytes";
+
 export type PixelDiff = {
   /** The verdict: sizes differ, or a `change` region survives and the changed pixels clear the floors. */
   changed: boolean;
@@ -51,7 +60,10 @@ export type PixelDiff = {
   regions: Region[];
   /** Boxes dropped for being below `minRegionArea`: counted, never silently lost. */
   specks: Specks;
-  overlay: Buffer;
+  /** How the verdict was reached: measured pixel by pixel, or settled by the shots being the same bytes. */
+  settledBy: SettledBy;
+  /** The diff image; null when `settledBy` is `identical-bytes`, which draws none. */
+  overlay: Buffer | null;
   width: number;
   height: number;
   mainWidth: number;
@@ -273,6 +285,20 @@ export function diffPngs(
   options: DiffOptions = {},
   ignore: DiffIgnore = {},
 ): PixelDiff {
+  const same = identicalBytes(main, branch);
+  return same ?? diffRasters(PNG.sync.read(main), PNG.sync.read(branch), options, { ignore });
+}
+
+/**
+ * `diffPngs` without the identical-bytes shortcut: always decodes and always draws an overlay, so
+ * its `overlay` is set. For a caller whose contract needs the image (a CI run's mask, ob 1727).
+ */
+export function measurePngs(
+  main: Buffer,
+  branch: Buffer,
+  options: DiffOptions = {},
+  ignore: DiffIgnore = {},
+): PixelDiff & { overlay: Buffer } {
   return diffRasters(PNG.sync.read(main), PNG.sync.read(branch), options, { ignore });
 }
 
@@ -306,7 +332,7 @@ export function diffRasters(
   b: Raster,
   options: DiffOptions = {},
   { ignore = {}, probe }: { ignore?: DiffIgnore; probe?: DiffProbe } = {},
-): PixelDiff {
+): PixelDiff & { overlay: Buffer } {
   const overlay = new PNG({
     width: Math.max(a.width, b.width),
     height: Math.max(a.height, b.height),
@@ -332,6 +358,7 @@ export function diffRasters(
     antialiased,
     regions,
     specks,
+    settledBy: "measured",
     overlay: encoded,
     width: overlay.width,
     height: overlay.height,

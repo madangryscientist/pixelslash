@@ -18,6 +18,12 @@ const view = (r: Awaited<ReturnType<typeof rows>>) =>
 
 const white = shot();
 const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
+// The same picture in other bytes: one pixel a level off white, below any threshold. Identical bytes
+// are settled without a diff or an overlay (ob 1948), so a test that needs a shot to be measured, and
+// to write its overlay, against another of the same picture sends it as this.
+const faint = { x: 1, y: 1, w: 1, h: 1, rgb: [254, 254, 254] as [number, number, number] };
+const whiteAgain = shot({ blocks: [faint] });
+const redAgain = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }, faint] });
 const names = (n: number) => Array.from({ length: n }, (_, i) => `shot-${i}`);
 const named = (list: string[], png: typeof white) => list.map((name) => ({ name, png }));
 
@@ -100,11 +106,11 @@ describe("a re-run resumes", () => {
     const clock = timed(ctx, 30_000);
     const first = await upload(
       ctx,
-      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(list, white) },
+      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(list, whiteAgain) },
       { blobs: clock.blobs, now: clock.now },
     );
-    // Identical shots are unchanged: the verdict would be `passed`, but 3 are not measured. The
-    // clock only moves on a write, and an unchanged shot also writes its overlay, so one fits.
+    // Unchanged shots: the verdict would be `passed`, but 3 are not measured. The clock only moves
+    // on a write, and a measured unchanged shot also writes its overlay, so one fits.
     expect(first.status).toBe("errored");
     expect((await rows(ctx, first)).filter((r) => r.diffStatus === null)).toHaveLength(3);
   });
@@ -124,7 +130,7 @@ describe("a re-run resumes", () => {
     const clock = timed(ctx, 10_000);
     const build = await upload(
       ctx,
-      { branch: "feat/x", commit: sha(3), mergeBase: sha(1), shots: named(list, red) },
+      { branch: "feat/x", commit: sha(3), mergeBase: sha(1), shots: named(list, redAgain) },
       { blobs: clock.blobs, now: clock.now },
     );
     expect(build.status).toBe("errored");

@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { ENGINE_VERSION, diffPngs, summarizeDiff } from "@pixelslash/engine/diff";
+import { ENGINE_VERSION, diffPngs, identicalResult, summarizeDiff } from "@pixelslash/engine/diff";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
@@ -27,8 +27,11 @@ export function diffKeyOf(imageKey: string): string {
 export type Measured = {
   changed: boolean;
   diffResult: DiffResult;
-  /** Where the overlay is. The server writes its own only when the comparison is stored. */
-  diffKey: () => Promise<string>;
+  /**
+   * Where the overlay is, or null when there is none: the shots were the same bytes, so none was
+   * drawn (ob 1948). The server writes its own only when the comparison is stored.
+   */
+  diffKey: () => Promise<string | null>;
   measuredBy: DiffLocation;
   engineVersion: string;
 };
@@ -40,6 +43,15 @@ function uiRects(resolved: ResolvedDiff | null): IgnoreRect[] {
   return (resolved?.ignore ?? []).map(({ x, y, width, height }) => ({ x, y, width, height }));
 }
 
+/** The shared size of two shots whose uploads hashed the same, or null when that is not known. */
+function sameBytes(
+  shot: SnapshotRow,
+  baseline: BaselineSnapshot,
+): { width: number; height: number } | null {
+  if (!shot.imageSha256 || shot.imageSha256 !== baseline.imageSha256) return null;
+  return shot.imageSize && baseline.imageSize ? shot.imageSize : null;
+}
+
 /** The server diff: both PNGs read and measured here. */
 export function serverComparer(deps: {
   blobs: BlobStore;
@@ -47,6 +59,17 @@ export function serverComparer(deps: {
 }): Comparer {
   const diff = deps.diff ?? diffPngs;
   return async (shot, baseline) => {
+    // The same bytes, known from the uploads' hashes: unchanged, with nothing read and no overlay.
+    // A shot without a hash or a size (older, or a marker) is read like any other.
+    const size = sameBytes(shot, baseline);
+    if (size)
+      return {
+        changed: false,
+        diffResult: summarizeDiff(identicalResult(size)),
+        measuredBy: "server",
+        engineVersion: ENGINE_VERSION,
+        diffKey: async () => null,
+      };
     const [main, branch] = await Promise.all([
       readBlob(deps.blobs, baseline.imageKey),
       readBlob(deps.blobs, shot.imageKey),
@@ -65,6 +88,8 @@ export function serverComparer(deps: {
       measuredBy: "server",
       engineVersion: ENGINE_VERSION,
       diffKey: async () => {
+        // `diff` may itself settle on the bytes (the engine's shortcut): no overlay then either.
+        if (!result.overlay) return null;
         const key = diffKeyOf(shot.imageKey);
         // One bulk copy, not a view: a blob store takes an ArrayBuffer, and a Buffer may be a view
         // into a pooled one. The overlay of a full-page shot is ~20 MB against a Worker's 128 MB.

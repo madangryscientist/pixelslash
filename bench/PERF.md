@@ -92,6 +92,13 @@ Bold is the biggest stage in each column. Where each one lies, and what is aimed
 | **Diff** | **regions** (ts 127 ms, cs 56 ms on long), then pixcmp (ts 126 ms, cs 38 ms). aa is small | cs long: 43%, now the biggest cs stage | a faster region pass; SIMD pixel compare | **not ticketed** |
 | Rest | spawn and JSON | never above 10% | — | — |
 
+**A pair that is byte-equal skips all five.** The identical-bytes shortcut (ob 1948) compares the
+two files' bytes first: equal, and there is no decode, no diff and no overlay. The `diff-identical`
+step times it on the long page (the same file twice): 665.7 ms on main, about 0.003 ms on this
+tree (the in-process timed diff; the file reads are not in it). A re-run of an unchanged page,
+which is most pages in most builds, costs a byte compare. It does nothing for a pair that differs
+by even one byte, so it moves none of the stages above for a changed page.
+
 So once ob 1942 lands, **Diff is the bottleneck with no ticket**: it is already the largest cs
 stage on the long page, and nothing targets it yet.
 
@@ -115,7 +122,7 @@ stage on the long page, and nothing targets it yet.
 | 14 | `bun build --compile` for startup | ts | ⏳ queued | — | ob 1942 |
 | 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | — | — |
 | 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | — | — |
-| 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload) | ts + web | ⏳ queued | — | ob 1948 |
+| 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - ts long without the overlay encode: about 986 − 321 = 665 ms (−33%).
@@ -142,6 +149,23 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 ## Run log
 
 Newest first. One entry per perf run that landed.
+
+### 2026-10-24 · ob 1948 · identical-bytes shortcut
+
+`bun run bench:perf -- --only diff-desktop,diff-long,diff-identical`: main (481e6e9) against this tree,
+10 interleaved rounds, one run. The step is new; main runs the bench's measuring code on its own
+engine, so it decodes and diffs the identical pair in full.
+
+| Step | main median | this tree median | change | main p95 | this tree p95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| diff + regions, desktop 1440x900 | 105.3 | 102.8 | −2.3% | 110.4 | 111.7 |
+| diff + regions, long page 1440x6000 | 714.5 | 715.2 | +0.1% | 802.3 | 758.8 |
+| identical pair, long page 1440x6000, same file twice | 665.7 | 0.003 | −100% | 2133.8 | 0.004 |
+
+The two changed pages did not move: the byte compare of two different files stops at the first
+differing byte. The identical row times the diff in-process, so it leaves out reading the two
+files and the process start. On the server the same pair is not even read: equal sha256 values
+(stored at upload) settle it with no blob read.
 
 ### 2026-10-24 · ob 1932 · per-phase timings, parallel decode
 

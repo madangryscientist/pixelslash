@@ -1,6 +1,6 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { PNG } from "pngjs";
-import { diffPngs } from "../src/diff.ts";
+import { diffPngs, measurePngs } from "../src/diff.ts";
 
 function solid(width: number, height: number, rgba: [number, number, number, number]): Buffer {
   const img = new PNG({ width, height });
@@ -30,6 +30,67 @@ function edge(grey: number): Buffer {
   return PNG.sync.write(img);
 }
 
+/** The same pixels, encoded another way: a different file, so no shortcut. */
+function reencoded(png: Buffer): Buffer {
+  return PNG.sync.write(PNG.sync.read(png), { deflateLevel: 1, filterType: 0 });
+}
+
+describe("diffPngs, identical bytes (ob 1948)", () => {
+  test("byte-equal PNGs are unchanged without a decode, a diff or an overlay", () => {
+    const png = solid(4, 2, [10, 20, 30, 255]);
+    const read = vi.spyOn(PNG.sync, "read");
+    const d = diffPngs(png, Buffer.from(png));
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
+    expect(d.settledBy).toBe("identical-bytes");
+    expect(d.changed).toBe(false);
+    expect(d.changedPixels).toBe(0);
+    expect(d.regions).toEqual([]);
+    expect(d.overlay).toBeNull();
+    expect([d.mainWidth, d.mainHeight, d.branchWidth, d.branchHeight]).toEqual([4, 2, 4, 2]);
+    expect([d.width, d.height]).toEqual([4, 2]);
+  });
+
+  test("options and ignore areas cannot change the verdict", () => {
+    const png = solid(4, 4, [1, 2, 3, 255]);
+    const area = { x: 0, y: 0, width: 2, height: 2 };
+    const d = diffPngs(
+      png,
+      Buffer.from(png),
+      { threshold: 0, minChangedPixels: 1, minRegionArea: 1 },
+      { main: [area], branch: [area] },
+    );
+    expect(d.settledBy).toBe("identical-bytes");
+    expect(d.changed).toBe(false);
+  });
+
+  test("a changed pixel takes the measured path and keeps its overlay", () => {
+    const a = solid(3, 3, [5, 5, 5, 255]);
+    const flipped = PNG.sync.read(a);
+    flipped.data[0] = 200;
+    const changed = diffPngs(a, PNG.sync.write(flipped), { minRegionArea: 1 });
+    expect(changed.settledBy).toBe("measured");
+    expect(changed.changed).toBe(true);
+    expect(changed.overlay).not.toBeNull();
+  });
+
+  test("differently encoded PNGs with the same pixels are measured, and come out unchanged", () => {
+    const a = edge(128);
+    const b = reencoded(a);
+    expect(b.equals(a)).toBe(false);
+    const d = diffPngs(a, b);
+    expect(d.settledBy).toBe("measured");
+    expect(d.changed).toBe(false);
+    expect(d.changedPixels).toBe(0);
+    expect(d.overlay).not.toBeNull();
+  });
+
+  test("identical bytes that are not a PNG are refused as before", () => {
+    const junk = Buffer.from("not a png at all, but long enough to have an IHDR-sized header");
+    expect(() => diffPngs(junk, Buffer.from(junk))).toThrow("unrecognised content");
+  });
+});
+
 describe("diffPngs", () => {
   test("identical → changedPixels 0", () => {
     const png = solid(4, 2, [10, 20, 30, 255]);
@@ -58,7 +119,7 @@ describe("diffPngs", () => {
     const taller = PNG.sync.read(solid(3, 4, [1, 2, 3, 255]));
     taller.data[0] = 9;
     const b = PNG.sync.write(taller);
-    const d = diffPngs(a, b);
+    const d = measurePngs(a, b);
     expect(d.changedPixels).toBe(1);
     expect(d.changed).toBe(true);
     expect(d.mainWidth).toBe(2);
@@ -77,7 +138,7 @@ describe("diffPngs", () => {
   test("identical overlap of different sizes → changedPixels 0, but the sizes differ so changed", () => {
     const a = solid(2, 2, [0, 0, 0, 255]);
     const b = solid(3, 2, [0, 0, 0, 255]);
-    const d = diffPngs(a, b);
+    const d = measurePngs(a, b);
     expect(d.changedPixels).toBe(0);
     expect(d.changed).toBe(true);
     const overlay = PNG.sync.read(d.overlay);
@@ -222,7 +283,7 @@ describe("diffPngs ignore areas", () => {
   });
 
   test("overlapping boxes are counted once; boxes past the overlap are clipped away", () => {
-    const d = diffPngs(blank, blank, opts, {
+    const d = measurePngs(blank, blank, opts, {
       main: [{ x: 0, y: 0, width: 10, height: 10 }],
       branch: [
         { x: 5, y: 5, width: 10, height: 10 },
@@ -237,7 +298,7 @@ describe("diffPngs ignore areas", () => {
 
   test("the same box on both shots is listed once", () => {
     const box = { x: 2, y: 2, width: 10, height: 10 };
-    const d = diffPngs(blank, blank, opts, { main: [box], branch: [box] });
+    const d = measurePngs(blank, blank, opts, { main: [box], branch: [box] });
     expect(d.ignored).toEqual([box]);
     expect(d.ignoredPixels).toBe(100);
   });

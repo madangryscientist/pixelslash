@@ -35,6 +35,9 @@ export type BaselineSnapshot = {
   ignore: IgnoreRect[];
   envFingerprint: string;
   imageKey: string;
+  /** The image's sha256 and size from upload (ob 1948); null on a shot that predates them. */
+  imageSha256: string | null;
+  imageSize: { width: number; height: number } | null;
 };
 
 /** The identity a snapshot is diffed under: name + the fixed variant. */
@@ -109,6 +112,8 @@ const baselineOf = ({
   ignore,
   envFingerprint,
   imageKey,
+  imageSha256,
+  imageSize,
 }: Candidate): BaselineSnapshot => ({
   id,
   name,
@@ -119,6 +124,8 @@ const baselineOf = ({
   ignore,
   envFingerprint,
   imageKey,
+  imageSha256,
+  imageSize,
 });
 
 /** Statement parameters besides the commit list in `queryCandidates`' WHERE (see `inChunks`). */
@@ -147,6 +154,8 @@ async function queryCandidates(db: Db, build: PickFor): Promise<Candidate[]> {
         ignore: snapshots.ignore,
         envFingerprint: snapshots.envFingerprint,
         imageKey: snapshots.imageKey,
+        imageSha256: snapshots.imageSha256,
+        imageSize: snapshots.imageSize,
         branch: builds.branch,
         commitSha: builds.commitSha,
         createdAt: builds.createdAt,
@@ -266,6 +275,8 @@ async function removedSince(
       ignore: snapshots.ignore,
       envFingerprint: snapshots.envFingerprint,
       imageKey: snapshots.imageKey,
+      imageSha256: snapshots.imageSha256,
+      imageSize: snapshots.imageSize,
     })
     .from(snapshots)
     .where(and(eq(snapshots.buildId, baselineBuildId), heldShot()));

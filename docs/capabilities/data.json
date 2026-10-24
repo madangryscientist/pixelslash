@@ -293,7 +293,7 @@
       "label": "Perceptual diff, not raw pixel-exact",
       "ps": {
         "v": "y",
-        "note": "YIQ threshold, alpha over white",
+        "note": "YIQ threshold, alpha over white; two byte-equal PNGs are settled as unchanged without decoding or diffing, the server by the sha256 stored at upload, and the report says so (ob 1948)",
         "commit": "b85f170"
       },
       "t": {
