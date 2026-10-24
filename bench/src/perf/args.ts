@@ -1,12 +1,14 @@
 /** Command line of `bun bench/src/perf/run.ts` (ob 1790). */
+import { parseCpus } from "../../env/cpulist.ts";
 import { argvReader, positiveInt } from "../impl/flags.ts";
 import { DEFAULT_TIMEOUT_MS, type DecodeMode } from "../impl/invoke.ts";
+import { defaultEnv, type EnvChoice } from "./env.ts";
 import { IMPL_STEP_IDS, isStep, STEP_IDS, type StepId } from "./steps.ts";
 
 export const USAGE =
   "usage: bun bench/src/perf/run.ts [--check] [--base <ref>] [--runs <n>] [--only <step,...>]\n" +
   "       bun bench/src/perf/run.ts --impl <cmd> [--impl <cmd> ...] [--runs <n>] [--only <step,...>] [--timeout-ms <n>]\n" +
-  "                                [--decode parallel|sequential]";
+  "                                [--decode parallel|sequential] [--env none|dedicated [--env-cpus <list>] [--env-mem <n>G|M]]";
 
 export const DEFAULT_RUNS = 10;
 
@@ -22,9 +24,11 @@ export type Args = {
   timeoutMs: number;
   /** `--decode` handed to each implementation; null leaves it to the implementation's default (sequential). */
   decode: DecodeMode | null;
+  /** `none` measures the shared desktop as it is; `dedicated` reserves cores and memory for the run (ob 1947). */
+  env: EnvChoice;
 };
 
-type Parsed = { args: Args; onlyGiven: boolean };
+type Parsed = { args: Args; onlyGiven: boolean; envGiven: boolean };
 
 const SWITCHES: Record<string, (p: Parsed) => void> = {
   "--check": (p) => void (p.args.check = true),
@@ -39,6 +43,22 @@ const VALUED: Record<string, (p: Parsed, raw: string) => void> = {
     if (raw !== "parallel" && raw !== "sequential")
       throw new Error(`--decode must be parallel or sequential, got ${raw}\n${USAGE}`);
     p.args.decode = raw;
+  },
+  "--env": (p, raw) => {
+    if (raw !== "none" && raw !== "dedicated")
+      throw new Error(`--env must be none or dedicated, got ${raw}\n${USAGE}`);
+    p.args.env.name = raw;
+  },
+  "--env-cpus": (p, raw) => {
+    parseCpus(raw);
+    p.envGiven = true;
+    p.args.env.cpus = raw;
+  },
+  "--env-mem": (p, raw) => {
+    if (!/^[1-9][0-9]{0,2}[MG]$/.test(raw))
+      throw new Error(`--env-mem must look like 4G or 512M, got ${raw}\n${USAGE}`);
+    p.envGiven = true;
+    p.args.env.mem = raw;
   },
   "--only": (p, raw) => {
     p.onlyGiven = true;
@@ -60,8 +80,10 @@ export function parseArgs(argv: string[]): Args {
       impls: [],
       timeoutMs: DEFAULT_TIMEOUT_MS,
       decode: null,
+      env: defaultEnv(),
     },
     onlyGiven: false,
+    envGiven: false,
   };
   const reader = argvReader(argv, USAGE);
   for (let a = reader.next(); a !== undefined; a = reader.next()) {
@@ -71,12 +93,18 @@ export function parseArgs(argv: string[]): Args {
     else if (valued) valued(parsed, reader.value(a));
     else throw new Error(`unknown argument: ${a}\n${USAGE}`);
   }
+  if (parsed.envGiven && parsed.args.env.name !== "dedicated")
+    throw new Error(`--env-cpus and --env-mem apply to --env dedicated only\n${USAGE}`);
   return withImpls(parsed.args, parsed.onlyGiven);
 }
 
 /** `--impl` compares implementations, not refs, and only the diff steps have a contract to time. */
 function withImpls(args: Args, onlyGiven: boolean): Args {
   if (args.impls.length === 0) {
+    if (args.env.name !== "none")
+      throw new Error(
+        `--env dedicated times --impl runs only (the ref comparison builds the web app)\n${USAGE}`,
+      );
     if (args.decode !== null) throw new Error(`--decode applies to --impl only\n${USAGE}`);
     return args;
   }

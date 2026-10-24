@@ -114,7 +114,7 @@ export function implTable(measured: ImplMeasured[], steps: StepId[]): string {
     if (si > 0) lines.push("");
     lines.push(STEP_LABELS[step]);
     lines.push(
-      `  ${"implementation".padEnd(34)} ${"decode".padStart(9)} ${"diff".padStart(9)} ${"self".padStart(9)} ${"wall".padStart(9)} ${"self p95".padStart(9)} ${"vs #1".padStart(8)}   n`,
+      `  ${"implementation".padEnd(34)} ${"decode".padStart(9)} ${"diff".padStart(9)} ${"self".padStart(9)} ${"wall".padStart(9)} ${"self p95".padStart(9)} ${"p95/med".padStart(8)} ${"vs #1".padStart(8)}   n`,
     );
     const firstSelf = selfMedian(measured[0]?.steps.get(step));
     measured.forEach((m, i) => {
@@ -134,12 +134,18 @@ export function implTable(measured: ImplMeasured[], steps: StepId[]): string {
               8,
             );
       lines.push(
-        `  ${name} ${ms(median(slot.samples.decode))} ${ms(median(slot.samples.diff))} ${ms(mine)} ${ms(median(slot.samples.wall))} ${ms(percentile(self, 95))} ${vs} ${String(self.length).padStart(3)}${slot.failure ? `  then FAILED: ${describeFailure(slot.failure)}` : ""}`,
+        `  ${name} ${ms(median(slot.samples.decode))} ${ms(median(slot.samples.diff))} ${ms(mine)} ${ms(median(slot.samples.wall))} ${ms(percentile(self, 95))} ${spread(self).padStart(8)} ${vs} ${String(self.length).padStart(3)}${slot.failure ? `  then FAILED: ${describeFailure(slot.failure)}` : ""}`,
       );
     });
   });
   return lines.join("\n");
 }
+
+/** p95 over the median of the samples: 1.00x is a steady machine, more is noise (ob 1947). */
+export const spread = (xs: number[]): string => {
+  const med = median(xs);
+  return med === 0 ? "-" : `${(percentile(xs, 95) / med).toFixed(2)}x`;
+};
 
 /** The phases in the order a diff runs them; a name an implementation adds is shown after these. */
 const PHASE_ORDER = [

@@ -61,6 +61,7 @@ describe("parseArgs", () => {
       impls: [],
       timeoutMs: DEFAULT_TIMEOUT_MS,
       decode: null,
+      env: { name: "none", cpus: "4,5,10,11", mem: "4G" },
     });
   });
 
@@ -75,7 +76,19 @@ describe("parseArgs", () => {
       impls: [],
       timeoutMs: DEFAULT_TIMEOUT_MS,
       decode: null,
+      env: { name: "none", cpus: "4,5,10,11", mem: "4G" },
     });
+  });
+
+  test("the env flags: dedicated with its own cores and memory, only for --impl runs", () => {
+    const impl = ["--impl", "bun x.ts"];
+    expect(
+      parseArgs(["--env", "dedicated", "--env-cpus", "2,3", "--env-mem", "2G", ...impl]).env,
+    ).toEqual({ name: "dedicated", cpus: "2,3", mem: "2G" });
+    expect(() => parseArgs(["--env", "dedicated"])).toThrow("--impl");
+    expect(() => parseArgs(["--env", "fast"])).toThrow("none or dedicated");
+    expect(() => parseArgs(["--env-cpus", "4,5"])).toThrow("--env dedicated only");
+    expect(() => parseArgs(["--env", "dedicated", "--env-mem", "lots", ...impl])).toThrow("4G");
   });
 
   test("a bad flag, rounds or step is refused", () => {

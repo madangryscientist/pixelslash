@@ -9,6 +9,11 @@ How the numbers are made: `bun run bench:perf -- --impl <a> --impl <b>`, 10 inte
 a warm-up, median ms, on Jacobus's desktop (busy, not a quiet machine). See `bench/README.md`.
 Perf runs are on demand only and never in the gate.
 
+> **Compare within a run and an env, not across.** Every run records its `env` (ob 1947): `shared` is
+> the desktop as it was, with the browser and the editor running; `dedicated` is `--env dedicated`,
+> with whole cores and memory reserved and boost off. Only rows from the same run and the same env
+> are compared; a `dedicated` number is not "faster" than a `shared` one, it is steadier.
+>
 > **Compare within a run, not across runs.** Interleaving makes A against B fair inside one run.
 > Two runs on different days differ by machine load: TS long-page wall time was 1132 ms in the
 > 1910 run and 986 ms in the 1932 run with the same code. Every percentage below compares rows
@@ -148,7 +153,47 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 
 ## Run log
 
-Newest first. One entry per perf run that landed.
+Newest first. One entry per perf run that landed. The `env` column says what the machine was doing
+(see the note at the top): the runs before ob 1947 are all `desktop, shared`.
+
+| Run | Ticket | env | What |
+| --- | --- | --- | --- |
+| 2026-10-24 | ob 1947 | desktop, dedicated | `--env dedicated` against `--env none`: spread of p95 over median |
+| 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
+| 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
+| 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-24 · ob 1947 · desktop, dedicated · `--env dedicated` against `--env none`
+
+Not a speed lever: it asks whether reserving cores, pinning memory and switching boost off makes a run
+steadier. Four runs of `bun run bench:perf -- --env <none|dedicated> --impl "bun bench/src/impl/ts-diff.ts"
+--impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll" --runs 15`,
+alternating, host load 0.6 to 2.8, nothing else started. The cell is `self p95 / self median`.
+
+| Page | Engine | none, run 1 | none, run 2 | dedicated, run 1 | dedicated, run 2 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| phone | ts | 1.43x | 1.06x | 1.07x | 1.02x |
+| phone | cs | 1.12x | 1.07x | 1.03x | 1.05x |
+| desktop | ts | 1.04x | 1.06x | 1.07x | 1.01x |
+| desktop | cs | 1.05x | 1.10x | 1.02x | 1.03x |
+| long | ts | 1.03x | 1.03x | 1.02x | 1.01x |
+| long | cs | 1.03x | 1.05x | 1.01x | 1.01x |
+| **mean · worst** | | | **1.09x · 1.43x** | | **1.03x · 1.07x** |
+
+With `--runs 5` (two runs each, 12 cells per env) the gap is too small to call: mean 1.04x, worst
+1.14x with `none`; mean 1.03x, worst 1.07x with `dedicated`. Fifteen rounds is the minimum that shows it.
+
+- **Steadier, not faster.** Boost off holds the reserved cores near 3.2 GHz (min 1.7, max 4.6 GHz during
+  the run) and wall medians are 1.2x to 1.4x slower than `none` (`--runs 5`: ts desktop 258 ms against
+  353 ms, cs desktop 104 ms against 130 ms). Compare engines inside one env; never a `dedicated` number
+  against a `none` one.
+- **Foreign tasks on the reserved cores** were 0 in two runs, one `systemd[1]` in another, and one
+  kernel worker (`kworker/5:4+events`) in the fourth. The sampler counts running threads outside the
+  scope on those CPUs every 250 ms.
+- The machine was quiet (load under 3), so `none` was already steady except for one 1.43x outlier.
+  The reservation matters most when the browser or a build is running; that case was not measured.
+- Engines keep their order in both envs, but the gap is not the same: cs against ts on phone wall is
+  −28% with `none` and −42% with `dedicated`, because ts is the engine that slows most with boost off.
 
 ### 2026-10-24 · ob 1948 · identical-bytes shortcut
 
@@ -212,3 +257,4 @@ The ts diff includes encoding the overlay PNG.
 - ob 1909: the language-neutral diff contract, and `--impl` for timing engines against each other.
 - ob 1910: the C# engine behind the contract.
 - ob 1932: per-phase timings, `startup_ms`, `--decode parallel|sequential`.
+- ob 1947: `--env dedicated`, reserved cores and memory for the run, and the `env` header in every result.

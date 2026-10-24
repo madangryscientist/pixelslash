@@ -308,6 +308,56 @@ code is 1. Two copies of the same implementation land within noise of each other
 combined with `--check` or `--base`; `--only` takes the `diff-*` steps. It is on demand only, like
 the rest of `bench:perf`, and numbers go to the gitignored `bench/perf-results/`.
 
+### A quiet machine: `bench:perf -- --env dedicated`
+
+```bash
+bench/env/install.sh        # once: asks first, then needs sudo
+bun run bench:perf -- --env dedicated --impl "bun bench/src/impl/ts-diff.ts" --impl ./pxdiff --runs 5
+```
+
+The desktop is shared with a browser and an editor, so a shared-run spread (p95 over the median, the
+`p95/med` column) can be large. `--env dedicated` reserves whole cores for the run: CPUs 4,5,10,11 by
+default (`--env-cpus`; a core and its SMT sibling go together, and the host keeps at least two CPUs),
+and 4G of memory (`--env-mem`, at most half the machine's; set as both `MemoryMin` and `MemoryMax`, no swap). The default is
+`--env none`, which measures the machine as it is. It needs `--impl` (the ref comparison builds the web
+app and is not timed this way).
+
+What the runner does, through the one root helper `pixelslash-bench-reserve on|off|status`:
+
+- sets `AllowedCPUs` on `system.slice`, `user.slice` and `init.scope` to the other CPUs (`--runtime`,
+  so a reboot also undoes it) and moves the runner itself into `pixelslash-bench.scope`, limited to
+  the reserved CPUs, so every child it starts runs there;
+- turns boost off (`/sys/devices/system/cpu/cpufreq/boost`) and keeps the performance governor;
+- restores all of it at the end, on SIGINT or SIGTERM and after a failure. The helper writes its
+  prior values to `/run/pixelslash-bench/state.json` before changing anything, and `off` is a full,
+  repeatable restore from that.
+
+If a run was killed so hard that nothing could restore (`kill -9`), the reservation stays until a
+reboot (`--runtime`) or an `off`: the next `--env dedicated` refuses to start and says so. Restore with
+`sudo -n /usr/local/sbin/pixelslash-bench-reserve off`.
+
+**The helper.** `bench/env/install.sh` builds it (`bun build --compile`, as you), prints what it will
+change, asks, and then installs the binary root-owned at `/usr/local/sbin/pixelslash-bench-reserve` and
+one sudoers line, `NOPASSWD` for that binary only (checked with `visudo -cf` first).
+Reinstalling first runs `off` with the installed helper, so a reservation is never left under a replaced binary. `bench/env/install.sh --uninstall` removes both. The helper takes no free-form input: the CPU list,
+memory size and pid are validated, `--pid` must belong to the user who ran sudo, and the commands it
+runs have fixed arguments. If it is not installed, `--env dedicated` is a usage error naming the install
+command; it never falls back to a shared run.
+
+**What the result says.** Every `bench/perf-results/*.json` and the printed header carry the env: its
+name, the CPU model, the reserved CPUs, memory min and max, boost, governor, the frequency the
+reserved cores measured (`scaling_cur_freq`), the host load at the start and end, the kernel, and the
+Bun and .NET versions. A sampler outside the scope reads `/proc/*/task/*/stat` four times a second and
+counts the threads that were running on a reserved CPU and are not the bench's (`other tasks seen`).
+The goal is 0. Per-CPU kernel threads (`ksoftirqd`, `kworker`, `migration`) cannot be moved by a cpuset;
+they are listed by name, not counted, and so are hardware interrupts, which a cpuset does not steer
+either.
+
+**The next step up** is what this does not do, because it needs a reboot: the kernel boot parameters
+`isolcpus=` and `nohz_full=` (with `rcu_nocbs=`) keep the scheduler tick and RCU callbacks off the
+reserved cores too, and `irqaffinity=` moves the interrupts away. Use them if the spread with
+`--env dedicated` is still not low enough.
+
 ### The C# implementation: `engines/dotnet`
 
 `engines/dotnet/PixelSlash.Diff` is the TypeScript engine's diff ported to C# (.NET 10) behind the

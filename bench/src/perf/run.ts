@@ -17,6 +17,8 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, type Args } from "./args.ts";
+import { beginEnv, defaultEnv, headerLines, type EnvHeader } from "./env.ts";
+import { realEnvDeps } from "./env-host.ts";
 import { writeFixtures } from "./fixtures.ts";
 import { implDump, implFailures, implTable, measureImpls, phaseTable } from "./impl.ts";
 import { say, warn } from "../say.ts";
@@ -69,7 +71,7 @@ async function undo(): Promise<void> {
   }
 }
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
   process.on(signal, () => {
     void cleanup().finally(() => process.exit(130));
   });
@@ -193,6 +195,8 @@ async function mainImpls(args: Args): Promise<number> {
   cleanups.push(() => rmSync(scratch, { recursive: true, force: true }));
   const fixtures = join(scratch, "fixtures");
   writeFixtures(fixtures);
+  // Dedicated: from here the runner and every child it starts are inside the reserved scope.
+  const env = await beginEnv(args.env, realEnvDeps(cleanups));
   const measured = await measureImpls(args.impls, args.only, {
     fixtures,
     rounds: args.runs,
@@ -200,7 +204,9 @@ async function mainImpls(args: Args): Promise<number> {
     decode: args.decode ?? undefined,
     progress: (line) => warn(`impl: ${line}`),
   });
+  const header = await env.finish();
   say("");
+  for (const line of headerLines(header)) say(line);
   say(
     `perf: ${args.impls.length} implementation${args.impls.length === 1 ? "" : "s"}, ${args.runs} rounds interleaved (A B A B ...) after a warm-up round, this machine, this run.`,
   );
@@ -220,7 +226,7 @@ async function mainImpls(args: Args): Promise<number> {
   const file = join(RESULTS_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
   writeFileSync(
     file,
-    `${JSON.stringify({ runs: args.runs, decode: args.decode, impls: implDump(measured) }, null, 2)}\n`,
+    `${JSON.stringify({ runs: args.runs, decode: args.decode, env: header, impls: implDump(measured) }, null, 2)}\n`,
   );
   say(`numbers: ${file}`);
   const failed = implFailures(measured);
@@ -240,13 +246,15 @@ async function main(args: Args): Promise<number> {
   const scratch = join(CACHE_ROOT, `run-${process.pid}`);
   cleanups.push(() => rmSync(scratch, { recursive: true, force: true }));
 
+  const env = await beginEnv(defaultEnv(), realEnvDeps(cleanups));
   const samples = await measure(args, await prepareTrees(baseSha), scratch);
+  const header = await env.finish();
   const head = args.only.map((s) => summary(samples.head, s));
   const rows =
     baseSha === null
       ? null
       : args.only.map((s) => compare(s, summary(samples.base, s), summary(samples.head, s)));
-  return report(args, { baseSha, headSha, rows, head, samples });
+  return report(args, { baseSha, headSha, rows, head, samples, header });
 }
 
 type Outcome = {
@@ -255,11 +263,13 @@ type Outcome = {
   rows: Comparison[] | null;
   head: Summary[];
   samples: Record<Tree["name"], Samples>;
+  header: EnvHeader;
 };
 
 /** Print the table, write the numbers, and say whether the check passed (0) or failed (1). */
-function report(args: Args, { baseSha, headSha, rows, head, samples }: Outcome): number {
+function report(args: Args, { baseSha, headSha, rows, head, samples, header }: Outcome): number {
   say("");
+  for (const line of headerLines(header)) say(line);
   say(
     baseSha === null
       ? `perf: head ${headSha} alone, ${args.runs} rounds. No base ref is available, so no comparison was made.`
@@ -271,7 +281,7 @@ function report(args: Args, { baseSha, headSha, rows, head, samples }: Outcome):
   const file = join(RESULTS_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
   writeFileSync(
     file,
-    `${JSON.stringify({ baseSha, headSha, runs: args.runs, rows, head, samples: { base: dump(samples.base), head: dump(samples.head) } }, null, 2)}\n`,
+    `${JSON.stringify({ baseSha, headSha, runs: args.runs, env: header, rows, head, samples: { base: dump(samples.base), head: dump(samples.head) } }, null, 2)}\n`,
   );
   say(`numbers: ${file}`);
 

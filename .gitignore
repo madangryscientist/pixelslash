@@ -6,3 +6,6 @@ bench/perf-results/
 engines/dotnet/**/bin/
 engines/dotnet/**/obj/
 engines/dotnet/**/TestResults/
+
+# the compiled root helper (bench/env/install.sh builds it)
+bench/env/dist/
