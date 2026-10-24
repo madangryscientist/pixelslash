@@ -115,6 +115,7 @@ stage on the long page, and nothing targets it yet.
 | 14 | `bun build --compile` for startup | ts | ⏳ queued | — | ob 1942 |
 | 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | — | — |
 | 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | — | — |
+| 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload) | ts + web | ⏳ queued | — | ob 1948 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - ts long without the overlay encode: about 986 − 321 = 665 ms (−33%).
