@@ -20,8 +20,10 @@
 
 /*
  * The page behind the cards. The components' own slate/white is the light theme; the Mocha theme
- * file remaps it under `.dark` on <html> but names no canvas, so the page's is set here: slate-50
- * in light, Mocha mantle in dark, so a card (white / base) lifts off it in both.
+ * file remaps it under `.dark` on <html> and paints mantle there (0.2.4), but that does not reach
+ * the app root: without the dark rule below, every dark shot changes (checked by pixel diff). So
+ * the canvas is set here: slate-50 in light, Mocha mantle in dark, so a card (white / base) lifts
+ * off it in both.
  */
 .app-canvas {
   background-color: #f8fafc;
@@ -33,23 +35,15 @@
 }
 
 /*
- * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.1.0 does not remap.
- * Without these a Callout's text, an error line or an outline button's hover would be a light-theme
- * colour on a dark surface. They sit here, not in a fork of the theme: delete a rule when the
- * theme ships it.
+ * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.2.4 does not remap.
+ * Without these a divider would be a light-theme colour on a dark surface. They sit here, not in a
+ * fork of the theme: delete a rule when the theme ships it. The theme already ships the text-red,
+ * border-amber and violet-hover rules with the same values, so they are not repeated.
+ * `border-red-200` stays: the theme ships 0.45 there, and the app keeps the 0.4 it has used since
+ * 0.1.0 on purpose.
  */
-.dark .text-red-700,
-.dark .text-red-800 {
-  color: #f38ba8; /* red */
-}
 .dark .border-red-200 {
   border-color: rgba(243, 139, 168, 0.4);
-}
-.dark .border-amber-200 {
-  border-color: rgba(249, 226, 175, 0.4);
-}
-.dark .hover\:bg-violet-50:hover {
-  background-color: rgba(203, 166, 247, 0.14); /* mauve tint */
 }
 .dark .divide-slate-100 > :not(:last-child) {
   border-color: #282839; /* what border-slate-100 maps to */
