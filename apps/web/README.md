@@ -136,3 +136,11 @@ for a Worker's CPU limit. On the CT's 2 vCPU a build of hackcove's 145 shots mea
 then stops at the budget: the build reads `errored` and names how many shots are left. A finalise
 sent again resumes (it keeps what was measured and diffs the rest), and `pixelslash upload` sends it
 again by itself while the count falls, so the build ends with all 145 measured and its real verdict.
+
+`vite preview` sends each request to workerd on a connection of its own (`freshConnectionPerRequest`
+in `vite.config.ts`, ob 1876). On the CT workerd closes its connection about 50 ms after it answers a
+long finalise, and the next finalise, sent at once by the CLI, was dispatched on the socket
+miniflare's undici pool had kept: `read ECONNRESET`, so a 500 `fetch failed` in the journal and a
+retry from the CLI for a request that never ran. Miniflare sets `reset: false` on every request it
+sends, so a `Connection: close` header cannot ask for this; the plugin sets `reset: true` on that
+pool. Preview only; the Cloudflare deploy does not run it.
