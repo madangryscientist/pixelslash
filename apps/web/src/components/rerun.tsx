@@ -1,8 +1,8 @@
+import { Button } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";
 import { rerunBuildShots } from "#/server/rerun";
-import { ActionButton } from "./action-button";
 
 /**
  * Partial re-runs (ob 1738): the server measures the named shots again from the PNGs it holds, and
@@ -43,17 +43,17 @@ export function RerunErrored({ projectId, buildId }: { projectId: string; buildI
   const { busy, error, run } = useRerun(projectId, buildId);
   return (
     <div className="mt-2">
-      <ActionButton
+      <Button
         variant="outline"
-        waiting={!hydrated}
+        disabled={!hydrated}
         busy={busy}
         busyLabel="Re-running…"
         onClick={() => run(null)}
-        className="px-3 py-1.5"
+        size="sm"
         data-testid="rerun-errored"
       >
         Re-run errored shots
-      </ActionButton>
+      </Button>
       <RerunError error={error} />
     </div>
   );
@@ -95,17 +95,17 @@ function RerunShotButton({
       <p className="mb-2 text-sm text-slate-600">
         Measure this shot again from the uploaded image. A review stays if the result is the same.
       </p>
-      <ActionButton
+      <Button
         variant="outline"
-        waiting={!hydrated}
+        disabled={!hydrated}
         busy={busy}
         busyLabel="Re-running…"
         onClick={() => run(snapshot.id)}
-        className="px-3 py-1.5"
+        size="sm"
         data-testid="rerun-shot"
       >
         Re-run this shot
-      </ActionButton>
+      </Button>
       <RerunError error={error} />
     </section>
   );

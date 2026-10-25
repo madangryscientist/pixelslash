@@ -83,9 +83,11 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
             {snapshot.diffError}
           </p>
         )}
-        <KeyValueList className="mt-2 empty:hidden">
-          <Provenance snapshot={snapshot} />
-        </KeyValueList>
+        {snapshot.measuredBy && (
+          <KeyValueList>
+            <Provenance snapshot={snapshot} />
+          </KeyValueList>
+        )}
         <SizeLine snapshot={snapshot} />
       </section>
     );

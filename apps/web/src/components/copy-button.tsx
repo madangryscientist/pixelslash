@@ -22,17 +22,13 @@ export function CopyLine({
   text,
   hydrated,
   testId,
-  className = "",
 }: {
   text: string;
   hydrated: boolean;
   testId: string;
-  className?: string;
 }) {
   return (
-    <div
-      className={`flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-[12.5px] text-slate-900 ${className}`}
-    >
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-[12.5px] text-slate-900">
       <code data-testid={testId} className="min-w-0 break-words">
         {text}
       </code>

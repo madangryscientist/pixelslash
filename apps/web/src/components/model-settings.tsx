@@ -1,7 +1,16 @@
 import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { Body, Card, Checkbox, Input, SectionHeading } from "@hackcove/ui";
-import { ActionButton } from "#/components/action-button";
+import {
+  Body,
+  Button,
+  Card,
+  Checkbox,
+  Code,
+  Field,
+  Input,
+  SectionHeading,
+  Stack,
+} from "@hackcove/ui";
 import type { ModelView, ModelSource } from "#/db/models";
 import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
 
@@ -35,37 +44,41 @@ export function ModelSettings({
 
   return (
     <Card data-testid="model-settings">
-      <SectionHeading className="mb-1.5">AI explanations</SectionHeading>
-      {source && <ModelInUse source={source} orgSettingsHref={orgSettingsHref} />}
-      <Body as="p" className="mb-4">
-        Any OpenAI-compatible vision endpoint. For each changed region of a branch build, the server
-        sends that region&apos;s baseline, new and diff crops to this model only, and shows its
-        label (intended, unintended or noise) and one sentence next to the region. With no model, or
-        when a call fails, the shot is reviewed as plain pixels. Nothing is sent until this is
-        saved.
-      </Body>
-      <form onSubmit={save} className="grid gap-3 text-sm sm:grid-cols-2">
-        <ModelFields
-          fields={fields}
-          setFields={setFields}
-          keySet={!!saved}
-          hydrated={hydrated}
-          owner={project ? "project" : "org"}
-        />
-        <ModelActions
-          fields={fields}
-          saved={saved}
-          busy={busy}
-          hydrated={hydrated}
-          onRemove={remove}
-          label={removeLabel(scope, source)}
-        />
-        {error && (
-          <p role="alert" className="text-sm text-red-700 sm:col-span-2">
-            {error}
-          </p>
-        )}
-      </form>
+      <Stack>
+        <SectionHeading>AI explanations</SectionHeading>
+        {source && <ModelInUse source={source} orgSettingsHref={orgSettingsHref} />}
+        <Body as="p">
+          Any OpenAI-compatible vision endpoint. For each changed region of a branch build, the
+          server sends that region&apos;s baseline, new and diff crops to this model only, and shows
+          its label (intended, unintended or noise) and one sentence next to the region. With no
+          model, or when a call fails, the shot is reviewed as plain pixels. Nothing is sent until
+          this is saved.
+        </Body>
+        <form onSubmit={save}>
+          <Stack>
+            <ModelFields
+              fields={fields}
+              setFields={setFields}
+              keySet={!!saved}
+              hydrated={hydrated}
+              owner={project ? "project" : "org"}
+            />
+            <ModelActions
+              fields={fields}
+              saved={saved}
+              busy={busy}
+              hydrated={hydrated}
+              onRemove={remove}
+              label={removeLabel(scope, source)}
+            />
+            {error && (
+              <p role="alert" className="text-sm text-red-700">
+                {error}
+              </p>
+            )}
+          </Stack>
+        </form>
+      </Stack>
     </Card>
   );
 }
@@ -167,37 +180,39 @@ function ModelFields({
   const set = (patch: Partial<Fields>) => setFields((f) => ({ ...f, ...patch }));
   return (
     <>
-      <label className="block">
-        <span className="text-slate-700">Base URL</span>
+      <Field label="Base URL" htmlFor="model-base-url-input">
         <Input
+          id="model-base-url-input"
           value={fields.baseUrl}
           placeholder={EXAMPLE.baseUrl}
           disabled={!hydrated}
           onChange={(e) => set({ baseUrl: e.target.value })}
           data-testid="model-base-url"
-          className="mt-0.5"
         />
-      </label>
-      <label className="block">
-        <span className="text-slate-700">Model</span>
+      </Field>
+      <Field label="Model" htmlFor="model-name-input">
         <Input
+          id="model-name-input"
           value={fields.model}
           placeholder={EXAMPLE.model}
           disabled={!hydrated}
           onChange={(e) => set({ model: e.target.value })}
           data-testid="model-name"
-          className="mt-0.5"
         />
-      </label>
-      <span className="block text-xs text-slate-500 sm:col-span-2">
+      </Field>
+      <span className="block text-xs text-slate-500">
         OpenCode Go works for a personal self-host (
-        <code>https://opencode.ai/inference/go/openai/v1</code>, a Go model that takes images). A
+        <Code>https://opencode.ai/inference/go/openai/v1</Code>, a Go model that takes images). A
         deployed service should use OpenCode Zen or the provider's own API, because Go is licensed
         for coding-agent traffic.
       </span>
-      <label className="block sm:col-span-2">
-        <span className="text-slate-700">API key</span>
+      <Field
+        label="API key"
+        htmlFor="model-key-input"
+        hint={`Stored for this ${owner} and never shown again. A new base URL needs its key again.`}
+      >
         <Input
+          id="model-key-input"
           type="password"
           autoComplete="off"
           value={fields.apiKey}
@@ -205,19 +220,14 @@ function ModelFields({
           disabled={!hydrated}
           onChange={(e) => set({ apiKey: e.target.value })}
           data-testid="model-key"
-          className="mt-0.5"
         />
-        <span className="block text-xs text-slate-500">
-          Stored for this {owner} and never shown again. A new base URL needs its key again.
-        </span>
-      </label>
+      </Field>
       <Checkbox
         align="start"
         checked={fields.autoPassNoise}
         disabled={!hydrated}
         onChange={(e) => set({ autoPassNoise: e.target.checked })}
         data-testid="model-auto-pass"
-        className="sm:col-span-2"
         label={
           <span>
             <span className="font-medium">Auto-pass noise</span>
@@ -250,31 +260,31 @@ function ModelActions({
   const missing =
     !fields.baseUrl.trim() || !fields.model.trim() || (!saved && !fields.apiKey.trim());
   return (
-    <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
-      <ActionButton
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
         type="submit"
-        waiting={!hydrated}
+        disabled={!hydrated}
         disabledReason={missing ? "Give the base URL, the model and the key." : undefined}
         busy={busy === "save"}
         busyLabel="Saving…"
         data-testid="model-save"
       >
         Save model
-      </ActionButton>
+      </Button>
       {saved && (
         <>
-          <ActionButton
+          <Button
             type="button"
             variant="ghost"
-            waiting={!hydrated}
+            disabled={!hydrated}
             busy={busy === "remove"}
             busyLabel="Removing…"
             onClick={onRemove}
-            className="text-red-700!"
+            tone="danger"
             data-testid="model-remove"
           >
             {label}
-          </ActionButton>
+          </Button>
           <span className="text-xs text-slate-500" data-testid="model-key-set">
             Key set for {saved.baseUrl}
           </span>

@@ -3,11 +3,14 @@ import { useState } from "react";
 import {
   Body,
   Breadcrumbs,
+  Button,
+  ButtonGroup,
   Callout,
   Card,
   ListLayout,
   Pill,
   SectionHeading,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -15,22 +18,16 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@hackcove/ui";
-import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { ModelSettings } from "#/components/model-settings";
 import { OverrideSettings } from "#/components/override-trail";
+import { DefaultBranch, UploadCommand } from "#/components/project-cards";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
 import type { DiffLocation } from "#/db/schema";
-import {
-  getProjectSettings,
-  issueToken,
-  revokeToken,
-  saveDefaultBranch,
-  saveDiffLocation,
-} from "#/server/fns";
+import { getProjectSettings, issueToken, revokeToken, saveDiffLocation } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/settings")({
   loader: ({ params }) => getProjectSettings({ data: { projectId: params.projectId } }),
@@ -54,47 +51,34 @@ function ProjectSettings() {
         title={`${project.name} · settings`}
       >
         <Card>
-          <SectionHeading className="mb-1.5">CI tokens</SectionHeading>
-          <Body as="p" className="mb-4">
-            CI uploads builds with a token. It is shown once, when issued; store it as a CI secret.
-          </Body>
-          {issued && (
-            <Callout
-              tone="warn"
-              role="status"
-              title="Copy this token now. It will not be shown again."
-              className="mb-4"
-            >
-              <CopyLine text={issued} hydrated={hydrated} testId="issued-token" className="mt-2" />
-            </Callout>
-          )}
-          <InlineForm
-            label="Token name, e.g. github-actions"
-            button="Issue token"
-            busyLabel="Issuing…"
-            emptyReason="Name the token first: where it will be used."
-            onSubmit={issue}
-          />
-          <TokenTable tokens={tokens} hydrated={hydrated} />
+          <Stack>
+            <Stack gap="xs">
+              <SectionHeading>CI tokens</SectionHeading>
+              <Body as="p">
+                CI uploads builds with a token. It is shown once, when issued; store it as a CI
+                secret.
+              </Body>
+            </Stack>
+            {issued && (
+              <Callout
+                tone="warn"
+                role="status"
+                title="Copy this token now. It will not be shown again."
+              >
+                <CopyLine text={issued} hydrated={hydrated} testId="issued-token" />
+              </Callout>
+            )}
+            <InlineForm
+              label="Token name, e.g. github-actions"
+              button="Issue token"
+              busyLabel="Issuing…"
+              emptyReason="Name the token first: where it will be used."
+              onSubmit={issue}
+            />
+            <TokenTable tokens={tokens} hydrated={hydrated} />
+          </Stack>
         </Card>
-        <Card>
-          <SectionHeading className="mb-1.5">Default branch</SectionHeading>
-          <Body as="p" className="mb-4">
-            Builds on this branch are accepted without review and become the baseline for branch
-            builds. Builds on other branches wait for review.
-          </Body>
-          <InlineForm
-            label="Default branch, e.g. main"
-            button="Save"
-            busyLabel="Saving…"
-            emptyReason="Name the branch: the one you merge into."
-            initialValue={project.defaultBranch}
-            onSubmit={async (branch) => {
-              await saveDefaultBranch({ data: { projectId: project.id, branch } });
-              await router.invalidate();
-            }}
-          />
-        </Card>
+        <DefaultBranch projectId={project.id} branch={project.defaultBranch} />
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
         <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
         <IgnoreBoxSettings
@@ -113,23 +97,6 @@ function ProjectSettings() {
         <UploadCommand serverUrl={serverUrl} hydrated={hydrated} />
       </ListLayout>
     </Page>
-  );
-}
-
-function UploadCommand({ serverUrl, hydrated }: { serverUrl: string; hydrated: boolean }) {
-  return (
-    <Card>
-      <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
-      <Body as="p" className="mb-3">
-        From CI or your machine, with the token in{" "}
-        <span className="font-mono text-[13px]">PIXELSLASH_TOKEN</span>:
-      </Body>
-      <CopyLine
-        text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}
-        hydrated={hydrated}
-        testId="upload-command"
-      />
-    </Card>
   );
 }
 
@@ -171,41 +138,47 @@ function DiffLocationForm({
   };
   return (
     <Card data-testid="diff-location">
-      <SectionHeading className="mb-1.5">Diff location</SectionHeading>
-      <Body as="p" className="mb-4">
-        Where this project&apos;s shots are compared with their baselines. Every shot of a build is
-        measured in the same place; a CI build whose result is missing or wrong errors, and is never
-        diffed on the server instead.
-      </Body>
-      <fieldset className="mb-4 space-y-2">
-        <legend className="sr-only">Diff location</legend>
-        {LOCATIONS.map((l) => (
-          <label key={l.value} className="flex items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="diff-location"
-              value={l.value}
-              checked={chosen === l.value}
-              onChange={() => setChosen(l.value)}
-              className="mt-1"
-            />
-            <span>
-              <span className="font-medium">{l.label}</span>
-              <span className="block text-slate-600">{l.detail}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
-      {chosen !== saved && (
-        <Callout tone="warn" role="status" title="Builds will not be comparable" className="mb-4">
-          Builds before and after a switch were measured in different places and may not be
-          consistent: a CI run and the server can disagree at the edges. Compare builds from the
-          same side of the switch.
-        </Callout>
-      )}
-      <ActionButton waiting={!hydrated} busy={busy} busyLabel="Saving…" onClick={() => void save()}>
-        Save diff location
-      </ActionButton>
+      <Stack>
+        <Stack gap="xs">
+          <SectionHeading>Diff location</SectionHeading>
+          <Body as="p">
+            Where this project&apos;s shots are compared with their baselines. Every shot of a build
+            is measured in the same place; a CI build whose result is missing or wrong errors, and
+            is never diffed on the server instead.
+          </Body>
+        </Stack>
+        <fieldset className="space-y-2">
+          <legend className="sr-only">Diff location</legend>
+          {LOCATIONS.map((l) => (
+            <label key={l.value} className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="diff-location"
+                value={l.value}
+                checked={chosen === l.value}
+                onChange={() => setChosen(l.value)}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-medium">{l.label}</span>
+                <span className="block text-slate-600">{l.detail}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {chosen !== saved && (
+          <Callout tone="warn" role="status" title="Builds will not be comparable">
+            Builds before and after a switch were measured in different places and may not be
+            consistent: a CI run and the server can disagree at the edges. Compare builds from the
+            same side of the switch.
+          </Callout>
+        )}
+        <ButtonGroup>
+          <Button disabled={!hydrated} busy={busy} busyLabel="Saving…" onClick={() => void save()}>
+            Save diff location
+          </Button>
+        </ButtonGroup>
+      </Stack>
     </Card>
   );
 }
@@ -227,13 +200,13 @@ function TokenTable({ tokens, hydrated }: { tokens: Token[]; hydrated: boolean }
   };
   if (tokens.length === 0) {
     return (
-      <p data-testid="no-tokens" className="mt-6 text-sm text-slate-400">
+      <p data-testid="no-tokens" className="text-sm text-slate-400">
         No tokens yet. Issue one above, then upload with it.
       </p>
     );
   }
   return (
-    <Table variant="plain" caption="Project tokens" className="mt-6">
+    <Table variant="plain" caption="Project tokens">
       <TableHead>
         <TableRow>
           <TableHeaderCell>Name</TableHeaderCell>
@@ -268,16 +241,16 @@ function TokenTable({ tokens, hydrated }: { tokens: Token[]; hydrated: boolean }
               </TableCell>
               <TableCell align="end">
                 {!t.revokedAt && (
-                  <ActionButton
+                  <Button
                     variant="ghost"
-                    waiting={!hydrated}
+                    disabled={!hydrated}
                     busy={revoking === t.id}
                     busyLabel="Revoking…"
                     onClick={() => void revoke(t.id)}
-                    className="text-red-700!"
+                    tone="danger"
                   >
                     Revoke
-                  </ActionButton>
+                  </Button>
                 )}
               </TableCell>
             </TableRow>

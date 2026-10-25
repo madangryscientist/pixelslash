@@ -1,7 +1,11 @@
 import {
   Body,
+  Button,
   Card,
+  Code,
+  CodeBlock,
   SectionHeading,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -11,7 +15,6 @@ import {
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { ActionButton } from "#/components/action-button";
 import { CopyButton } from "#/components/copy-button";
 import type { DiffOptions } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
@@ -121,17 +124,17 @@ function ClearButton({
   };
   return (
     <>
-      <ActionButton
+      <Button
         variant="ghost"
-        waiting={!hydrated}
+        disabled={!hydrated}
         busy={busy}
         busyLabel="Clearing…"
         onClick={clear}
-        className="text-red-700!"
+        tone="danger"
         data-testid="override-list-clear"
       >
         Clear
-      </ActionButton>
+      </Button>
       {error && (
         <p role="alert" className="text-xs text-red-700">
           {error}
@@ -147,8 +150,8 @@ function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: bo
     <details className="mt-4 text-sm" data-testid="override-export">
       <summary className="cursor-pointer text-violet-700">Export as config</summary>
       <p className="mt-2 text-slate-600">
-        Merge each route&apos;s <code>diff</code>, <code>ignore</code> and <code>variants</code>{" "}
-        into the route of that name in <code>pixelslash.config.json</code>, then clear the overrides
+        Merge each route&apos;s <Code>diff</Code>, <Code>ignore</Code> and <Code>variants</Code>{" "}
+        into the route of that name in <Code>pixelslash.config.json</Code>, then clear the overrides
         and ignore boxes here: the builds measure the same. A key the config already sets on that
         variant beats a route&apos;s; move it to the variant. Ignore boxes are in image px, the
         config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise divide by it.
@@ -156,12 +159,7 @@ function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: bo
       <div className="mt-2 flex justify-end">
         <CopyButton text={exported} hydrated={hydrated} />
       </div>
-      <pre
-        data-testid="override-export-json"
-        className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[12px] text-slate-800"
-      >
-        {exported}
-      </pre>
+      <CodeBlock data-testid="override-export-json">{exported}</CodeBlock>
     </details>
   );
 }
@@ -181,51 +179,55 @@ export function OverrideSettings({
 }) {
   return (
     <Card data-testid="diff-overrides">
-      <SectionHeading className="mb-1.5">Diff thresholds set in review</SectionHeading>
-      <Body as="p" className="mb-4">
-        Set from a shot&apos;s screen, for a test or one variant of it; they beat the config&apos;s
-        values. Clearing one applies the config&apos;s again from the next build.
-      </Body>
-      {overrides.list.length === 0 ? (
-        <p data-testid="no-overrides" className="text-sm text-slate-400">
-          None. Set one from a shot&apos;s screen.
-        </p>
-      ) : (
-        <Table variant="plain" caption="Diff thresholds set in review">
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Test</TableHeaderCell>
-              <TableHeaderCell>Options</TableHeaderCell>
-              <TableHeaderCell>Set</TableHeaderCell>
-              <TableHeaderCell align="end">
-                <span className="sr-only">Actions</span>
-              </TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {overrides.list.map((o) => (
-              <TableRow key={`${o.name}\n${variantLabel(o.variant)}`} data-testid="override-row">
-                <TableCell tone="strong" secondary={variantLabel(o.variant)}>
-                  {o.name}
-                </TableCell>
-                <TableCell mono>{optionsText(o.options)}</TableCell>
-                <TableCell>
-                  @{o.by}, {formatDateTime(o.at)}
-                </TableCell>
-                <TableCell align="end">
-                  <CopyButton text={o.snippet} hydrated={hydrated} />
-                  <ClearButton projectId={projectId} o={o} hydrated={hydrated} />
-                </TableCell>
+      <Stack>
+        <Stack gap="xs">
+          <SectionHeading>Diff thresholds set in review</SectionHeading>
+          <Body as="p">
+            Set from a shot&apos;s screen, for a test or one variant of it; they beat the
+            config&apos;s values. Clearing one applies the config&apos;s again from the next build.
+          </Body>
+        </Stack>
+        {overrides.list.length === 0 ? (
+          <p data-testid="no-overrides" className="text-sm text-slate-400">
+            None. Set one from a shot&apos;s screen.
+          </p>
+        ) : (
+          <Table variant="plain" caption="Diff thresholds set in review">
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Test</TableHeaderCell>
+                <TableHeaderCell>Options</TableHeaderCell>
+                <TableHeaderCell>Set</TableHeaderCell>
+                <TableHeaderCell align="end">
+                  <span className="sr-only">Actions</span>
+                </TableHeaderCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      {(overrides.list.length > 0 || overrides.boxes.length > 0) && (
-        <ExportAsConfig exported={overrides.exported} hydrated={hydrated} />
-      )}
-      <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700">Changes</h3>
-      <OverrideChanges changes={overrides.changes} />
+            </TableHead>
+            <TableBody>
+              {overrides.list.map((o) => (
+                <TableRow key={`${o.name}\n${variantLabel(o.variant)}`} data-testid="override-row">
+                  <TableCell tone="strong" secondary={variantLabel(o.variant)}>
+                    {o.name}
+                  </TableCell>
+                  <TableCell mono>{optionsText(o.options)}</TableCell>
+                  <TableCell>
+                    @{o.by}, {formatDateTime(o.at)}
+                  </TableCell>
+                  <TableCell align="end">
+                    <CopyButton text={o.snippet} hydrated={hydrated} />
+                    <ClearButton projectId={projectId} o={o} hydrated={hydrated} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {(overrides.list.length > 0 || overrides.boxes.length > 0) && (
+          <ExportAsConfig exported={overrides.exported} hydrated={hydrated} />
+        )}
+        <h3 className="text-sm font-semibold text-slate-700">Changes</h3>
+        <OverrideChanges changes={overrides.changes} />
+      </Stack>
     </Card>
   );
 }

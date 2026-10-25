@@ -1,7 +1,9 @@
 import {
   Body,
+  Button,
   Card,
   SectionHeading,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -11,7 +13,6 @@ import {
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { ActionButton } from "#/components/action-button";
 import { CopyButton } from "#/components/copy-button";
 import { type Variant, variantLabel } from "#/components/override-trail";
 import type { IgnoreRect } from "#/db/schema";
@@ -54,17 +55,17 @@ function ClearBox({
   };
   return (
     <>
-      <ActionButton
+      <Button
         variant="ghost"
-        waiting={!hydrated}
+        disabled={!hydrated}
         busy={busy}
         busyLabel="Clearing…"
         onClick={clear}
-        className="text-red-700!"
+        tone="danger"
         data-testid="ignore-list-clear"
       >
         Clear
-      </ActionButton>
+      </Button>
       {error && (
         <p role="alert" className="text-xs text-red-700">
           {error}
@@ -131,47 +132,51 @@ export function IgnoreBoxSettings({
 }) {
   return (
     <Card data-testid="ignore-box-settings">
-      <SectionHeading className="mb-1.5">Ignore boxes drawn in review</SectionHeading>
-      <Body as="p" className="mb-4">
-        Drawn on a shot&apos;s screen, for a test or one variant of it, in image px; the server diff
-        skips them along with the config&apos;s and manifest&apos;s areas. The export above carries
-        them. Clearing one measures those pixels again from the next build.
-      </Body>
-      {boxes.length === 0 ? (
-        <p data-testid="no-ignore-boxes" className="text-sm text-slate-400">
-          None. Draw one from a shot&apos;s screen.
-        </p>
-      ) : (
-        <Table variant="plain" caption="Ignore boxes">
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Test</TableHeaderCell>
-              <TableHeaderCell>Box</TableHeaderCell>
-              <TableHeaderCell>Drawn</TableHeaderCell>
-              <TableHeaderCell align="end">
-                <span className="sr-only">Actions</span>
-              </TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {boxes.map((b) => (
-              <TableRow key={b.id} data-testid="ignore-row">
-                <TestCell box={b} />
-                <TableCell mono>{rectText(b.rect)}</TableCell>
-                <TableCell>
-                  @{b.by}, {formatDateTime(b.at)}
-                </TableCell>
-                <TableCell align="end">
-                  <CopyButton text={b.snippet} hydrated={hydrated} />
-                  <ClearBox projectId={projectId} boxId={b.id} hydrated={hydrated} />
-                </TableCell>
+      <Stack>
+        <Stack gap="xs">
+          <SectionHeading>Ignore boxes drawn in review</SectionHeading>
+          <Body as="p">
+            Drawn on a shot&apos;s screen, for a test or one variant of it, in image px; the server
+            diff skips them along with the config&apos;s and manifest&apos;s areas. The export above
+            carries them. Clearing one measures those pixels again from the next build.
+          </Body>
+        </Stack>
+        {boxes.length === 0 ? (
+          <p data-testid="no-ignore-boxes" className="text-sm text-slate-400">
+            None. Draw one from a shot&apos;s screen.
+          </p>
+        ) : (
+          <Table variant="plain" caption="Ignore boxes">
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Test</TableHeaderCell>
+                <TableHeaderCell>Box</TableHeaderCell>
+                <TableHeaderCell>Drawn</TableHeaderCell>
+                <TableHeaderCell align="end">
+                  <span className="sr-only">Actions</span>
+                </TableHeaderCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700">Trail</h3>
-      <BoxTrail trail={trail} />
+            </TableHead>
+            <TableBody>
+              {boxes.map((b) => (
+                <TableRow key={b.id} data-testid="ignore-row">
+                  <TestCell box={b} />
+                  <TableCell mono>{rectText(b.rect)}</TableCell>
+                  <TableCell>
+                    @{b.by}, {formatDateTime(b.at)}
+                  </TableCell>
+                  <TableCell align="end">
+                    <CopyButton text={b.snippet} hydrated={hydrated} />
+                    <ClearBox projectId={projectId} boxId={b.id} hydrated={hydrated} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        <h3 className="text-sm font-semibold text-slate-700">Trail</h3>
+        <BoxTrail trail={trail} />
+      </Stack>
     </Card>
   );
 }

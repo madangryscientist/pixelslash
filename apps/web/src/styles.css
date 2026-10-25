@@ -60,10 +60,6 @@
   --ps-warn-soft: #fffbeb;
   --ps-brand-soft: #f5f3ff;
   --ps-brand-ink: #1e1e2e;
-  --ps-dis-bg: #f1f5f9;
-  --ps-dis-ink: #94a3b8;
-  --ps-dis-line: #e2e8f0;
-  --ps-scrim: rgba(15, 23, 42, 0.35);
 }
 .dark {
   --ps-changed: #fab387;
@@ -75,8 +71,4 @@
   --ps-warn: #f9e2af;
   --ps-warn-soft: #2d2a22;
   --ps-brand-soft: #2a2540;
-  --ps-dis-bg: #262637;
-  --ps-dis-ink: #6c7086;
-  --ps-dis-line: #313244;
-  --ps-scrim: rgba(0, 0, 0, 0.55);
 }

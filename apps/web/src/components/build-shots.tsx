@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo, useState } from "react";
-import { type LinkRenderProps, Tabs } from "@hackcove/ui";
+import { Button, type LinkRenderProps, Tabs } from "@hackcove/ui";
 import { aiFiltered } from "#/components/ai-notes";
 import { ShotCard, measured } from "#/components/shot-card";
 import { ReviewChip } from "#/components/ui";
@@ -124,14 +124,9 @@ function UnchangedFold({
       {shown ? (
         <ShotRows projectId={projectId} buildId={buildId} rows={rows} baseline={baseline} />
       ) : (
-        <button
-          type="button"
-          data-testid="unchanged-show"
-          onClick={() => setShown(true)}
-          className="w-full rounded-lg border border-dashed border-slate-300 px-4 py-3 text-left text-sm text-slate-600 hover:bg-slate-50"
-        >
+        <Button variant="dashed" data-testid="unchanged-show" onClick={() => setShown(true)}>
           {rows.length} unchanged shot{rows.length === 1 ? "" : "s"} are folded away. Show
-        </button>
+        </Button>
       )}
     </GroupSection>
   );

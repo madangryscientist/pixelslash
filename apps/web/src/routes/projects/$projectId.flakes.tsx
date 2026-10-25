@@ -1,7 +1,6 @@
 import { Breadcrumbs, Button, Input, ListLayout, Pill } from "@hackcove/ui";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { ActionButton } from "#/components/action-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { useFlagWrite } from "#/components/detection-flag";
 import { FlakeHistory, FlakeRuns, FlakyPolicyControl, flakeAnchor } from "#/components/flake";
@@ -32,16 +31,16 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
   if (flake.status === "resolved") {
     return (
       <div className="space-y-1">
-        <ActionButton
+        <Button
           variant="outline"
           busy={busy}
           busyLabel="Reopening…"
           disabledReason={hydrated ? undefined : "Loading"}
           onClick={() => run(() => saveFlakeStatus({ data: { ...ids, open: true, note: null } }))}
-          className="px-3 py-1.5"
+          size="sm"
         >
           Reopen
-        </ActionButton>
+        </Button>
         {error && (
           <p role="alert" className="text-sm text-red-700">
             {error}
@@ -52,12 +51,7 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
   }
   if (!resolving) {
     return (
-      <Button
-        variant="outline"
-        disabled={!hydrated}
-        onClick={() => setResolving(true)}
-        className="px-3 py-1.5"
-      >
+      <Button variant="outline" disabled={!hydrated} onClick={() => setResolving(true)} size="sm">
         Resolve
       </Button>
     );
@@ -77,15 +71,10 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
         </p>
       )}
       <div className="flex gap-2">
-        <ActionButton type="submit" busy={busy} busyLabel="Resolving…" className="px-3 py-1.5">
+        <Button type="submit" busy={busy} busyLabel="Resolving…" size="sm">
           Resolve
-        </ActionButton>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setResolving(false)}
-          className="px-3 py-1.5"
-        >
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setResolving(false)} size="sm">
           Cancel
         </Button>
       </div>

@@ -1,7 +1,6 @@
-import { type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
+import { Button, type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { OrgOverview } from "#/db/orgs";
-import { ActionButton } from "./action-button";
 import { Avatar } from "./avatar";
 import { plural } from "./org-projects";
 
@@ -40,12 +39,12 @@ export function OrgHeader({
       }
       actions={
         <>
-          <ActionButton variant="outline" waiting={!hydrated} onClick={() => onDialog("invite")}>
+          <Button variant="outline" disabled={!hydrated} onClick={() => onDialog("invite")}>
             Invite
-          </ActionButton>
-          <ActionButton waiting={!hydrated} onClick={() => onDialog("project")}>
+          </Button>
+          <Button disabled={!hydrated} onClick={() => onDialog("project")}>
             + New project
-          </ActionButton>
+          </Button>
         </>
       }
       tabs={<OrgTabs org={org} tab={tab} />}

@@ -1,3 +1,4 @@
+import { Button, CodeBlock, Field, Input } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { CopyButton } from "#/components/copy-button";
@@ -5,7 +6,6 @@ import { useHydrated } from "#/components/ui";
 import type { DiffOptions } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
 import { saveDiffOverride } from "#/server/overrides";
-import { ActionButton } from "./action-button";
 
 /**
  * Diff thresholds set from a shot's screen (ob 1495): for this test (every variant) or for this
@@ -80,7 +80,7 @@ function useSave(ids: { projectId: string; buildId: string; snapshotId: string }
   return { busy, error, note, save };
 }
 
-function Field({
+function OptionField({
   name,
   value,
   disabled,
@@ -92,9 +92,9 @@ function Field({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block">
-      <span className="text-slate-700">{name}</span>
-      <input
+    <Field label={name} htmlFor={`override-${name}-input`} hint={HINTS[name]}>
+      <Input
+        id={`override-${name}-input`}
         type="number"
         step="any"
         min="0"
@@ -104,10 +104,8 @@ function Field({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         data-testid={`override-${name}`}
-        className="mt-0.5 h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900 placeholder:text-slate-400 hover:border-violet-400 focus-visible:outline-2 focus-visible:outline-violet-600 disabled:opacity-50"
       />
-      <span className="block text-xs text-slate-500">{HINTS[name]}</span>
-    </label>
+    </Field>
   );
 }
 
@@ -120,12 +118,7 @@ function Snippet({ o, hydrated }: { o: ShownOverride; hydrated: boolean }) {
         </span>
         <CopyButton text={o.snippet} hydrated={hydrated} />
       </div>
-      <pre
-        data-testid="override-snippet"
-        className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-2 font-mono text-[11.5px] text-slate-800"
-      >
-        {o.snippet}
-      </pre>
+      <CodeBlock data-testid="override-snippet">{o.snippet}</CodeBlock>
     </div>
   );
 }
@@ -187,29 +180,29 @@ function Actions({
 }) {
   return (
     <div className="flex gap-2">
-      <ActionButton
+      <Button
         type="submit"
-        waiting={waiting}
+        disabled={waiting}
         busy={busy}
         busyLabel="Saving…"
-        className="px-3 py-1.5"
+        size="sm"
         data-testid="override-save"
       >
         Save
-      </ActionButton>
+      </Button>
       {onClear && (
-        <ActionButton
+        <Button
           type="button"
           variant="outline"
-          waiting={waiting}
+          disabled={waiting}
           busy={busy}
           busyLabel="Clearing…"
           onClick={onClear}
-          className="px-3 py-1.5"
+          size="sm"
           data-testid="override-clear"
         >
           Clear
-        </ActionButton>
+        </Button>
       )}
     </div>
   );
@@ -247,7 +240,7 @@ function OverrideForm({
       >
         <ScopePicker scope={scope} onChange={setScope} />
         {KEYS.map((key) => (
-          <Field
+          <OptionField
             key={key}
             name={key}
             value={draft[key]}

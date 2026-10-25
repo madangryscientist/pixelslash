@@ -1,7 +1,6 @@
-import { AppShell, Input, Pill } from "@hackcove/ui";
+import { AppShell, Button, Input, Pill } from "@hackcove/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
-import { ActionButton } from "./action-button";
 import { AppBrand, AppControls } from "./shell";
 
 export { useHydrated };
@@ -40,8 +39,8 @@ export function ReviewChip({ state, by }: { state: string; by?: string | null })
 /**
  * The page frame. `data-hydrated` is false in the server HTML and true once React owns the page.
  * The controls disable themselves until then, and a browser test can wait for the same signal.
- * The page's layout (`ListLayout`, `SidebarLayout`, ...) goes inside; `bleed` is for the layouts
- * that draw their own edge (`SidebarLayout`, `FullBleedLayout`).
+ * The page's layout (`ListLayout`, `SidebarLayout`, ...) goes inside; only `FullBleedLayout`
+ * draws its own edge and needs `bleed`.
  */
 export function Page({ bleed = false, children }: { bleed?: boolean; children: ReactNode }) {
   const hydrated = useHydrated();
@@ -100,18 +99,17 @@ export function InlineForm({
         value={value}
         disabled={!hydrated}
         onChange={(e) => setValue(e.target.value)}
-        width="auto"
-        className="min-w-0 flex-1"
+        width="lg"
       />
-      <ActionButton
+      <Button
         type="submit"
-        waiting={!hydrated}
+        disabled={!hydrated}
         disabledReason={empty ? emptyReason : undefined}
         busy={busy}
         busyLabel={busyLabel}
       >
         {button}
-      </ActionButton>
+      </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-red-700">
           {error}

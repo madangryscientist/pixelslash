@@ -120,7 +120,7 @@ function Footer({
           variant="outline"
           disabled={!hydrated || busy}
           onClick={regenerate}
-          className="px-2 py-1 text-xs"
+          size="sm"
           data-testid="summary-regenerate"
         >
           {busy ? "Regenerating…" : "Regenerate"}

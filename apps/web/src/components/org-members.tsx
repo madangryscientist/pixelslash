@@ -1,7 +1,7 @@
+import { Button, Input } from "@hackcove/ui";
 import { useState } from "react";
 import type { OrgInvite, OrgMember, OrgOverview } from "#/db/orgs";
 import { formatDay } from "#/lib/format";
-import { ActionButton } from "./action-button";
 import { Avatar } from "./avatar";
 
 function MemberRow({ member, isViewer }: { member: OrgMember; isViewer: boolean }) {
@@ -58,9 +58,9 @@ function InviteRow({
       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11.5px] font-semibold text-slate-600">
         pending
       </span>
-      <ActionButton
+      <Button
         variant="ghost"
-        waiting={!hydrated}
+        disabled={!hydrated}
         busy={busy}
         busyLabel="Withdrawing…"
         aria-label={`Withdraw invite for ${invite.githubLogin}`}
@@ -72,10 +72,10 @@ function InviteRow({
             setError(e instanceof Error ? e.message : String(e));
           });
         }}
-        className="px-2.5 py-1 text-[13px]"
+        size="sm"
       >
         Withdraw
-      </ActionButton>
+      </Button>
     </li>
   );
 }
@@ -119,24 +119,24 @@ export function MembersPanel({
         }}
         className="flex flex-wrap gap-2 rounded-t-xl border-b border-slate-200 bg-slate-50 px-4 py-3.5"
       >
-        <input
+        <Input
           aria-label="Invite a member by GitHub login"
           placeholder="GitHub login to invite, e.g. octo-dev"
           value={login}
           disabled={!hydrated}
           autoComplete="off"
           onChange={(e) => setLogin(e.target.value)}
-          className="h-8.5 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 hover:border-violet-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50"
+          width="lg"
         />
-        <ActionButton
+        <Button
           type="submit"
-          waiting={!hydrated}
+          disabled={!hydrated}
           disabledReason={empty ? "Type a GitHub login first." : undefined}
           busy={busy}
           busyLabel="Inviting…"
         >
           Invite
-        </ActionButton>
+        </Button>
         <p className="w-full text-xs text-slate-500" role={error ? "alert" : undefined}>
           {error ??
             (empty ? "Type a GitHub login first." : "They join when they sign in with that login.")}

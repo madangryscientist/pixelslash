@@ -1,7 +1,6 @@
 import { Button, Input, Pill, Section, buttonClass } from "@hackcove/ui";
 import { Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { ActionButton } from "#/components/action-button";
 import type { ProjectFlag, SnapshotFlag } from "#/db/flags";
 import type { FlagKind, IgnoreRect } from "#/db/schema";
 import { flagShot, withdrawShotFlag } from "#/server/fns";
@@ -131,7 +130,7 @@ function AreaPicker({ draft }: { draft: FlagDraft }) {
         disabled={!canDraw}
         title={canDraw ? "Drag a box on either shot" : "Nothing was measured to draw on"}
         onClick={() => draft.setDrawing(!draft.drawing)}
-        className="px-2.5 py-1"
+        size="sm"
       >
         {drawLabel(draft)}
       </Button>
@@ -140,12 +139,7 @@ function AreaPicker({ draft }: { draft: FlagDraft }) {
           <span data-testid="flag-rect" className="text-xs text-slate-500">
             {rectText(draft.rect)}
           </span>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => draft.setRect(null)}
-            className="px-2 py-1"
-          >
+          <Button type="button" variant="ghost" onClick={() => draft.setRect(null)} size="sm">
             Clear
           </Button>
         </>
@@ -215,27 +209,27 @@ function FlagForm({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <ActionButton
+        <Button
           type="submit"
           disabledReason={kind ? undefined : "Pick missed change or false positive"}
           busy={busy}
           busyLabel="Saving…"
-          className="px-3 py-1.5"
+          size="sm"
         >
           {mine ? "Save flag" : "Flag"}
-        </ActionButton>
+        </Button>
         {mine && (
           <Button
             type="button"
             variant="outline"
             disabled={busy}
             onClick={() => run(() => withdrawShotFlag({ data: ids }))}
-            className="px-3 py-1.5"
+            size="sm"
           >
             Withdraw
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={draft.close} className="px-3 py-1.5">
+        <Button type="button" variant="ghost" onClick={draft.close} size="sm">
           Cancel
         </Button>
       </div>

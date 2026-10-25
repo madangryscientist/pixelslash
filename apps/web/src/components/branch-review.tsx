@@ -217,7 +217,7 @@ function MainRow({
               variant="outline"
               disabled={disabled}
               onClick={() => review("rejected")}
-              className="px-3 py-1.5"
+              size="sm"
               data-testid="main-reject"
             >
               Reject
@@ -225,7 +225,7 @@ function MainRow({
             <Button
               disabled={disabled}
               onClick={() => review("accepted")}
-              className="px-3 py-1.5"
+              size="sm"
               data-testid="main-accept"
             >
               Accept
@@ -243,14 +243,9 @@ function Fold({ count, noun, children }: { count: number; noun: string; children
   const [shown, setShown] = useState(false);
   if (shown) return children;
   return (
-    <button
-      type="button"
-      data-testid="main-fold-show"
-      onClick={() => setShown(true)}
-      className="w-full rounded-lg border border-dashed border-slate-300 px-4 py-3 text-left text-sm text-slate-600 hover:bg-slate-50"
-    >
+    <Button variant="dashed" data-testid="main-fold-show" onClick={() => setShown(true)}>
       {count} shot{count === 1 ? "" : "s"} folded away: {noun}. Show
-    </button>
+    </Button>
   );
 }
 

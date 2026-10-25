@@ -2,9 +2,12 @@ import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import {
   Body,
+  Button,
   Callout,
   Card,
+  Code,
   Input,
+  Stack,
   Pill,
   Table,
   TableBody,
@@ -15,7 +18,6 @@ import {
 } from "@hackcove/ui";
 import { formatDateTime } from "#/lib/format";
 import { issueOrgTokenFn, revokeOrgTokenFn } from "#/server/org-token-fns";
-import { ActionButton } from "./action-button";
 import { CopyLine } from "./copy-button";
 
 export type OrgToken = {
@@ -45,24 +47,25 @@ export function OrgTokensPanel({
   const [issued, setIssued] = useState<string | null>(null);
   return (
     <Card>
-      <Body as="p" className="mb-4">
-        An org token lets CI reach every project in {orgName}: it creates a project by name with{" "}
-        <code>pixelslash project create</code> and uploads to one with <code>--project NAME</code>.
-        It is shown once, when issued. A project's own CI token, in its settings, still reaches only
-        that project.
-      </Body>
-      {issued && (
-        <Callout
-          tone="warn"
-          role="status"
-          title="Copy this token now. It will not be shown again."
-          className="mb-4"
-        >
-          <CopyLine text={issued} hydrated={hydrated} testId="issued-org-token" className="mt-2" />
-        </Callout>
-      )}
-      <IssueForm orgId={orgId} onIssued={setIssued} />
-      <TokenTable tokens={tokens} hydrated={hydrated} />
+      <Stack>
+        <Body as="p">
+          An org token lets CI reach every project in {orgName}: it creates a project by name with{" "}
+          <Code>pixelslash project create</Code> and uploads to one with <Code>--project NAME</Code>
+          . It is shown once, when issued. A project's own CI token, in its settings, still reaches
+          only that project.
+        </Body>
+        {issued && (
+          <Callout
+            tone="warn"
+            role="status"
+            title="Copy this token now. It will not be shown again."
+          >
+            <CopyLine text={issued} hydrated={hydrated} testId="issued-org-token" />
+          </Callout>
+        )}
+        <IssueForm orgId={orgId} onIssued={setIssued} />
+        <TokenTable tokens={tokens} hydrated={hydrated} />
+      </Stack>
     </Card>
   );
 }
@@ -95,17 +98,16 @@ function IssueForm({ orgId, onIssued }: { orgId: string; onIssued: (token: strin
         placeholder="Token name, e.g. monorepo CI"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        width="auto"
-        className="min-w-0 flex-1"
+        width="lg"
       />
-      <ActionButton
+      <Button
         type="submit"
         disabledReason={empty ? emptyReason : undefined}
         busy={busy}
         busyLabel="Issuing…"
       >
         Issue org token
-      </ActionButton>
+      </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-red-700">
           {error}
@@ -132,13 +134,13 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
   };
   if (tokens.length === 0) {
     return (
-      <p data-testid="no-org-tokens" className="mt-6 text-sm text-slate-400">
+      <p data-testid="no-org-tokens" className="text-sm text-slate-400">
         No org tokens yet. Issue one above to use a single secret across a monorepo's CI.
       </p>
     );
   }
   return (
-    <Table variant="plain" caption="Org tokens" className="mt-6">
+    <Table variant="plain" caption="Org tokens">
       <TableHead>
         <TableRow>
           <TableHeaderCell>Name</TableHeaderCell>
@@ -172,17 +174,17 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
               </TableCell>
               <TableCell align="end">
                 {active && (
-                  <ActionButton
+                  <Button
                     variant="ghost"
-                    waiting={!hydrated}
+                    disabled={!hydrated}
                     busy={revoking === t.id}
                     busyLabel="Revoking…"
                     onClick={() => void revoke(t.id)}
-                    className="text-red-700!"
+                    tone="danger"
                     aria-label={`Revoke ${t.name}`}
                   >
                     Revoke
-                  </ActionButton>
+                  </Button>
                 )}
               </TableCell>
             </TableRow>

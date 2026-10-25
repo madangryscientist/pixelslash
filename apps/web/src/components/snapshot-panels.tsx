@@ -1,5 +1,5 @@
-import { Container, KeyValue, KeyValueList, Pill } from "@hackcove/ui";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode } from "react";
+import { Button, Container, Dialog, Kbd, KeyValue, KeyValueList, Pill } from "@hackcove/ui";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { formatDateTime } from "#/lib/format";
@@ -14,17 +14,6 @@ const SHORTCUTS: [string, string][] = [
   ["?", "Show these shortcuts"],
   ["Esc", "Close this list"],
 ];
-
-function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd
-      aria-hidden="true"
-      className="ml-1.5 rounded border border-current/30 px-1 font-mono text-[10px] leading-4 opacity-75"
-    >
-      {children}
-    </kbd>
-  );
-}
 
 const barButton =
   "inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50";
@@ -105,7 +94,7 @@ function Actions({
         onClick={() => onPrevious?.()}
         className={outline}
       >
-        ‹<Kbd>k</Kbd>
+        ‹ <Kbd aria-hidden="true">k</Kbd>
       </button>
       <button
         type="button"
@@ -115,7 +104,7 @@ function Actions({
         onClick={() => onNext?.()}
         className={outline}
       >
-        ›<Kbd>j</Kbd>
+        › <Kbd aria-hidden="true">j</Kbd>
       </button>
       <button
         type="button"
@@ -135,7 +124,7 @@ function Actions({
         onClick={actions.onReject}
         className={`${barButton} border border-red-300 bg-white text-red-700 hover:bg-red-50`}
       >
-        Reject<Kbd>r</Kbd>
+        Reject <Kbd aria-hidden="true">r</Kbd>
       </button>
       <button
         type="button"
@@ -145,7 +134,7 @@ function Actions({
         onClick={actions.onAccept}
         className={`${barButton} border border-transparent bg-emerald-700 text-white hover:bg-emerald-800`}
       >
-        Accept<Kbd>a</Kbd>
+        Accept <Kbd aria-hidden="true">a</Kbd>
       </button>
       <button
         type="button"
@@ -192,7 +181,7 @@ export function ViewerBar({
   const why = reviewable ? undefined : `This build is ${build.status}; a new build is needed.`;
   return (
     <div className="sticky top-14 z-10 border-b border-slate-200 bg-white">
-      <Container className="py-2.5">
+      <Container>
         {breadcrumbs}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <ShotTitle build={build} snapshot={snapshot} label={label} />
@@ -210,40 +199,26 @@ export function ViewerBar({
   );
 }
 
-/** The `?` list. The browser's <dialog> makes the page inert and closes it on Esc. */
+/** The `?` list, on hackcove's `Dialog`: the page goes inert, Esc and a click on the scrim close it. */
 export function ShortcutHelp({ onClose }: { onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="shortcut-help-title"
+    <Dialog
+      title="Keyboard shortcuts"
+      size="sm"
       onClose={onClose}
-      // A click on the scrim is a click on the <dialog> element itself, not on its contents.
-      onClick={(event) => event.target === dialog.current && dialog.current?.close()}
-      className="mx-auto mt-28 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-(--ps-scrim)"
+      footer={
+        <Button variant="outline" autoFocus onClick={onClose}>
+          Close
+        </Button>
+      }
     >
-      <h2 id="shortcut-help-title" className="mb-3 text-[17px] font-semibold">
-        Keyboard shortcuts
-      </h2>
       <KeyValueList>
         {SHORTCUTS.map(([key, what]) => (
           <KeyValue key={key} label={what}>
-            <kbd className="rounded border border-slate-300 px-1.5 font-mono text-xs">{key}</kbd>
+            <Kbd>{key}</Kbd>
           </KeyValue>
         ))}
       </KeyValueList>
-      <form method="dialog" className="mt-4 flex justify-end">
-        <button
-          type="submit"
-          autoFocus
-          className={`${barButton} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
-        >
-          Close
-        </button>
-      </form>
-    </dialog>
+    </Dialog>
   );
 }

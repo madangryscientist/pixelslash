@@ -1,4 +1,4 @@
-import { Breadcrumbs, ListLayout } from "@hackcove/ui";
+import { Breadcrumbs, Code, ListLayout } from "@hackcove/ui";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import {
@@ -73,8 +73,8 @@ function BranchPage() {
           </span>
           {build.mergeBaseSha && (
             <span className="text-slate-500">
-              · merge-base with <code>{project.defaultBranch}</code>:{" "}
-              <code>{short(build.mergeBaseSha)}</code>
+              · merge-base with <Code>{project.defaultBranch}</Code>:{" "}
+              <Code>{short(build.mergeBaseSha)}</Code>
             </span>
           )}
         </div>

@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import {
   Body,
   Breadcrumbs,
+  Button,
   Callout,
   Card,
   Input,
@@ -10,6 +11,7 @@ import {
   Pill,
   SectionHeading,
   Select,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -17,7 +19,6 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@hackcove/ui";
-import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
@@ -38,32 +39,35 @@ function AccountSettings() {
     <Page>
       <ListLayout breadcrumbs={<Breadcrumbs crumbs={["Settings"]} />} title="Settings">
         <Card>
-          <SectionHeading className="mb-1.5">API tokens</SectionHeading>
-          <Body as="p" className="mb-4">
-            The CLI and MCP server act as you with a personal token: they see the organizations and
-            projects you see here. It is shown once, when issued. For CI, issue a project's CI token
-            in its settings instead.
-          </Body>
-          {issued && (
-            <Callout
-              tone="warn"
-              role="status"
-              title="Copy this token now. It will not be shown again."
-              className="mb-4"
-            >
-              <CopyLine text={issued} hydrated={hydrated} testId="issued-token" className="mt-2" />
-            </Callout>
-          )}
-          <IssueForm onIssued={setIssued} />
-          <TokenTable tokens={tokens} now={now} hydrated={hydrated} />
-          <Body as="p" className="mt-6 mb-3">
-            Check a token from your machine with:
-          </Body>
-          <CopyLine
-            text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
-            hydrated={hydrated}
-            testId="token-usage"
-          />
+          <Stack>
+            <Stack gap="xs">
+              <SectionHeading>API tokens</SectionHeading>
+              <Body as="p">
+                The CLI and MCP server act as you with a personal token: they see the organizations
+                and projects you see here. It is shown once, when issued. For CI, issue a project's
+                CI token in its settings instead.
+              </Body>
+            </Stack>
+            {issued && (
+              <Callout
+                tone="warn"
+                role="status"
+                title="Copy this token now. It will not be shown again."
+              >
+                <CopyLine text={issued} hydrated={hydrated} testId="issued-token" />
+              </Callout>
+            )}
+            <IssueForm onIssued={setIssued} />
+            <TokenTable tokens={tokens} now={now} hydrated={hydrated} />
+            <Stack gap="sm">
+              <Body as="p">Check a token from your machine with:</Body>
+              <CopyLine
+                text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
+                hydrated={hydrated}
+                testId="token-usage"
+              />
+            </Stack>
+          </Stack>
         </Card>
       </ListLayout>
     </Page>
@@ -104,8 +108,7 @@ function IssueForm({ onIssued }: { onIssued: (token: string) => void }) {
         value={name}
         disabled={!hydrated}
         onChange={(e) => setName(e.target.value)}
-        width="auto"
-        className="min-w-0 flex-1"
+        width="lg"
       />
       <Select
         aria-label="Expires"
@@ -121,15 +124,15 @@ function IssueForm({ onIssued }: { onIssued: (token: string) => void }) {
         ))}
         <option value="never">Never expires</option>
       </Select>
-      <ActionButton
+      <Button
         type="submit"
-        waiting={!hydrated}
+        disabled={!hydrated}
         disabledReason={empty ? emptyReason : undefined}
         busy={busy}
         busyLabel="Issuing…"
       >
         Issue token
-      </ActionButton>
+      </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-red-700">
           {error}
@@ -164,13 +167,13 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
   };
   if (tokens.length === 0) {
     return (
-      <p data-testid="no-tokens" className="mt-6 text-sm text-slate-400">
+      <p data-testid="no-tokens" className="text-sm text-slate-400">
         No tokens yet. Issue one above to use the CLI or MCP server as yourself.
       </p>
     );
   }
   return (
-    <Table variant="plain" caption="Personal tokens" className="mt-6">
+    <Table variant="plain" caption="Personal tokens">
       <TableHead>
         <TableRow>
           <TableHeaderCell>Name</TableHeaderCell>
@@ -209,17 +212,17 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
               </TableCell>
               <TableCell align="end">
                 {active && (
-                  <ActionButton
+                  <Button
                     variant="ghost"
-                    waiting={!hydrated}
+                    disabled={!hydrated}
                     busy={revoking === t.id}
                     busyLabel="Revoking…"
                     onClick={() => void revoke(t.id)}
-                    className="text-red-700!"
+                    tone="danger"
                     aria-label={`Revoke ${t.name}`}
                   >
                     Revoke
-                  </ActionButton>
+                  </Button>
                 )}
               </TableCell>
             </TableRow>

@@ -1,3 +1,4 @@
+import { Button, CodeBlock } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { CopyButton } from "#/components/copy-button";
@@ -7,7 +8,6 @@ import type { DiffResult, IgnoreRect } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
 import { EDGE_WARNING, edgeTouches } from "#/lib/ignore-edge";
 import { addIgnoreBoxFn, clearIgnoreBoxFn } from "#/server/ignore-boxes";
-import { ActionButton } from "./action-button";
 
 /**
  * Ignore boxes drawn on a shot's screen (ob 1499): drag a box over the image, then ignore it for
@@ -132,36 +132,36 @@ function PendingBox({
       <p className="text-xs text-slate-600">
         {rect.width}×{rect.height} px at {rect.x},{rect.y}
       </p>
-      <ActionButton
-        waiting={waiting}
+      <Button
+        disabled={waiting}
         busy={busy}
         busyLabel="Saving…"
         onClick={() => onSave("test")}
-        className="w-full px-3 py-1.5"
+        size="sm"
         data-testid="ignore-save-test"
       >
         Ignore for this test
-      </ActionButton>
-      <ActionButton
+      </Button>
+      <Button
         variant="outline"
-        waiting={waiting}
+        disabled={waiting}
         busy={busy}
         busyLabel="Saving…"
         onClick={() => onSave("variant")}
-        className="w-full px-3 py-1.5"
+        size="sm"
         data-testid="ignore-save-variant"
       >
         This test, this variant
-      </ActionButton>
-      <ActionButton
+      </Button>
+      <Button
         variant="ghost"
-        waiting={waiting}
+        disabled={waiting}
         disabledReason={busy ? "Saving" : undefined}
         onClick={onCancel}
-        className="w-full px-3 py-1.5"
+        size="sm"
       >
         Cancel
-      </ActionButton>
+      </Button>
     </div>
   );
 }
@@ -184,17 +184,17 @@ function BoxRow({
           <span className="mr-1 rounded bg-sky-800 px-1 text-[10px] text-white">UI</span>
           {box.variant ? "This variant" : "This test"} · {box.rect.width}×{box.rect.height}
         </span>
-        <ActionButton
+        <Button
           variant="outline"
-          waiting={!hydrated}
+          disabled={!hydrated}
           busy={busy}
           busyLabel="Clearing…"
           onClick={onClear}
-          className="px-2 py-1 text-xs"
+          size="sm"
           data-testid="ignore-clear"
         >
           Clear
-        </ActionButton>
+        </Button>
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
         <span>
@@ -202,12 +202,7 @@ function BoxRow({
         </span>
         <CopyButton text={box.snippet} hydrated={hydrated} />
       </div>
-      <pre
-        data-testid="ignore-snippet"
-        className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-2 font-mono text-[11.5px] text-slate-800"
-      >
-        {box.snippet}
-      </pre>
+      <CodeBlock data-testid="ignore-snippet">{box.snippet}</CodeBlock>
     </li>
   );
 }
@@ -264,16 +259,16 @@ export function IgnoreBoxes({
           onCancel={draft.reset}
         />
       ) : (
-        <ActionButton
+        <Button
           variant={draft.drawing ? "primary" : "outline"}
           aria-pressed={draft.drawing}
-          waiting={!hydrated}
+          disabled={!hydrated}
           onClick={() => draft.setDrawing(!draft.drawing)}
-          className="w-full px-3 py-1.5"
+          size="sm"
           data-testid="ignore-draw"
         >
           {draft.drawing ? "Drag over the shot…" : "Draw ignore box"}
-        </ActionButton>
+        </Button>
       )}
       <p className="text-xs text-slate-500">
         In image px. Saving re-diffs this build now, and every later build reads it.

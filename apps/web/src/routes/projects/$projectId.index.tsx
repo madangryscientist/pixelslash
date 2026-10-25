@@ -3,6 +3,7 @@ import {
   Breadcrumbs,
   Card,
   ListLayout,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -190,15 +191,10 @@ function EmptyProject({
         </li>
         <li className="grid grid-cols-[26px_1fr] items-start gap-2.5">
           <Step n={2} />
-          <div className="min-w-0">
-            Upload a snapshot dir with it:
-            <CopyLine
-              text={command}
-              hydrated={hydrated}
-              testId="upload-command"
-              className="mt-1.5"
-            />
-          </div>
+          <Stack gap="xs">
+            <span>Upload a snapshot dir with it:</span>
+            <CopyLine text={command} hydrated={hydrated} testId="upload-command" />
+          </Stack>
         </li>
       </ol>
     </Card>

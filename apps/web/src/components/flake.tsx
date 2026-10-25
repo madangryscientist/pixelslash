@@ -1,7 +1,6 @@
 import { Button, Input, Pill } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { useFlagWrite } from "#/components/detection-flag";
 import { useHydrated } from "#/components/ui";
@@ -180,10 +179,10 @@ function MarkFlakyForm({
         </p>
       )}
       <div className="flex gap-2">
-        <ActionButton type="submit" busy={busy} busyLabel="Marking…" className="px-3 py-1.5">
+        <Button type="submit" busy={busy} busyLabel="Marking…" size="sm">
           Mark flaky
-        </ActionButton>
-        <Button type="button" variant="ghost" onClick={onClose} className="px-3 py-1.5">
+        </Button>
+        <Button type="button" variant="ghost" onClick={onClose} size="sm">
           Cancel
         </Button>
       </div>
@@ -226,12 +225,7 @@ export function FlakePanel({
             onClose={() => setMarking(false)}
           />
         ) : (
-          <Button
-            variant="outline"
-            disabled={!hydrated}
-            onClick={() => setMarking(true)}
-            className="px-3 py-1.5"
-          >
+          <Button variant="outline" disabled={!hydrated} onClick={() => setMarking(true)} size="sm">
             Mark flaky
           </Button>
         )}

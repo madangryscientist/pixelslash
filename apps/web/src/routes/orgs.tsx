@@ -1,8 +1,6 @@
-import { Card, SidebarLayout } from "@hackcove/ui";
+import { Button, ButtonGroup, Card, FieldDialog, SidebarLayout, Stack } from "@hackcove/ui";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { ActionButton } from "#/components/action-button";
-import { FieldDialog } from "#/components/dialog";
 import { ModelSettings } from "#/components/model-settings";
 import { MembersPanel } from "#/components/org-members";
 import { type OrgToken, OrgTokensPanel } from "#/components/org-tokens";
@@ -64,7 +62,7 @@ function Orgs() {
     selected ? invite({ data: { orgId: selected.id, login } }).then(refresh) : Promise.resolve();
 
   return (
-    <Page bleed>
+    <Page>
       <SidebarLayout
         rail={
           <OrgRail
@@ -180,16 +178,24 @@ function OrgDialogs({
 
 function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
   return (
-    <Card as="div" dashed="filled" data-testid="no-orgs" className="mx-auto mt-10 max-w-lg">
-      <h1 className="mb-1.5 text-[17px] font-semibold">No organizations yet</h1>
-      <p className="mb-4 text-slate-600">
-        An organization owns your projects and the people who review them. Create one to add
-        projects.
-      </p>
-      <ActionButton waiting={!hydrated} onClick={onNew}>
-        + New organization
-      </ActionButton>
-    </Card>
+    <Stack width="narrow">
+      <Card as="div" dashed="filled" data-testid="no-orgs">
+        <Stack>
+          <Stack gap="xs">
+            <h1 className="text-[17px] font-semibold">No organizations yet</h1>
+            <p className="text-slate-600">
+              An organization owns your projects and the people who review them. Create one to add
+              projects.
+            </p>
+          </Stack>
+          <ButtonGroup>
+            <Button disabled={!hydrated} onClick={onNew}>
+              + New organization
+            </Button>
+          </ButtonGroup>
+        </Stack>
+      </Card>
+    </Stack>
   );
 }
 

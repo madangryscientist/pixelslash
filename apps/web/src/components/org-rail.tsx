@@ -1,7 +1,7 @@
+import { Button, Stack } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { OrgOverview } from "#/db/orgs";
 import { colourOf } from "./avatar";
-import { ActionButton } from "./action-button";
 
 /**
  * The organizations down the left, each with how many of its projects have a latest build waiting
@@ -19,8 +19,8 @@ export function OrgRail({
   hydrated: boolean;
 }) {
   return (
-    <>
-      <h2 className="mx-2.5 mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+    <Stack gap="sm">
+      <h2 className="mx-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
         Organizations
       </h2>
       <nav aria-label="Organizations">
@@ -60,20 +60,9 @@ export function OrgRail({
           })}
         </ul>
       </nav>
-      <ActionButton
-        variant="ghost"
-        waiting={!hydrated}
-        onClick={onNew}
-        className="mt-2.5 w-full justify-start border-0 px-2.5 text-[13px] font-normal"
-      >
-        <span
-          aria-hidden="true"
-          className="grid h-6 w-6 place-items-center rounded-md border border-dashed border-slate-300 text-slate-400"
-        >
-          +
-        </span>
+      <Button variant="dashed" disabled={!hydrated} onClick={onNew}>
         New organization
-      </ActionButton>
-    </>
+      </Button>
+    </Stack>
   );
 }

@@ -53,7 +53,7 @@ function AcceptAll({
       variant="outline"
       disabled={!hydrated || busy || !reviewable || toReview === 0}
       onClick={accept}
-      className="px-3 py-1.5"
+      size="sm"
     >
       Accept all
     </Button>
@@ -161,7 +161,7 @@ export function BuildHeader({
                 Review next
               </Link>
             ) : (
-              <Button disabled className="px-3 py-1.5" data-testid="review-next">
+              <Button disabled size="sm" data-testid="review-next">
                 Review next
               </Button>
             )}

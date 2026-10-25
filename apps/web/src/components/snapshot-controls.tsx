@@ -79,7 +79,7 @@ function CompositionToggle({
           side ? "Draw the composition findings on Branch" : "Findings are drawn side by side only"
         }
         onClick={() => onChange(!on)}
-        className="px-3 py-1.5"
+        size="sm"
       >
         Composition
       </Button>
@@ -124,7 +124,7 @@ export function ViewerControls({
         disabled={!hydrated || !measured}
         title={measured ? "Draw the measured regions" : "Nothing was measured, so nothing to draw"}
         onClick={() => onHighlight(!highlight)}
-        className="px-3 py-1.5"
+        size="sm"
       >
         Highlight
       </Button>

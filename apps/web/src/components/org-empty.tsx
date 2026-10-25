@@ -1,5 +1,4 @@
-import { Card } from "@hackcove/ui";
-import { ActionButton } from "./action-button";
+import { Button, Card, Stack } from "@hackcove/ui";
 import { CopyLine } from "./copy-button";
 
 /** An org with no projects: what a project is, and the two steps to a first build. */
@@ -20,9 +19,9 @@ export function EmptyOrg({
         A project holds one app's builds. Make one, issue a token in its settings, then upload from
         CI or your machine.
       </p>
-      <ActionButton waiting={!hydrated} onClick={onNewProject}>
+      <Button disabled={!hydrated} onClick={onNewProject}>
         + New project
-      </ActionButton>
+      </Button>
       <ol className="mx-auto mt-5 grid max-w-140 gap-2.5 text-left text-slate-600">
         <li className="grid grid-cols-[26px_1fr] items-start gap-2.5">
           <Step n={1} />
@@ -33,15 +32,10 @@ export function EmptyOrg({
         </li>
         <li className="grid grid-cols-[26px_1fr] items-start gap-2.5">
           <Step n={2} />
-          <div className="min-w-0">
-            Upload a build:
-            <CopyLine
-              text={command}
-              hydrated={hydrated}
-              testId="upload-command"
-              className="mt-1.5"
-            />
-          </div>
+          <Stack gap="xs">
+            <span>Upload a build:</span>
+            <CopyLine text={command} hydrated={hydrated} testId="upload-command" />
+          </Stack>
         </li>
       </ol>
     </Card>
