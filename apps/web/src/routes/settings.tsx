@@ -9,6 +9,12 @@ import {
   Pill,
   SectionHeading,
   Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
 } from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
@@ -21,8 +27,6 @@ export const Route = createFileRoute("/settings")({
   loader: () => getAccountSettings(),
   component: AccountSettings,
 });
-
-const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 /** The signed-in user's own settings: for now, the personal API tokens the CLI and MCP act with (ob 1728). */
 function AccountSettings() {
@@ -165,41 +169,45 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
     );
   }
   return (
-    <table className="mt-6 w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-slate-200">
-          <th className={HEAD}>Name</th>
-          <th className={HEAD}>Token</th>
-          <th className={HEAD}>Created</th>
-          <th className={HEAD}>Last used</th>
-          <th className={HEAD}>Expires</th>
-          <th className={HEAD}>Status</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
+    <Table variant="plain" caption="Personal tokens" className="mt-6">
+      <TableHead>
+        <TableRow>
+          <TableHeaderCell>Name</TableHeaderCell>
+          <TableHeaderCell>Token</TableHeaderCell>
+          <TableHeaderCell>Created</TableHeaderCell>
+          <TableHeaderCell>Last used</TableHeaderCell>
+          <TableHeaderCell>Expires</TableHeaderCell>
+          <TableHeaderCell>Status</TableHeaderCell>
+          <TableHeaderCell align="end">
+            <span className="sr-only">Actions</span>
+          </TableHeaderCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
         {tokens.map((t) => {
           const state = stateOf(t, now);
+          const active = state === "active";
+          const tone = active ? undefined : "muted";
           return (
-            <tr key={t.id} className={state === "active" ? "" : "text-slate-400"}>
-              <td className="py-3 pr-3 font-medium">{t.name}</td>
-              <td className="pr-3 font-mono text-[12.5px] text-slate-600">{t.prefix}…</td>
-              <td className="pr-3 whitespace-nowrap text-slate-600">
-                {formatDateTime(t.createdAt)}
-              </td>
-              <td className="pr-3 whitespace-nowrap text-slate-600">
+            <TableRow key={t.id}>
+              <TableCell tone={active ? "strong" : "muted"}>{t.name}</TableCell>
+              <TableCell mono tone={tone}>
+                {t.prefix}…
+              </TableCell>
+              <TableCell tone={tone}>{formatDateTime(t.createdAt)}</TableCell>
+              <TableCell tone={tone}>
                 {t.lastUsedAt ? formatDateTime(t.lastUsedAt) : "never"}
-              </td>
-              <td className="pr-3 whitespace-nowrap text-slate-600">
+              </TableCell>
+              <TableCell tone={tone}>
                 {t.expiresAt ? formatDateTime(t.expiresAt) : "never"}
-              </td>
-              <td className="pr-3">
-                <Pill dot tone={state === "active" ? "emerald" : "slate"}>
+              </TableCell>
+              <TableCell>
+                <Pill dot tone={active ? "emerald" : "slate"}>
                   {state}
                 </Pill>
-              </td>
-              <td className="text-right">
-                {state === "active" && (
+              </TableCell>
+              <TableCell align="end">
+                {active && (
                   <ActionButton
                     variant="ghost"
                     waiting={!hydrated}
@@ -212,11 +220,11 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
                     Revoke
                   </ActionButton>
                 )}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           );
         })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

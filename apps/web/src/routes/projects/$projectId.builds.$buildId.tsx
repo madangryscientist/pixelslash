@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
 import { BuildTimings } from "#/components/build-timings";
 import { BuildSummary } from "#/components/build-summary";
-import { TabBody, Tabs } from "#/components/build-shots";
+import { BuildTabs, TabBody } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { BuildOverrideChanges } from "#/components/override-trail";
 import { RerunErrored } from "#/components/rerun";
@@ -121,7 +121,7 @@ function BuildPage() {
           <p className="text-slate-600">This build holds no snapshots yet.</p>
         ) : (
           <>
-            <Tabs projectId={project.id} buildId={build.id} active={active} counts={counts} />
+            <BuildTabs projectId={project.id} buildId={build.id} active={active} counts={counts} />
             <TabBody
               key={active}
               projectId={project.id}

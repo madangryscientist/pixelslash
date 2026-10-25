@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
-import { Button, navTabClass } from "@hackcove/ui";
+import { Button, type LinkRenderProps, Tabs } from "@hackcove/ui";
 import { ShotThumb } from "#/components/shot-card";
 import { ReviewChip, useHydrated } from "#/components/ui";
 import {
@@ -73,23 +73,26 @@ export function ModeTabs({
     { id: "since", label: "Since last build" },
   ];
   return (
-    <nav aria-label="Read the branch" className="flex flex-wrap gap-2">
-      {modes.map((mode) => (
-        <Link
-          key={mode.id}
-          to="/projects/$projectId/branches/$branch"
-          params={{ projectId, branch }}
-          search={mode.id === "main" ? {} : { mode: mode.id }}
-          replace
-          resetScroll={false}
-          data-testid={`mode-${mode.id}`}
-          aria-current={mode.id === active ? "page" : undefined}
-          className={navTabClass(mode.id === active)}
-        >
-          {mode.label}
-        </Link>
-      ))}
-    </nav>
+    <Tabs
+      variant="pill"
+      label="Read the branch"
+      value={active}
+      items={modes.map((mode) => ({
+        value: mode.id,
+        label: mode.label,
+        render: (props: LinkRenderProps) => (
+          <Link
+            to="/projects/$projectId/branches/$branch"
+            params={{ projectId, branch }}
+            search={mode.id === "main" ? {} : { mode: mode.id }}
+            replace
+            resetScroll={false}
+            data-testid={`mode-${mode.id}`}
+            {...props}
+          />
+        ),
+      }))}
+    />
   );
 }
 

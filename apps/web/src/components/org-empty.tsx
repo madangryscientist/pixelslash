@@ -1,3 +1,4 @@
+import { Card } from "@hackcove/ui";
 import { ActionButton } from "./action-button";
 import { CopyLine } from "./copy-button";
 
@@ -13,10 +14,7 @@ export function EmptyOrg({
 }) {
   const command = `PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`;
   return (
-    <div
-      data-testid="empty-org"
-      className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
-    >
+    <Card as="div" dashed="filled" data-testid="empty-org">
       <h2 className="mb-1.5 text-[17px] font-semibold">No projects yet</h2>
       <p className="mx-auto mb-4 max-w-[460px] text-slate-600">
         A project holds one app's builds. Make one, issue a token in its settings, then upload from
@@ -46,7 +44,7 @@ export function EmptyOrg({
           </div>
         </li>
       </ol>
-    </div>
+    </Card>
   );
 }
 

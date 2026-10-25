@@ -1,4 +1,13 @@
-import { Body, SectionHeading } from "@hackcove/ui";
+import {
+  Body,
+  SectionHeading,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ActionButton } from "#/components/action-button";
@@ -30,8 +39,6 @@ type Listed = {
   snippet: string;
 };
 
-export const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
-
 export const variantLabel = (v: Variant | null) =>
   v ? `${v.platform} · ${v.browser} · ${v.viewport} · ${v.theme}` : "every variant";
 
@@ -51,31 +58,30 @@ function OverrideChanges({ changes }: { changes: Change[] }) {
       </p>
     );
   return (
-    <table data-testid="override-changes" className="w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-slate-200">
-          <th className={HEAD}>When</th>
-          <th className={HEAD}>Who</th>
-          <th className={HEAD}>Test</th>
-          <th className={HEAD}>Change</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
+    <Table variant="plain" caption="Thresholds changed in review" data-testid="override-changes">
+      <TableHead>
+        <TableRow>
+          <TableHeaderCell>When</TableHeaderCell>
+          <TableHeaderCell>Who</TableHeaderCell>
+          <TableHeaderCell>Test</TableHeaderCell>
+          <TableHeaderCell>Change</TableHeaderCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
         {changes.map((c) => (
-          <tr key={c.id} data-testid="override-change">
-            <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{formatDateTime(c.at)}</td>
-            <td className="pr-3">@{c.by}</td>
-            <td className="pr-3">
-              <span className="font-medium">{c.name}</span>
-              <span className="block text-xs text-slate-500">{variantLabel(c.variant)}</span>
-            </td>
-            <td className="pr-3 font-mono text-[12px]">
+          <TableRow key={c.id} data-testid="override-change">
+            <TableCell>{formatDateTime(c.at)}</TableCell>
+            <TableCell>@{c.by}</TableCell>
+            <TableCell tone="strong" secondary={variantLabel(c.variant)}>
+              {c.name}
+            </TableCell>
+            <TableCell mono>
               {optionsText(c.before)} → {optionsText(c.after)}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -134,6 +140,31 @@ function ClearButton({
   );
 }
 
+/** The overrides and ignore boxes as the config a route would carry, to copy. */
+function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: boolean }) {
+  return (
+    <details className="mt-4 text-sm" data-testid="override-export">
+      <summary className="cursor-pointer text-violet-700">Export as config</summary>
+      <p className="mt-2 text-slate-600">
+        Merge each route&apos;s <code>diff</code>, <code>ignore</code> and <code>variants</code>{" "}
+        into the route of that name in <code>pixelslash.config.json</code>, then clear the overrides
+        and ignore boxes here: the builds measure the same. A key the config already sets on that
+        variant beats a route&apos;s; move it to the variant. Ignore boxes are in image px, the
+        config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise divide by it.
+      </p>
+      <div className="mt-2 flex justify-end">
+        <CopyButton text={exported} hydrated={hydrated} />
+      </div>
+      <pre
+        data-testid="override-export-json"
+        className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[12px] text-slate-800"
+      >
+        {exported}
+      </pre>
+    </details>
+  );
+}
+
 /**
  * The settings page's section: every override, clear one, export them all (with the ignore boxes,
  * ob 1499), and the trail.
@@ -162,56 +193,38 @@ export function OverrideSettings({
           None. Set one from a shot&apos;s screen.
         </p>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200">
-              <th className={HEAD}>Test</th>
-              <th className={HEAD}>Options</th>
-              <th className={HEAD}>Set</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
+        <Table variant="plain" caption="Diff thresholds set in review">
+          <TableHead>
+            <TableRow>
+              <TableHeaderCell>Test</TableHeaderCell>
+              <TableHeaderCell>Options</TableHeaderCell>
+              <TableHeaderCell>Set</TableHeaderCell>
+              <TableHeaderCell align="end">
+                <span className="sr-only">Actions</span>
+              </TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {overrides.list.map((o) => (
-              <tr key={`${o.name}\n${variantLabel(o.variant)}`} data-testid="override-row">
-                <td className="py-2 pr-3">
-                  <span className="font-medium">{o.name}</span>
-                  <span className="block text-xs text-slate-500">{variantLabel(o.variant)}</span>
-                </td>
-                <td className="pr-3 font-mono text-[12px]">{optionsText(o.options)}</td>
-                <td className="pr-3 text-slate-600">
+              <TableRow key={`${o.name}\n${variantLabel(o.variant)}`} data-testid="override-row">
+                <TableCell tone="strong" secondary={variantLabel(o.variant)}>
+                  {o.name}
+                </TableCell>
+                <TableCell mono>{optionsText(o.options)}</TableCell>
+                <TableCell>
                   @{o.by}, {formatDateTime(o.at)}
-                </td>
-                <td className="text-right">
+                </TableCell>
+                <TableCell align="end">
                   <CopyButton text={o.snippet} hydrated={hydrated} />
                   <ClearButton projectId={projectId} o={o} hydrated={hydrated} />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
       {(overrides.list.length > 0 || overrides.boxes.length > 0) && (
-        <details className="mt-4 text-sm" data-testid="override-export">
-          <summary className="cursor-pointer text-violet-700">Export as config</summary>
-          <p className="mt-2 text-slate-600">
-            Merge each route&apos;s <code>diff</code>, <code>ignore</code> and <code>variants</code>{" "}
-            into the route of that name in <code>pixelslash.config.json</code>, then clear the
-            overrides and ignore boxes here: the builds measure the same. A key the config already
-            sets on that variant beats a route&apos;s; move it to the variant. Ignore boxes are in
-            image px, the config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise
-            divide by it.
-          </p>
-          <div className="mt-2 flex justify-end">
-            <CopyButton text={overrides.exported} hydrated={hydrated} />
-          </div>
-          <pre
-            data-testid="override-export-json"
-            className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[12px] text-slate-800"
-          >
-            {overrides.exported}
-          </pre>
-        </details>
+        <ExportAsConfig exported={overrides.exported} hydrated={hydrated} />
       )}
       <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700">Changes</h3>
       <OverrideChanges changes={overrides.changes} />

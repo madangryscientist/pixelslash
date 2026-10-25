@@ -20,21 +20,8 @@ export function parseTheme(value: string | undefined | null): Theme | null {
  */
 export const THEME_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);var d=m?m[1]==="dark":matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d)}catch(e){}})()`;
 
-/** The theme the page shows right now: the class on <html> is the source of truth. */
-export function currentTheme(): Theme {
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
-}
-
-/** Subscribes to the class on <html> changing, whoever changes it. */
-export function subscribeToTheme(onChange: () => void): () => void {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  return () => observer.disconnect();
-}
-
-/** An explicit choice: flip the class now and remember it for the server's next render. */
-export function chooseTheme(theme: Theme): void {
-  document.documentElement.classList.toggle("dark", theme === "dark");
+/** An explicit choice, remembered for the server's next render. The toggle flips the class itself. */
+export function rememberTheme(theme: Theme): void {
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${THEME_COOKIE}=${theme}; Path=/; Max-Age=${ONE_YEAR}; SameSite=Lax${secure}`;
 }

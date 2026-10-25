@@ -1,7 +1,6 @@
 import { Link, getRouteApi } from "@tanstack/react-router";
-import { AppShellBrand, IconButton } from "@hackcove/ui";
-import { useSyncExternalStore } from "react";
-import { chooseTheme, currentTheme, subscribeToTheme } from "#/lib/theme";
+import { AppShellBrand, ColourSchemeToggle } from "@hackcove/ui";
+import { rememberTheme } from "#/lib/theme";
 import { useHydrated } from "#/lib/use-hydrated";
 
 const rootRoute = getRouteApi("__root__");
@@ -22,27 +21,18 @@ export function Logo({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
-/** Both icons are in the markup; CSS shows the one for the theme on <html>, so no frame is wrong. */
+/** The theme cookie is the choice; the server's theme is what the first render shows. */
 function ThemeToggle() {
+  const { theme } = rootRoute.useLoaderData();
   const hydrated = useHydrated();
-  const theme = useSyncExternalStore(subscribeToTheme, currentTheme, () => "light");
-  const icon = "h-4 w-4 fill-none stroke-current stroke-2";
   return (
-    <IconButton
-      label="Dark theme"
-      aria-pressed={theme === "dark"}
-      data-testid="theme-toggle"
+    <ColourSchemeToggle
+      store={false}
+      initial={theme === "dark" ? "dark" : "light"}
+      onChange={rememberTheme}
       disabled={!hydrated}
-      onClick={() => chooseTheme(theme === "dark" ? "light" : "dark")}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true" className={`${icon} dark:hidden`}>
-        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" strokeLinejoin="round" />
-      </svg>
-      <svg viewBox="0 0 24 24" aria-hidden="true" className={`${icon} hidden dark:block`}>
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-      </svg>
-    </IconButton>
+      data-testid="theme-toggle"
+    />
   );
 }
 
@@ -88,12 +78,7 @@ export function AppBrand() {
     <AppShellBrand
       logo={<Logo />}
       label="PixelSlash"
-      // Not `{...props}`: its `target?: string | undefined` is refused by Link under exactOptionalPropertyTypes.
-      render={({ className, children }) => (
-        <Link to={viewer ? "/orgs" : "/"} className={className}>
-          {children}
-        </Link>
-      )}
+      render={(props) => <Link to={viewer ? "/orgs" : "/"} {...props} />}
     />
   );
 }

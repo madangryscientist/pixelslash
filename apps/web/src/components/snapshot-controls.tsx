@@ -1,4 +1,4 @@
-import { Button } from "@hackcove/ui";
+import { Button, SegmentedControl } from "@hackcove/ui";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionLegend } from "#/components/composition";
 import type { Scale } from "#/components/snapshot-frame";
@@ -18,7 +18,7 @@ const SCALES: { id: Scale; label: string; title: string }[] = [
   { id: "zoom", label: "Zoom to change", title: "Crop to the measured change" },
 ];
 
-/** One row of buttons where exactly one is pressed. */
+/** One row of options where exactly one is chosen; `disabled` is why an option cannot be, by id. */
 function Segmented<T extends string>({
   label,
   options,
@@ -30,26 +30,29 @@ function Segmented<T extends string>({
   options: { id: T; label: string; title?: string }[];
   value: T;
   onChange: (value: T) => void;
-  /** Why an option cannot be picked, by id; absent means it can. */
   disabled?: Partial<Record<T, string>>;
 }) {
   const hydrated = useHydrated();
   return (
-    <div role="group" aria-label={label} className="flex gap-1">
-      {options.map(({ id, label: text, title }) => (
-        <Button
-          key={id}
-          variant={value === id ? "primary" : "outline"}
-          aria-pressed={value === id}
-          disabled={!hydrated || disabled?.[id] !== undefined}
-          title={disabled?.[id] ?? title}
-          onClick={() => onChange(id)}
-          className="px-3 py-1.5"
-        >
-          {text}
-        </Button>
-      ))}
-    </div>
+    <SegmentedControl
+      label={label}
+      value={value}
+      disabled={!hydrated}
+      onChange={(id) => {
+        const option = options.find((candidate) => candidate.id === id);
+        if (option) onChange(option.id);
+      }}
+      items={options.map(({ id, label: text, title }) => {
+        const why = disabled?.[id];
+        const reason = why ?? title;
+        return {
+          value: id,
+          label: text,
+          disabled: why !== undefined,
+          ...(reason === undefined ? {} : { title: reason }),
+        };
+      })}
+    />
   );
 }
 

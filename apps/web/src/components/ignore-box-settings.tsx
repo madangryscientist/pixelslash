@@ -1,9 +1,18 @@
-import { Body, SectionHeading } from "@hackcove/ui";
+import {
+  Body,
+  SectionHeading,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ActionButton } from "#/components/action-button";
 import { CopyButton } from "#/components/copy-button";
-import { HEAD, type Variant, variantLabel } from "#/components/override-trail";
+import { type Variant, variantLabel } from "#/components/override-trail";
 import type { IgnoreRect } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
 import { clearIgnoreBoxFromSettings } from "#/server/ignore-boxes";
@@ -66,10 +75,9 @@ function ClearBox({
 
 function TestCell({ box }: { box: Box }) {
   return (
-    <td className="py-2 pr-3">
-      <span className="font-medium">{box.name}</span>
-      <span className="block text-xs text-slate-500">{variantLabel(box.variant)}</span>
-    </td>
+    <TableCell tone="strong" secondary={variantLabel(box.variant)}>
+      {box.name}
+    </TableCell>
   );
 }
 
@@ -82,30 +90,30 @@ function BoxTrail({ trail }: { trail: Box[] }) {
       </p>
     );
   return (
-    <table data-testid="ignore-trail" className="w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-slate-200">
-          <th className={HEAD}>Test</th>
-          <th className={HEAD}>Box</th>
-          <th className={HEAD}>Drawn</th>
-          <th className={HEAD}>Cleared</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
+    <Table variant="plain" caption="Ignore boxes drawn in review" data-testid="ignore-trail">
+      <TableHead>
+        <TableRow>
+          <TableHeaderCell>Test</TableHeaderCell>
+          <TableHeaderCell>Box</TableHeaderCell>
+          <TableHeaderCell>Drawn</TableHeaderCell>
+          <TableHeaderCell>Cleared</TableHeaderCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
         {trail.map((b) => (
-          <tr key={b.id} data-testid="ignore-trail-row">
+          <TableRow key={b.id} data-testid="ignore-trail-row">
             <TestCell box={b} />
-            <td className="pr-3 font-mono text-[12px]">{rectText(b.rect)}</td>
-            <td className="pr-3 text-slate-600">
+            <TableCell mono>{rectText(b.rect)}</TableCell>
+            <TableCell>
               @{b.by}, {formatDateTime(b.at)}
-            </td>
-            <td className="pr-3 text-slate-600">
+            </TableCell>
+            <TableCell>
               {b.cleared ? `@${b.cleared.by}, ${formatDateTime(b.cleared.at)}` : "—"}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -136,31 +144,33 @@ export function IgnoreBoxSettings({
           None. Draw one from a shot&apos;s screen.
         </p>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200">
-              <th className={HEAD}>Test</th>
-              <th className={HEAD}>Box</th>
-              <th className={HEAD}>Drawn</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
+        <Table variant="plain" caption="Ignore boxes">
+          <TableHead>
+            <TableRow>
+              <TableHeaderCell>Test</TableHeaderCell>
+              <TableHeaderCell>Box</TableHeaderCell>
+              <TableHeaderCell>Drawn</TableHeaderCell>
+              <TableHeaderCell align="end">
+                <span className="sr-only">Actions</span>
+              </TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {boxes.map((b) => (
-              <tr key={b.id} data-testid="ignore-row">
+              <TableRow key={b.id} data-testid="ignore-row">
                 <TestCell box={b} />
-                <td className="pr-3 font-mono text-[12px]">{rectText(b.rect)}</td>
-                <td className="pr-3 text-slate-600">
+                <TableCell mono>{rectText(b.rect)}</TableCell>
+                <TableCell>
                   @{b.by}, {formatDateTime(b.at)}
-                </td>
-                <td className="text-right">
+                </TableCell>
+                <TableCell align="end">
                   <CopyButton text={b.snippet} hydrated={hydrated} />
                   <ClearBox projectId={projectId} boxId={b.id} hydrated={hydrated} />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
       <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700">Trail</h3>
       <BoxTrail trail={trail} />

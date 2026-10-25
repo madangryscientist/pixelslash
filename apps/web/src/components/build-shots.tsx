@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo, useState } from "react";
-import { navTabClass } from "@hackcove/ui";
+import { type LinkRenderProps, Tabs } from "@hackcove/ui";
 import { aiFiltered } from "#/components/ai-notes";
 import { ShotCard, measured } from "#/components/shot-card";
 import { ReviewChip } from "#/components/ui";
@@ -9,7 +9,7 @@ import { BUILD_TABS, type BuildTab } from "#/lib/build-tabs";
 import { type ShotLabel, shotLabeller } from "#/lib/shot-label";
 import { GROUP_LABEL, type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
 
-export function Tabs({
+export function BuildTabs({
   projectId,
   buildId,
   active,
@@ -21,23 +21,27 @@ export function Tabs({
   counts: Record<BuildTab, number>;
 }) {
   return (
-    <nav aria-label="Shots in this build" className="flex flex-wrap gap-2">
-      {BUILD_TABS.map((tab) => (
-        <Link
-          key={tab.id}
-          to="/projects/$projectId/builds/$buildId"
-          params={{ projectId, buildId }}
-          search={{ tab: tab.id }}
-          replace
-          resetScroll={false}
-          data-testid={`tab-${tab.id}`}
-          aria-current={tab.id === active ? "page" : undefined}
-          className={navTabClass(tab.id === active)}
-        >
-          {tab.label} <span data-testid={`tab-count-${tab.id}`}>{counts[tab.id]}</span>
-        </Link>
-      ))}
-    </nav>
+    <Tabs
+      variant="pill"
+      label="Shots in this build"
+      value={active}
+      items={BUILD_TABS.map((tab) => ({
+        value: tab.id,
+        label: tab.label,
+        count: counts[tab.id],
+        render: (props: LinkRenderProps) => (
+          <Link
+            to="/projects/$projectId/builds/$buildId"
+            params={{ projectId, buildId }}
+            search={{ tab: tab.id }}
+            replace
+            resetScroll={false}
+            data-testid={`tab-${tab.id}`}
+            {...props}
+          />
+        ),
+      }))}
+    />
   );
 }
 

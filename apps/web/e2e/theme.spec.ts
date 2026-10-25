@@ -23,7 +23,8 @@ test.describe("a light system", () => {
 
     await toggle.click();
     await expect(page.locator("html")).toHaveClass(/dark/);
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    // The label names the theme it switches to, so it flips with the page.
+    await expect(toggle).toHaveAccessibleName("Switch to light theme");
 
     // No flash: the document the server sends already carries the class, before any script runs.
     const html = await (await page.request.get("/")).text();
@@ -31,7 +32,7 @@ test.describe("a light system", () => {
 
     await page.reload();
     await expect(page.locator("html")).toHaveClass(/dark/);
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveAccessibleName("Switch to light theme");
 
     await toggle.click();
     await expect(page.locator("html")).not.toHaveClass(/dark/);

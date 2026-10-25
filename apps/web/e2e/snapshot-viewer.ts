@@ -15,7 +15,7 @@ export async function checkSnapshotViewer(page: Page) {
   const accept = page.getByRole("button", { name: "Accept", exact: true });
   const reject = page.getByRole("button", { name: "Reject", exact: true });
   for (const mode of ["Overlay", "Slider", "Side by side"]) {
-    await page.getByRole("button", { name: mode, exact: true }).click();
+    await page.getByRole("radio", { name: mode, exact: true }).click();
     await expect(accept).toBeInViewport();
     await expect(reject).toBeInViewport();
   }
@@ -27,9 +27,9 @@ export async function checkSnapshotViewer(page: Page) {
   await page.getByRole("button", { name: "Highlight" }).click();
   await expect(page.locator(BOXES).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Zoom to change" }).click();
+  await page.getByRole("radio", { name: "Zoom to change" }).click();
   await expect(page.locator('[data-scale="zoom"]').first()).toBeVisible();
-  await page.getByRole("button", { name: "Fit", exact: true }).click();
+  await page.getByRole("radio", { name: "Fit", exact: true }).click();
   await expect(page.locator('[data-scale="zoom"]')).toHaveCount(0);
 
   // `?` opens the list of keys; Esc closes it and the keys work again.

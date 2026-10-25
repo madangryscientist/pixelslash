@@ -1,6 +1,5 @@
-import { PageHeader, navTabClass } from "@hackcove/ui";
+import { type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
 import type { OrgOverview } from "#/db/orgs";
 import { ActionButton } from "./action-button";
 import { Avatar } from "./avatar";
@@ -56,48 +55,22 @@ export function OrgHeader({
 
 export type Tab = "projects" | "members" | "tokens" | "model" | "timings";
 
-function TabLink({
-  org,
-  tab,
-  current,
-  children,
-}: {
-  org: OrgOverview;
-  tab: Exclude<Tab, "projects"> | undefined;
-  current: Tab;
-  children: ReactNode;
-}) {
-  const active = current === (tab ?? "projects");
-  return (
-    <Link
-      to="/orgs"
-      search={tab ? { org: org.id, tab } : { org: org.id }}
-      aria-current={active ? "page" : undefined}
-      className={navTabClass(active)}
-    >
-      {children}
-    </Link>
-  );
-}
-
 function OrgTabs({ org, tab }: { org: OrgOverview; tab: Tab }) {
+  const to = (target: Exclude<Tab, "projects"> | undefined) => (props: LinkRenderProps) => (
+    <Link to="/orgs" search={target ? { org: org.id, tab: target } : { org: org.id }} {...props} />
+  );
   return (
-    <nav aria-label="Organization" className="flex flex-wrap gap-1 text-sm">
-      <TabLink org={org} tab={undefined} current={tab}>
-        Projects <span className="ml-1 text-slate-400">{org.projects.length}</span>
-      </TabLink>
-      <TabLink org={org} tab="members" current={tab}>
-        Members <span className="ml-1 text-slate-400">{org.members.length}</span>
-      </TabLink>
-      <TabLink org={org} tab="tokens" current={tab}>
-        Tokens
-      </TabLink>
-      <TabLink org={org} tab="model" current={tab}>
-        AI model
-      </TabLink>
-      <TabLink org={org} tab="timings" current={tab}>
-        Timings
-      </TabLink>
-    </nav>
+    <Tabs
+      variant="pill"
+      label="Organization"
+      value={tab}
+      items={[
+        { value: "projects", label: "Projects", count: org.projects.length, render: to(undefined) },
+        { value: "members", label: "Members", count: org.members.length, render: to("members") },
+        { value: "tokens", label: "Tokens", render: to("tokens") },
+        { value: "model", label: "AI model", render: to("model") },
+        { value: "timings", label: "Timings", render: to("timings") },
+      ]}
+    />
   );
 }

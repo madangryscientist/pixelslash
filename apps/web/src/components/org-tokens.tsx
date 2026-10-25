@@ -1,6 +1,17 @@
 import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { Body, Callout, Input, Pill } from "@hackcove/ui";
+import {
+  Body,
+  Callout,
+  Input,
+  Pill,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@hackcove/ui";
 import { formatDateTime } from "#/lib/format";
 import { issueOrgTokenFn, revokeOrgTokenFn } from "#/server/org-token-fns";
 import { ActionButton } from "./action-button";
@@ -14,8 +25,6 @@ export type OrgToken = {
   lastUsedAt: Date | null;
   revokedAt: Date | null;
 };
-
-const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 /**
  * The org's CI tokens (ob 1787): one `psorg_` token reaches every project of the org, so a
@@ -128,36 +137,39 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
     );
   }
   return (
-    <table className="mt-6 w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-slate-200">
-          <th className={HEAD}>Name</th>
-          <th className={HEAD}>Token</th>
-          <th className={HEAD}>Created</th>
-          <th className={HEAD}>Last used</th>
-          <th className={HEAD}>Status</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
+    <Table variant="plain" caption="Org tokens" className="mt-6">
+      <TableHead>
+        <TableRow>
+          <TableHeaderCell>Name</TableHeaderCell>
+          <TableHeaderCell>Token</TableHeaderCell>
+          <TableHeaderCell>Created</TableHeaderCell>
+          <TableHeaderCell>Last used</TableHeaderCell>
+          <TableHeaderCell>Status</TableHeaderCell>
+          <TableHeaderCell align="end">
+            <span className="sr-only">Actions</span>
+          </TableHeaderCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
         {tokens.map((t) => {
           const active = !t.revokedAt;
+          const tone = active ? undefined : "muted";
           return (
-            <tr key={t.id} data-testid="org-token-row" className={active ? "" : "text-slate-400"}>
-              <td className="py-3 pr-3 font-medium">{t.name}</td>
-              <td className="pr-3 font-mono text-[12.5px] text-slate-600">{t.prefix}…</td>
-              <td className="pr-3 whitespace-nowrap text-slate-600">
-                {formatDateTime(t.createdAt)}
-              </td>
-              <td className="pr-3 whitespace-nowrap text-slate-600">
+            <TableRow key={t.id} data-testid="org-token-row">
+              <TableCell tone={active ? "strong" : "muted"}>{t.name}</TableCell>
+              <TableCell mono tone={tone}>
+                {t.prefix}…
+              </TableCell>
+              <TableCell tone={tone}>{formatDateTime(t.createdAt)}</TableCell>
+              <TableCell tone={tone}>
                 {t.lastUsedAt ? formatDateTime(t.lastUsedAt) : "never"}
-              </td>
-              <td className="pr-3">
+              </TableCell>
+              <TableCell>
                 <Pill dot tone={active ? "emerald" : "slate"}>
                   {active ? "active" : "revoked"}
                 </Pill>
-              </td>
-              <td className="text-right">
+              </TableCell>
+              <TableCell align="end">
                 {active && (
                   <ActionButton
                     variant="ghost"
@@ -171,11 +183,11 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
                     Revoke
                   </ActionButton>
                 )}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           );
         })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

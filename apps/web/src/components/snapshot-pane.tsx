@@ -1,3 +1,4 @@
+import { Card } from "@hackcove/ui";
 import { type ReactNode, type SyntheticEvent, useCallback, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionBoxes } from "#/components/composition";
@@ -151,9 +152,9 @@ export function Pane({
           </ShotImage>
         </Viewport>
       ) : (
-        <p className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
+        <Card as="div" dashed>
           {empty}
-        </p>
+        </Card>
       )}
     </figure>
   );

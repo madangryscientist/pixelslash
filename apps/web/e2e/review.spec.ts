@@ -234,13 +234,13 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expectSignedImage(page);
   await capture(page, "03-snapshot-side-by-side");
 
-  await page.getByRole("button", { name: "Overlay" }).click();
+  await page.getByRole("radio", { name: "Overlay" }).click();
   await expect(
     page.locator('svg[aria-label="Measured regions"] rect[data-kind="change"]').first(),
   ).toBeVisible();
   await capture(page, "04-snapshot-overlay");
 
-  await page.getByRole("button", { name: "Slider" }).click();
+  await page.getByRole("radio", { name: "Slider" }).click();
   await page.getByLabel("Compare position").fill("70");
   await expect(page.getByLabel("Compare position")).toHaveValue("70");
   await capture(page, "05-snapshot-slider");

@@ -1,6 +1,19 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Body, Breadcrumbs, Callout, ListLayout, Pill, SectionHeading } from "@hackcove/ui";
+import {
+  Body,
+  Breadcrumbs,
+  Callout,
+  ListLayout,
+  Pill,
+  SectionHeading,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
@@ -22,8 +35,6 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
   loader: ({ params }) => getProjectSettings({ data: { projectId: params.projectId } }),
   component: ProjectSettings,
 });
-
-const HEAD = "py-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 function ProjectSettings() {
   const { project, org, tokens, overrides, model, serverUrl } = Route.useLoaderData();
@@ -224,50 +235,57 @@ function TokenTable({ tokens, hydrated }: { tokens: Token[]; hydrated: boolean }
     );
   }
   return (
-    <table className="mt-6 w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-slate-200">
-          <th className={HEAD}>Name</th>
-          <th className={HEAD}>Token</th>
-          <th className={HEAD}>Created</th>
-          <th className={HEAD}>Last used</th>
-          <th className={HEAD}>Status</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
-        {tokens.map((t) => (
-          <tr key={t.id} className={t.revokedAt ? "text-slate-400" : ""}>
-            <td className="py-3 pr-3 font-medium">{t.name}</td>
-            <td className="pr-3 font-mono text-[12.5px] text-slate-600">{t.prefix}…</td>
-            <td className="pr-3 whitespace-nowrap text-slate-600" title={t.createdAt.toISOString()}>
-              {formatDateTime(t.createdAt)}
-            </td>
-            <td className="pr-3 whitespace-nowrap text-slate-600">
-              {t.lastUsedAt ? formatDateTime(t.lastUsedAt) : "never"}
-            </td>
-            <td className="pr-3">
-              <Pill dot tone={t.revokedAt ? "slate" : "emerald"}>
-                {t.revokedAt ? "revoked" : "active"}
-              </Pill>
-            </td>
-            <td className="text-right">
-              {!t.revokedAt && (
-                <ActionButton
-                  variant="ghost"
-                  waiting={!hydrated}
-                  busy={revoking === t.id}
-                  busyLabel="Revoking…"
-                  onClick={() => void revoke(t.id)}
-                  className="text-red-700!"
-                >
-                  Revoke
-                </ActionButton>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <Table variant="plain" caption="Project tokens" className="mt-6">
+      <TableHead>
+        <TableRow>
+          <TableHeaderCell>Name</TableHeaderCell>
+          <TableHeaderCell>Token</TableHeaderCell>
+          <TableHeaderCell>Created</TableHeaderCell>
+          <TableHeaderCell>Last used</TableHeaderCell>
+          <TableHeaderCell>Status</TableHeaderCell>
+          <TableHeaderCell align="end">
+            <span className="sr-only">Actions</span>
+          </TableHeaderCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {tokens.map((t) => {
+          const tone = t.revokedAt ? "muted" : undefined;
+          return (
+            <TableRow key={t.id}>
+              <TableCell tone={t.revokedAt ? "muted" : "strong"}>{t.name}</TableCell>
+              <TableCell mono tone={tone}>
+                {t.prefix}…
+              </TableCell>
+              <TableCell tone={tone} title={t.createdAt.toISOString()}>
+                {formatDateTime(t.createdAt)}
+              </TableCell>
+              <TableCell tone={tone}>
+                {t.lastUsedAt ? formatDateTime(t.lastUsedAt) : "never"}
+              </TableCell>
+              <TableCell>
+                <Pill dot tone={t.revokedAt ? "slate" : "emerald"}>
+                  {t.revokedAt ? "revoked" : "active"}
+                </Pill>
+              </TableCell>
+              <TableCell align="end">
+                {!t.revokedAt && (
+                  <ActionButton
+                    variant="ghost"
+                    waiting={!hydrated}
+                    busy={revoking === t.id}
+                    busyLabel="Revoking…"
+                    onClick={() => void revoke(t.id)}
+                    className="text-red-700!"
+                  >
+                    Revoke
+                  </ActionButton>
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }

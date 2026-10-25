@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { Body, Input, SectionHeading } from "@hackcove/ui";
+import { Body, Checkbox, Input, SectionHeading } from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import type { ModelView, ModelSource } from "#/db/models";
 import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
@@ -214,23 +214,23 @@ function ModelFields({
           Stored for this {owner} and never shown again. A new base URL needs its key again.
         </span>
       </label>
-      <label className="flex items-start gap-2 sm:col-span-2">
-        <input
-          type="checkbox"
-          checked={fields.autoPassNoise}
-          disabled={!hydrated}
-          onChange={(e) => set({ autoPassNoise: e.target.checked })}
-          data-testid="model-auto-pass"
-          className="mt-1"
-        />
-        <span>
-          <span className="font-medium">Auto-pass noise</span>
-          <span className="block text-slate-600">
-            Accept a shot when the model labels every changed region noise. Off, noise is only
-            labelled and a person still decides.
+      <Checkbox
+        align="start"
+        checked={fields.autoPassNoise}
+        disabled={!hydrated}
+        onChange={(e) => set({ autoPassNoise: e.target.checked })}
+        data-testid="model-auto-pass"
+        className="sm:col-span-2"
+        label={
+          <span>
+            <span className="font-medium">Auto-pass noise</span>
+            <span className="block text-slate-600">
+              Accept a shot when the model labels every changed region noise. Off, noise is only
+              labelled and a person still decides.
+            </span>
           </span>
-        </span>
-      </label>
+        }
+      />
     </>
   );
 }

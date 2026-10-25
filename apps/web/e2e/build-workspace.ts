@@ -22,7 +22,7 @@ export async function expectBuildWorkspaceOpen(page: Page) {
     ["unmeasured", "0"],
     ["unchanged", "1"],
   ] as const) {
-    await expect(page.getByTestId(`tab-count-${tab}`)).toHaveText(count);
+    await expect(page.getByTestId(`tab-${tab}`)).toHaveText(new RegExp(`\\s${count}$`));
   }
 }
 

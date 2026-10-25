@@ -1,4 +1,4 @@
-import { SidebarLayout } from "@hackcove/ui";
+import { Card, SidebarLayout } from "@hackcove/ui";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ActionButton } from "#/components/action-button";
@@ -180,10 +180,7 @@ function OrgDialogs({
 
 function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
   return (
-    <div
-      data-testid="no-orgs"
-      className="mx-auto mt-10 max-w-lg rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
-    >
+    <Card as="div" dashed="filled" data-testid="no-orgs" className="mx-auto mt-10 max-w-lg">
       <h1 className="mb-1.5 text-[17px] font-semibold">No organizations yet</h1>
       <p className="mb-4 text-slate-600">
         An organization owns your projects and the people who review them. Create one to add
@@ -192,7 +189,7 @@ function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
       <ActionButton waiting={!hydrated} onClick={onNew}>
         + New organization
       </ActionButton>
-    </div>
+    </Card>
   );
 }
 

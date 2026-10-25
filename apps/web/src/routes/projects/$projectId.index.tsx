@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Breadcrumbs, ListLayout, buttonClass } from "@hackcove/ui";
+import { Breadcrumbs, Card, ListLayout, buttonClass } from "@hackcove/ui";
 import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb } from "#/components/crumbs";
@@ -156,10 +156,7 @@ function EmptyProject({
 }) {
   const command = `PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`;
   return (
-    <div
-      data-testid="empty-project"
-      className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
-    >
+    <Card as="div" dashed="filled" data-testid="empty-project">
       <h2 className="mb-1.5 text-[17px] font-semibold">No builds yet</h2>
       <p className="mx-auto mb-4 max-w-[460px] text-slate-600">
         A build is one upload of snapshots from CI or your machine. Builds on{" "}
@@ -194,6 +191,6 @@ function EmptyProject({
           </div>
         </li>
       </ol>
-    </div>
+    </Card>
   );
 }
