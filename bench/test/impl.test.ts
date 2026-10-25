@@ -203,9 +203,10 @@ describe("ts-diff --decode (ob 1932)", () => {
     expect(mismatches).toEqual([]);
   }, 180_000);
 
-  // PS-210: the decode and the pixel loop are one call into diff.wasm, so the phases are the file
-  // read (all of decode_ms), and --decode changes nothing. The overlay is not encoded (PS-211).
-  test("decode_read is decode_ms, and the file read is the only phase", async () => {
+  // PS-210: the decode and the pixel loop are one call into diff.wasm, and --decode changes nothing.
+  // PS-212: the call times its own steps, so decode_ms is the file read plus its decode_* phases. The
+  // overlay is not encoded (PS-211).
+  test("decode_ms is the file read and the call's decode phases", async () => {
     const {
       phases = {},
       decode_ms,
@@ -213,8 +214,11 @@ describe("ts-diff --decode (ob 1932)", () => {
       startup_ms,
       peak_rss_bytes,
     } = await desktop("sequential");
-    expect(Object.keys(phases)).toEqual(["decode_read"]);
-    expect(phases["decode_read"]).toBe(decode_ms);
+    expect(Object.keys(phases)).toEqual(
+      "decode_read decode_inflate decode_unfilter decode_other pixel_compare regions".split(" "),
+    );
+    const decoding = Object.entries(phases).filter(([name]) => name.startsWith("decode_"));
+    expect(decoding.reduce((sum, [, ms]) => sum + ms, 0)).toBeCloseTo(decode_ms, 6);
     expect(diff_ms).toBeGreaterThanOrEqual(0);
     expect(startup_ms).toBeGreaterThan(0);
     // Its own VmHWM: more than an empty Bun, far less than the runner's high-water mark it would inherit.

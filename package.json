@@ -17,6 +17,7 @@
     "bench": "nx run bench:bench --output-style=stream",
     "bench:check": "nx run bench:check --output-style=stream",
     "bench:perf": "bun bench/src/perf/run.ts",
+    "bench:native": "bun bench/src/perf/native.ts",
     "bench:perf:check": "bun bench/src/perf/run.ts --check",
     "bench:decoders": "bun bench/src/perf/decoders.ts",
     "bench:import-flags": "bun bench/src/import-flags.ts",

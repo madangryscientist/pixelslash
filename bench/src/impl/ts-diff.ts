@@ -8,7 +8,8 @@
  *
  * It runs the engine's one diff, `wasmDiff` (PS-210: `diff.wasm`, the same module the CLI and the
  * server run), so the verdict and regions are the engine's. The decode is inside that call, with
- * the pixel loop: `decode_ms` is reading the two files alone, and `diff_ms` is the rest. The overlay
+ * the pixel loop; the call reports its phases (PS-212), so `decode_ms` is reading the two files
+ * plus the call's `decode_*` phases, and `diff_ms` is the rest of the call. The overlay
  * is not encoded: the contract does not ask for it, and the engine's encode is swapped for a no-op
  * (what `--overlay none` did before the JS encoders were retired, PS-211).
  *
@@ -97,16 +98,20 @@ function diffPair(args: Args): ImplOutput {
   const baseBytes = readFileSync(args.basePath);
   const headBytes = readFileSync(args.headPath);
   const decodeMs = performance.now() - reading;
+  const phases: Record<string, number> = {};
   const diffing = performance.now();
   // No overlay PNG: the contract does not ask for one, and its encode is not timed.
-  const result = wasmDiff([baseBytes, headBytes], { encode: () => Buffer.alloc(0) });
-  const diffMs = performance.now() - diffing;
+  const result = wasmDiff([baseBytes, headBytes], { encode: () => Buffer.alloc(0), phases });
+  const callMs = performance.now() - diffing;
+  const decoding = Object.entries(phases)
+    .filter(([name]) => name.startsWith("decode_"))
+    .reduce((sum, [, ms]) => sum + ms, 0);
   return {
     verdict: result.changed ? "changed" : "unchanged",
     regions: changeRegions(result),
-    decode_ms: decodeMs,
-    diff_ms: diffMs,
-    phases: { decode_read: decodeMs },
+    decode_ms: decodeMs + decoding,
+    diff_ms: Math.max(0, callMs - decoding),
+    phases: { decode_read: decodeMs, ...phases },
   };
 }
 

@@ -27,22 +27,22 @@ and napi-image engines were retired in PS-211 (see the run log); their rows in o
 
 ## Dashboard
 
-Wall time per page for the two engines, from the one run that timed both: PS-209, `--env dedicated
---runs 10`, 2026-10-25 (`bench/perf-results/2026-10-25T17-51-22-485Z.json`). Both sides do the same
+Wall time per page for the two engines, from the last run that timed both: PS-212, `--env dedicated
+--runs 10`, 2026-10-26 (`bench/perf-results/2026-10-25T22-19-31-236Z.json`). Both sides do the same
 work: decode, diff and regions, and no overlay image, since the bench's WASM encode is a no-op (PS-211).
 
 | Page | ts (`diff.wasm`), wall | cs (SkiaSharp, parallel, shipped default), wall | cs vs ts |
 | --- | ---: | ---: | ---: |
-| phone | 65.0 ms | 98.5 ms | +52% |
-| desktop | 94.9 ms | 107.6 ms | +13% |
-| long | 400.0 ms | 206.6 ms | −48% |
+| phone | 55.8 ms | 96.3 ms | +73% |
+| desktop | 74.4 ms | 109.5 ms | +47% |
+| long | 321.4 ms | 233.2 ms | −27% |
 
 **Work done.** The table before PS-211 compared cs with a production-shaped ts that encoded an
 overlay, which credited cs for skipping that encode; those rows are retired with the pngjs engine.
 libspng on zlib-ng is the fastest cs decoder (PS-168: 87.1 / 95.1 / 195.0 ms wall, from that run,
 not compared here). It needs `native/build.sh`, so the shipped cs default is SkiaSharp.
 
-Source: PS-209, 2026-10-25, `--env dedicated`. The production engine (CLI and web) is `diff.wasm`
+Source: PS-212, 2026-10-26, `--env dedicated` (PS-209's run had long at 400.0 against 206.6 ms). The production engine (CLI and web) is `diff.wasm`
 (PS-210); cs is bench-only so far.
 
 The phase-by-phase breakdown behind the [Bottlenecks](#bottlenecks) section.
@@ -145,6 +145,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, shipped; the only diff, CLI and server, since PS-210 | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
 | 21 | Free the explain queue's full-page decodes: `regionCrops` decodes one PNG at a time and releases its raster, `explainShot` releases the three blobs it read | web + engine | ✅ measured, shipped | burst 50 × 1280×9500 with the model on: workerd peak 1497 → 783 / 728 MB, settled 1499 → 611 / 617 MB; crops unchanged | PS-206 |
 | 22 | The WASM differ's overlay encode: pngjs's adaptive filter pass in the module (wasm SIMD), deflate in workerd's zlib at pngjs's level and strategy, chunks in JS | web (workerd) | ✅ measured, shipped; the only overlay encode since PS-210 | workerd, 15 rounds, wasm with pngjs's encode → its own: phone 23.1 → 12.2 ms (−47%), desktop 76.0 → 32.2 (−58%), long 528.8 → 238.0 (−55%); against pngjs −71 to −74%; overlay byte-equal | PS-205 |
+| 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1–4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -175,6 +176,13 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
   was left. **Its filter pass was the cost, not deflate** (PS-205): deflate alone is 13.5 of pngjs's
   330 ms. With the filter in the module (wasm SIMD) the WASM diff takes the long page to 238 ms,
   −73% against pngjs (885 ms) in the same run. The module is 29 KB.
+- **The gap from diff.wasm to cs on the long page is now the decode, not the diff** (PS-212).
+  Built natively, the same Rust beats cs on the pixel loop and the blob boxes, so those are not
+  ours. What was ours was the unfilter (65 ms in wasm, 26 natively, before the fix; 13 in both
+  after). What is left is inflate in the runtime's zlib, one image after the other (67 ms), against
+  cs decoding both files at once (39 ms wall for all of decode), and wasm's first touch of its
+  memory (`decode_other` 38 ms cold). Closing that needs threads or a faster
+  inflate, which is a decision, not a fix.
 - **Constraint:** the web app's server diff runs in workerd, which can load WASM but no native
   code. The CLI (Bun) can load native code. So the fastest production ts option differs per path:
   napi-image for the CLI, pngjs (or jsquash) for workerd. Since PS-210 neither: the CLI, the
@@ -192,6 +200,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-26 | PS-212 | desktop, dedicated | why diff.wasm is 2.3x slower than cs on the long page: each step in wasm, natively and in cs; the unfilter fixed |
 | 2026-10-25 | PS-205 | desktop, shared | the WASM differ's overlay encode: pngjs's filter pass in the module, timed in workerd |
 | 2026-10-25 | PS-206 | desktop, shared | workerd's memory on an HC-124-sized burst, with the explain queue on |
 | 2026-10-25 | planner | desktop, dedicated | ts with the overlay encode on and off, pngjs and napi-image, against cs |
@@ -316,6 +325,96 @@ on it. The burst shows `/` answering throughout.
 workerd and vite peak together there is not measured either. A real
 model's latency is not measured either: the stub answers at once. A slow model keeps fewer crops
 in flight per shot, not more rasters, because the rasters are freed before the call.
+
+### 2026-10-26 · PS-212 · desktop, dedicated · where diff.wasm loses to cs, step by step
+
+The question: PS-209 had `diff.wasm` at 361.1 ms self on the long page against cs's 153.8, 2.3x. Is
+that WASM, or our Rust? The server diff is going native (PS-217), so the same `lib.rs` was built for
+the host (`engines/wasm/native`, bench-only, no crate) and each step timed in wasm, natively and in
+cs. Only what native Rust still loses is ours.
+
+**Step by step, wasm against native** (`bun run bench:native -- --runs 10`, shared desktop, load
+5–7; the warm median and the first run on a fresh instance; the same rows on both sides, inflate
+outside both; every image, field, overlay and box list FNV-equal between the two). Long page, ms,
+two runs: HEAD's `lib.rs` and this branch's, four minutes apart:
+
+| Step | before: wasm / native, warm | before: wasm / native, first | after: wasm / native, warm | after: wasm / native, first |
+| --- | ---: | ---: | ---: | ---: |
+| copy the rows in | 4.6 / 3.9 | 39.4 / 30.4 | 3.9 / 4.2 | 33.0 / 7.3 |
+| unfilter | **64.7 / 25.6** | 83.7 / 28.1 | **12.9 / 12.9** | 25.2 / 13.1 |
+| pixel loop | 32.0 / 29.7 | 45.7 / 38.8 | 30.8 / 30.6 | 40.9 / 29.8 |
+| blob boxes | 43.8 / 32.9 | 64.8 / 36.6 | 42.2 / 33.3 | 47.0 / 34.7 |
+| total | 145.1 / 92.0 | 233.6 / 133.9 | 89.9 / 81.0 | 146.1 / 84.9 |
+
+Two later runs of the after build, with the desktop busier, had the unfilter at 15.6 / 11.8 and
+17.2 / 16.6 and the blob boxes at 47.9 / 31.0 and 59.0 / 57.1: read the table for its shape, not
+its decimals.
+
+- **Unfilter was ours.** It ran in place over the raw lines and then copied each line out, and every
+  pixel went through a filter match. Natively it cost 26 ms and in wasm 65. It now writes straight
+  into the raster, reads the line above from it, and has one loop per filter with the pixel width a
+  constant: 12.9 in both.
+- **The pixel loop is not ours, and neither are the blob boxes.** The pixel loop is the same in wasm
+  and natively. The blob boxes are about 9 ms slower in wasm than natively with the same code, so
+  that is the runtime. Natively both beat cs (cs pixel_compare + anti_alias 53.7, regions 80.9 in
+  the dedicated run below). SIMD128 on both loops was tried: 1–4 ms, inside the noise, so dropped.
+- **The first run pays for memory.** Copying the rows into a fresh instance took 33–44 ms in wasm in
+  every run, against 6–10 natively in three runs of four (30 in the first): `memory.grow` and the
+  first touch of the new pages. In a cold process that is most of `decode_other`.
+
+**Dedicated A/B** (`bun run bench:perf -- --env dedicated --runs 10`, HEAD's `ts-diff` from a
+worktree, this branch's, and cs; reserved CPUs 4-5,10-11 and 4G, no other tasks on them, host load
+6.4 → 6.0). Raw: `bench/perf-results/2026-10-25T22-19-31-236Z.json`.
+
+| Page | ts before, self / wall | ts after, self / wall | Change, self | cs, self / wall | cs vs ts after, self |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| phone | 37.2 / 62.0 | 32.7 / 55.8 | −12% | 45.4 / 96.3 | +39% |
+| desktop | 65.1 / 91.9 | 50.3 / 74.4 | −23% | 57.9 / 109.5 | +15% |
+| long | 360.1 / 394.1 | **288.5 / 321.4** | **−20%** | 175.1 / 233.2 | −39% |
+
+The long page's phases (ts after; cs's decode is one phase, both files at once):
+
+| Phase | ts after | cs | Whose |
+| --- | ---: | ---: | --- |
+| decode_inflate | 66.6 | — | the runtime's zlib, one file after the other |
+| decode_unfilter | 30.7 | — | ours, fixed (cold; 13 warm) |
+| decode_other | 38.2 | 64.7 work, 39.3 wall | wasm's memory growth and first touch, plus the chunk walk |
+| pixel_compare (+ anti_alias) | 51.3 | 53.7 | even |
+| regions | 100.1 | 80.9 | blob boxes 52 cold (natively about 33), JS merge and rules 25 |
+
+The gap was 2.34x (361.1 against 153.8, PS-209) and is 1.65x (288.5 against 175.1) in this run. Of
+the 113 ms left, 96 is decode: ours is 135.5 ms of inflate, unfilter and memory, one image after
+the other, and cs's whole decode is 39.3 ms wall because SkiaSharp decodes both files at once. The
+diff is 17 ms behind, all of it in regions (the blob boxes in wasm and cold), and startup is 12 ms
+ahead. **What is left needs threads or a faster inflate**, which this
+ticket does not take:
+
+- **Native zlib-ng in the PS-217 native server.** cs's libspng on zlib-ng decodes both long files in
+  16.9 ms (PS-168, parallel). Against our 66.6 ms of inflate alone, that is the largest lever, and it
+  is native, so it does not reach workerd.
+- **Decode the two files at once.** Inflate plus unfilter is about 97 ms for both; in parallel that
+  is about half on the wall. Natively a second thread; in workerd there are no threads, so only on
+  the native server.
+- **A permissive inflate crate in the module** (miniz_oxide, MIT/Apache-2.0). Not measured: the brief
+  allows it only on a scratch branch, and Bun's zlib is native code, so a wasm inflate would have to
+  beat native zlib to help the CLI. It might help workerd, whose zlib is also native. Worth a
+  scratch measurement before anyone commits a crate.
+- **Inflate straight into the module's memory** to save the copy (5 ms warm) and touch the pages
+  once. Small.
+
+**In workerd** (`apps/web/perf/diff-wasm/run.ts`, restored minimal: one workerd, the server's
+`wasmDiff`, each page checked equal to Bun's first; 15 rounds after 3 warm-up; run in a HEAD
+worktree, then this branch, back to back, shared desktop, load 4–8; the module runs there, SIMD128
+included, as PS-205's filter pass already did):
+
+| Page | before | after | Change | Request alone |
+| --- | ---: | ---: | ---: | ---: |
+| phone | 26.6 ms | 22.5 ms | −15% | 13.4–14.1 ms |
+| desktop | 51.5 ms | 39.0 ms | −24% | 11.4–11.8 ms |
+| long | 297.1 ms | 211.0 ms | −29% | 15.2–16.7 ms |
+
+Peak RSS after the rounds 405 → 403 MB. The empty request cost 11–17 ms here against 1.5–2.6 in
+PS-205's run, so the desktop was busy; compare the two columns, not this table with older ones.
 
 ### 2026-10-25 · PS-209 · desktop, dedicated · the WASM diff as a bench engine, against ts and cs
 

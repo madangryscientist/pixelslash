@@ -11,19 +11,37 @@
 //! It uses std only for `f64::sqrt` and `f64::floor` (core has no stable float math), which lower
 //! to the wasm instructions; nothing allocates through std, and a panic aborts (a trap in JS).
 
+#[cfg(target_arch = "wasm32")]
 use std::arch::wasm32::{self, *};
 use std::slice;
 
+#[cfg(target_arch = "wasm32")]
 unsafe extern "C" {
     static __heap_base: u8;
 }
 
 static mut TOP: usize = 0;
 
+#[cfg(target_arch = "wasm32")]
 const PAGE: usize = 65536;
 
+#[cfg(target_arch = "wasm32")]
 fn heap_base() -> usize {
     &raw const __heap_base as usize
+}
+
+/// The bench's native build (PS-212, `engines/wasm/native`): one arena from the host allocator
+/// stands in for linear memory, so the bump allocator and its contiguity are the same.
+#[cfg(not(target_arch = "wasm32"))]
+const ARENA: usize = 1 << 31;
+
+#[cfg(not(target_arch = "wasm32"))]
+fn heap_base() -> usize {
+    static BASE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *BASE.get_or_init(|| {
+        let layout = std::alloc::Layout::from_size_align(ARENA, 16).unwrap();
+        unsafe { std::alloc::alloc(layout) as usize }
+    })
 }
 
 /// Forget every allocation: the next `alloc` starts at the bottom of the heap again.
@@ -50,12 +68,19 @@ pub extern "C" fn alloc(len: usize) -> usize {
     let Some(end) = start.checked_add(len) else {
         return 0;
     };
-    let have = wasm32::memory_size(0) * PAGE;
-    if end > have {
-        let pages = (end - have).div_ceil(PAGE);
-        if wasm32::memory_grow(0, pages) == usize::MAX {
-            return 0;
+    #[cfg(target_arch = "wasm32")]
+    {
+        let have = wasm32::memory_size(0) * PAGE;
+        if end > have {
+            let pages = (end - have).div_ceil(PAGE);
+            if wasm32::memory_grow(0, pages) == usize::MAX {
+                return 0;
+            }
         }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if end > heap_base() + ARENA {
+        return 0;
     }
     unsafe { TOP = end }
     start
@@ -111,71 +136,107 @@ fn paeth(left: u8, above: u8, up_left: u8) -> u8 {
     }
 }
 
-/// Unfilter an 8-bit, non-interlaced PNG's inflated rows in place at `src` (`channels` 3 or 4,
-/// `(width * channels + 1) * height` bytes), then write them to `dst` as RGBA (RGB gets alpha
-/// 255, as pngjs's bitmapper does). 0 on success, 1 on a filter type pngjs refuses.
+/// Unfilter an 8-bit, non-interlaced PNG's inflated rows at `src` (`channels` 3 or 4,
+/// `(width * channels + 1) * height` bytes) and write them to `dst` as RGBA (RGB gets alpha 255,
+/// as pngjs's bitmapper does). 0 on success, 1 on a filter type pngjs refuses, or 2 when memory
+/// for RGB's two scratch lines ran out.
 #[unsafe(no_mangle)]
 pub extern "C" fn unfilter(src: usize, width: u32, height: u32, channels: u32, dst: usize) -> u32 {
-    let (w, h, bpp) = (width as usize, height as usize, channels as usize);
-    let row = w * bpp;
-    let stride = row + 1;
-    let data = bytes_mut(src, stride * h);
-    for y in 0..h {
-        let (before, rest) = data.split_at_mut(y * stride);
-        let filter = rest[0];
-        let line = &mut rest[1..stride];
-        let up: &[u8] = if y == 0 { &[] } else { &before[(y - 1) * stride + 1..y * stride] };
-        match filter {
-            0 => {}
-            1 => {
-                for x in bpp..row {
-                    line[x] = line[x].wrapping_add(line[x - bpp]);
-                }
-            }
-            2 => {
-                if y > 0 {
-                    for x in 0..row {
-                        line[x] = line[x].wrapping_add(up[x]);
-                    }
-                }
-            }
-            3 => {
-                for x in 0..row {
-                    let left = if x >= bpp { line[x - bpp] as u32 } else { 0 };
-                    let above = if y > 0 { up[x] as u32 } else { 0 };
-                    line[x] = line[x].wrapping_add(((left + above) >> 1) as u8);
-                }
-            }
-            4 => {
-                for x in 0..row {
-                    let left = if x >= bpp { line[x - bpp] } else { 0 };
-                    let (above, up_left) = if y > 0 {
-                        (up[x], if x >= bpp { up[x - bpp] } else { 0 })
-                    } else {
-                        (0, 0)
-                    };
-                    line[x] = line[x].wrapping_add(paeth(left, above, up_left));
-                }
-            }
-            _ => return 1,
-        }
+    let (w, h) = (width as usize, height as usize);
+    match channels {
+        4 => unfilter_rgba(bytes(src, (w * 4 + 1) * h), w, h, bytes_mut(dst, w * h * 4)),
+        _ => unfilter_rgb(bytes(src, (w * 3 + 1) * h), w, h, bytes_mut(dst, w * h * 4)),
     }
-    let out = bytes_mut(dst, w * h * 4);
+}
+
+/// RGBA: each line straight into `dst`, against the line above it there (PS-212: no second pass).
+#[cfg_attr(target_arch = "wasm32", target_feature(enable = "simd128"))]
+fn unfilter_rgba(data: &[u8], w: usize, h: usize, out: &mut [u8]) -> u32 {
+    let (row, stride) = (w * 4, w * 4 + 1);
     for y in 0..h {
-        let line = &data[y * stride + 1..(y + 1) * stride];
-        let to = &mut out[y * w * 4..(y + 1) * w * 4];
-        if bpp == 4 {
-            to.copy_from_slice(line);
-        } else {
-            for x in 0..w {
-                to[x * 4] = line[x * 3];
-                to[x * 4 + 1] = line[x * 3 + 1];
-                to[x * 4 + 2] = line[x * 3 + 2];
-                to[x * 4 + 3] = 255;
-            }
+        let line = &data[y * stride..(y + 1) * stride];
+        let (done, rest) = out.split_at_mut(y * row);
+        let up = if y == 0 { None } else { Some(&done[(y - 1) * row..]) };
+        if !unfilter_pixels::<4>(line[0], &line[1..], up, &mut rest[..row]) {
+            return 1;
         }
     }
     0
+}
+
+/// RGB: each line into one of two scratch lines (it and the line above), then widened to RGBA.
+#[cfg_attr(target_arch = "wasm32", target_feature(enable = "simd128"))]
+fn unfilter_rgb(data: &[u8], w: usize, h: usize, out: &mut [u8]) -> u32 {
+    let (row, stride) = (w * 3, w * 3 + 1);
+    let scratch = mark();
+    let lines = alloc(row * 2);
+    if lines == 0 {
+        return 2;
+    }
+    let lines = bytes_mut(lines, row * 2);
+    let mut failed = 0;
+    for y in 0..h {
+        let line = &data[y * stride..(y + 1) * stride];
+        let (first, second) = lines.split_at_mut(row);
+        let (cur, above) = if y % 2 == 0 { (first, second) } else { (second, first) };
+        if !unfilter_pixels::<3>(line[0], &line[1..], if y == 0 { None } else { Some(above) }, cur) {
+            failed = 1;
+            break;
+        }
+        for (to, px) in out[y * w * 4..(y + 1) * w * 4].chunks_exact_mut(4).zip(cur.chunks_exact(3)) {
+            to.copy_from_slice(&[px[0], px[1], px[2], 255]);
+        }
+    }
+    rewind(scratch);
+    failed
+}
+
+/// One line of `B`-byte pixels: `line` (filtered, without its filter byte) unfiltered into `out`,
+/// against `up` (None on the first line, where every byte above is 0). Each filter is its own
+/// loop with no test inside, a pixel at a time, so the compiler can keep the left pixel in
+/// registers and vectorise Up. False on a filter type pngjs refuses.
+#[inline(always)]
+fn unfilter_pixels<const B: usize>(filter: u8, line: &[u8], up: Option<&[u8]>, out: &mut [u8]) -> bool {
+    match (filter, up) {
+        (0, _) | (2, None) => out.copy_from_slice(line),
+        // Paeth with nothing above picks the left byte, as Sub adds it.
+        (1, _) | (4, None) => {
+            let mut left = [0u8; B];
+            for (to, px) in out.chunks_exact_mut(B).zip(line.chunks_exact(B)) {
+                for c in 0..B {
+                    left[c] = px[c].wrapping_add(left[c]);
+                }
+                to.copy_from_slice(&left);
+            }
+        }
+        (2, Some(up)) => {
+            for ((to, &v), &above) in out.iter_mut().zip(line).zip(up) {
+                *to = v.wrapping_add(above);
+            }
+        }
+        (3, _) => {
+            let mut left = [0u8; B];
+            for (i, (to, px)) in out.chunks_exact_mut(B).zip(line.chunks_exact(B)).enumerate() {
+                for c in 0..B {
+                    let above = up.map_or(0, |up| up[i * B + c]);
+                    left[c] = px[c].wrapping_add(((left[c] as u32 + above as u32) >> 1) as u8);
+                }
+                to.copy_from_slice(&left);
+            }
+        }
+        (4, Some(up)) => {
+            let (mut left, mut up_left) = ([0u8; B], [0u8; B]);
+            for ((to, px), above) in out.chunks_exact_mut(B).zip(line.chunks_exact(B)).zip(up.chunks_exact(B)) {
+                for c in 0..B {
+                    left[c] = px[c].wrapping_add(paeth(left[c], above[c], up_left[c]));
+                    up_left[c] = above[c];
+                }
+                to.copy_from_slice(&left);
+            }
+        }
+        _ => return false,
+    }
+    true
 }
 
 /// pngjs's Adam7 passes (`interlace.js`): the columns and rows of each 8x8 tile a pass covers.
@@ -388,10 +449,12 @@ pub extern "C" fn decode(
 }
 
 /// Bytes per pixel of the RGBA overlay: the left neighbour is 4 bytes back.
+#[cfg(target_arch = "wasm32")]
 const BPP: usize = 4;
 
 /// The predictor of `filter` (1 Sub, 2 Up, 3 Average, 4 Paeth; 0 None) for one byte.
 #[inline(always)]
+#[cfg(target_arch = "wasm32")]
 fn predict(filter: usize, left: i32, above: i32, up_left: i32) -> i32 {
     match filter {
         0 => 0,
@@ -404,6 +467,7 @@ fn predict(filter: usize, left: i32, above: i32, up_left: i32) -> i32 {
 
 /// The byte at `x` and its left, above and upper-left neighbours (0 off the row's left edge).
 #[inline(always)]
+#[cfg(target_arch = "wasm32")]
 fn neighbours(line: &[u8], up: &[u8], x: usize) -> (i32, i32, i32, i32) {
     let (left, up_left) = if x >= BPP { (line[x - BPP] as i32, up[x - BPP] as i32) } else { (0, 0) };
     (line[x] as i32, left, up[x] as i32, up_left)
@@ -412,6 +476,7 @@ fn neighbours(line: &[u8], up: &[u8], x: usize) -> (i32, i32, i32, i32) {
 /// Eight bytes at `at`, widened to i16 lanes: `high` picks the upper half of the 16.
 #[inline]
 #[target_feature(enable = "simd128")]
+#[cfg(target_arch = "wasm32")]
 fn widen(v: v128, high: bool) -> v128 {
     if high { u16x8_extend_high_u8x16(v) } else { u16x8_extend_low_u8x16(v) }
 }
@@ -420,6 +485,7 @@ fn widen(v: v128, high: bool) -> v128 {
 /// above − upper-left, left − upper-left and left + above − 2 × upper-left.
 #[inline]
 #[target_feature(enable = "simd128")]
+#[cfg(target_arch = "wasm32")]
 fn paeth_v(left: v128, above: v128, up_left: v128) -> v128 {
     let p_left = i16x8_abs(i16x8_sub(above, up_left));
     let p_above = i16x8_abs(i16x8_sub(left, up_left));
@@ -432,6 +498,7 @@ fn paeth_v(left: v128, above: v128, up_left: v128) -> v128 {
 /// 16 bytes from `at` (unaligned); the caller keeps `at + 16` inside the slice it came from.
 #[inline]
 #[target_feature(enable = "simd128")]
+#[cfg(target_arch = "wasm32")]
 fn load(bytes: &[u8], at: usize) -> v128 {
     debug_assert!(at + 16 <= bytes.len());
     unsafe { v128_load(bytes.as_ptr().add(at) as *const v128) }
@@ -441,6 +508,7 @@ fn load(bytes: &[u8], at: usize) -> v128 {
 /// adds them. `up` is the row above, all zeros for the first. 16 bytes at a time in i16 lanes;
 /// the first pixel (no left neighbour) and the tail are added one byte at a time.
 #[target_feature(enable = "simd128")]
+#[cfg(target_arch = "wasm32")]
 fn filter_sums(line: &[u8], up: &[u8]) -> [u64; 5] {
     let mut sums = [0u64; 5];
     let add = |sums: &mut [u64; 5], x: usize| {
@@ -489,6 +557,7 @@ fn filter_sums(line: &[u8], up: &[u8]) -> [u64; 5] {
 
 /// One row filtered with `filter` into `to`, each byte wrapped to u8 as pngjs's Buffer stores it.
 #[target_feature(enable = "simd128")]
+#[cfg(target_arch = "wasm32")]
 fn filter_row(filter: usize, line: &[u8], up: &[u8], to: &mut [u8]) {
     let row = line.len();
     let one = |x: usize, to: &mut [u8]| {
@@ -527,6 +596,7 @@ fn filter_row(filter: usize, line: &[u8], up: &[u8], to: &mut [u8]) {
 /// filtered rows (`(width * 4 + 1) * height` bytes, each led by its filter type) to `dst`. 0 on
 /// success, 1 when memory for the zero row above the first ran out.
 #[unsafe(no_mangle)]
+#[cfg(target_arch = "wasm32")]
 pub extern "C" fn filter(src: usize, width: u32, height: u32, dst: usize) -> u32 {
     let (w, h) = (width as usize, height as usize);
     let row = w * 4;
@@ -862,6 +932,6 @@ pub extern "C" fn blob_boxes(kind: usize, w: u32, h: u32, gap: f64, out: usize) 
             count += 1;
         }
     }
-    unsafe { *(out as *mut u32) = boxes as u32 };
+    unsafe { *(out as *mut usize) = boxes };
     count
 }

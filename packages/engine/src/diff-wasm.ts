@@ -9,6 +9,7 @@
 import { constants, deflateSync, inflateSync } from "node:zlib";
 import { diffModule } from "#diff-module";
 import type { DiffIgnore, DiffOptions, PixelDiff } from "./diff.ts";
+import { type WasmPhases, timed, untimed } from "./diff-phases.ts";
 import type { Raster } from "./diff-probe.ts";
 import { clipRects, ignoreMask } from "./ignore-mask.ts";
 import { DEFAULT_THRESHOLD, measuredDiff } from "./measured.ts";
@@ -114,7 +115,9 @@ function expand(wasm: DiffExports, png: Png, raw: number, rgba: number) {
   const { width, height } = png;
   const plain = plainChannels(png);
   if (plain) {
-    if (wasm.unfilter(raw, width, height, plain, rgba) === 0) return;
+    const code = wasm.unfilter(raw, width, height, plain, rgba);
+    if (code === 0) return;
+    if (code === 2) throw new Error("diff.wasm: memory is full");
     const filter = badFilter(wasm, raw, width * plain + 1, height);
     throw new Error(`Unrecognised filter type - ${filter}`);
   }
@@ -127,6 +130,7 @@ function expand(wasm: DiffExports, png: Png, raw: number, rgba: number) {
 function decodeInto(
   wasm: DiffExports,
   bytes: Buffer,
+  phases?: WasmPhases,
 ): { at: number; width: number; height: number } {
   const scratch = wasm.mark();
   const file = alloc(wasm, bytes.length);
@@ -139,11 +143,11 @@ function decodeInto(
   const [only] = png.idat;
   const size = wasm.inflated_len(width, height, depth, colour, interlace);
   const data = png.idat.length === 1 && only ? only : Buffer.concat(png.idat);
-  const inflated = inflateLines(data, size, interlace === 1);
+  const inflated = timed(phases, "decode_inflate", () => inflateLines(data, size, interlace === 1));
   const raw = alloc(wasm, size);
   new Uint8Array(wasm.memory.buffer, raw, size).set(inflated);
   release(inflated);
-  expand(wasm, png, raw, rgba);
+  timed(phases, "decode_unfilter", () => expand(wasm, png, raw, rgba));
   wasm.rewind(lines);
   return { at: rgba, width, height };
 }
@@ -220,16 +224,19 @@ type WasmDiffOptions = {
   options?: DiffOptions;
   ignore?: DiffIgnore;
   encode?: ((overlay: Raster) => Buffer) | undefined;
+  /** Filled with where the time went, when given (the bench's phase split). */
+  phases?: WasmPhases | undefined;
 };
 
 function run(
   wasm: DiffExports,
   [main, branch]: [Buffer, Buffer],
-  { options = {}, ignore = {}, encode }: WasmDiffOptions,
+  { options = {}, ignore = {}, encode, phases }: WasmDiffOptions,
 ): PixelDiff & { overlay: Buffer } {
   wasm.reset();
-  const ma = decodeInto(wasm, main);
-  const br = decodeInto(wasm, branch);
+  // The chunk walk and the copies into the module are decode_other.
+  const ma = untimed(phases, "decode_other", () => decodeInto(wasm, main, phases));
+  const br = untimed(phases, "decode_other", () => decodeInto(wasm, branch, phases));
   const width = Math.min(ma.width, br.width);
   const height = Math.min(ma.height, br.height);
   const n = width * height;
@@ -242,25 +249,16 @@ function run(
   const out = alloc(wasm, 12);
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
   const maxDelta = MAX_YIQ_DELTA * threshold * threshold;
-  wasm.diff(
-    ma.at,
-    ma.width,
-    ma.height,
-    br.at,
-    br.width,
-    br.height,
-    skip,
-    maxDelta,
-    field,
-    overlay,
-    out,
-  );
+  const shots = [ma.at, ma.width, ma.height, br.at, br.width, br.height] as const;
+  timed(phases, "pixel_compare", () => wasm.diff(...shots, skip, maxDelta, field, overlay, out));
   const gap = options.mergeDistance ?? DEFAULT_MERGE_DISTANCE;
-  const count = wasm.blob_boxes(field, width, height, gap, out + 8);
+  const count = timed(phases, "regions", () => wasm.blob_boxes(field, width, height, gap, out + 8));
   if (count === 0xffffffff) throw new Error("diff.wasm: memory is full");
   let encodeWith = encode;
   if (!encodeWith) {
-    const png = encodeOverlay(wasm, overlay, overlayWidth, overlayHeight);
+    const png = timed(phases, "overlay_encode", () =>
+      encodeOverlay(wasm, overlay, overlayWidth, overlayHeight),
+    );
     encodeWith = () => png;
   }
   // Views only now: a call that grows the memory detaches every view made before it.
@@ -282,11 +280,13 @@ function run(
     width: overlayWidth,
     height: overlayHeight,
   };
-  return measuredDiff(
-    [a, b],
-    raster,
-    { changedPixels, antialiased, ignoredPixels, ignored, field: fieldOf },
-    { options, blobs: () => boxes, encode: encodeWith },
+  return timed(phases, "regions", () =>
+    measuredDiff(
+      [a, b],
+      raster,
+      { changedPixels, antialiased, ignoredPixels, ignored, field: fieldOf },
+      { options, blobs: () => boxes, encode: encodeWith },
+    ),
   );
 }
 

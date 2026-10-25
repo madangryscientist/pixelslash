@@ -15,6 +15,7 @@ bun run bench:check                # regression guard: PixelSlash against the la
 bun run bench:perf                 # speed, before vs after on this machine (see "Speed"); on demand only
 bun run bench:perf:check           # the same comparison; exits 1 when a step is over 25% slower
 bun run bench:perf -- --impl "<cmd>" --impl "<cmd>"   # time implementations against each other
+bun run bench:native               # diff.wasm's steps in wasm and natively (needs cargo; PS-212)
 bunx nx run bench:corpus           # re-render the main corpus (needs chromium-headless-shell)
 bun bench/src/generate.ts --set holdout   # re-render the held-out corpus
 ```
@@ -265,9 +266,9 @@ reported against that case, by name, and the run goes on with the next one.
 contract. It is the baseline, and the first thing to run to check the harness. It runs `wasmDiff`,
 the one diff the CLI and the server run (`diff.wasm`, PS-210), so the verdict and regions are the
 engine's. It reads the two files, then one call does inflate, unfilter, the pixel loop and the
-regions, so `decode_ms` is the read alone, `diff_ms` holds the rest, and only `decode_read` is
-reported. A `-` in the phase table for its `decode_inflate`, `decode_unfilter`, `pixel_compare` and
-similar is that split, not a missing measurement. No overlay image is encoded: the engine's encode is
+regions; the call times its own steps (PS-212), so `decode_ms` is the read plus the call's
+`decode_inflate`, `decode_unfilter` and `decode_other`, and `diff_ms` is the rest of the call, split
+into `pixel_compare` (the anti-alias test included) and `regions`. No overlay image is encoded: the engine's encode is
 a no-op here, since the contract does not ask for one, so the JS side does not pay for work C# never
 does. A cold process is slower than the warm in-process loop of
 `bench:perf` (roughly 1.7x here, from JIT warm-up), so numbers from the two modes are not

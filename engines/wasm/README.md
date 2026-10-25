@@ -44,6 +44,16 @@ both run it. The module uses std only for
 
 ## Timing
 
-Timing is on demand only, never in the gate. The bench times this diff (`bun run bench:perf`, see
-`bench/README.md`); the workerd A/B harness that compared it with pngjs (`apps/web/perf/diff-wasm`)
-went in PS-210 with the pngjs diff. The results are in `bench/PERF.md`, levers 20 and 22.
+Timing is on demand only, never in the gate. The bench times this diff, split into its phases
+(`decode_inflate`, `decode_unfilter`, `decode_other`, `pixel_compare`, `regions`; `bun run
+bench:perf`, see `bench/README.md`). Two harnesses time the module on its own:
+
+- `bun run bench:native` (PS-212) times each step in wasm and in the same `lib.rs` built for the
+  host (`native/`, a bench-only binary with no crates; needs `cargo`, as `wasm:build` does), and
+  checks both found the same. A step slow in both is the code's; one slow only in wasm is the
+  runtime's.
+- `cd apps/web && bun perf/diff-wasm/run.ts` times `wasmDiff` in workerd, the server's runtime,
+  after checking it gives Bun's answer (PS-204's harness, restored minimal in PS-212). For an A/B,
+  run it in a checkout of each side.
+
+The results are in `bench/PERF.md`, levers 20, 22 and 23.

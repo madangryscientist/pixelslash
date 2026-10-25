@@ -11,3 +11,4 @@ engines/dotnet/**/TestResults/
 bench/env/dist/
 engines/dotnet/native/out/
 engines/wasm/target/
+engines/wasm/native/target/

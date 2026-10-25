@@ -3,8 +3,8 @@
     "engines/wasm/Cargo.toml": "739fcc2946a29ac274a9689f044cff61a98e268c6b145d094d528c2ea8706807",
     "engines/wasm/Cargo.lock": "234f65a5ef8baa097120ce590e46d01929700e91af883ae08519d92636e010a1",
     "engines/wasm/rust-toolchain.toml": "2ee34e1b486a9c1b1c7aa54d21b2b973de7865451b94cd69e58c0a0943d39c70",
-    "engines/wasm/src/lib.rs": "95f17eaf279c166585add62c35c7c4f6d17cbf02a962aa883bbe7875e477ff7e"
+    "engines/wasm/src/lib.rs": "67cffa7171c267bbf3224361a0b3e7e72e6286b5a52d70a57ec7a7a3a2bc5947"
   },
-  "wasm": "71b694bdd6d5b1bb0faf51ec16624ed542940f29ae6674c3d65d6b92593f2069",
-  "bytes": 37265
+  "wasm": "0c0615bc6e097005f176fa326a885d941b233734ef5657128860b549e203ea03",
+  "bytes": 38925
 }
