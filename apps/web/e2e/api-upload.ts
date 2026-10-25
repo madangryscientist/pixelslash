@@ -120,8 +120,7 @@ export async function open(page: Page, url: string) {
  * Wait for the model to finish: explaining runs on the queue after the finalise replies (ob 1875),
  * and the build page reloads itself while a shot or the summary is still explaining.
  */
-export async function explained(page: Page) {
-  const timeout = 30_000;
+export async function explained(page: Page, timeout = 30_000) {
   await expect(page.getByTestId("shot-ai-pending")).toHaveCount(0, { timeout });
   await expect(page.getByTestId("summary-pending")).toHaveCount(0, { timeout });
 }

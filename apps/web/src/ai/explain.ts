@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { type Box, regionCrops } from "@pixelslash/engine/region-crops";
+import { release } from "@pixelslash/engine/release";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { inChunks } from "#/db/chunks";
 import type { Db } from "#/db/db";
@@ -106,7 +107,14 @@ async function explainShot(
     readBlob(deps.blobs, shot.imageKey),
     readBlob(deps.blobs, shot.diffKey),
   ]);
-  const crops = regionCrops({ main, branch, diff }, asked);
+  // The three shots as stored, read whole and dead once cut: freed now, not left to a collector a
+  // Worker cannot call (PS-206, as the diff's uploads are in PS-200).
+  let crops: ReturnType<typeof regionCrops>;
+  try {
+    crops = regionCrops({ main, branch, diff }, asked);
+  } finally {
+    release(main, branch, diff);
+  }
   const answers = await settleLimited(asked, MODEL_CONNECTIONS, async (region, i) => {
     const crop = crops[i];
     if (!crop) throw new Error("region is outside the overlap");

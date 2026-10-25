@@ -148,6 +148,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 19 | Self-host server diff in a Bun sidecar with napi-image (workerd keeps pngjs on Cloudflare) | web (self-host) | ✅ measured, shipped | PS-200 burst, 50 shots 1280×5000: diff time 29.7/37.9 → 11.9/14.3 s; workerd settled RSS 660/691 → 357/363 MB | PS-203 |
 | 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
 | 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, a flag (`DIFF_WASM`, off) | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
+| 21 | Free the explain queue's full-page decodes: `regionCrops` decodes one PNG at a time and releases its raster, `explainShot` releases the three blobs it read | web + engine | ✅ measured, shipped | burst 50 × 1280×9500 with the model on: workerd peak 1497 → 783 / 728 MB, settled 1499 → 611 / 617 MB; crops unchanged | PS-206 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -190,6 +191,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-206 | desktop, shared | workerd's memory on an HC-124-sized burst, with the explain queue on |
 | 2026-10-25 | planner | desktop, dedicated | ts with the overlay encode on and off, pngjs and napi-image, against cs |
 | 2026-10-25 | PS-204 | desktop, shared | the server diff's hot loops in Rust→WASM, timed in workerd |
 | 2026-10-25 | PS-203 | desktop, shared | the self-host's server diff in a Bun sidecar with napi-image |
@@ -201,6 +203,58 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
 
+### 2026-10-25 · PS-206 · desktop, shared · workerd's memory on a burst that is explained
+
+**The 1.5 GB was the explain queue, not the diff, and it is now about 0.6–0.8 GB.** With the
+project's model set, every changed shot is explained after the finalise. `explainShot` read the
+baseline, the branch and the overlay whole, and `regionCrops` decoded all three with pngjs at once
+(about 49 MB of raster each at 1280×9500). None of it was freed, and a Worker has no `gc()`. On an
+HC-124-sized burst, workerd went from 382 MB to 1497 MB and stayed there. The diff alone, with the
+sidecar, never passed 454 MB. Now `regionCrops` decodes one image at a time and releases its raster
+before the next one (`release()`, as in PS-200), and `explainShot` releases the three blobs once
+they are cut. The crops are the same (`packages/engine/test/region-crops.test.ts`).
+
+**Env.** Linux desktop, 12 cores, load average about 7 (other worktrees running), browser and editor
+up (`shared`). The burst is `apps/web/e2e/rss-burst.spec.ts` against the e2e production build, with
+the diff sidecar on as the LAN runs it. It sends 50 shots of 1280×9500, the HC-124 size, to main,
+then 50 changed ones to a branch, finalises the branch, and with `PIXELSLASH_RSS_MODEL=1` waits until
+the e2e stub's model has explained every shot. All the RSS figures are workerd's except where a
+column says otherwise. The spec now also samples `vite preview`, which shares workerd's cgroup on
+the LAN box, and it GETs `/` once a second throughout. The spec fails if a probe fails or takes
+longer than 10 s.
+
+```bash
+cd apps/web
+PIXELSLASH_RSS_BURST=50 PIXELSLASH_RSS_HEIGHT=9500 bunx playwright test rss-burst                       # diff only
+PIXELSLASH_RSS_MODEL=1 PIXELSLASH_RSS_BURST=50 PIXELSLASH_RSS_HEIGHT=9500 bunx playwright test rss-burst  # with explain
+```
+
+| Run | after main | peak | settled 10 s | sidecar peak | vite peak | diff | explain | GET / probes (failed, slowest) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| before, diff only | 446 MB | 454 MB | 349 MB | 482 MB | 503 MB | 21.9 s | — | 33 (0, 118 ms) |
+| before, explained | 382 MB | **1497 MB** | **1499 MB** | 466 MB | 554 MB | 21.8 s | 31.4 s | 64 (0, 1323 ms) |
+| after, explained #1 | 385 MB | **783 MB** | **611 MB** | 466 MB | 555 MB | 24.5 s | 37.2 s | 73 (0, 1078 ms) |
+| after, explained #2 | 307 MB | **728 MB** | **617 MB** | 457 MB | 571 MB | 24.8 s | 42.9 s | 92 (0, 1458 ms) |
+
+The diff and explain times moved with the load: the change frees memory and adds no work. The
+explain stub answers at once, so the explain column is the queue and the crops, not a model's time.
+
+**Against the CT's cap.** `pixelslash-web` runs vite preview and workerd in one cgroup, with
+MemoryHigh at 1400M. Before the change, workerd alone reached 1.5 GB, which matches the live stall.
+After it, workerd peaks at 0.73–0.78 GB. The sum of the two processes' separate peaks is about
+1.3 GB, but they do not peak at the same moment. The rest of workerd's settled ~610 MB is the
+isolate's heap and allocator after 100 uploads (about 180 MB of it at idle). This change does not
+touch it.
+
+**Not changed.** Diff semantics, the sidecar, `DIFF_WASM` and the Cloudflare path: the only
+difference on Cloudflare is that the explain queue's buffers are freed. There is no admission limit
+on the upload or the diff. Freeing removed the cause, and workerd cannot read its own RSS to refuse
+on it. The burst shows `/` answering throughout.
+
+**Not measured.** The CT itself (2 vCPU, PS-155's caps): the planner said not to touch it. Whether
+workerd and vite peak together there is not measured either. A real
+model's latency is not measured either: the stub answers at once. A slow model keeps fewer crops
+in flight per shot, not more rasters, because the rasters are freed before the call.
 ### 2026-10-25 · planner · desktop, dedicated · the overlay encode on and off, against cs
 
 Asked for by Jacobus, so it ran on demand, not as part of a ticket. Five implementations of `bench:perf --env dedicated --runs

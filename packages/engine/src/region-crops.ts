@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 import { PNG } from "pngjs";
+import { readPngSize } from "./identical.ts";
+import { release } from "./release.ts";
 
 /** A box in image px, from the top-left of the shots: a diff region, or the crop around one. */
 export type Box = { x: number; y: number; w: number; h: number };
@@ -42,30 +44,52 @@ function cut(img: PNG, box: Box, scale: number): Buffer {
   return PNG.sync.write(out);
 }
 
+/** A PNG's size from its header, before any of it is decoded. */
+function sizeOf(png: Buffer, name: string): { width: number; height: number } {
+  const size = readPngSize(png);
+  if (!size) throw new Error(`the ${name} image is not a PNG`);
+  return size;
+}
+
+/** Each box cut from one image, decoded here and freed before the next image is (PS-206). */
+function cutAll(png: Buffer, boxes: ({ box: Box; scale: number } | null)[]): (Buffer | null)[] {
+  const img = PNG.sync.read(png);
+  try {
+    return boxes.map((at) => at && cut(img, at.box, at.scale));
+  } finally {
+    // A full-page raster (~49 MB at 1280x9500), dead now. A Worker has no gc(): left to the
+    // collector, a burst of explained shots held workerd at 1.5 GB (PS-206, as PS-200).
+    release(img.data);
+  }
+}
+
 /**
  * The baseline, new and diff-overlay crops of each region (ob 1473), and nothing else of the shots.
  * Regions are in the overlap's px, so every crop is clipped to the smallest of the three images:
- * the non-overlap is never sent as if it were part of the change. Each PNG is decoded once.
+ * the non-overlap is never sent as if it were part of the change. Each PNG is decoded once, and
+ * one at a time: its crops are cut and its pixels freed before the next is decoded.
  */
 export function regionCrops(
   images: { main: Buffer; branch: Buffer; diff: Buffer },
   regions: Box[],
 ): (RegionCrop | null)[] {
-  const main = PNG.sync.read(images.main);
-  const branch = PNG.sync.read(images.branch);
-  const diff = PNG.sync.read(images.diff);
-  const width = Math.min(main.width, branch.width, diff.width);
-  const height = Math.min(main.height, branch.height, diff.height);
-  return regions.map((region) => {
+  const sizes = [
+    sizeOf(images.main, "baseline"),
+    sizeOf(images.branch, "new"),
+    sizeOf(images.diff, "diff"),
+  ];
+  const width = Math.min(...sizes.map((s) => s.width));
+  const height = Math.min(...sizes.map((s) => s.height));
+  const boxes = regions.map((region) => {
     const box = cropBox(region, width, height);
     if (!box) return null;
-    const scale = Math.ceil(Math.max(box.w, box.h) / REGION_CROP_MAX_SIDE);
-    return {
-      box,
-      scale,
-      main: cut(main, box, scale),
-      branch: cut(branch, box, scale),
-      diff: cut(diff, box, scale),
-    };
+    return { box, scale: Math.ceil(Math.max(box.w, box.h) / REGION_CROP_MAX_SIDE) };
+  });
+  const main = cutAll(images.main, boxes);
+  const branch = cutAll(images.branch, boxes);
+  const diff = cutAll(images.diff, boxes);
+  return boxes.map((at, i) => {
+    const [m, b, d] = [main[i], branch[i], diff[i]];
+    return at && m && b && d ? { ...at, main: m, branch: b, diff: d } : null;
   });
 }
