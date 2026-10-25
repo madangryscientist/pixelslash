@@ -36,14 +36,6 @@ export const COULD_NOT_BUILD: { name: string; why: string }[] = [
     name: "ImageSharp 3.2 / 4.x (C#)",
     why: "the build stops without a Six Labors licence key; buying one is not ours to do, so 3.1.12 is measured",
   },
-  {
-    name: "jsquash under bun build --compile (TS)",
-    why: "its .wasm is loaded by path and is not embedded: ENOENT on /$bunfs/root/squoosh_png_bg.wasm",
-  },
-  {
-    name: "sharp under bun build --compile (TS)",
-    why: 'its native addon and libvips are not embedded: "Could not load the sharp module"',
-  },
 ];
 
 function bytesOf(path: string): number {

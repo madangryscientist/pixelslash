@@ -44,7 +44,6 @@ function pointAtStub(config: { vars?: Record<string, unknown> }) {
       GITHUB_OAUTH_BASE: base,
       GITHUB_API_BASE: base,
       DIFF_SIDECAR_URL: sidecar,
-      DIFF_WASM: process.env["PIXELSLASH_E2E_WASM"] ?? "1",
     },
   };
 }

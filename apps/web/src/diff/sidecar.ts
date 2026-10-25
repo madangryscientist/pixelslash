@@ -22,13 +22,13 @@ export type SidecarDiff = (
 
 /**
  * Far above a diff's own time (a 1440x6000 page is ~0.4 s natively) and below the Worker budget's
- * slowest shot: a sidecar that hangs costs this once per shot, then pngjs measures it.
+ * slowest shot: a sidecar that hangs costs this once per shot, then the in-process diff measures it.
  */
 const TIMEOUT_MS = 15_000;
 
 /**
  * Why the sidecar gave no result. `unreachable` and `error` are logged once per kind; `rejected` is
- * a file the sidecar could not diff (HTTP 422), which pngjs then reports in its own words.
+ * a file the sidecar could not diff (HTTP 422), which the in-process diff then reports in the same words.
  */
 type Kind = "unreachable" | "error" | "rejected";
 
@@ -103,7 +103,7 @@ export function logFallbackOnce(
 ): void {
   if (logged.has(kind)) return;
   logged.add(kind);
-  warn(`server diff: in-process pngjs (${kind}): ${message}`);
+  warn(`server diff: in-process (${kind}): ${message}`);
 }
 
 /** For tests: forget what was logged. */

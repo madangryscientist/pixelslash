@@ -5,7 +5,6 @@ import {
   database,
   defaultDiffLocation,
   diffSidecarUrl,
-  inProcessDiff,
   explainQueue,
   imageSigningSecret,
   minCliVersion,
@@ -21,7 +20,6 @@ const handle = ({ request }: { request: Request }) =>
     modelKeySecret: modelKeySecret(),
     explainQueue: explainQueue(),
     diffSidecar: diffSidecarUrl(),
-    diff: inProcessDiff(),
     defaultDiffLocation,
   });
 

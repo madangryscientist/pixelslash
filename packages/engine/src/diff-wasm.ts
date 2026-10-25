@@ -1,23 +1,18 @@
 /**
- * The server diff with its hot loops in WebAssembly (PS-204, a spike behind a flag). The Rust in
- * `engines/wasm` unfilters both PNGs, runs the pixel loop, finds the blob boxes and runs the
- * overlay encode's filter pass (PS-205); inflate and deflate stay in the runtime's zlib, and
- * everything after the boxes (merging, noise, shift labels, floors) is the engine's own
- * `measuredDiff`. The result is byte-identical to
- * `diffPngs`, and any PNG the fast path does not read falls back to `diffPngs` whole.
+ * The diff, with its hot loops in WebAssembly (PS-204; the only diff since PS-210). The Rust in
+ * `engines/wasm` unfilters and expands both PNGs, runs the pixel loop, finds the blob boxes and
+ * runs the overlay encode's filter pass (PS-205); inflate and deflate stay in the runtime's zlib,
+ * and everything after the boxes (merging, noise, shift labels, floors) is `measuredDiff`. The
+ * chunk walk is `png-walk.ts`, pngjs's reader down to its error messages. There is no JS fallback:
+ * a module that will not load or instantiate fails with an error that names it.
  */
-import { deflateSync, inflateSync } from "node:zlib";
-import {
-  type DiffIgnore,
-  type DiffOptions,
-  DEFAULT_THRESHOLD,
-  type PixelDiff,
-  diffPngs,
-  measuredDiff,
-} from "./diff.ts";
+import { constants, deflateSync, inflateSync } from "node:zlib";
+import { diffModule } from "#diff-module";
+import type { DiffIgnore, DiffOptions, PixelDiff } from "./diff.ts";
 import type { Raster } from "./diff-probe.ts";
-import { identicalBytes } from "./identical.ts";
 import { clipRects, ignoreMask } from "./ignore-mask.ts";
+import { DEFAULT_THRESHOLD, measuredDiff } from "./measured.ts";
+import { type Png, SIGNATURE, plainChannels, walkPng } from "./png-walk.ts";
 import { type Box, DEFAULT_MERGE_DISTANCE, type DiffField } from "./regions.ts";
 import { release } from "./release.ts";
 import { MAX_YIQ_DELTA } from "./yiq.ts";
@@ -31,6 +26,28 @@ type DiffExports = {
   alloc(len: number): number;
   crc32(ptr: number, len: number): number;
   unfilter(src: number, width: number, height: number, channels: number, dst: number): number;
+  inflated_len(
+    width: number,
+    height: number,
+    depth: number,
+    colour: number,
+    interlace: number,
+  ): number;
+  decode(
+    src: number,
+    width: number,
+    height: number,
+    depth: number,
+    colour: number,
+    interlace: number,
+    palette: number,
+    entries: number,
+    transN: number,
+    t0: number,
+    t1: number,
+    t2: number,
+    dst: number,
+  ): number;
   filter(src: number, width: number, height: number, dst: number): number;
   diff(
     a: number,
@@ -48,106 +65,86 @@ type DiffExports = {
   blob_boxes(kind: number, width: number, height: number, gap: number, out: number): number;
 };
 
-type DiffFn = typeof diffPngs;
-
-/** A PNG the fast path reads: 8-bit RGB or RGBA, not interlaced, and nothing that changes pixels. */
-type SimplePng = { width: number; height: number; channels: 3 | 4; idat: Buffer[] };
-
-/** A chunk whose CRC pngjs checks, so the fast path checks it too: [start of type, length]. */
-type Checked = [number, number];
-
-const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-type Chunk = { type: string; at: number; length: number; data: Buffer };
-
-/** Every chunk up to and including IEND, or null when the file is not one whole PNG. */
-function chunksOf(png: Buffer): Chunk[] | null {
-  if (png.length < 8 || SIGNATURE.some((byte, i) => png[i] !== byte)) return null;
-  const chunks: Chunk[] = [];
-  for (let at = 8; at + 12 <= png.length;) {
-    const length = png.readUInt32BE(at);
-    const end = at + 12 + length;
-    if (end > png.length) return null;
-    const type = png.toString("latin1", at + 4, at + 8);
-    chunks.push({ type, at, length, data: png.subarray(at + 8, at + 8 + length) });
-    if (type === "IEND") return end === png.length ? chunks : null;
-    at = end;
-  }
-  return null;
-}
-
-/** The chunks whose CRC pngjs checks, so the fast path checks them too. */
-const CHECKED = new Set(["IHDR", "IDAT", "gAMA", "IEND"]);
-
-/** A chunk after IHDR that pngjs reads the way the fast path does. */
-function fastChunk({ type, length }: Chunk): boolean {
-  if (type === "IDAT") return true;
-  // pngjs reads gamma into metadata and never applies it to the pixels.
-  if (type === "gAMA") return length === 4;
-  if (type === "IEND") return length === 0;
-  // Ancillary (lower-case first letter) and not one that changes the pixels; a critical chunk
-  // pngjs does not know makes it throw.
-  return (type.charCodeAt(0) & 0x20) !== 0 && type !== "tRNS";
-}
-
 /**
- * The parts of `png` the fast path needs, or null when pngjs might read it differently: another
- * depth or colour type, interlace, a palette or transparency chunk, an unknown critical chunk,
- * anything after IEND. Null is not an error: `diffPngs` then decodes it, or refuses it, as always.
+ * The inflated lines, `size` bytes, as pngjs inflates them: Adam7 through a plain `inflateSync`,
+ * otherwise through its capped inflate, which keeps the first `size` bytes and stops there, so a
+ * stream with more data, or cut off after the image, still reads.
  */
-function simplePng(png: Buffer): { png: SimplePng; checked: Checked[] } | null {
-  const chunks = chunksOf(png) ?? [];
-  const [ihdr, ...rest] = chunks;
-  if (ihdr?.type !== "IHDR" || ihdr.length !== 13) return null;
-  const header = ihdrOf(ihdr.data);
-  const idat = rest.filter((c) => c.type === "IDAT").map((c) => c.data);
-  if (!header || idat.length === 0 || !rest.every(fastChunk)) return null;
-  const checked = chunks
-    .filter((c) => CHECKED.has(c.type))
-    .map((c): Checked => [c.at + 4, c.length]);
-  return { png: { ...header, idat }, checked };
+function inflateLines(data: Buffer, size: number, interlaced: boolean): Buffer {
+  let inflated: Buffer;
+  try {
+    inflated = inflateSync(data);
+  } catch (error) {
+    if (interlaced) throw error;
+    const flushed = inflateSync(data, { finishFlush: constants.Z_SYNC_FLUSH });
+    if (flushed.length < size) throw error;
+    inflated = flushed;
+  }
+  if (inflated.length === 0) throw new Error("bad png - invalid inflate data response");
+  if (inflated.length < size) throw new Error("bad png - inflated data is shorter than the image");
+  return inflated.length === size ? inflated : inflated.subarray(0, size);
 }
 
-function ihdrOf(data: Buffer): Omit<SimplePng, "idat"> | null {
-  const width = data.readUInt32BE(0);
-  const height = data.readUInt32BE(4);
-  const [depth, colorType, compression, filter, interlace] = data.subarray(8, 13);
-  if (depth !== 8 || compression !== 0 || filter !== 0 || interlace !== 0) return null;
-  if (colorType !== 6 && colorType !== 2) return null;
-  if (width === 0 || height === 0) return null;
-  return { width, height, channels: colorType === 6 ? 4 : 3 };
+/** The first line's filter type pngjs refuses, in the fast path's rows at `raw`. */
+function badFilter(wasm: DiffExports, raw: number, stride: number, height: number): number {
+  const rows = new Uint8Array(wasm.memory.buffer, raw, stride * height);
+  for (let y = 0; y < height; y++) if ((rows[y * stride] ?? 0) > 4) return rows[y * stride] ?? 0;
+  return 0;
 }
 
-/** Thrown inside the fast path when it must hand the pair to `diffPngs`. */
-class NotFast extends Error {}
+/** The palette copied into wasm memory as RGBA entries (0: none). */
+function paletteAt(wasm: DiffExports, png: Png): number {
+  if (png.palette.length === 0) return 0;
+  const at = alloc(wasm, png.palette.length * 4);
+  new Uint8Array(wasm.memory.buffer, at, png.palette.length * 4).set(png.palette.flat());
+  return at;
+}
+
+/** `decode`'s code for the lines at `raw` taken to RGBA at `rgba`: 0, or the error's code. */
+function decodeLines(wasm: DiffExports, png: Png, raw: number, rgba: number): number {
+  const { width, height, depth, colour, interlace, palette, trans } = png;
+  const [t0 = 0, t1 = 0, t2 = 0] = trans;
+  const at = paletteAt(wasm, png);
+  const shape = [width, height, depth, colour, interlace] as const;
+  return wasm.decode(raw, ...shape, at, palette.length, trans.length, t0, t1, t2, rgba);
+}
+
+/** Unfilter and expand the inflated lines at `raw` to RGBA at `rgba`, or throw pngjs's error. */
+function expand(wasm: DiffExports, png: Png, raw: number, rgba: number) {
+  const { width, height } = png;
+  const plain = plainChannels(png);
+  if (plain) {
+    if (wasm.unfilter(raw, width, height, plain, rgba) === 0) return;
+    const filter = badFilter(wasm, raw, width * plain + 1, height);
+    throw new Error(`Unrecognised filter type - ${filter}`);
+  }
+  const code = decodeLines(wasm, png, raw, rgba);
+  if (code >= 0x200) throw new Error(`index ${code & 0xff} not in palette`);
+  if (code >= 0x100) throw new Error(`Unrecognised filter type - ${code & 0xff}`);
+}
 
 /** Decode `bytes` into a fresh RGBA buffer in wasm memory; its address. */
 function decodeInto(
   wasm: DiffExports,
   bytes: Buffer,
 ): { at: number; width: number; height: number } {
-  const parsed = simplePng(bytes);
-  if (!parsed) throw new NotFast("not a simple PNG");
-  const { width, height, channels, idat } = parsed.png;
-  const rgba = alloc(wasm, width * height * 4);
   const scratch = wasm.mark();
   const file = alloc(wasm, bytes.length);
   new Uint8Array(wasm.memory.buffer, file, bytes.length).set(bytes);
-  const view = new DataView(wasm.memory.buffer);
-  for (const [type, length] of parsed.checked) {
-    const crc = wasm.crc32(file + type, 4 + length) >>> 0;
-    if (crc !== view.getUint32(file + type + 4 + length)) throw new NotFast("CRC mismatch");
-  }
+  const png = walkPng(bytes, (at, len) => wasm.crc32(file + at, len));
   wasm.rewind(scratch);
-  const [only] = idat;
-  const inflated = inflateSync(idat.length === 1 && only ? only : Buffer.concat(idat));
-  const rows = (width * channels + 1) * height;
-  if (inflated.length !== rows) throw new NotFast("inflated size is not the image's");
-  const raw = alloc(wasm, rows);
-  new Uint8Array(wasm.memory.buffer, raw, rows).set(inflated);
+  const { width, height, depth, colour, interlace } = png;
+  const rgba = alloc(wasm, width * height * 4);
+  const lines = wasm.mark();
+  const [only] = png.idat;
+  const size = wasm.inflated_len(width, height, depth, colour, interlace);
+  const data = png.idat.length === 1 && only ? only : Buffer.concat(png.idat);
+  const inflated = inflateLines(data, size, interlace === 1);
+  const raw = alloc(wasm, size);
+  new Uint8Array(wasm.memory.buffer, raw, size).set(inflated);
   release(inflated);
-  if (wasm.unfilter(raw, width, height, channels, rgba) !== 0) throw new NotFast("bad filter");
-  wasm.rewind(scratch);
+  expand(wasm, png, raw, rgba);
+  wasm.rewind(lines);
   return { at: rgba, width, height };
 }
 
@@ -163,7 +160,7 @@ function encodeOverlay(wasm: DiffExports, at: number, width: number, height: num
   const scratch = wasm.mark();
   const rowsLen = (width * 4 + 1) * height;
   const rows = alloc(wasm, rowsLen);
-  if (wasm.filter(at, width, height, rows) !== 0) throw new NotFast("wasm memory is full");
+  if (wasm.filter(at, width, height, rows) !== 0) throw new Error("diff.wasm: memory is full");
   const idat = deflateSync(new Uint8Array(wasm.memory.buffer, rows, rowsLen), DEFLATE);
   wasm.rewind(scratch);
   const ihdr = Buffer.alloc(13);
@@ -194,7 +191,7 @@ function encodeOverlay(wasm: DiffExports, at: number, width: number, height: num
 
 function alloc(wasm: DiffExports, len: number): number {
   const at = wasm.alloc(len);
-  if (at === 0) throw new NotFast("wasm memory is full");
+  if (at === 0) throw new Error("diff.wasm: memory is full");
   return at;
 }
 
@@ -218,18 +215,18 @@ function skipMask(wasm: DiffExports, ignore: DiffIgnore, width: number, height: 
   return { ignored, skip, count: mask.count };
 }
 
-/** What `fastDiff` takes beside the pair: `encode` is the overlay's PNG encode, or the engine's. */
-type FastOptions = {
-  options: DiffOptions;
-  ignore: DiffIgnore;
-  encode: ((overlay: Raster) => Buffer) | undefined;
+/** What `wasmDiff` takes beside the pair: `encode` replaces the overlay's PNG encode. */
+type WasmDiffOptions = {
+  options?: DiffOptions;
+  ignore?: DiffIgnore;
+  encode?: ((overlay: Raster) => Buffer) | undefined;
 };
 
-function fastDiff(
+function run(
   wasm: DiffExports,
   [main, branch]: [Buffer, Buffer],
-  { options, ignore, encode }: FastOptions,
-): PixelDiff {
+  { options = {}, ignore = {}, encode }: WasmDiffOptions,
+): PixelDiff & { overlay: Buffer } {
   wasm.reset();
   const ma = decodeInto(wasm, main);
   const br = decodeInto(wasm, branch);
@@ -260,7 +257,7 @@ function fastDiff(
   );
   const gap = options.mergeDistance ?? DEFAULT_MERGE_DISTANCE;
   const count = wasm.blob_boxes(field, width, height, gap, out + 8);
-  if (count === 0xffffffff) throw new NotFast("wasm memory is full");
+  if (count === 0xffffffff) throw new Error("diff.wasm: memory is full");
   let encodeWith = encode;
   if (!encodeWith) {
     const png = encodeOverlay(wasm, overlay, overlayWidth, overlayHeight);
@@ -288,13 +285,7 @@ function fastDiff(
   return measuredDiff(
     [a, b],
     raster,
-    {
-      changedPixels,
-      antialiased,
-      ignoredPixels,
-      ignored,
-      field: fieldOf,
-    },
+    { changedPixels, antialiased, ignoredPixels, ignored, field: fieldOf },
     { options, blobs: () => boxes, encode: encodeWith },
   );
 }
@@ -306,6 +297,8 @@ const EXPORTS = [
   "alloc",
   "crc32",
   "unfilter",
+  "inflated_len",
+  "decode",
   "filter",
   "diff",
   "blob_boxes",
@@ -319,45 +312,37 @@ function isDiffExports(exports: WebAssembly.Instance["exports"]): exports is Dif
 }
 
 function instantiate(module: WebAssembly.Module): DiffExports {
-  const { exports } = new WebAssembly.Instance(module);
+  let exports: WebAssembly.Instance["exports"];
+  try {
+    ({ exports } = new WebAssembly.Instance(module));
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error);
+    throw new Error(`diff.wasm will not instantiate: ${why}`, { cause: error });
+  }
   if (!isDiffExports(exports)) throw new Error("diff.wasm does not export the diff");
   return exports;
 }
 
 const size = ({ width, height }: { width: number; height: number }) => ({ width, height });
 
+/** One instance, made on first use and reused: its memory stays at the largest diff's size. */
+let wasm: DiffExports | null = null;
+
 /**
- * `diffPngs` with the hot loops in `module` (the compiled `diff.wasm`). One instance per differ,
- * reused: its memory stays at the largest diff's size. A failure inside the fast path drops the
- * instance and the pair goes to `diffPngs`, which gives the same answer or the same error;
- * `fellBack` is told why (the tests use it to prove the fast path ran). `encode` replaces the
- * overlay's PNG encode on the fast path, as `measuredDiff`'s does (the bench's `--overlay none`);
- * left out, it is pngjs's encode with the filter pass in wasm (PS-205), which writes the same bytes.
+ * Decode and diff the pair in `diff.wasm`. Always measures and always draws the overlay; the
+ * identical-bytes shortcut is `diffPngs`'s. `encode` replaces the overlay's PNG encode (the bench's
+ * `--overlay none` captures the raster instead); left out, it is pngjs's encode, byte for byte.
+ * Any error drops the instance, so the next diff starts on a fresh one.
  */
-export function wasmDiffer(
-  module: WebAssembly.Module,
-  {
-    fellBack,
-    encode,
-  }: { fellBack?: (reason: unknown) => void; encode?: (overlay: Raster) => Buffer } = {},
-): DiffFn {
-  let wasm: DiffExports | null = null;
-  function diff(
-    main: Buffer,
-    branch: Buffer,
-    options: DiffOptions = {},
-    ignore: DiffIgnore = {},
-  ): PixelDiff {
-    const same = identicalBytes(main, branch);
-    if (same) return same;
-    try {
-      wasm ??= instantiate(module);
-      return fastDiff(wasm, [main, branch], { options, ignore, encode });
-    } catch (error) {
-      if (!(error instanceof NotFast)) wasm = null;
-      fellBack?.(error);
-      return diffPngs(main, branch, options, ignore);
-    }
+export function wasmDiff(
+  pair: [Buffer, Buffer],
+  options: WasmDiffOptions = {},
+): PixelDiff & { overlay: Buffer } {
+  try {
+    wasm ??= instantiate(diffModule());
+    return run(wasm, pair, options);
+  } catch (error) {
+    wasm = null;
+    throw error;
   }
-  return diff;
 }

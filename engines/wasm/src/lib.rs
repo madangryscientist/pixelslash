@@ -178,6 +178,215 @@ pub extern "C" fn unfilter(src: usize, width: u32, height: u32, channels: u32, d
     0
 }
 
+/// pngjs's Adam7 passes (`interlace.js`): the columns and rows of each 8x8 tile a pass covers.
+const PASSES: [(&[usize], &[usize]); 7] = [
+    (&[0], &[0]),
+    (&[4], &[0]),
+    (&[0, 4], &[4]),
+    (&[2, 6], &[0, 4]),
+    (&[0, 2, 4, 6], &[2, 6]),
+    (&[1, 3, 5, 7], &[0, 2, 4, 6]),
+    (&[0, 1, 2, 3, 4, 5, 6, 7], &[1, 3, 5, 7]),
+];
+
+/// One sub-image of the decode: its size and its Adam7 pass (`None` for a non-interlaced image).
+#[derive(Clone, Copy)]
+struct Pass {
+    width: usize,
+    height: usize,
+    index: Option<usize>,
+}
+
+/// pngjs's `getImagePasses`: the passes with pixels, in file order; the whole image when not interlaced.
+fn passes(width: usize, height: usize, interlace: bool) -> ([Pass; 7], usize) {
+    let mut out = [Pass { width: 0, height: 0, index: None }; 7];
+    if !interlace {
+        out[0] = Pass { width, height, index: None };
+        return (out, 1);
+    }
+    let count = |offsets: &[usize], size: usize| {
+        size / 8 * offsets.len() + offsets.iter().take_while(|&&o| o < size % 8).count()
+    };
+    let mut n = 0;
+    for (i, (xs, ys)) in PASSES.iter().enumerate() {
+        let (w, h) = (count(xs, width), count(ys, height));
+        if w > 0 && h > 0 {
+            out[n] = Pass { width: w, height: h, index: Some(i) };
+            n += 1;
+        }
+    }
+    (out, n)
+}
+
+/// Samples per pixel of a PNG colour type (0 grey, 2 RGB, 3 palette, 4 grey+alpha, 6 RGBA).
+fn channels_of(colour: u32) -> usize {
+    match colour {
+        2 => 3,
+        4 => 2,
+        6 => 4,
+        _ => 1,
+    }
+}
+
+/// The bytes of one filtered line, without its filter byte (pngjs's `byteWidth`).
+fn line_bytes(width: usize, channels: usize, depth: usize) -> usize {
+    (width * channels * depth).div_ceil(8)
+}
+
+/// The inflated size of an image: every pass's lines, each with its filter byte. The JS checks the
+/// inflate against it before `decode` runs, so `decode` never reads past its input.
+#[unsafe(no_mangle)]
+pub extern "C" fn inflated_len(width: u32, height: u32, depth: u32, colour: u32, interlace: u32) -> u32 {
+    let (list, n) = passes(width as usize, height as usize, interlace != 0);
+    let channels = channels_of(colour);
+    list[..n]
+        .iter()
+        .map(|p| (line_bytes(p.width, channels, depth as usize) + 1) * p.height)
+        .sum::<usize>() as u32
+}
+
+/// Unfilter one line in place against the line above (`up`, empty on a pass's first line), with
+/// pngjs's `xComparison` as `bpp`. False on a filter type pngjs refuses.
+fn unfilter_line(filter: u8, line: &mut [u8], up: &[u8], bpp: usize) -> bool {
+    let above = |x: usize| if up.is_empty() { 0 } else { up[x] };
+    match filter {
+        0 => {}
+        1 => {
+            for x in bpp..line.len() {
+                line[x] = line[x].wrapping_add(line[x - bpp]);
+            }
+        }
+        2 => {
+            for x in 0..line.len() {
+                line[x] = line[x].wrapping_add(above(x));
+            }
+        }
+        3 => {
+            for x in 0..line.len() {
+                let left = if x >= bpp { line[x - bpp] as u32 } else { 0 };
+                line[x] = line[x].wrapping_add(((left + above(x) as u32) >> 1) as u8);
+            }
+        }
+        4 => {
+            for x in 0..line.len() {
+                let (left, up_left) = if x >= bpp { (line[x - bpp], above(x - bpp)) } else { (0, 0) };
+                line[x] = line[x].wrapping_add(paeth(left, above(x), up_left));
+            }
+        }
+        _ => return false,
+    }
+    true
+}
+
+/// Sample `i` of a line of `depth`-bit samples: big-endian for 16, most significant bits first below 8.
+#[inline(always)]
+fn sample(line: &[u8], i: usize, depth: usize) -> u32 {
+    match depth {
+        8 => line[i] as u32,
+        16 => (line[i * 2] as u32) << 8 | line[i * 2 + 1] as u32,
+        _ => {
+            let bit = i * depth;
+            (line[bit / 8] as u32 >> (8 - depth - bit % 8)) & ((1 << depth) - 1)
+        }
+    }
+}
+
+/// Decode any PNG pngjs reads (PS-210): every bit depth, grey, palette and alpha, tRNS and Adam7,
+/// to the same RGBA bytes as `PNG.sync.read`. `src` holds the inflated lines (`inflated_len`
+/// bytes), unfiltered in place. `palette` is `entries` RGBA colours with tRNS's alpha applied;
+/// `trans_n` is 1 (grey) or 3 (RGB) when a tRNS names a transparent colour (`t0`..`t2`), else 0.
+/// Returns 0, or `0x100 | type` for a filter type pngjs refuses, or `0x200 | index` for a palette
+/// index past the palette; like pngjs, every line is unfiltered before any pixel is looked up.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn decode(
+    src: usize,
+    width: u32,
+    height: u32,
+    depth: u32,
+    colour: u32,
+    interlace: u32,
+    palette: usize,
+    entries: u32,
+    trans_n: u32,
+    t0: u32,
+    t1: u32,
+    t2: u32,
+    dst: usize,
+) -> u32 {
+    let (w, h, depth) = (width as usize, height as usize, depth as usize);
+    let channels = channels_of(colour);
+    let bpp = match depth {
+        8 => channels,
+        16 => channels * 2,
+        _ => 1,
+    };
+    let (list, n) = passes(w, h, interlace != 0);
+    let data = bytes_mut(src, inflated_len(width, height, depth as u32, colour, interlace) as usize);
+    let mut at = 0;
+    for pass in &list[..n] {
+        let stride = line_bytes(pass.width, channels, depth) + 1;
+        for y in 0..pass.height {
+            let (before, rest) = data.split_at_mut(at);
+            let up: &[u8] = if y == 0 { &[] } else { &before[at - stride + 1..] };
+            let filter = rest[0];
+            if !unfilter_line(filter, &mut rest[1..stride], up, bpp) {
+                return 0x100 | filter as u32;
+            }
+            at += stride;
+        }
+    }
+    let out = bytes_mut(dst, w * h * 4);
+    let max = (1u32 << depth) - 1;
+    let scale = |v: u32| if depth == 8 { v } else { (v * 510 + max) / (2 * max) };
+    let mut at = 0;
+    for pass in &list[..n] {
+        let stride = line_bytes(pass.width, channels, depth) + 1;
+        for y in 0..pass.height {
+            let line = &data[at + 1..at + stride];
+            for x in 0..pass.width {
+                let (ox, oy) = match pass.index {
+                    None => (x, y),
+                    Some(i) => {
+                        let (xs, ys) = PASSES[i];
+                        (x / xs.len() * 8 + xs[x % xs.len()], y / ys.len() * 8 + ys[y % ys.len()])
+                    }
+                };
+                let s = |c: usize| sample(line, x * channels + c, depth);
+                let px = &mut out[(oy * w + ox) * 4..(oy * w + ox) * 4 + 4];
+                if colour == 3 {
+                    // The index, looked up in output order below as pngjs's `dePalette` does.
+                    px[0] = s(0) as u8;
+                    continue;
+                }
+                let raw = match channels {
+                    1 => [s(0), s(0), s(0), max],
+                    2 => [s(0), s(0), s(0), s(1)],
+                    3 => [s(0), s(1), s(2), max],
+                    _ => [s(0), s(1), s(2), s(3)],
+                };
+                let clear = (trans_n == 1 && raw[0] == t0)
+                    || (trans_n == 3 && raw[0] == t0 && raw[1] == t1 && raw[2] == t2);
+                for c in 0..4 {
+                    px[c] = if clear { 0 } else { scale(raw[c]) as u8 };
+                }
+            }
+            at += stride;
+        }
+    }
+    if colour == 3 {
+        let colours = bytes(palette, entries as usize * 4);
+        for px in out.chunks_exact_mut(4) {
+            let index = px[0] as usize;
+            if index >= entries as usize {
+                return 0x200 | index as u32;
+            }
+            px.copy_from_slice(&colours[index * 4..index * 4 + 4]);
+        }
+    }
+    0
+}
+
 /// Bytes per pixel of the RGBA overlay: the left neighbour is 4 bytes back.
 const BPP: usize = 4;
 

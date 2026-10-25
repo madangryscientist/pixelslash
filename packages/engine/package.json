@@ -3,21 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#diff-module": {
+      "workerd": "./src/diff-module.workerd.ts",
+      "default": "./src/diff-module.bun.ts"
+    }
+  },
   "exports": {
     ".": "./src/index.ts",
     "./diff": "./src/diff.ts",
     "./diff-wasm": "./src/diff-wasm.ts",
-    "./diff.wasm": "./wasm/diff.wasm",
-    "./png-codec": "./src/png-codec.ts",
     "./release": "./src/release.ts",
     "./judge": "./src/judge.ts",
-    "./png-native": "./src/png-native.ts",
     "./ci-diff": "./src/ci-diff.ts",
     "./region-crops": "./src/region-crops.ts",
     "./composition-entry": "./src/composition-entry.ts"
   },
   "dependencies": {
-    "@napi-rs/image": "1.15.0",
     "playwright": "1.60.0",
     "pngjs": "^7.0.0"
   },

@@ -168,11 +168,6 @@ const stripped = (r: Awaited<ReturnType<typeof invokeImpl>>) =>
 
 const badInput = (extra: object) => () => parseImplOutput(JSON.stringify({ ...OK, ...extra }));
 
-const sumOf = (phases: Record<string, number>, names: string[]): number =>
-  names.reduce((t, n) => t + (phases[n] ?? Number.NaN), 0);
-const DIFF_PHASES = ["pixel_compare", "anti_alias", "regions", "overlay_encode"];
-const DECODE_PHASES = ["decode_read", "decode_inflate", "decode_unfilter", "decode_other"];
-
 /** `ts-diff.ts` on the desktop fixture pair in one decode mode. */
 async function desktop(decode: "parallel" | "sequential") {
   const fixtures = join(dir, "fixtures-phases");
@@ -208,7 +203,9 @@ describe("ts-diff --decode (ob 1932)", () => {
     expect(mismatches).toEqual([]);
   }, 180_000);
 
-  test("sequential: the diff phases and the decode split add up to diff_ms and decode_ms", async () => {
+  // PS-210: the decode and the pixel loop are one call into diff.wasm, so the phases are the file
+  // read (all of decode_ms) and the overlay encode (part of diff_ms), and --decode changes nothing.
+  test("decode_read is decode_ms, and overlay_encode is inside diff_ms", async () => {
     const {
       phases = {},
       decode_ms,
@@ -216,24 +213,12 @@ describe("ts-diff --decode (ob 1932)", () => {
       startup_ms,
       peak_rss_bytes,
     } = await desktop("sequential");
-    expect(Object.values(phases).every((v) => v >= 0)).toBe(true);
+    expect(Object.keys(phases).toSorted()).toEqual(["decode_read", "overlay_encode"]);
+    expect(phases["decode_read"]).toBe(decode_ms);
+    expect(phases["overlay_encode"]).toBeLessThanOrEqual(diff_ms);
     expect(startup_ms).toBeGreaterThan(0);
     // Its own VmHWM: more than an empty Bun, far less than the runner's high-water mark it would inherit.
     expect(peak_rss_bytes).toBeGreaterThan(10e6);
-    expect(Math.abs(sumOf(phases, DIFF_PHASES) - diff_ms)).toBeLessThanOrEqual(
-      Math.max(2, diff_ms * 0.1),
-    );
-    expect(Math.abs(sumOf(phases, DECODE_PHASES) - decode_ms)).toBeLessThanOrEqual(
-      Math.max(2, decode_ms * 0.1),
-    );
-  });
-
-  test("parallel: the decode split is summed work over both files", async () => {
-    const { phases = {}, diff_ms } = await desktop("parallel");
-    expect(Math.abs(sumOf(phases, DIFF_PHASES) - diff_ms)).toBeLessThanOrEqual(
-      Math.max(2, diff_ms * 0.1),
-    );
-    expect(sumOf(phases, DECODE_PHASES)).toBeGreaterThan(0);
   });
 
   test("a bad --decode is a usage error", async () => {

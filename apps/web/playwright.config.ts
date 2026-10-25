@@ -59,9 +59,6 @@ export default defineConfig({
         PIXELSLASH_E2E_STUB_PORT: String(STUB_PORT),
         // And at this sidecar, or at none (`vite.config.ts`).
         PIXELSLASH_E2E_SIDECAR: sidecar ? SIDECAR : "",
-        // The WebAssembly diff in-process by default (PS-207). `PIXELSLASH_E2E_WASM=` (empty) runs the
-        // e2e with pngjs instead, as a rollback check.
-        PIXELSLASH_E2E_WASM: process.env["PIXELSLASH_E2E_WASM"] ?? "1",
       },
       url: SERVER,
       reuseExistingServer: false,

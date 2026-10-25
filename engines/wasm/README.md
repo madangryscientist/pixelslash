@@ -1,18 +1,22 @@
-# engines/wasm: the server diff's hot loops in WebAssembly (PS-204, a spike)
+# engines/wasm: the diff's hot loops in WebAssembly (PS-204; the only diff since PS-210)
 
-A Rust crate compiled to `wasm32-unknown-unknown`. It holds the loops that dominate the
-server diff in workerd: pngjs's unfilter, the per-pixel loop (YIQ delta, anti-alias test, the
-overlay paint), the region pass's blob boxes and (PS-205) pngjs's adaptive filter for the overlay's
-encode, which picks each row's filter as pngjs does and runs 16 bytes at a time in wasm SIMD. It was written from our TypeScript
-(`packages/engine/src/diff.ts`, `yiq.ts`, `regions.ts`) and the PNG spec's filter definitions, not
-from a rival's code. It must give `diffPngs`'s result byte for byte. Everything else stays in JS
-(`packages/engine/src/diff-wasm.ts`): chunk parsing, inflate (workerd's zlib), the ignore mask,
-merging boxes, noise, shift labels, the floors, and the encode's deflate (workerd's zlib at
-pngjs's level and strategy) and PNG chunks. The fast path reads 8-bit
-RGB and RGBA, uninterlaced, with no critical chunk besides IHDR, IDAT and IEND and no `tRNS`.
-Any other PNG (16-bit, palette, interlaced) goes to `diffPngs`, which gives the same answer.
+A Rust crate compiled to `wasm32-unknown-unknown`. It holds the loops that dominate a diff: the PNG
+unfilter and the expansion of every colour type and bit depth to RGBA (palette and `tRNS`, 16-bit,
+Adam7), the per-pixel loop (YIQ delta, anti-alias test, the overlay paint), the region pass's blob
+boxes and (PS-205) pngjs's adaptive filter for the overlay's encode, which picks each row's filter as
+pngjs does and runs 16 bytes at a time in wasm SIMD. It was written from our TypeScript
+(`packages/engine/src/diff.ts`, `yiq.ts`, `regions.ts`) and the PNG spec, not from a rival's code.
+It gives the result the pngjs diff gave before PS-210, byte for byte, overlay included
+(`packages/engine/test/fixtures/pngjs-golden.json` holds that answer for every bench corpus pair).
+Everything else stays in JS (`packages/engine/src/diff-wasm.ts`): chunk parsing (pngjs's checks
+and error messages), inflate (the runtime's zlib), the ignore mask, merging boxes, noise, shift
+labels, the floors, and the encode's deflate (zlib at pngjs's level and strategy) and PNG chunks.
 
-The web app uses it when `DIFF_WASM=1`, which every config sets since PS-207; any other value is pngjs (`apps/web/src/server/env.ts`).
+It is the one diff, in the CLI (Bun) and in the server (workerd). `#diff-module` in the engine's
+`package.json` picks how the module arrives: `diff-module.bun.ts` reads `wasm/diff.wasm` from disk,
+and under the `workerd` condition `diff-module.workerd.ts` imports it, so the Worker's bundle carries
+it as a compiled module. There is no JS fallback: a module that will not load or instantiate fails
+with an error that names `diff.wasm`.
 
 ## Building
 
@@ -40,10 +44,6 @@ both run it. The module uses std only for
 
 ## Timing
 
-Timing is on demand only, never in the gate:
-
-```bash
-cd apps/web && bun perf/diff-wasm/run.ts
-```
-
-The results are in `bench/PERF.md`, levers 20 and 22.
+Timing is on demand only, never in the gate. The bench times this diff (`bun run bench:perf`, see
+`bench/README.md`); the workerd A/B harness that compared it with pngjs (`apps/web/perf/diff-wasm`)
+went in PS-210 with the pngjs diff. The results are in `bench/PERF.md`, levers 20 and 22.

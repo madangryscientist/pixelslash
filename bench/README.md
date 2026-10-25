@@ -261,32 +261,25 @@ reported against that case, by name, and the run goes on with the next one.
 `<impl>` is a command line split on whitespace (no quoting), so `./target/release/pxdiff` and
 `bun bench/src/impl/ts-diff.ts` both work. It runs from the repo root.
 
-**The reference implementation** is `bench/src/impl/ts-diff.ts`: the TypeScript engine's diff
-behind the contract. It is the baseline, and the first thing to run to check the harness. It decodes
-the two files itself (`ts-decode.ts`) and hands the pixels to the engine's `diffRasters`, the call `diffPngs` makes after its
-own decode. `diffPngs` is that decode plus `diffRasters`, so the verdict and regions are the engine's
-and the CLI's output does not move. The decoder is `napi-image` by default, the fastest permissive
-one measured (PS-168), which gives pngjs's RGBA byte for byte; `--decoder pngjs` is the engine's own,
-with its read, inflate and unfilter steps timed by patching two methods of pngjs's synchronous path
-on the module's own prototype, not by swapping the decoder. Every other decoder reports its decode
-as `decode_read` and `decode_other`. `diff_ms` is the `diffRasters` call. The overlay image the
-contract does not ask for is not encoded by default (`--overlay none`, PS-168), so the TS side does
-not pay for work C# never does; `--overlay pngjs` encodes it as the engine does, and
-`overlay_encode` reports it. The engine's timing hook is an optional callback that is
-`undefined` in production. `--decode parallel` decodes the head on a Bun `Worker` while the base
-decodes on the main thread; the worker's start-up is inside `decode_ms`, because the decode waits for
-it, and it is why parallel can lose on a small image. And a cold process is slower than the warm in-process loop of `bench:perf`
-(roughly 1.7x here, from JIT warm-up), so numbers from the two modes are not comparable.
+**The reference implementation** is `bench/src/impl/ts-diff.ts`: the engine's diff behind the
+contract. It is the baseline, and the first thing to run to check the harness. It runs `wasmDiff`,
+the one diff the CLI and the server run (`diff.wasm`, PS-210), so the verdict and regions are the
+engine's. It reads the two files, then one call does inflate, unfilter, the pixel loop and the
+regions, so `decode_ms` is the read alone, `diff_ms` holds the rest, and only `decode_read` and
+`overlay_encode` are reported. A `-` in the phase table for its `decode_inflate`,
+`decode_unfilter`, `pixel_compare` and similar is that split, not a missing measurement. The
+overlay image the contract does not ask for is not encoded by default (`--overlay none`, PS-168),
+so the TS side does not pay for work C# never does; `--overlay pngjs` encodes it as the engine does,
+and `overlay_encode` reports it. A cold process is slower than the warm in-process loop of
+`bench:perf` (roughly 1.7x here, from JIT warm-up), so numbers from the two modes are not
+comparable.
 
-`--engine wasm` (PS-209) runs the server's WASM diff (`wasmDiffer`, PS-204, `DIFF_WASM`) behind the
-same contract, for comparing it with the others. It reads the two files, then one call does inflate,
-unfilter, the pixel loop and the regions, so `decode_ms` is the read alone, `diff_ms` holds the rest,
-and only `decode_read` and `overlay_encode` are reported. A `-` in the phase table for its
-`decode_inflate`, `decode_unfilter`, `pixel_compare` and similar is that split, not a missing
-measurement. `--decoder` is refused with it, `--decode` is ignored, and `--overlay` works as above.
-A pair the fast path declines (an interlaced or 16-bit PNG) is an error, exit 1, not a pngjs result
-timed as wasm.
-When it landed (PS-209) its verdict and regions matched the pngjs reference on all 157 pairs.
+`--engine wasm` (PS-209's spelling) is still accepted, so a recorded command runs; `--engine ts` and
+`--decoder` are usage errors since PS-210, as the pngjs diff and its decoders are gone, and the
+runner's `--decode` is accepted and ignored. When the WASM diff landed (PS-209) its verdict and
+regions matched the pngjs reference on all 157 pairs; since PS-210 it reads every PNG pngjs read,
+and `packages/engine/test/fixtures/pngjs-golden.json` holds pngjs's whole result, overlay included,
+for each of them.
 
 ### Scoring: `bench -- --impl`
 
@@ -423,21 +416,27 @@ stb's buffer and the RGB to RGBA expansion, which stb does inside `FromMemory` t
 
 ### Decoders and encoders: `bench:decoders` (PS-168)
 
-Both bench implementations take a decoder by name, and the TS one an overlay encoder; the
-production engine (`packages/engine`) is not touched by either and decodes and encodes with pngjs.
+The C# implementation takes a decoder by name, and the TS one an overlay encoder; the production
+engine (`packages/engine`) is not touched by either and decodes and encodes inside `diff.wasm`.
+The TS decoder rows went in PS-210: that impl decodes inside `diff.wasm`, so there is no decoder to
+pick. The decoders themselves stay in `bench/src/impl/ts-codecs.ts` as PS-168's record, and a gate
+test still holds each to pngjs's RGBA.
 
 ```bash
 bun run bench:decoders -- --env dedicated            # every candidate below, written to bench/results/decoders-<yyyy-mm>.md
 engines/dotnet/native/build.sh                        # once: libspng (zlib and zlib-ng) and Wuffs, into native/out/
 <csharp> [--decoder stb|spng|spng-zlibng|wuffs|skia|imagesharp] diff a.png b.png --json [--decode parallel|sequential]
-bun bench/src/impl/ts-diff.ts [--decoder <name>] [--overlay <name>] diff a.png b.png --json [--decode parallel|sequential]
+bun bench/src/impl/ts-diff.ts [--overlay <name>] diff a.png b.png --json
 ```
 
 Each switch is given at most once, before `diff` (how `--impl` passes an implementation's own
 flags) or after the operands (where the harness puts `--decode`). An unknown name is exit 2, and a
 decoder whose library is not built or not compiled in is a usage error, never a silent fallback.
-Every decoder must give the baseline's RGBA byte for byte (StbImageSharp in C#, pngjs in TS): a gate
-test decodes every PNG in both corpora and `fixtures/ds` with each one that is present.
+Every C# decoder must give the baseline's RGBA byte for byte (StbImageSharp): a gate test decodes
+every PNG in both corpora and `fixtures/ds` with each one that is present.
+
+The TS rows are PS-168's candidates. PS-210 removed them from the code (the TS impl decodes inside
+`diff.wasm`); the rows stay as the record, and their numbers are in `PERF.md`.
 
 | engine | decoder | licence | where it runs | how it gets here |
 | --- | --- | --- | --- | --- |
@@ -446,15 +445,15 @@ test decodes every PNG in both corpora and `fixtures/ds` with each one that is p
 | C# | `spng`, `spng-zlibng` | BSD-2 (libspng), zlib (zlib, zlib-ng) | C# | `native/build.sh` |
 | C# | `wuffs` | Apache-2.0 | C# | `native/build.sh` |
 | C# | `imagesharp` | Six Labors Split (paid for commercial use) | C# | `-p:DecoderCandidates=true` only; measured, never shipped |
-| TS | `pngjs` | MIT | CLI, workerd | npm; the engine's, and the only one that splits its decode into phases |
-| TS | `fast-png`, `upng` | MIT | CLI, workerd | npm |
-| TS | `napi-image` (default, sequential) | MIT | CLI (native addon) | npm |
-| TS | `jsquash` | Apache-2.0 | CLI, workerd (WASM) | npm |
+| TS | `pngjs` | MIT | CLI, workerd | npm; the baseline, and the engine's until PS-210 |
+| TS | `fast-png`, `upng` | MIT | CLI, workerd | npm; removed in PS-210 |
+| TS | `napi-image` | MIT | CLI (native addon) | npm; the TS impl's default until PS-210 |
+| TS | `jsquash` | Apache-2.0 | CLI, workerd (WASM) | npm; removed in PS-210 |
 | TS | `cf-wasm` | MIT | CLI, workerd (WASM) | npm |
 | TS | `sharp` | Apache-2.0, libvips LGPL-3.0 | CLI (native addon) | npm; measured, never shipped |
 
 The TS overlay encoders (`--overlay`): `none` (default), `pngjs` (the engine's), `pngjs-l6`,
-`pngjs-l1` (deflate levels), `sharp`, `napi-image` and `cf-wasm`, with the decoders' licences.
+`pngjs-l1` (deflate levels), `sharp`, `napi-image` and `cf-wasm`, with the libraries' licences.
 
 `native/build.sh` fetches each library's source at a pinned sha256 into
 `~/.cache/pixelslash-native`, builds it with the system `gcc` and writes `native/out/*.so`
@@ -462,13 +461,12 @@ The TS overlay encoders (`--overlay`): `none` (default), `pngjs` (the engine's),
 and the C# default still runs: that is why the default is `skia`, the fastest permissive decoder
 that comes from NuGet, and not `spng-zlibng` or `wuffs`, which measured faster (`bench/PERF.md`).
 
-`bench:decoders` builds the C# engine with `-p:DecoderCandidates=true` and the TS impl with
-`bun build --compile` into `~/.cache/pixelslash-perf`, then runs `bench:perf --impl` over every
-candidate in one interleaved run (its flags, such as `--env dedicated`, `--runs` or `--only`, go
-through). Peak RSS is what each process reports as `peak_rss_bytes` (its own `VmHWM`), because the
-kernel's rusage for a child carries the parent's high-water mark through fork and exec. Two cannot
-run under `--compile`: `jsquash` (its `.wasm` is not embedded) and `sharp` (its native module does
-not load); the table says so under "Could not build", with libspng and Wuffs as WASM (no maintained
+`bench:decoders` builds the C# engine with `-p:DecoderCandidates=true`, then runs
+`bench:perf --impl` over every C# decoder and TS overlay encoder in one interleaved run (its flags,
+such as `--env dedicated`, `--runs` or `--only`, go through). The TS impl's `bun build --compile`
+start-up row went in PS-210: a compiled binary does not carry `diff.wasm`, which the engine reads
+from disk. Peak RSS is what each process reports as `peak_rss_bytes` (its own `VmHWM`), because the
+kernel's rusage for a child carries the parent's high-water mark through fork and exec. The table's "Could not build" lists libspng and Wuffs as WASM (no maintained
 npm build) and ImageSharp 3.2 and 4.x (they need a licence key).
 
 ## The regression guard

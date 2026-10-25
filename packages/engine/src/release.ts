@@ -11,15 +11,6 @@ export function release(...buffers: (Uint8Array | Buffer | false | undefined)[])
   for (const bytes of buffers) if (bytes) releaseOne(bytes);
 }
 
-/** Run `work`, then free the buffers it was given: they are the caller's own and dead after it. */
-export function releasing<T>(buffers: (Uint8Array | Buffer)[], work: () => T): T {
-  try {
-    return work();
-  } finally {
-    release(...buffers);
-  }
-}
-
 function releaseOne(bytes: Uint8Array | Buffer): void {
   const store = bytes.buffer;
   if (!(store instanceof ArrayBuffer)) return;

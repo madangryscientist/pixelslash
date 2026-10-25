@@ -1,5 +1,7 @@
-/** The perceptual colour maths of the pixel diff (moved out of `diff.ts` unchanged, PS-204). */
-import type { Raster } from "./diff-probe.ts";
+/**
+ * The perceptual colour maths the shift labels use (moved out of `diff.ts` unchanged, PS-204). The
+ * pixel loop and its anti-alias test run in `diff.wasm` (PS-210).
+ */
 
 /** Largest YIQ delta (squared, weighted) between black and white. */
 export const MAX_YIQ_DELTA = 35215;
@@ -36,57 +38,4 @@ export function colourDelta(a: Uint8Array, ia: number, b: Uint8Array, ib: number
   const dq = qa - qb;
   const delta = 0.5053 * dy * dy + 0.299 * di * di + 0.1957 * dq * dq;
   return dy > 0 ? -delta : delta;
-}
-
-/** Brightness difference of a neighbour against the centre pixel of the same shot. */
-function brightnessDelta(d: Uint8Array, centre: number, neighbour: number): number {
-  return lumaIq(d, centre)[0] - lumaIq(d, neighbour)[0];
-}
-
-function sameRgba(d: Uint8Array, a: number, b: number): boolean {
-  return d[a] === d[b] && d[a + 1] === d[b + 1] && d[a + 2] === d[b + 2] && d[a + 3] === d[b + 3];
-}
-
-/** In-bounds 8-neighbourhood of (x, y), as [x, y] pairs. */
-function neighbours(img: Raster, x: number, y: number): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let ny = Math.max(y - 1, 0); ny <= Math.min(y + 1, img.height - 1); ny++) {
-    for (let nx = Math.max(x - 1, 0); nx <= Math.min(x + 1, img.width - 1); nx++) {
-      if (nx !== x || ny !== y) out.push([nx, ny]);
-    }
-  }
-  return out;
-}
-
-/** More than two of the 8 neighbours share the pixel's exact colour: it sits in a flat area. */
-function hasManySiblings(img: Raster, x: number, y: number): boolean {
-  const at = (y * img.width + x) << 2;
-  const same = neighbours(img, x, y).filter(([nx, ny]) =>
-    sameRgba(img.data, at, (ny * img.width + nx) << 2),
-  );
-  return same.length > 2;
-}
-
-type Extreme = { delta: number; x: number; y: number };
-
-/**
- * Whether (x, y) is an anti-aliased edge pixel of `img` (Vysniauskas, "On the detection of
- * anti-aliased pixels", 2009): its neighbours run both darker and lighter, few match it, and the
- * extreme neighbour sits in a flat area in both shots, i.e. the edge is a real, hard one.
- */
-export function isAntialiased(img: Raster, x: number, y: number, other: Raster): boolean {
-  const centre = (y * img.width + x) << 2;
-  let equal = 0;
-  const min: Extreme = { delta: 0, x: 0, y: 0 };
-  const max: Extreme = { delta: 0, x: 0, y: 0 };
-  for (const [nx, ny] of neighbours(img, x, y)) {
-    const delta = brightnessDelta(img.data, centre, (ny * img.width + nx) << 2);
-    if (delta === 0) equal++;
-    else if (delta < min.delta) Object.assign(min, { delta, x: nx, y: ny });
-    else if (delta > max.delta) Object.assign(max, { delta, x: nx, y: ny });
-  }
-  if (equal > 2 || min.delta === 0 || max.delta === 0) return false;
-  const flatBoth = (e: Extreme) =>
-    hasManySiblings(img, e.x, e.y) && hasManySiblings(other, e.x, e.y);
-  return flatBoth(min) || flatBoth(max);
 }

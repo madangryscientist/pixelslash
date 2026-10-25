@@ -76,14 +76,13 @@ export {
 export {
   DEFAULT_THRESHOLD,
   diffPngs,
-  diffRasters,
   type DiffIgnore,
   type DiffOptions,
   type IgnoreRect,
   type PixelDiff,
   type SettledBy,
 } from "./diff.ts";
-export type { DiffPhase, DiffProbe, Raster } from "./diff-probe.ts";
+export type { Raster } from "./diff-probe.ts";
 export {
   baselinesInto,
   checkAgainstServer,

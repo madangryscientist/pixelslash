@@ -1,18 +1,18 @@
 /**
- * The self-host's diff sidecar (PS-203): the server diff with the napi-image codec. workerd cannot
- * load a native addon, so on a self-host the Worker sends each shot's two PNGs here over loopback
- * (`src/diff/sidecar.ts`) and gets back what `diffPngs` returns. It is the engine's own `diffPngs`
- * with the CLI's codec (PS-185), the same options and ignore areas: only the decode and the encode
- * are native, and `png-native.ts` falls back to pngjs for any file it does not hold equal.
+ * The self-host's diff sidecar (PS-203): the server diff in a Bun process of its own. On a self-host
+ * the Worker sends each shot's two PNGs here over loopback (`src/diff/sidecar.ts`) and gets back
+ * what `diffPngs` returns: the engine's own `diffPngs`, the same `diff.wasm` the Worker and the CLI
+ * run (PS-210), with the same options and ignore areas. It stays because a burst of full-page
+ * shots diffed inside workerd peaked over the self-host unit's MemoryHigh, and here it does not
+ * (PS-210's memory check, in the commit that kept it).
  *
  * Bound to 127.0.0.1 and nothing else is served: the shots come from the Worker on the same machine
  * and go nowhere (invariant 4). Nothing is written to disk. Opt-in: the Worker calls it only when
- * `DIFF_SIDECAR_URL` is set, and falls back to pngjs in-process when it is down or errors. See
+ * `DIFF_SIDECAR_URL` is set, and diffs in-process when it is down or errors. See
  * apps/web/README.md, "The diff sidecar".
  */
 import { Buffer } from "node:buffer";
 import { diffPngs } from "@pixelslash/engine/diff";
-import { useNativePngCodec } from "@pixelslash/engine/png-native";
 import { release } from "@pixelslash/engine/release";
 import { SIDECAR_PATH, decodeRequest, encodeResponse } from "../../src/diff/sidecar-wire.ts";
 
@@ -45,7 +45,7 @@ async function handle(req: Request): Promise<Response> {
     try {
       result = diffPngs(main, branch, options, ignore);
     } catch (e) {
-      // 422: the Worker measures it in-process, and pngjs reports the same bad file in its own words.
+      // 422: the Worker measures it in-process, and reports the same bad file in the same words.
       log(`failed: ${messageOf(e)}`);
       return failure(422, messageOf(e));
     }
@@ -62,7 +62,6 @@ async function handle(req: Request): Promise<Response> {
   }
 }
 
-const native = await useNativePngCodec();
 const port = Number(process.env["PIXELSLASH_DIFF_SIDECAR_PORT"] || DEFAULT_PORT);
 const server = Bun.serve({
   hostname: "127.0.0.1",
@@ -70,8 +69,4 @@ const server = Bun.serve({
   maxRequestBodySize: MAX_BODY_BYTES,
   fetch: handle,
 });
-// Without the addon the sidecar still answers, with pngjs: slower, never different.
-log(
-  `diff sidecar on http://${server.hostname}:${server.port}${SIDECAR_PATH} ` +
-    `(codec: ${native ? "napi-image" : "pngjs, the addon did not load"})`,
-);
+log(`diff sidecar on http://${server.hostname}:${server.port}${SIDECAR_PATH} (diff.wasm)`);

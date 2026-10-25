@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import {
@@ -8,7 +8,6 @@ import {
   type PixelDiff,
   diffPngs,
 } from "@pixelslash/engine/diff";
-import { PNG } from "pngjs";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { png } from "../../e2e/png";
 import { resetFallbackLog, sidecarDiff, sidecarEndpoint } from "./sidecar";
@@ -16,10 +15,9 @@ import { context, onlyShot, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 
 /**
- * The self-host's diff sidecar (PS-203) against the in-process pngjs diff. The real sidecar runs as
- * its own process, with the napi-image codec, as systemd runs it. Its overlay is encoded natively,
- * so the file bytes differ from pngjs's (PS-185); what is held equal is every field of the result
- * and the overlay's decoded pixels.
+ * The self-host's diff sidecar (PS-203) against the in-process diff. The real sidecar runs as its
+ * own process, as systemd runs it. Both run `diff.wasm` (PS-210), so every field of the result is
+ * held equal, the overlay's bytes included.
  */
 
 const ROOT = join(import.meta.dirname, "..", "..", "..", "..");
@@ -45,9 +43,7 @@ beforeAll(async () => {
   reader.releaseLock();
   // Its per-diff log lines are drained, so a full pipe never stalls it.
   void proc.stdout.pipeTo(new WritableStream());
-  // The equality below means nothing if the sidecar fell back to pngjs itself.
-  if (!said.includes("codec: napi-image"))
-    throw new Error(`the sidecar has no native codec: ${said}`);
+  if (!said.includes("(diff.wasm)")) throw new Error(`the sidecar did not say its engine: ${said}`);
   url = /http:\/\/127\.0\.0\.1:\d+/.exec(said)?.[0] ?? "";
   if (!url) throw new Error(`the sidecar did not say where it listens: ${said}`);
 }, 30_000);
@@ -65,36 +61,22 @@ function client(base: string, deps: { timeoutMs?: number } = {}) {
 
 const hash = (data: Uint8Array) => new Bun.CryptoHasher("sha256").update(data).digest("hex");
 
-/** The result with the overlay as its decoded pixels: what the sidecar must give pngjs's. */
+/** The result with the overlay as its hash: what the sidecar must give the in-process diff's. */
 function comparable({ overlay, ...fields }: PixelDiff) {
-  if (!overlay) return { ...fields, overlay: null };
-  const decoded = PNG.sync.read(Buffer.from(overlay));
-  return { ...fields, overlay: `${decoded.width}x${decoded.height} ${hash(decoded.data)}` };
+  return { ...fields, overlay: overlay ? hash(overlay) : null };
 }
 
-function pairs(dir: string): Array<[string, Buffer, Buffer]> {
-  return readdirSync(join(ROOT, dir)).map((name) => [
-    `${dir}/${name}`,
-    readFileSync(join(ROOT, dir, name, "base.png")),
-    readFileSync(join(ROOT, dir, name, "head.png")),
-  ]);
-}
+/** A real changed pair: the transport carries a drawn overlay and its regions intact. */
+const CORPUS = join(ROOT, "bench/corpus/real-colour-badge");
 
-describe("the sidecar gives the in-process pngjs result (PS-203)", () => {
-  test("on every bench corpus pair", async () => {
-    const diff = client(url);
-    const all = pairs("bench/corpus");
-    expect(all.length).toBeGreaterThan(60);
-    let overlays = 0;
-    for (const [name, main, branch] of all) {
-      const want = comparable(diffPngs(main, branch));
-      const got = await diff(main, branch, {}, {});
-      if (got.overlay) overlays++;
-      expect({ name, ...comparable(got) }).toEqual({ name, ...want });
-    }
-    // A sidecar that drew nothing would pass the equality on identical pairs alone.
-    expect(overlays).toBeGreaterThan(all.length / 2);
-  }, 120_000);
+describe("the sidecar gives the in-process result (PS-203)", () => {
+  test("on a bench corpus pair", async () => {
+    const main = readFileSync(join(CORPUS, "base.png"));
+    const branch = readFileSync(join(CORPUS, "head.png"));
+    const got = await client(url)(main, branch, {}, {});
+    expect(got.overlay).toBeTruthy();
+    expect(comparable(got)).toEqual(comparable(diffPngs(main, branch)));
+  });
 
   // The e2e uploads' own fixtures, with the options and ignore areas a shot can carry, which the
   // corpus pairs do not.
@@ -133,7 +115,7 @@ describe("the sidecar gives the in-process pngjs result (PS-203)", () => {
   );
 });
 
-describe("a build falls back to pngjs in-process (PS-203)", () => {
+describe("a build falls back to the in-process diff (PS-203)", () => {
   const W = 120;
   const H = 80;
   const main = shot({ width: W, height: H });
@@ -176,7 +158,7 @@ describe("a build falls back to pngjs in-process (PS-203)", () => {
   test("unset: measured in-process, said once", async () => {
     const got = await measured(undefined);
     expect(got.diffStatus).toBe("changed");
-    expect(fallbacks()).toEqual([expect.stringContaining("in-process pngjs (unset)")]);
+    expect(fallbacks()).toEqual([expect.stringContaining("in-process (unset)")]);
   });
 
   test("not on loopback: refused, measured in-process, said once", async () => {
@@ -186,7 +168,7 @@ describe("a build falls back to pngjs in-process (PS-203)", () => {
     resetFallbackLog();
     warn.mockClear();
     expect(await measured("http://192.0.2.1:4181")).toEqual(want);
-    expect(fallbacks()).toEqual([expect.stringContaining("in-process pngjs (refused)")]);
+    expect(fallbacks()).toEqual([expect.stringContaining("in-process (refused)")]);
   });
 
   test("down: measured in-process, said once, and not tried again that run", async () => {
@@ -214,7 +196,7 @@ describe("a build falls back to pngjs in-process (PS-203)", () => {
         { diffSidecar: dead },
       );
       expect(build.status).not.toBe("errored");
-      expect(fallbacks()).toEqual([expect.stringContaining("in-process pngjs (unreachable)")]);
+      expect(fallbacks()).toEqual([expect.stringContaining("in-process (unreachable)")]);
       // Three shots measured, and the sidecar tried for the first only.
       expect(connections).toBe(1);
     } finally {
@@ -233,7 +215,7 @@ describe("a build falls back to pngjs in-process (PS-203)", () => {
       resetFallbackLog();
       warn.mockClear();
       expect(await measured(`http://127.0.0.1:${failing.port}`)).toEqual(want);
-      expect(fallbacks()).toEqual([expect.stringContaining("in-process pngjs (error): ")]);
+      expect(fallbacks()).toEqual([expect.stringContaining("in-process (error): ")]);
       expect(fallbacks()[0]).toContain("HTTP 500 boom");
     } finally {
       await failing.stop(true);

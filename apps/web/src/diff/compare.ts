@@ -85,10 +85,8 @@ function sidecarOf(url: string | undefined): SidecarDiff | null {
 }
 
 /**
- * One comparer's diffs: in the sidecar when there is one, and in-process (WebAssembly in workerd,
- * or pngjs) when there is none or it fails. Either way the same engine measures with the same options, so the
- * result is the same; only the overlay's PNG bytes differ, as two encoders deflate the same pixels
- * differently.
+ * One comparer's diffs: in the sidecar when there is one, and in-process when there is none or it
+ * fails. Both run the same `diff.wasm` with the same options (PS-210), so the result is the same.
  */
 function measurer(
   diff: typeof diffPngs,
@@ -104,7 +102,7 @@ function measurer(
         return await sidecar(main, branch, options ?? {}, ignore);
       } catch (e) {
         if (!(e instanceof SidecarError)) throw e;
-        // A file the sidecar could not diff is not its failure: pngjs says why, as on Cloudflare.
+        // A file the sidecar could not diff is not its failure: the in-process diff says why, as on Cloudflare.
         if (e.kind !== "rejected") logFallbackOnce(e.kind, e.message);
         // Not reached once, not tried again this run: a hung sidecar costs the diff budget one
         // timeout, not one per shot.

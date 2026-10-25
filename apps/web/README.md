@@ -146,30 +146,31 @@ again by itself while the count falls, so the build ends with all 145 measured a
 
 ### The diff sidecar
 
-workerd cannot load a native addon, so in-process the server diff runs its hot loops in WebAssembly
-(`DIFF_WASM`, on by default since PS-207; any other value is pngjs, the slow part of a diff, see
-`bench/PERF.md`). On the self-host the Worker instead sends each
+In-process the server diff is the engine's `diff.wasm`, the CLI's diff (PS-210; there is no pngjs
+diff and no switch). On the self-host the Worker instead sends each
 shot's two PNGs to a Bun process on the same box: `deploy/lan/diff-sidecar.ts`, unit
-`pixelslash-diff`, on `127.0.0.1:4181`. It runs the engine's own `diffPngs` with the same options and
-ignore areas, with the CLI's napi-image codec (PS-185), and answers with the result and the overlay.
-The verdict, the counts and the regions are the same as in-process, and the overlay's pixels are the
-same; only its PNG bytes differ, as two encoders deflate the same pixels differently
-(`src/diff/sidecar.test.ts` holds this on every `bench/corpus` pair and the e2e fixtures).
+`pixelslash-diff`, on `127.0.0.1:4181`. It runs the engine's own `diffPngs` (the same `diff.wasm`) with the same
+options and ignore areas, and answers with the result and the overlay, so the verdict, the counts,
+the regions and the overlay's bytes are the same as in-process (`src/diff/sidecar.test.ts` holds
+this on a `bench/corpus` pair and the e2e fixtures). It stays because it keeps a burst's diffs
+out of `pixelslash-web`'s memory: on the RSS burst (`e2e/rss-burst.spec.ts`, workerd and vite together)
+PS-210 measured the in-process diff at a 1519–1588 MB peak, over the unit's `MemoryHigh=1400M`,
+and 1124 MB with the sidecar.
 
 `DIFF_SIDECAR_URL` names it, in `wrangler.jsonc`'s `env.e2e` vars only, so the CT build and the
 production e2e run use it (that run starts a sidecar of its own on a free port;
 `PIXELSLASH_E2E_NO_SIDECAR=1` runs it without one). `test:e2e:dev` starts none, so the in-process diff
-stays under an e2e run. The Cloudflare deploy never sets it and never bundles the addon. Only a
+stays under an e2e run. The Cloudflare deploy never sets it and never runs a sidecar. Only a
 loopback URL (`127.0.0.1`, `localhost`, `[::1]`) is used; any other is refused, so a typo cannot send
 shots off the box. When it is unset, refused, down, times out (15 s) or answers with an error, the
-shot is measured in-process (WebAssembly, or pngjs when `DIFF_WASM` is not `1`), and the reason is
+shot is measured in-process (the same `diff.wasm`), and the reason is
 logged once per kind, not once per shot.
 After the first shot it cannot reach, the rest of that build skips it, so a hung sidecar costs one
 timeout, not one per shot. A PNG the sidecar cannot decode is measured in-process too, without a log
-line, so pngjs reports it in its own words as on Cloudflare.
+line, so the diff reports it in its own words as on Cloudflare.
 
 ```
-server diff: in-process pngjs (unreachable): http://127.0.0.1:4181/v1/diff: Unable to connect...
+server diff: in-process (unreachable): http://127.0.0.1:4181/v1/diff: Unable to connect...
 ```
 
 The shots go over loopback to a process bound to 127.0.0.1 and nowhere else; nothing is written to

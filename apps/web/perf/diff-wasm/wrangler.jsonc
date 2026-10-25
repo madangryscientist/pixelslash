@@ -1,9 +1,0 @@
-// The PS-204 timing worker: pngjs against the WebAssembly diff, in workerd. Not deployed; `run.ts`
-// builds and serves it with `vite preview`, the way the e2e run serves the app.
-{
-  "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "pixelslash-diff-wasm-bench",
-  "compatibility_date": "2025-09-02",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "./worker.ts",
-}

@@ -73,6 +73,8 @@ RUN find /usr/share/fonts -mindepth 1 -maxdepth 1 ! -name pixelslash -exec rm -r
 COPY --from=opencode /opencode/opencode /usr/local/bin/opencode
 
 COPY packages/engine/src packages/engine/src
+# The diff's compiled module (PS-210): the CLI diffs only through it.
+COPY packages/engine/wasm/diff.wasm packages/engine/wasm/
 COPY packages/cli/src packages/cli/src
 
 WORKDIR /work

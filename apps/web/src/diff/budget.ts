@@ -34,6 +34,8 @@ export class Budget {
   async spend(work: () => Promise<void>): Promise<void> {
     const began = this.now();
     await work();
+    // The diff is synchronous: yield so the isolate answers other requests between shots.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     this.ran++;
     this.slowest = Math.max(this.slowest, this.now() - began);
   }

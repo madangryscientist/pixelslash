@@ -124,14 +124,18 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page }) 
   const samples: number[] = [];
   const sidecarSamples: number[] = [];
   const viteSamples: number[] = [];
+  const unitSamples: number[] = [];
   const idle = workerdRssMb();
   const sidecarIdle = sidecarRssMb();
   // 0 means no workerd was found in /proc, not a small number: do not print it as a result.
   expect(idle).toBeGreaterThan(0);
   const sampler = setInterval(() => {
-    samples.push(workerdRssMb());
+    const workerd = workerdRssMb();
+    const vite = viteRssMb();
+    samples.push(workerd);
     sidecarSamples.push(sidecarRssMb());
-    viteSamples.push(viteRssMb());
+    viteSamples.push(vite);
+    unitSamples.push(workerd + vite);
   }, 250);
   const home = probeHome();
   const t0 = Date.now();
@@ -163,6 +167,7 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page }) 
   const sidecarPeak = Math.max(0, ...sidecarSamples);
   const sidecarSettled = sidecarRssMb();
   const vitePeak = Math.max(0, ...viteSamples);
+  const unitPeak = Math.max(0, ...unitSamples);
   const homeFailed = homeTimes.filter((ms) => ms < 0).length;
   const homeSlowest = Math.max(0, ...homeTimes);
   const seconds = Math.round((Date.now() - t0) / 1000);
@@ -172,7 +177,7 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page }) 
       `sidecar idle=${sidecarIdle}MB peak=${sidecarPeak}MB settled10s=${sidecarSettled}MB ` +
       `mainUpload=${(mainMs / 1000).toFixed(1)}s branchUpload=${(branchMs / 1000).toFixed(1)}s ` +
       `diffSeconds=${((branchMs - mainMs) / 1000).toFixed(1)} finalises=${rounds} ` +
-      `vitePeak=${vitePeak}MB home=${homeTimes.length} probes, ${homeFailed} failed, ` +
+      `vitePeak=${vitePeak}MB unitPeak=${unitPeak}MB home=${homeTimes.length} probes, ${homeFailed} failed, ` +
       `slowest ${homeSlowest}ms` +
       (MODEL ? ` explainSeconds=${(explainMs / 1000).toFixed(1)}` : "") +
       "\n",
