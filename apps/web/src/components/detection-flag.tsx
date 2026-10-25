@@ -207,7 +207,6 @@ function FlagForm({
         value={note}
         maxLength={200}
         onChange={(e) => setNote(e.target.value)}
-        className="w-full px-3"
       />
       <AreaPicker draft={draft} />
       {error && (

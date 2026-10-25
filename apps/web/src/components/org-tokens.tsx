@@ -85,7 +85,8 @@ function IssueForm({ orgId, onIssued }: { orgId: string; onIssued: (token: strin
         placeholder="Token name, e.g. monorepo CI"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="min-w-0 flex-1 px-3"
+        width="auto"
+        className="min-w-0 flex-1"
       />
       <ActionButton
         type="submit"

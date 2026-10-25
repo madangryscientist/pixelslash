@@ -1,3 +1,4 @@
+import { KeyValue, KeyValueList } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
@@ -22,15 +23,6 @@ function Heading({ children }: { children: ReactNode }) {
     <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
       {children}
     </h2>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-slate-600">{label}</dt>
-      <dd className="text-right tabular-nums">{children}</dd>
-    </div>
   );
 }
 
@@ -70,10 +62,10 @@ function Provenance({ snapshot }: { snapshot: SnapshotView }) {
   if (!snapshot.measuredBy) return null;
   return (
     <>
-      <Row label="Measured by">
+      <KeyValue label="Measured by">
         <span data-testid="measured-by">{MEASURED_BY[snapshot.measuredBy]}</span>
-      </Row>
-      <Row label="Engine">{snapshot.engineVersion ?? "unknown"}</Row>
+      </KeyValue>
+      <KeyValue label="Engine">{snapshot.engineVersion ?? "unknown"}</KeyValue>
     </>
   );
 }
@@ -91,9 +83,9 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
             {snapshot.diffError}
           </p>
         )}
-        <dl className="mt-2 space-y-1 text-sm empty:hidden">
+        <KeyValueList className="mt-2 empty:hidden">
           <Provenance snapshot={snapshot} />
-        </dl>
+        </KeyValueList>
         <SizeLine snapshot={snapshot} />
       </section>
     );
@@ -111,19 +103,19 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
   return (
     <section>
       <Heading>Measured</Heading>
-      <dl className="space-y-1 text-sm">
-        <Row label="Changed px">{formatNumber(result.changedPixels)}</Row>
-        <Row label="Changed regions">{boxes}</Row>
-        <Row label="Anti-aliased px">{formatNumber(result.antialiasedPixels)}</Row>
-        <Row label="Ignored px">{formatNumber(result.ignoredPixels)}</Row>
-        <Row label="Specks dropped">
+      <KeyValueList>
+        <KeyValue label="Changed px">{formatNumber(result.changedPixels)}</KeyValue>
+        <KeyValue label="Changed regions">{boxes}</KeyValue>
+        <KeyValue label="Anti-aliased px">{formatNumber(result.antialiasedPixels)}</KeyValue>
+        <KeyValue label="Ignored px">{formatNumber(result.ignoredPixels)}</KeyValue>
+        <KeyValue label="Specks dropped">
           {result.specks.count} ({formatNumber(result.specks.pixels)} px)
-        </Row>
-        <Row label="Compared at">
+        </KeyValue>
+        <KeyValue label="Compared at">
           {result.width}×{result.height}
-        </Row>
+        </KeyValue>
         <Provenance snapshot={snapshot} />
-      </dl>
+      </KeyValueList>
       <SizeLine snapshot={snapshot} />
     </section>
   );
@@ -134,16 +126,16 @@ function Environment({ snapshot }: { snapshot: SnapshotView }) {
   return (
     <section>
       <Heading>Captured in</Heading>
-      <dl className="space-y-1 text-sm">
-        <Row label="Platform">{snapshot.platform}</Row>
-        <Row label="Browser">{snapshot.browser}</Row>
-        <Row label="Viewport">{snapshot.viewport}</Row>
-        <Row label="Colour scheme">
+      <KeyValueList>
+        <KeyValue label="Platform">{snapshot.platform}</KeyValue>
+        <KeyValue label="Browser">{snapshot.browser}</KeyValue>
+        <KeyValue label="Viewport">{snapshot.viewport}</KeyValue>
+        <KeyValue label="Colour scheme">
           <span data-testid="color-scheme" className="font-mono text-xs">
             prefers-color-scheme: {snapshot.theme}
           </span>
-        </Row>
-      </dl>
+        </KeyValue>
+      </KeyValueList>
     </section>
   );
 }
@@ -179,14 +171,14 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
   };
   const allDefault = OPTION_KEYS.every((key) => used[key] === undefined);
   const list = (
-    <dl data-testid="diff-options" className="space-y-1 text-sm">
+    <KeyValueList data-testid="diff-options">
       {OPTION_KEYS.map((key) => {
         const source = sourceOf(key);
         return (
           <div key={key}>
-            <Row label={key}>
+            <KeyValue label={key}>
               <span data-testid={`option-${key}`}>{used[key] ?? "engine default"}</span>
-            </Row>
+            </KeyValue>
             {source && (
               <p data-testid={`source-${key}`} className="text-xs text-slate-500">
                 {source}
@@ -195,7 +187,7 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
           </div>
         );
       })}
-    </dl>
+    </KeyValueList>
   );
   return (
     <section>

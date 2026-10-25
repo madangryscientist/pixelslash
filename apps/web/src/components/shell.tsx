@@ -1,5 +1,5 @@
 import { Link, getRouteApi } from "@tanstack/react-router";
-import { IconButton } from "@hackcove/ui";
+import { AppShellBrand, IconButton } from "@hackcove/ui";
 import { useSyncExternalStore } from "react";
 import { chooseTheme, currentTheme, subscribeToTheme } from "#/lib/theme";
 import { useHydrated } from "#/lib/use-hydrated";
@@ -81,19 +81,28 @@ function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }
   );
 }
 
-/**
- * The bar on every page, one row in the AppShell header: the mark and wordmark, the theme toggle
- * and, when someone is signed in, who they are and Sign out. The viewer comes from the root loader.
- */
-export function AppHeader() {
+/** The mark and wordmark as one link home: the app for someone signed in, the landing page otherwise. */
+export function AppBrand() {
+  const { viewer } = rootRoute.useLoaderData();
+  return (
+    <AppShellBrand
+      logo={<Logo />}
+      label="PixelSlash"
+      // Not `{...props}`: its `target?: string | undefined` is refused by Link under exactOptionalPropertyTypes.
+      render={({ className, children }) => (
+        <Link to={viewer ? "/orgs" : "/"} className={className}>
+          {children}
+        </Link>
+      )}
+    />
+  );
+}
+
+/** The end of the AppShell header: the theme toggle and, when someone is signed in, who they are and Sign out. */
+export function AppControls() {
   const { viewer } = rootRoute.useLoaderData();
   return (
     <>
-      <Link to={viewer ? "/orgs" : "/"} className="flex items-center gap-2 font-semibold">
-        <Logo />
-        PixelSlash
-      </Link>
-      <span className="ml-auto" />
       <ThemeToggle />
       {viewer && <UserMenu viewer={viewer} />}
     </>

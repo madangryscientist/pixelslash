@@ -99,14 +99,15 @@ function IssueForm({ onIssued }: { onIssued: (token: string) => void }) {
         value={name}
         disabled={!hydrated}
         onChange={(e) => setName(e.target.value)}
-        className="min-w-0 flex-1 px-3"
+        width="auto"
+        className="min-w-0 flex-1"
       />
       <Select
         aria-label="Expires"
         value={days}
         disabled={!hydrated}
         onChange={(e) => setDays(e.target.value)}
-        className="w-auto! px-3"
+        width="auto"
       >
         {TOKEN_EXPIRY_DAYS.map((d) => (
           <option key={d} value={String(d)}>

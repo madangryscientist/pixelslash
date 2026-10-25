@@ -1,4 +1,4 @@
-import { appShellRootClass } from "@hackcove/ui";
+import { appShellRootClassFor } from "@hackcove/ui";
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { THEME_SCRIPT } from "#/lib/theme";
@@ -27,7 +27,7 @@ function RootDocument({ children }: { children: ReactNode }) {
     // The class legitimately differs from the server's markup when the script resolved the system theme.
     <html
       lang="en"
-      className={theme === "dark" ? `dark ${appShellRootClass}` : appShellRootClass}
+      className={appShellRootClassFor(theme === "dark" ? "dark" : "light")}
       suppressHydrationWarning
     >
       <head>

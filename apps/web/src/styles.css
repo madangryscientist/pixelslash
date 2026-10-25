@@ -20,7 +20,7 @@
 
 /*
  * The page behind the cards. The components' own slate/white is the light theme; the Mocha theme
- * file remaps it under `.dark` on <html> and paints mantle there (0.2.4), but that does not reach
+ * file remaps it under `.dark` on <html> and paints mantle there (#181825), but that does not reach
  * the app root: without the dark rule below, every dark shot changes (checked by pixel diff). So
  * the canvas is set here: slate-50 in light, Mocha mantle in dark, so a card (white / base) lifts
  * off it in both.
@@ -35,7 +35,7 @@
 }
 
 /*
- * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.2.4 does not remap.
+ * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.2.5 does not remap.
  * Without these a divider would be a light-theme colour on a dark surface. They sit here, not in a
  * fork of the theme: delete a rule when the theme ships it. The theme already ships the text-red,
  * border-amber and violet-hover rules with the same values, so they are not repeated.

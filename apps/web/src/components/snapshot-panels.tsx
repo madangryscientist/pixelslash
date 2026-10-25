@@ -1,4 +1,4 @@
-import { Container, Pill } from "@hackcove/ui";
+import { Container, KeyValue, KeyValueList, Pill } from "@hackcove/ui";
 import { type ReactNode, useEffect, useRef } from "react";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
@@ -228,16 +228,13 @@ export function ShortcutHelp({ onClose }: { onClose: () => void }) {
       <h2 id="shortcut-help-title" className="mb-3 text-[17px] font-semibold">
         Keyboard shortcuts
       </h2>
-      <dl className="space-y-1.5 text-sm">
+      <KeyValueList>
         {SHORTCUTS.map(([key, what]) => (
-          <div key={key} className="flex items-center justify-between">
-            <dt className="text-slate-600">{what}</dt>
-            <dd>
-              <kbd className="rounded border border-slate-300 px-1.5 font-mono text-xs">{key}</kbd>
-            </dd>
-          </div>
+          <KeyValue key={key} label={what}>
+            <kbd className="rounded border border-slate-300 px-1.5 font-mono text-xs">{key}</kbd>
+          </KeyValue>
         ))}
-      </dl>
+      </KeyValueList>
       <form method="dialog" className="mt-4 flex justify-end">
         <button
           type="submit"

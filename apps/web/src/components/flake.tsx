@@ -173,7 +173,6 @@ function MarkFlakyForm({
         value={note}
         maxLength={200}
         onChange={(e) => setNote(e.target.value)}
-        className="w-full px-3"
       />
       {error && (
         <p role="alert" className="text-red-700">

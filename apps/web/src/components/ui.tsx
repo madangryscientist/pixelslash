@@ -2,7 +2,7 @@ import { AppShell, Input, Pill } from "@hackcove/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
 import { ActionButton } from "./action-button";
-import { AppHeader } from "./shell";
+import { AppBrand, AppControls } from "./shell";
 
 export { useHydrated };
 
@@ -47,7 +47,7 @@ export function Page({ bleed = false, children }: { bleed?: boolean; children: R
   const hydrated = useHydrated();
   return (
     <div className="app-canvas" data-hydrated={hydrated}>
-      <AppShell header={<AppHeader />} bleed={bleed}>
+      <AppShell brand={<AppBrand />} controls={<AppControls />} bleed={bleed}>
         {children}
       </AppShell>
     </div>
@@ -100,7 +100,8 @@ export function InlineForm({
         value={value}
         disabled={!hydrated}
         onChange={(e) => setValue(e.target.value)}
-        className="min-w-0 flex-1 px-3"
+        width="auto"
+        className="min-w-0 flex-1"
       />
       <ActionButton
         type="submit"

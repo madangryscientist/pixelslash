@@ -178,7 +178,7 @@ function ModelFields({
           disabled={!hydrated}
           onChange={(e) => set({ baseUrl: e.target.value })}
           data-testid="model-base-url"
-          className="mt-0.5 w-full px-3"
+          className="mt-0.5"
         />
       </label>
       <label className="block">
@@ -189,7 +189,7 @@ function ModelFields({
           disabled={!hydrated}
           onChange={(e) => set({ model: e.target.value })}
           data-testid="model-name"
-          className="mt-0.5 w-full px-3"
+          className="mt-0.5"
         />
       </label>
       <span className="block text-xs text-slate-500 sm:col-span-2">
@@ -208,7 +208,7 @@ function ModelFields({
           disabled={!hydrated}
           onChange={(e) => set({ apiKey: e.target.value })}
           data-testid="model-key"
-          className="mt-0.5 w-full px-3"
+          className="mt-0.5"
         />
         <span className="block text-xs text-slate-500">
           Stored for this {owner} and never shown again. A new base URL needs its key again.
