@@ -2,7 +2,13 @@ import { copyFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser } from "playwright";
-import { capturePair, launchBrowser, shotPair, type CapturePage } from "./capture.ts";
+import {
+  capturePair,
+  launchBrowser,
+  shotPair,
+  type CapturePage,
+  type PairSteps,
+} from "./capture.ts";
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
@@ -19,7 +25,7 @@ import { renderIndex, renderPixelReport, renderReport, type RouteRow } from "./r
 import { joinOrigin, routeOutNames, routeSlug } from "./routes.ts";
 import { writeRunFiles, writeRunTimings, type RunManifest } from "./run.ts";
 import { withTimings } from "./report-timings.ts";
-import { buildTimings, timed, type ShotTiming, type Timings } from "./timings.ts";
+import { buildTimings, elapsed, timed, type ShotTiming, type Timings } from "./timings.ts";
 
 export type Deps = {
   spawn?: SpawnProc;
@@ -69,7 +75,9 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
   const routes = opts.routes ?? [];
   const pixel = !opts.ds;
   await mkdir(opts.out, { recursive: true });
+  const launching = performance.now();
   const browser = await routeBrowser(opts, deps);
+  const browserLaunchMs = browser ? elapsed(launching) : undefined;
   const rows: RouteRow[] = [];
   const shots: ShotTiming[] = [];
   const already: Violation[] = [];
@@ -90,7 +98,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
     await browser?.close();
   }
   const reportPath = join(opts.out, "index.html");
-  const timings = buildTimings(started, shots);
+  const timings = buildTimings(started, shots, browserLaunchMs);
   await Bun.write(reportPath, withTimings(renderIndex(rows, pixel), timings));
   const result: CompareResult = { already, fresh, reportPath, skipped, out: opts.out, timings };
   if (skipReason) result.skipReason = skipReason;
@@ -139,7 +147,7 @@ async function takeShots(
   opts: CompareOptions,
   deps: Deps,
   browser: Browser | undefined,
-): Promise<void> {
+): Promise<PairSteps | undefined> {
   const liveDest = join(opts.out, "live.png");
   const localDest = join(opts.out, "local.png");
   if (opts.livePng && opts.localPng) {
@@ -147,12 +155,12 @@ async function takeShots(
     if (!existsSync(opts.localPng)) throw new UsageError(`local-png not found: ${opts.localPng}`);
     await copyFile(opts.livePng, liveDest);
     await copyFile(opts.localPng, localDest);
-    return;
+    return undefined;
   }
   if (!opts.live || !opts.local) throw new UsageError("need --live URL --local URL");
   const pair = { liveUrl: opts.live, localUrl: opts.local, liveDest, localDest };
-  if (browser) await shotPair(browser, pair, opts.width);
-  else await capturePair(pair, opts.width, deps.capture);
+  if (browser) return { steps: await shotPair(browser, pair, opts.width) };
+  return capturePair(pair, opts.width, deps.capture);
 }
 
 async function judgePair(
@@ -177,6 +185,19 @@ async function judgePair(
   }
 }
 
+/** The pair's one shot timing: its diff, and its capture with the capture's parts when it shot. */
+function pairShot(
+  name: string,
+  diffMs: number,
+  opts: CompareOptions,
+  captured: { ms: number; value: PairSteps | undefined },
+): ShotTiming {
+  const shot: ShotTiming = { name, diffMs, ...captured.value?.steps };
+  // Existing PNGs are only copied: no capture happened, so no capture timing.
+  if (!(opts.livePng && opts.localPng)) shot.captureMs = captured.ms;
+  return shot;
+}
+
 export async function compare(
   opts: CompareOptions,
   deps: Deps = {},
@@ -199,13 +220,12 @@ export async function compare(
     ignore: { main: opts.ignore, branch: opts.ignore },
   });
   const manifest = written.manifest;
-  const shot: ShotTiming = { name: routePath ?? "page", diffMs: written.diffMs };
-  // Existing PNGs are only copied: no capture happened, so no capture timing.
-  if (!(opts.livePng && opts.localPng)) shot.captureMs = captured.ms;
+  const shot = pairShot(routePath ?? "page", written.diffMs, opts, captured);
+  const launched = captured.value?.browserLaunchMs;
 
   const reportPath = join(opts.out, "report.html");
   if (!opts.ds) {
-    const timings = buildTimings(started, [shot]);
+    const timings = buildTimings(started, [shot], launched);
     const html = renderPixelReport({
       path: routePath,
       changedPixels: manifest.changedPixels,
@@ -237,7 +257,7 @@ export async function compare(
   const verdict = judged.value;
   // A run with no judge has no judge timing, not 0.
   if (!verdict.skipped) shot.judgeMs = judged.ms;
-  const timings = buildTimings(started, [shot]);
+  const timings = buildTimings(started, [shot], launched);
   const dsOut = join(opts.out, "ds");
   await mkdir(dsOut, { recursive: true });
   for (const name of components) {

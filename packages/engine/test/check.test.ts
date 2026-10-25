@@ -83,6 +83,7 @@ function session(): CaptureSession {
     config,
     routes: config.routes,
     fingerprint: FP,
+    browserLaunchMs: 0,
     shoot: async (route) => ({ png: (shots[route.name] ?? png)(), ignore: [] }),
     close: async () => {},
   };

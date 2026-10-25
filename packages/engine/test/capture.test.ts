@@ -30,7 +30,13 @@ describe("settleCapture", () => {
     await tick();
     expect(calls).toEqual(["evaluate", "waitForFunction", "loadState:networkidle", "evaluate"]);
     release();
-    await done;
+    // Each condition is timed apart (PS-195).
+    expect(await done).toEqual({
+      fontsMs: expect.any(Number),
+      imagesMs: expect.any(Number),
+      networkIdleMs: expect.any(Number),
+      framesMs: expect.any(Number),
+    });
   });
 
   test("is bounded: a page that never settles rejects at the timeout", async () => {

@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { PNG } from "pngjs";
 import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
@@ -9,10 +7,7 @@ import {
   type Composition,
   type CompositionLibrary,
 } from "./composition.ts";
-import { writeGapsReport } from "./composition-report.ts";
 import {
-  resolveDiff,
-  resolveFlaky,
   resolveIgnore,
   type CaptureConfig,
   type FlakyPolicy,
@@ -24,7 +19,6 @@ import {
 } from "./config.ts";
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
 import { CaptureError } from "./errors.ts";
-import { clearFlakeOutput } from "./flake-upload.ts";
 import {
   BARE,
   fcList,
@@ -35,10 +29,10 @@ import {
 } from "./fingerprint.ts";
 import { maskLocators, measureIgnore, toImageRects } from "./page-areas.ts";
 import { joinOrigin } from "./routes.ts";
+import { captureInto } from "./capture-into.ts";
 import { signIn, type Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
-import { elapsed, type ShotTiming } from "./timings.ts";
-import { identity } from "./manifest.ts";
+import { elapsed, type CaptureSteps, type SettleSteps, type ShotTiming } from "./timings.ts";
 import { awaitStory, storybookRoutes } from "./storybook.ts";
 
 /** Masked regions are painted this colour, by Playwright for selectors and by us for rectangles. */
@@ -98,6 +92,7 @@ export type SnapshotResult = {
 };
 
 export { toImageRects };
+export { captureInto } from "./capture-into.ts";
 
 /** Launch flags that take host-specific rendering choices out of the picture. */
 const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];
@@ -135,19 +130,26 @@ export function paintRects(png: Buffer, rects: MaskRect[], scale: number): Buffe
   return PNG.sync.write(img);
 }
 
-/** Load the page and wait for it to settle; returns how long that took, the page's own time. */
-async function open(page: Page, url: string, route: Route, timeoutMs: number): Promise<number> {
+type Opened = { navigateMs: number; settleMs: number; settle: SettleSteps };
+
+/** Load the page and wait for it to settle; returns how long each took, the page's own time. */
+async function open(page: Page, url: string, route: Route, timeoutMs: number): Promise<Opened> {
   page.setDefaultNavigationTimeout(timeoutMs);
   const loading = performance.now();
   const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
+  const settling = performance.now();
   if (!resp) throw new CaptureError(`capture failed for ${url}: no response`);
   if (resp.status() >= 400)
     throw new CaptureError(`capture failed for ${url}: HTTP ${resp.status()}`);
   // A story's own render signal and the generic settle share one budget.
   const started = Date.now();
   if (route.storybook) await awaitStory(page, route.name, timeoutMs);
-  await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
-  return performance.now() - loading;
+  const settle = await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
+  return {
+    navigateMs: settling - loading,
+    settleMs: performance.now() - settling,
+    settle,
+  };
 }
 
 type Shot = {
@@ -171,7 +173,10 @@ type Shot = {
 export type Shoot = {
   png: Buffer;
   ignore: IgnoreRect[];
-  settleMs?: number;
+  /** Navigate and settle together, unrounded: `pixelslash dev` adds these up. */
+  loadMs?: number;
+  /** Navigate, settle and screenshot apart (PS-195). */
+  steps?: CaptureSteps;
   composition?: Composition;
 };
 
@@ -200,11 +205,12 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   try {
     await pinClock(context, stabilise);
     const page = await context.newPage();
-    const settleMs = await open(page, url, route, stabilise.timeoutMs);
+    const opened = await open(page, url, route, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");
     const locators = await maskLocators(page, selectors, (selector) =>
       shot.warn(`warning: mask "${selector}" matched nothing on ${route.path}`),
     );
+    const shooting = performance.now();
     const png = await page.screenshot({
       fullPage: true,
       animations: stabilise.animations ? "disabled" : "allow",
@@ -212,6 +218,12 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
       mask: locators,
       maskColor: MASK_COLOR,
     });
+    const steps: CaptureSteps = {
+      navigateMs: Math.round(opened.navigateMs),
+      settleMs: Math.round(opened.settleMs),
+      screenshotMs: elapsed(shooting),
+      settle: opened.settle,
+    };
     // The PNG's size from its IHDR chunk, without decoding the image.
     const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
     const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
@@ -229,7 +241,8 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
         stabilise.deviceScaleFactor,
       ),
       ignore,
-      settleMs,
+      loadMs: opened.navigateMs + opened.settleMs,
+      steps,
       ...(composition && { composition }),
     };
   } catch (e) {
@@ -251,6 +264,8 @@ export type CaptureSession = {
   config: CaptureConfig;
   routes: Route[];
   fingerprint: Fingerprint;
+  /** How long the browser took to launch (PS-195). */
+  browserLaunchMs: number;
   shoot: (route: Route, variant: Variant) => Promise<Shoot>;
   close: () => Promise<void>;
 };
@@ -277,7 +292,9 @@ export async function openCaptureSession(
   };
   try {
     if (config.start) stopApp = await startApp(config.start);
+    const launching = performance.now();
     const launched = await launchChromium(LAUNCH_ARGS);
+    const browserLaunchMs = elapsed(launching);
     browser = launched;
     const fingerprint: Fingerprint = { image, browser: `chromium ${launched.version()}`, fonts };
     // The app is up now, so the Storybook's index can be read.
@@ -295,6 +312,7 @@ export async function openCaptureSession(
       config,
       routes,
       fingerprint,
+      browserLaunchMs,
       shoot: (route, variant) =>
         shoot(launched, {
           url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
@@ -322,45 +340,6 @@ export function recapture(
   const route = session.routes.find((r) => r.name === entry.name);
   const variant = session.config.variants.find((v) => v.name === entry.variant.name);
   return route && variant ? session.shoot(route, variant) : Promise.resolve(undefined);
-}
-
-/** Every route × variant of the session's config into `out`, and `out/manifest.json`. */
-export async function captureInto(session: CaptureSession, out: string): Promise<SnapshotResult> {
-  const { config, routes, fingerprint } = session;
-  await mkdir(out, { recursive: true });
-  await clearFlakeOutput(out);
-  const snapshots: SnapshotEntry[] = [];
-  const shots: ShotTiming[] = [];
-  for (const variant of config.variants) {
-    for (const route of routes) {
-      const file = `${route.name}/${variant.name}.png`;
-      const started = performance.now();
-      const { png, ignore, composition } = await session.shoot(route, variant);
-      const captureMs = elapsed(started);
-      await mkdir(join(out, route.name), { recursive: true });
-      await Bun.write(join(out, file), png);
-      const entry: SnapshotEntry = {
-        name: route.name,
-        path: route.path,
-        variant,
-        tags: route.tags,
-        diff: resolveDiff(config, route, variant),
-        ignore,
-        flaky: resolveFlaky(config, route),
-        file,
-        fingerprint,
-        ...(composition && { composition }),
-      };
-      snapshots.push(entry);
-      shots.push({ name: identity(entry), captureMs });
-    }
-  }
-  const manifest: SnapshotManifest = { version: 1, snapshots };
-  const manifestPath = join(out, "manifest.json");
-  await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  if (!config.composition) return { manifest, manifestPath, shots };
-  const gapsPath = await writeGapsReport(out, manifest, config.composition.name);
-  return { manifest, manifestPath, shots, gapsPath };
 }
 
 /**

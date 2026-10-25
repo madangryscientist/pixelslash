@@ -45,7 +45,7 @@ function timedSession(session: CaptureSession): { session: CaptureSession; settl
   let settleMs = 0;
   const shoot: CaptureSession["shoot"] = async (route, variant) => {
     const got = await session.shoot(route, variant);
-    settleMs += got.settleMs ?? 0;
+    settleMs += got.loadMs ?? 0;
     return got;
   };
   return { session: { ...session, shoot }, settled: () => settleMs };
@@ -86,7 +86,8 @@ export async function runIteration(opts: DevRunOptions): Promise<DevIteration> {
   const { id, dir } = await newIteration(opts.store);
   const timed = timedSession(opts.session);
   const shots = join(dir, "shots");
-  const { manifest } = await captureInto(timed.session, shots);
+  // One shot at a time: `oursMs` is the run less the summed settle, which needs the shots apart.
+  const { manifest } = await captureInto(timed.session, shots, 1);
   const side = await sideOf(opts, dir, manifest.snapshots);
   const report = join(dir, "report");
   const result = await compareSnapshots({ mainDir: side.dir, branchDir: shots, out: report });

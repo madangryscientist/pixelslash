@@ -93,7 +93,10 @@ export async function captureLocal(
     const shooting = onlyRoutes(session, flags.only);
     const total = shooting.routes.length * config.variants.length;
     const result = await captureInto(watched(shooting, watch, total), flags.out);
-    return { ...result, timings: buildTimings(started, result.shots) };
+    return {
+      ...result,
+      timings: buildTimings(started, result.shots, session.browserLaunchMs),
+    };
   } finally {
     await session.close();
   }
@@ -151,7 +154,7 @@ export async function runCapture(
   });
   try {
     const result = await captureInto(session, flags.out);
-    const timings = buildTimings(started, result.shots);
+    const timings = buildTimings(started, result.shots, session.browserLaunchMs);
     printCaptured(result, io);
     // The config's retries unless the flag says otherwise; the shots were just shot here.
     const retries = flags.uploadFlags["flake-retries"] ?? String(config.flake.retries);

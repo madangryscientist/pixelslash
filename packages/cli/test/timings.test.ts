@@ -1,7 +1,17 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { join } from "node:path";
 import { run } from "../src/run.ts";
-import { DS, capture, cleanup, faintPair, newMissSpawn, readManifest, tmp } from "./support.ts";
+import {
+  DS,
+  capture,
+  cleanup,
+  faintPair,
+  newMissSpawn,
+  readManifest,
+  servePages,
+  servePaths,
+  tmp,
+} from "./support.ts";
 
 afterAll(cleanup);
 
@@ -84,4 +94,61 @@ describe("step timings (ob 1791)", () => {
     expect(b.timings).not.toHaveProperty("judgeMs");
     expect(b.timings?.shots[0]).not.toHaveProperty("judgeMs");
   });
+
+  const PARTS = {
+    navigateMs: expect.any(Number),
+    settleMs: expect.any(Number),
+    screenshotMs: expect.any(Number),
+    settle: {
+      fontsMs: expect.any(Number),
+      imagesMs: expect.any(Number),
+      networkIdleMs: expect.any(Number),
+      framesMs: expect.any(Number),
+    },
+  };
+
+  test("a URL pair splits capture into navigate, settle and screenshot, with the browser launch (PS-195)", async () => {
+    const dir = await tmp();
+    const pages = await servePages();
+    const cap = capture();
+    const argv = ["--live", pages.url("live.html"), "--local", pages.url("local.html")];
+    expect(await run([...argv, "--out", dir], cap.io, {})).toBe(0);
+    const { timings } = await readManifest(join(dir, "manifest.json"));
+    expect(timings).toMatchObject({ browserLaunchMs: expect.any(Number), ...PARTS });
+    expect(timings?.shots[0]).toMatchObject(PARTS);
+    // The settle is the network-idle wait at least. The two pages are shot at once, so their parts
+    // add up to no more than twice the pair's capture.
+    const {
+      navigateMs = 0,
+      settleMs = 0,
+      screenshotMs = 0,
+      captureMs = 0,
+      settle,
+    } = timings?.shots[0] ?? {};
+    expect(settleMs).toBeGreaterThanOrEqual(settle?.networkIdleMs ?? Infinity);
+    expect(navigateMs + settleMs + screenshotMs).toBeLessThanOrEqual(2 * captureMs);
+    const html = await Bun.file(join(dir, "report.html")).text();
+    expect(html).toContain("<th>Navigate</th>");
+    expect(html).toMatch(/browser launch \d+ ms · settle: fonts \d+ ms/);
+  }, 60_000);
+
+  test("capture --json carries the parts per shot and the launch once (PS-195)", async () => {
+    const dir = await tmp();
+    const config = join(dir, "pixelslash.config.json");
+    await Bun.write(
+      config,
+      JSON.stringify({
+        baseUrl: servePaths({ "/": "live.html" }),
+        routes: ["/"],
+        variants: [{ name: "small", viewport: { width: 400, height: 300 } }],
+      }),
+    );
+    const cap = capture();
+    const argv = ["capture", "--config", config, "--out", join(dir, "out"), "--json"];
+    const pinned = { env: { PIXELSLASH_IMAGE_VERSION: "test" }, listFonts: async () => [] };
+    expect(await run(argv, cap.io, pinned)).toBe(0);
+    const { timings } = JSON.parse(cap.stdout);
+    expect(timings).toMatchObject({ browserLaunchMs: expect.any(Number), ...PARTS });
+    expect(timings.shots[0]).toMatchObject(PARTS);
+  }, 60_000);
 });

@@ -136,6 +136,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | — | — |
 | 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | — | — |
 | 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
+| 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -172,12 +173,68 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-195 | desktop, shared | capture split into navigate, settle, screenshot and launch; pages shot at once |
 | 2026-10-25 | PS-190 | desktop, shared | where a real run's time goes: capture vs diff, CLI and server (measurement, no code) |
 | 2026-10-25 | PS-168 | desktop, dedicated | decoders and encoders: every candidate for both engines |
 | 2026-10-24 | ob 1947 | desktop, dedicated | `--env dedicated` against `--env none`: spread of p95 over median |
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · PS-195 · desktop, shared · split settle out of capture, then cut it
+
+**Settle is 83% of capture, and nearly all of settle is the network-idle wait** (capture-only, 10 shots:
+settle 5122 of 6169 ms, network idle 4867 of those). Network idle is Playwright's fixed quiet window of
+about 500 ms per page, so it is waiting, not working, and it cannot be made shorter without shooting
+early. **The cut overlaps the waits instead of shortening any:** a pair's Main and Branch are shot at
+once, and `capture` (and `check`) shoot up to four pages at once, each in its own browser context with
+its own full settle. Capture-only total −62%, long pair −28%, 5-route pair −39%; the PNGs are byte-equal.
+
+**Question.** PS-190 found capture is 68–93% of a real CLI run but could not say which part. Which part
+of capture dominates, and can it be cut inside invariant 2?
+
+**Env.** Same machine and fixtures as PS-190: Linux desktop, 12 cores, load average 1.4 to 2.0, browser
+and editor running (`shared`). Bun 1.4.2, Playwright 1.64.1, Chromium 148 headless shell,
+`fingerprint: bare`. Before is b93deff (the split, shots one at a time), after is 65668c2 (pages at once);
+both in the same session, one after the other. Fixture pages from `python3 -m http.server` on :8765 and
+:8766.
+
+**Commands.** PS-190's three, unchanged, three runs each per side (`CLI=packages/cli/src/index.ts`).
+
+**Medians over three runs, ms.** Run-level parts are sums over shots, so with pages at once they pass
+`captureMs`, and `captureMs` (also a sum) passes `totalMs`. The runs were tight: every before total is
+within 37 ms of its median and every after total within 24 ms, so p95 (= max of three) is left out.
+
+| Run | | total | capture (sum) | settle (sum) | network idle | screenshot | navigate | launch | diff |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| capture only, 10 shots | before | 6630 | 6169 | 5122 | 4867 | 734 | 64 | 40 | — |
+| | after | **2527 (−62%)** | 7088 | 5096 | 4814 | 1329 | 102 | 39 | — |
+| long pair, 1440 × 6080 | before | 2162 | 1453 | 1021 | 965 | 327 | 13 | 39 | 694 |
+| | after | **1559 (−28%)** | 846 | 1007 | 959 | 507 | 19 | 39 | 705 |
+| 5-route pair, 5 shots | before | 7.4 s | 6.3 s | 5140 | 4855 | 940 | 64 | — | 1.0 s |
+| | after | **4.5 s (−39%)** | 3.4 s | 5135 | 4857 | 1335 | 72 | — | 1.0 s |
+
+The 5-route row is from the stderr line (0.1 s) and the per-route manifests; its index carries the rest.
+
+**What moved.** Settle and network idle are the same per page before and after (every wait still runs
+in full); they now overlap. Screenshot time per page rose (734 → 1329 ms summed for 10 shots) because
+four pages encode at once on a shared CPU; it is still far below the wait it overlaps. Diff did not move.
+Fonts, images and frames together are under 6% of settle, so they were not levers.
+
+**Levers considered and not taken.** A shorter network-idle window (an own idle check instead of
+Playwright's 500 ms) would shoot earlier than today, which invariant 2 forbids without showing pixel
+equality on every page; overlapping gets more and changes nothing a page sees. More than four at once
+was not measured: the capture image runs on CI runners of unknown size, and four kept screenshot
+contention small here. Each shot keeps its own timeout while four share the CPU, so a page that
+only just settles in time alone can now time out; none of these pages came near it.
+
+**Pixels.** All 102 PNGs from the runs (diff.png left out) hashed identically across the three runs and
+before against after. In the pinned capture image (`docker build` of `git archive` main and of the
+branch), `fixtures/capture` (6 PNGs) and the PS-190 config (10 PNGs) hashed identically, PNGs and
+manifest, on both, two runs each; the 10-shot capture there went from 6.3 s to 2.2 s.
+
+**Never-settling page.** A page whose top-level `fetch` never answers still fails both a pair and
+`capture` with exit 1 after 8.2–8.6 s ("capture settle exceeded 8000ms"), as before.
 
 ### 2026-10-25 · PS-190 · desktop, shared · where a real run's time goes
 

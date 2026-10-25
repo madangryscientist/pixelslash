@@ -259,7 +259,11 @@ export async function checkAgainstServer(
     warn: client.warn,
   });
   // No upload timing: `check` only reads the server. Its requests are inside the total.
-  result.timings = buildTimings(started, mergeShots(captured, result.timings.shots));
+  result.timings = buildTimings(
+    started,
+    mergeShots(captured, result.timings.shots),
+    session.browserLaunchMs,
+  );
   await Bun.write(
     result.indexPath,
     withTimings(

@@ -47,10 +47,11 @@ export function fakeSession(settleMs = 40) {
     config,
     routes: config.routes,
     fingerprint: { image: "version:test", browser: "chromium 1", fonts: "sha256:f" },
+    browserLaunchMs: 0,
     shoot: async () => {
       page.shots++;
       await Bun.sleep(settleMs);
-      return { png: png(page.at), ignore: [], settleMs };
+      return { png: png(page.at), ignore: [], loadMs: settleMs };
     },
     close: async () => {},
   };
