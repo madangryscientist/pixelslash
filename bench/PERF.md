@@ -28,13 +28,22 @@ parallel, by default since PS-168; StbImageSharp before).
 
 ## Dashboard
 
-Best known wall time per page, and the baseline it's measured against (the same run, `env` dedicated):
+Best known wall time per page, against ts doing the same work (the same run, `env` dedicated). Every
+column decodes, diffs and finds regions, and none encodes an overlay PNG, because cs has no overlay.
+The production-shaped ts also encodes the overlay, which cs does not do, so it is shown for scale but
+is not a baseline:
 
-| Page | Baseline: ts, production-shaped | Best so far | Config | Change | Shipped cs default (skia, parallel) | Change |
-| --- | ---: | ---: | --- | ---: | ---: | ---: |
-| phone | 128.1 ms | **87.1 ms** | cs, libspng on zlib-ng, parallel | −32% | 95.3 ms | −26% |
-| desktop | 247.4 ms | **95.1 ms** | cs, libspng on zlib-ng, parallel | −62% | 105.7 ms | −57% |
-| long | 1114.8 ms | **195.0 ms** | cs, libspng on zlib-ng, parallel | −83% | 207.2 ms | −81% |
+| Page | ts, production-shaped (+ overlay) | ts, pngjs, no overlay | ts, napi-image, no overlay | Best so far | Config | vs pngjs | vs napi-image | Shipped cs default (skia, parallel) | vs pngjs | vs napi-image |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| phone | 128.1 ms | 105.5 ms | 88.0 ms | **87.1 ms** | cs, libspng on zlib-ng, parallel | −17% | −1% | 95.3 ms | −10% | +8% |
+| desktop | 247.4 ms | 163.3 ms | 122.2 ms | **95.1 ms** | cs, libspng on zlib-ng, parallel | −42% | −22% | 105.7 ms | −35% | −14% |
+| long | 1114.8 ms | 706.4 ms | 438.6 ms | **195.0 ms** | cs, libspng on zlib-ng, parallel | −72% | −56% | 207.2 ms | −71% | −53% |
+
+**Work done.** cs does less than the production engine: it has no overlay image and no ignore areas
+(`engines/dotnet/PixelSlash.Diff/Diff.cs`, "not ported"). Its numbers compare only against a ts row
+with `--overlay none`. Before 2026-10-25 this table measured "Change" against the production-shaped
+row (−32% / −62% / −83% best, −26% / −57% / −81% shipped), which credited cs for skipping the overlay
+encode.
 
 Source: the PS-168 run, 2026-10-25, `--env dedicated`. It is not comparable with the ob 1932
 dashboard (`shared`, boost on), which it replaces. The production engine (CLI and web) is still ts
@@ -119,7 +128,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 
 | # | Lever | Engine | Status | Measured effect (same run) | Ticket |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Port the diff to C# (.NET 10, StbImageSharp) | cs | ✅ measured, bench-only | wall −27% phone, −51% desktop, −68% long against ts | ob 1910 |
+| 1 | Port the diff to C# (.NET 10, StbImageSharp) | cs | ✅ measured, bench-only | wall −27% phone, −51% desktop, −68% long against ts, but ts encoded the overlay and cs did not. On equal work (PS-168, shipped cs, no overlay): −10% / −35% / −71% against pngjs, +8% / −14% / −53% against napi-image | ob 1910 |
 | 2 | Decode base and head in parallel | ts | ✅ measured, a switch | +4% phone (Worker start-up costs more than it saves), −0.3% desktop, −11% long | ob 1932 |
 | 3 | Decode base and head in parallel | cs | ✅ measured, a switch | 0% phone, −9% desktop, −22% long (285 → 224 ms) | ob 1932 |
 | 4 | Phase probe overhead (the timing itself) | ts | ✅ measured | ≤1% (24.0/24.2, 80.5/80.4, 536.6/541.9 ms) | ob 1932 |
@@ -559,7 +568,9 @@ Median ms. "self" is decode + diff as the engine reports it, and "change" is cs 
 | long | ts | 236.6 | 519.0 | 757.1 | 1132.0 | 768.9 | |
 | long | cs | 143.5 | 101.8 | 243.0 | 273.3 | 254.9 | −67.9% |
 
-The ts diff includes encoding the overlay PNG.
+The ts diff includes encoding the overlay PNG, and cs encodes none, so "change" is not equal work:
+it credits cs for skipping the encode. For an equal-work comparison see the dashboard (PS-168, ts
+with `--overlay none`).
 
 ### Tooling history
 
