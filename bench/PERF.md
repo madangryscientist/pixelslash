@@ -190,6 +190,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | planner | desktop, dedicated | ts with the overlay encode on and off, pngjs and napi-image, against cs |
 | 2026-10-25 | PS-204 | desktop, shared | the server diff's hot loops in Rust→WASM, timed in workerd |
 | 2026-10-25 | PS-203 | desktop, shared | the self-host's server diff in a Bun sidecar with napi-image |
 | 2026-10-25 | PS-195 | desktop, shared | capture split into navigate, settle, screenshot and launch; pages shot at once |
@@ -199,6 +200,44 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · planner · desktop, dedicated · the overlay encode on and off, against cs
+
+Asked for by Jacobus, so it ran on demand, not as part of a ticket. Five implementations of `bench:perf --env dedicated --runs
+10`, interleaved: ts with pngjs and napi-image, each with the overlay encode on (`--overlay pngjs`,
+`--overlay napi-image`) and off (`--overlay none`), and cs (SkiaSharp, parallel, the shipped default).
+cs encodes no overlay, so only the `none` rows are equal work for it. The host was busy (load 5 to 8,
+with a builder's gate running), but the reserved cores saw no other tasks. Raw:
+`bench/perf-results/2026-10-25T16-37-09-610Z.json`.
+
+Wall, median ms:
+
+| Page | ts pngjs + overlay | ts pngjs, none | ts napi-image + overlay | ts napi-image, none | cs | cs vs pngjs, none | cs vs napi-image, none |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| phone | 138.7 | 112.2 | 99.5 | 97.4 | 103.1 | −8% | +6% |
+| desktop | 252.5 | 174.9 | 140.4 | 136.3 | 115.9 | −34% | −15% |
+| long | 1139.0 | 721.0 | 564.2 | 517.9 | 243.1 | −66% | −53% |
+
+The overlay encode's own phase (median ms):
+
+| Page | pngjs | napi-image |
+| --- | ---: | ---: |
+| phone | 24.2 | 2.5 |
+| desktop | 78.3 | 6.1 |
+| long | 412.9 | 48.1 |
+
+- **On equal work, cs's gain is about half of what the old tables said.** On the long page it is −53%
+  against the fastest ts, with no overlay on either side. cs is slower than ts on phone (+6%), because
+  its start-up and rest (54 ms) cost more than its faster diff saves on a small page. On self
+  (decode + diff, no process) cs is −26% / −41% / −61% against napi-image.
+- **The pngjs overlay encode was 37% of the production-shaped long page** (413 of 1139 ms). With
+  napi-image it is 48 ms. That one stage is most of the gap the old "Change" columns credited to cs.
+- **The earlier 3-engine run** (08:15, same env, `bench/perf-results/2026-10-25T08-15-53-847Z.json`):
+  ts pngjs + pngjs overlay, ts napi-image + napi-image overlay and cs, at 1118.5 / 465.6 / 205.0 ms wall on the
+  long page. Its "vs #1" (cs −56% / −74% / −86%, as self) compared cs against ts doing the overlay
+  encode, so it has the same flaw as the pre-fix dashboard. This run replaces it.
+- **Napi-image's decode was 3x slower here than in PS-168** (86.5 against 29.8 ms on long). kswapd
+  and btrfs writeback were on the host. Compare these rows with each other, not with PS-168's.
 
 ### 2026-10-25 · PS-204 · desktop, shared · the server diff's hot loops in WASM, in workerd
 
