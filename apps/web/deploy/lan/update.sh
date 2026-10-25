@@ -17,6 +17,9 @@
 # napi-image codec on 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come
 # up is reported and the update goes on, since the Worker then diffs in-process with pngjs, as it
 # did before the sidecar. See apps/web/README.md, "The diff sidecar".
+#
+# One run is enough when a commit changes this file: after the fetch the new file runs once, before
+# anything is stopped (see the self-check in main).
 set -Eeuo pipefail
 
 HELPER_SWITCH=/etc/pixelslash/opencode-helper
@@ -26,9 +29,13 @@ OPENCODE_BIN=/home/pixelslash/.opencode/bin/opencode
 
 # Everything is in a function so bash has read the whole script before `git reset` rewrites it.
 main() {
-  local repo=/home/pixelslash/pixelslash
+  # PIXELSLASH_REPO is for the test, which points the script at a temp checkout; prev sits beside it.
+  local repo=${PIXELSLASH_REPO:-/home/pixelslash/pixelslash}
   local dist=$repo/apps/web/dist
-  local prev=/home/pixelslash/dist.prev
+  local prev=${repo%/*}/dist.prev
+  # This file's sha256 before the reset rewrites it.
+  local self=$0 before=""
+  [[ -n ${PIXELSLASH_UPDATE_REEXEC:-} ]] || before=$(sha256sum "$self" | cut -d' ' -f1)
   as_app() {
     runuser -u pixelslash -- env PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin \
       bash -c "cd $repo && $1"
@@ -87,6 +94,17 @@ SQL
 
   # A deploy checkout: nothing is edited or committed here, so main's tip wins.
   as_app "git fetch --quiet origin main && git reset --quiet --hard origin/main && git log --oneline -1"
+
+  # A changed script is run once more, before anything is stopped, so the new one decides the rest.
+  # The env var set here makes that run skip this check: no second re-exec.
+  if [[ -n $before ]]; then
+    local after
+    after=$(sha256sum "$self" | cut -d' ' -f1)
+    if [[ $after != "$before" ]]; then
+      echo "update.sh changed (sha256 $before -> $after): running the new script" >&2
+      exec env PIXELSLASH_UPDATE_REEXEC=1 bash "$self" "$@"
+    fi
+  fi
 
   # The switch, read before anything is stopped: a bad one fails here, with the LAN still up.
   local helper_model="" had_helper=0
