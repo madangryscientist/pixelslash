@@ -4,7 +4,7 @@
  * implementation of the contract in `bench/README.md`.
  *
  *   bun bench/src/impl/ts-diff.ts diff <base.png> <head.png> --json
- *     [--decode parallel|sequential] [--decoder <name>] [--overlay <name>]
+ *     [--engine ts|wasm] [--decode parallel|sequential] [--decoder <name>] [--overlay <name>]
  *
  * It decodes the two files itself with `--decoder`: by default napi-image, the fastest permissive
  * one measured (PS-168); pngjs, the engine's own, is split into phases in `ts-decode.ts`. It hands
@@ -14,10 +14,16 @@
  * `--overlay`. The contract does not ask for the overlay, so the default is `none`, which encodes
  * nothing (PS-168); `--overlay pngjs` is what the engine itself does. `phases` splits both. The
  * names are in `ts-codecs.ts`. Exit 2 on bad usage, 1 when a file cannot be read or decoded.
+ *
+ * `--engine wasm` (PS-209) runs the server's WASM diff (`DIFF_WASM`, PS-204) instead, through
+ * `wasmDiffer`. It decodes inside the same call as the pixel loop, so its `diff_ms` holds the
+ * inflate, the unfilter and the compare together, and `decode_ms` is the file read alone. It has no
+ * decoder of its own to choose, so `--decoder` is refused with it; `--decode` is ignored.
  */
 // The diff entry, not the package root: the root also exports capture, which loads Playwright.
 import { readFileSync } from "node:fs";
 import { diffRasters } from "@pixelslash/engine/diff";
+import { wasmDiffer } from "@pixelslash/engine/diff-wasm";
 import type { DiffPhase } from "@pixelslash/engine";
 import { SPAWN_AT_ENV, type ImplOutput } from "./contract.ts";
 import { changeRegions } from "../pixelslash.ts";
@@ -33,20 +39,26 @@ import { addTimes, decodeFile, type Decoded } from "./ts-decode.ts";
 import type { WorkerReply, WorkerRequest } from "./ts-decode-worker.ts";
 
 const USAGE =
-  "usage: ts-diff.ts [--decoder <name>] [--overlay <name>] [--decode parallel|sequential] diff <base.png> <head.png> --json";
+  "usage: ts-diff.ts [--engine ts|wasm] [--decoder <name>] [--overlay <name>] [--decode parallel|sequential] diff <base.png> <head.png> --json";
 
 export const DEFAULT_DECODER: DecoderName = "napi-image";
 export const DEFAULT_OVERLAY: OverlayName = "none";
 
+/** The compiled `diff.wasm` the server ships (`packages/engine/wasm`), read when `--engine wasm` runs. */
+const WASM_PATH = new URL("../../../packages/engine/wasm/diff.wasm", import.meta.url);
+
+type Engine = "ts" | "wasm";
+
 type Args = {
   basePath: string;
   headPath: string;
+  engine: Engine;
   parallel: boolean;
   decoder: DecoderName;
   overlay: OverlayName;
 };
 
-const SWITCHES = ["--decode", "--decoder", "--overlay"];
+const SWITCHES = ["--decode", "--decoder", "--overlay", "--engine"];
 
 /** The switches and the operands apart; null when a switch has no value or comes twice. */
 function splitSwitches(argv: string[]): { seen: Map<string, string>; operands: string[] } | null {
@@ -86,14 +98,31 @@ export function parseArgs(argv: string[]): Args | null {
   return values && { basePath, headPath, ...values };
 }
 
-/** The switches' values, defaulted; null when one is not a known name. */
+/** A switch's value, defaulted; null when it is not one `isKnown` accepts. */
+function pick<T extends string>(
+  seen: Map<string, string>,
+  name: string,
+  fallback: T,
+  isKnown: (value: string) => value is T,
+): T | null {
+  const value = seen.get(name) ?? fallback;
+  return isKnown(value) ? value : null;
+}
+
+const isEngine = (value: string): value is Engine => value === "ts" || value === "wasm";
+const isMode = (value: string): value is "parallel" | "sequential" =>
+  value === "parallel" || value === "sequential";
+
+/** The switches' values, defaulted; null when one is not a known name or the pair does not fit. */
 function switchValues(seen: Map<string, string>): Omit<Args, "basePath" | "headPath"> | null {
-  const mode = seen.get("--decode") ?? "sequential";
-  const decoder = seen.get("--decoder") ?? DEFAULT_DECODER;
-  const overlay = seen.get("--overlay") ?? DEFAULT_OVERLAY;
-  if (mode !== "parallel" && mode !== "sequential") return null;
-  if (!isDecoder(decoder) || !isOverlay(overlay)) return null;
-  return { parallel: mode === "parallel", decoder, overlay };
+  const engine = pick(seen, "--engine", "ts", isEngine);
+  const mode = pick(seen, "--decode", "sequential", isMode);
+  const decoder = pick(seen, "--decoder", DEFAULT_DECODER, isDecoder);
+  const overlay = pick(seen, "--overlay", DEFAULT_OVERLAY, isOverlay);
+  if (!engine || !mode || !decoder || !overlay) return null;
+  // The WASM engine decodes inside its own call, so there is no decoder for `--decoder` to pick.
+  if (engine === "wasm" && seen.has("--decoder")) return null;
+  return { engine, parallel: mode === "parallel", decoder, overlay };
 }
 
 /** Head on a worker thread, base on this one; the worker's start-up is part of the wall time. */
@@ -120,6 +149,86 @@ async function decodeBoth(
   }
 }
 
+/** The TypeScript engine: its own decoder, then `diffRasters`. */
+async function diffTs(args: Args): Promise<ImplOutput> {
+  const decoding = performance.now();
+  const [base, head] = args.parallel
+    ? await decodeBoth(args.basePath, args.headPath, args.decoder)
+    : [
+        await decodeFile(args.basePath, args.decoder),
+        await decodeFile(args.headPath, args.decoder),
+      ];
+  const decodeMs = performance.now() - decoding;
+  const times = addTimes(base.times, head.times);
+  const phases: Record<string, number> = {
+    decode_read: times.read,
+    decode_inflate: times.inflate,
+    decode_unfilter: times.unfilter,
+    decode_other: times.other,
+  };
+  const probe = (phase: DiffPhase, ms: number) => {
+    phases[phase] = ms;
+  };
+  const diffing = performance.now();
+  // The engine's own encode is swapped for a capture, so `--overlay` alone decides what is encoded.
+  let overlay: Uint8Array | null = null;
+  const capture = ({ data }: { data: Uint8Array }) => {
+    overlay = data;
+    return Buffer.alloc(0);
+  };
+  const diff = diffRasters(base.raster, head.raster, {}, { probe, encode: capture });
+  const encoding = performance.now();
+  if (overlay)
+    await encodeWith(args.overlay, { data: overlay, width: diff.width, height: diff.height });
+  phases.overlay_encode = performance.now() - encoding;
+  const diffMs = performance.now() - diffing;
+  return {
+    verdict: diff.changed ? "changed" : "unchanged",
+    regions: changeRegions(diff),
+    decode_ms: decodeMs,
+    diff_ms: diffMs,
+    phases,
+  };
+}
+
+/** The server's WASM diff (`wasmDiffer`, PS-204): decode, unfilter and compare in one call. */
+async function diffWasm(args: Args): Promise<ImplOutput> {
+  const module = new WebAssembly.Module(readFileSync(WASM_PATH));
+  // The same capture as `diffTs`: the engine's encode is swapped, so `--overlay` alone decides.
+  let overlay: Uint8Array | null = null;
+  const capture = ({ data }: { data: Uint8Array }) => {
+    overlay = data;
+    return Buffer.alloc(0);
+  };
+  const diff = wasmDiffer(module, {
+    // A pair the fast path declines would carry pngjs's verdict under the wasm label: refuse it.
+    fellBack: (reason) => {
+      throw new Error(
+        `ts-diff: wasm declined the pair (${reason instanceof Error ? reason.message : String(reason)}), so it is not timed as wasm`,
+      );
+    },
+    encode: capture,
+  });
+  const reading = performance.now();
+  const baseBytes = readFileSync(args.basePath);
+  const headBytes = readFileSync(args.headPath);
+  const decodeMs = performance.now() - reading;
+  const diffing = performance.now();
+  const result = diff(baseBytes, headBytes);
+  const encoding = performance.now();
+  if (overlay)
+    await encodeWith(args.overlay, { data: overlay, width: result.width, height: result.height });
+  const overlayEncodeMs = performance.now() - encoding;
+  const diffMs = performance.now() - diffing;
+  return {
+    verdict: result.changed ? "changed" : "unchanged",
+    regions: changeRegions(result),
+    decode_ms: decodeMs,
+    diff_ms: diffMs,
+    phases: { decode_read: decodeMs, overlay_encode: overlayEncodeMs },
+  };
+}
+
 async function main(argv: string[]): Promise<number> {
   const startedAt = performance.timeOrigin + performance.now();
   const args = parseArgs(argv);
@@ -129,44 +238,7 @@ async function main(argv: string[]): Promise<number> {
   }
   const spawnedAt = Number(process.env[SPAWN_AT_ENV]);
   try {
-    const decoding = performance.now();
-    const [base, head] = args.parallel
-      ? await decodeBoth(args.basePath, args.headPath, args.decoder)
-      : [
-          await decodeFile(args.basePath, args.decoder),
-          await decodeFile(args.headPath, args.decoder),
-        ];
-    const decodeMs = performance.now() - decoding;
-    const times = addTimes(base.times, head.times);
-    const phases: Record<string, number> = {
-      decode_read: times.read,
-      decode_inflate: times.inflate,
-      decode_unfilter: times.unfilter,
-      decode_other: times.other,
-    };
-    const probe = (phase: DiffPhase, ms: number) => {
-      phases[phase] = ms;
-    };
-    const diffing = performance.now();
-    // The engine's own encode is swapped for a capture, so `--overlay` alone decides what is encoded.
-    let overlay: Uint8Array | null = null;
-    const capture = ({ data }: { data: Uint8Array }) => {
-      overlay = data;
-      return Buffer.alloc(0);
-    };
-    const diff = diffRasters(base.raster, head.raster, {}, { probe, encode: capture });
-    const encoding = performance.now();
-    if (overlay)
-      await encodeWith(args.overlay, { data: overlay, width: diff.width, height: diff.height });
-    phases.overlay_encode = performance.now() - encoding;
-    const diffMs = performance.now() - diffing;
-    const out: ImplOutput = {
-      verdict: diff.changed ? "changed" : "unchanged",
-      regions: changeRegions(diff),
-      decode_ms: decodeMs,
-      diff_ms: diffMs,
-      phases,
-    };
+    const out = args.engine === "wasm" ? await diffWasm(args) : await diffTs(args);
     // Unset or not a number (run by hand): there is no spawn to measure from.
     if (process.env[SPAWN_AT_ENV] !== undefined && Number.isFinite(spawnedAt))
       out.startup_ms = Math.max(0, startedAt - spawnedAt);

@@ -81,6 +81,7 @@ describe("ts-diff's switches (PS-168)", () => {
     ).toEqual({
       basePath: "b.png",
       headPath: "h.png",
+      engine: "ts",
       parallel: true,
       decoder: "upng",
       overlay: "pngjs-l1",
@@ -97,5 +98,9 @@ describe("ts-diff's switches (PS-168)", () => {
     expect(parseArgs(["--decode", "parallel", ...operands, "--decode", "parallel"])).toBeNull();
     expect(parseArgs([...operands, "extra"])).toBeNull();
     expect(parseArgs([...operands, "--decoder"])).toBeNull();
+    // PS-209: the WASM engine decodes in its own call, so a decoder has nothing to pick.
+    expect(parseArgs(["--engine", "wasm", ...operands])).toMatchObject({ engine: "wasm" });
+    expect(parseArgs(["--engine", "wasm", "--decoder", "pngjs", ...operands])).toBeNull();
+    expect(parseArgs(["--engine", "nope", ...operands])).toBeNull();
   });
 });

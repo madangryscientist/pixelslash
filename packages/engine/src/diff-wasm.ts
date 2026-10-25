@@ -175,11 +175,17 @@ function skipMask(wasm: DiffExports, ignore: DiffIgnore, width: number, height: 
   return { ignored, skip, count: mask.count };
 }
 
+/** What `fastDiff` takes beside the pair: `encode` is the overlay's PNG encode, or the engine's. */
+type FastOptions = {
+  options: DiffOptions;
+  ignore: DiffIgnore;
+  encode: ((overlay: Raster) => Buffer) | undefined;
+};
+
 function fastDiff(
   wasm: DiffExports,
   [main, branch]: [Buffer, Buffer],
-  options: DiffOptions,
-  ignore: DiffIgnore,
+  { options, ignore, encode }: FastOptions,
 ): PixelDiff {
   wasm.reset();
   const ma = decodeInto(wasm, main);
@@ -241,7 +247,7 @@ function fastDiff(
       ignored,
       field: fieldOf,
     },
-    { options, blobs: () => boxes },
+    { options, blobs: () => boxes, ...(encode && { encode }) },
   );
 }
 
@@ -266,11 +272,16 @@ const size = ({ width, height }: { width: number; height: number }) => ({ width,
  * `diffPngs` with the hot loops in `module` (the compiled `diff.wasm`). One instance per differ,
  * reused: its memory stays at the largest diff's size. A failure inside the fast path drops the
  * instance and the pair goes to `diffPngs`, which gives the same answer or the same error;
- * `fellBack` is told why (the tests use it to prove the fast path ran).
+ * `fellBack` is told why (the tests use it to prove the fast path ran). `encode` replaces the
+ * overlay's PNG encode on the fast path, as `measuredDiff`'s does (the bench's `--overlay none`);
+ * left out, it is the engine's own.
  */
 export function wasmDiffer(
   module: WebAssembly.Module,
-  { fellBack }: { fellBack?: (reason: unknown) => void } = {},
+  {
+    fellBack,
+    encode,
+  }: { fellBack?: (reason: unknown) => void; encode?: (overlay: Raster) => Buffer } = {},
 ): DiffFn {
   let wasm: DiffExports | null = null;
   function diff(
@@ -283,7 +294,7 @@ export function wasmDiffer(
     if (same) return same;
     try {
       wasm ??= instantiate(module);
-      return fastDiff(wasm, [main, branch], options, ignore);
+      return fastDiff(wasm, [main, branch], { options, ignore, encode });
     } catch (error) {
       if (!(error instanceof NotFast)) wasm = null;
       fellBack?.(error);

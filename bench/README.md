@@ -278,6 +278,16 @@ decodes on the main thread; the worker's start-up is inside `decode_ms`, because
 it, and it is why parallel can lose on a small image. And a cold process is slower than the warm in-process loop of `bench:perf`
 (roughly 1.7x here, from JIT warm-up), so numbers from the two modes are not comparable.
 
+`--engine wasm` (PS-209) runs the server's WASM diff (`wasmDiffer`, PS-204, `DIFF_WASM`) behind the
+same contract, for comparing it with the others. It reads the two files, then one call does inflate,
+unfilter, the pixel loop and the regions, so `decode_ms` is the read alone, `diff_ms` holds the rest,
+and only `decode_read` and `overlay_encode` are reported. A `-` in the phase table for its
+`decode_inflate`, `decode_unfilter`, `pixel_compare` and similar is that split, not a missing
+measurement. `--decoder` is refused with it, `--decode` is ignored, and `--overlay` works as above.
+A pair the fast path declines (an interlaced or 16-bit PNG) is an error, exit 1, not a pngjs result
+timed as wasm.
+When it landed (PS-209) its verdict and regions matched the pngjs reference on all 157 pairs.
+
 ### Scoring: `bench -- --impl`
 
 ```bash
