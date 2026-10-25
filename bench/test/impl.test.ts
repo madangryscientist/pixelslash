@@ -10,6 +10,7 @@ import { implFailures, implTable, measureImpls, phaseTable } from "../src/perf/i
 import { loadCorpus } from "../src/corpus.ts";
 import { branchFile, mainFile, writeFixtures } from "../src/perf/fixtures.ts";
 import { runPixelslash } from "../src/pixelslash.ts";
+import { phaseCell } from "./phase-cell.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "ps-impl-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -277,8 +278,7 @@ describe("bench:perf --impl", () => {
       expect(header).toContain(col);
     expect(first).toContain("2.0");
     expect(first).toContain("1.5");
-    expect(second).toContain("-");
-    expect(second).not.toContain("1.5");
+    expect(phaseCell(header ?? "", second ?? "", "pixel_compare")).toBe("-");
     const [step, plain] = measured.map((m) => m.steps.get("diff-phone")?.samples);
     expect(step?.phases["pixel_compare"]).toEqual([1.5]);
     expect(step?.startup).toEqual([5]);
