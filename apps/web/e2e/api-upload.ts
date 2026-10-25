@@ -79,7 +79,13 @@ function shotForm(shot: Shot): FormData {
 }
 
 /** Open a build, put each shot, finalise: the server diffs in the finalise request. */
-export async function uploadBuild(token: string, build: object, shots: Shot[]) {
+export async function uploadBuild(
+  token: string,
+  build: object,
+  shots: Shot[],
+  /** More of the finalise body, such as the CLI's `timings`. */
+  finalise: object = {},
+) {
   const headers = { authorization: `Bearer ${token}` };
   const opened = await fetch(`${SERVER}/api/v1/builds`, {
     method: "POST",
@@ -99,7 +105,7 @@ export async function uploadBuild(token: string, build: object, shots: Shot[]) {
   const done = await fetch(`${SERVER}/api/v1/builds/${id}/finalize`, {
     method: "POST",
     headers: { ...headers, "content-type": "application/json" },
-    body: JSON.stringify({ snapshots: shots.length }),
+    body: JSON.stringify({ snapshots: shots.length, ...finalise }),
   });
   expect(done.status).toBe(200);
   return id;

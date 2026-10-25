@@ -1,7 +1,12 @@
-import type { BuildTimings as CliTimings } from "#/db/diff-json";
 import type { BuildView } from "#/db/review";
 import { formatDuration } from "#/lib/format";
-import { totalMs } from "#/lib/timings";
+import {
+  CLI_TOTAL_NOTE,
+  RERUN_NOTE,
+  type StepRow,
+  cliStepRows,
+  serverStepRows,
+} from "#/lib/timings";
 
 /**
  * How long a build took (ob 1792): the server's steps, from the numbers its diff run and the
@@ -9,38 +14,13 @@ import { totalMs } from "#/lib/timings";
  * not finished, is not shown rather than shown as 0.
  */
 
-type Step = { key: string; label: string; ms: number };
-
-function serverSteps(build: BuildView["build"]): Step[] {
-  const all: [string, string, number | null][] = [
-    ["queue", "before diff", build.queueMs],
-    ["diff", "diff", build.diffMs],
-    ["explain", "AI explanations", build.explainMs],
-    ["summary", "AI summary", build.summaryMs],
-    ["total", "total", totalMs(build)],
-  ];
-  return all.flatMap(([key, label, ms]) => (ms === null ? [] : [{ key, label, ms }]));
-}
-
-function cliSteps(timings: CliTimings | null): Step[] {
-  if (!timings) return [];
-  const all: [string, string, number | undefined][] = [
-    ["capture", "capture", timings.captureMs],
-    ["diff", "diff", timings.diffMs],
-    ["judge", "judge", timings.judgeMs],
-    ["upload", "upload", timings.upload?.totalMs],
-    ["total", "total", timings.totalMs],
-  ];
-  return all.flatMap(([key, label, ms]) => (ms === undefined ? [] : [{ key, label, ms }]));
-}
-
 function Line({
   scope,
   steps,
   note,
 }: {
   scope: "server" | "cli";
-  steps: Step[];
+  steps: StepRow[];
   note?: string | undefined;
 }) {
   if (steps.length === 0) return null;
@@ -50,17 +30,27 @@ function Line({
       {steps.map((step) => (
         <span key={step.key} data-testid={`timing-${scope}-${step.key}`}>
           <span className="text-slate-500">{step.label}</span>{" "}
-          <span className="font-mono text-slate-800">{formatDuration(step.ms)}</span>
+          <span className="font-mono text-slate-800 tabular-nums">{formatDuration(step.ms)}</span>
+          {step.note && (
+            <span data-testid={`timing-${scope}-${step.key}-note`} className="text-slate-500">
+              {" "}
+              ({step.note})
+            </span>
+          )}
         </span>
       ))}
-      {note && <span className="text-slate-500">{note}</span>}
+      {note && (
+        <span data-testid={`timings-${scope}-note`} className="text-slate-500">
+          {note}
+        </span>
+      )}
     </div>
   );
 }
 
 export function BuildTimings({ build }: { build: BuildView["build"] }) {
-  const server = serverSteps(build);
-  const cli = cliSteps(build.timings);
+  const server = serverStepRows(build, build.aiSummary !== null);
+  const cli = cliStepRows(build.timings);
   if (server.length === 0 && cli.length === 0) return null;
   return (
     <section
@@ -68,12 +58,12 @@ export function BuildTimings({ build }: { build: BuildView["build"] }) {
       data-testid="build-timings"
       className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm"
     >
+      <Line scope="server" steps={server} note={build.rerun ? RERUN_NOTE : undefined} />
       <Line
-        scope="server"
-        steps={server}
-        note={build.rerun ? "of the latest run, a re-run of this build" : undefined}
+        scope="cli"
+        steps={cli}
+        note={cli.some((step) => step.key === "total") ? CLI_TOTAL_NOTE : undefined}
       />
-      <Line scope="cli" steps={cli} />
     </section>
   );
 }

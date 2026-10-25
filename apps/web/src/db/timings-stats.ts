@@ -25,6 +25,8 @@ export type ProjectTimings = {
    * its last run only, so it is left out rather than pooled as a whole build.
    */
   builds: number;
+  /** Builds of the window that took more than one run and so are not in `builds`: said, so a project is not called empty when its builds are all resumed. */
+  rerunBuilds: number;
   steps: Record<Step, StepStats | null>;
 };
 
@@ -55,6 +57,7 @@ export async function orgTimings(
       summaryMs: builds.summaryMs,
       finishedAt: builds.finishedAt,
       processingStartedAt: builds.processingStartedAt,
+      rerun: builds.rerun,
     })
     .from(builds)
     .innerJoin(projects, eq(projects.id, builds.projectId))
@@ -64,7 +67,6 @@ export async function orgTimings(
         eq(projects.orgId, orgId),
         real(orgs.isSmoke),
         isNotNull(builds.finishedAt),
-        eq(builds.rerun, false),
         gte(builds.finishedAt, since),
       ),
     )
@@ -77,7 +79,14 @@ export async function orgTimings(
     else byProject.set(row.projectId, [row]);
   }
   return listed.map(({ id, name }) => {
-    const own = byProject.get(id) ?? [];
-    return { projectId: id, name, builds: own.length, steps: summarise(own) };
+    const all = byProject.get(id) ?? [];
+    const own = all.filter((row) => !row.rerun);
+    return {
+      projectId: id,
+      name,
+      builds: own.length,
+      rerunBuilds: all.length - own.length,
+      steps: summarise(own),
+    };
   });
 }

@@ -26,10 +26,13 @@ test("formatDay is the UTC day and month", () => {
   expect(formatDay(new Date("2026-10-19T23:59:00Z"))).toBe("19 Oct");
 });
 
-test("formatDuration reads in the unit a person thinks in", () => {
-  expect(formatDuration(0)).toBe("0 ms");
-  expect(formatDuration(840.4)).toBe("840 ms");
-  expect(formatDuration(1_240)).toBe("1.2 s");
-  expect(formatDuration(18_400)).toBe("18 s");
-  expect(formatDuration(75_000)).toBe("1 min 15 s");
+const nb = (text: string) => text.replaceAll(" ", "\u00a0");
+
+test("formatDuration reads in the unit a person thinks in, with non-breaking spaces", () => {
+  expect(formatDuration(0)).toBe(nb("0 ms"));
+  expect(formatDuration(840.4)).toBe(nb("840 ms"));
+  expect(formatDuration(1_240)).toBe(nb("1.2 s"));
+  expect(formatDuration(18_400)).toBe(nb("18 s"));
+  expect(formatDuration(75_000)).toBe(nb("1 min 15 s"));
+  expect(formatDuration(75_000)).not.toContain(" ");
 });

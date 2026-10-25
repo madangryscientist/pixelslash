@@ -60,7 +60,7 @@ describe("orgTimings", () => {
     expect(emptyDocs).toMatchObject({ projectId: docs.id, builds: 0 });
     expect(Object.values(emptyDocs?.steps ?? {})).toEqual([null, null, null, null, null]);
     expect(fullWeb?.builds).toBe(10);
-    expect(fullWeb?.steps.diff).toEqual({ p50: 500, p95: 1000, n: 10 });
+    expect(fullWeb?.steps.diff).toEqual({ p50: 500, p95: 1000, max: 1000, n: 10, tail: "max" });
     expect(fullWeb?.steps.queue).toBeNull();
   });
 
@@ -78,7 +78,7 @@ describe("orgTimings", () => {
     });
     const [, result] = await orgTimings(db, ada.id, org.id, now);
     expect(result?.builds).toBe(1);
-    expect(result?.steps.diff).toEqual({ p50: 100, p95: 100, n: 1 });
+    expect(result?.steps.diff).toEqual({ p50: 100, p95: 100, max: 100, n: 1, tail: "max" });
   });
 
   test("a build that took a second run is left out: it holds its last run's numbers only", async () => {
@@ -87,7 +87,27 @@ describe("orgTimings", () => {
     await finished(db, web.id, { diffMs: 5, rerun: true });
     const [, result] = await orgTimings(db, ada.id, org.id, now);
     expect(result?.builds).toBe(1);
-    expect(result?.steps.diff).toEqual({ p50: 100, p95: 100, n: 1 });
+    expect(result?.rerunBuilds).toBe(1);
+    expect(result?.steps.diff).toEqual({ p50: 100, p95: 100, max: 100, n: 1, tail: "max" });
+  });
+
+  test("a project whose every build took a second run is not empty: it says how many were left out", async () => {
+    const { db, ada, org, web } = await setup();
+    await finished(db, web.id, { diffMs: 5, rerun: true });
+    await finished(db, web.id, { diffMs: 6, rerun: true });
+    const [, result] = await orgTimings(db, ada.id, org.id, now);
+    expect(result).toMatchObject({ builds: 0, rerunBuilds: 2 });
+    expect(result?.steps.diff).toBeNull();
+  });
+
+  test("a build whose end is before its start has no Total, and the others' Total stands", async () => {
+    const { db, ada, org, web } = await setup();
+    await finished(db, web.id, { diffMs: 100, total: 4_000 });
+    await finished(db, web.id, { diffMs: 100, total: -300 });
+    const [, result] = await orgTimings(db, ada.id, org.id, now);
+    expect(result?.builds).toBe(2);
+    expect(result?.steps.diff?.n).toBe(2);
+    expect(result?.steps.total).toEqual({ p50: 4_000, p95: 4_000, max: 4_000, n: 1, tail: "max" });
   });
 
   test("only a member reads an org's timings, and only that org's projects", async () => {

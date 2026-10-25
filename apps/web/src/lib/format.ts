@@ -45,12 +45,13 @@ export function formatRelative(then: Date, now: Date): string {
 
 /**
  * A step's length: `340 ms`, `2.4 s`, `18 s`, `2 min 5 s`. Whole numbers where a decimal would be
- * noise, and the same string in the Worker and the browser.
+ * noise, and the same string in the Worker and the browser. The spaces are non-breaking, so a
+ * figure never splits from its unit across a line.
  */
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)} ms`;
-  if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
+  if (ms < 1000) return `${Math.round(ms)}\u00a0ms`;
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}\u00a0s`;
   const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds} s`;
-  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+  if (seconds < 60) return `${seconds}\u00a0s`;
+  return `${Math.floor(seconds / 60)}\u00a0min\u00a0${seconds % 60}\u00a0s`;
 }
