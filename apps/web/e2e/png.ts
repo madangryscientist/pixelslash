@@ -25,8 +25,36 @@ function chunk(type: string, data: Buffer): Buffer {
 
 export type Block = { x: number; y: number; w: number; h: number; rgb: [number, number, number] };
 
+/** Rows of short colour runs from a seeded generator: text-like, and never the same twice in a row. */
+function paintRuns(raw: Buffer, width: number, height: number, seed: number): void {
+  const stride = width * 4 + 1;
+  let state = seed + 1;
+  const next = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state >>> 8;
+  };
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width;) {
+      const run = 3 + (next() % 30);
+      const colour = next();
+      for (let end = Math.min(width, x + run); x < end; x += 1) {
+        const at = y * stride + 1 + x * 4;
+        raw[at] = colour & 0xff;
+        raw[at + 1] = (colour >> 8) & 0xff;
+        raw[at + 2] = (colour >> 16) & 0xff;
+      }
+    }
+  }
+}
+
 /** A white RGBA PNG with opaque blocks painted on it: enough to be `changed`, no dependency. */
-export function png(width: number, height: number, blocks: Block[] = []): Buffer {
+export function png(
+  width: number,
+  height: number,
+  blocks: Block[] = [],
+  /** Paint a seeded pattern of colour runs instead of white, so the file is MBs and not KBs (PS-200). */
+  busy?: number,
+): Buffer {
   const stride = width * 4 + 1;
   const raw = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y += 1) {
@@ -39,6 +67,7 @@ export function png(width: number, height: number, blocks: Block[] = []): Buffer
       raw[at + 3] = 255;
     }
   }
+  if (busy !== undefined) paintRuns(raw, width, height, busy);
   for (const block of blocks) {
     for (let y = block.y; y < block.y + block.h; y += 1) {
       for (let x = block.x; x < block.x + block.w; x += 1) {

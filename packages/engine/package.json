@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./diff": "./src/diff.ts",
+    "./release": "./src/release.ts",
     "./judge": "./src/judge.ts",
     "./png-native": "./src/png-native.ts",
     "./ci-diff": "./src/ci-diff.ts",

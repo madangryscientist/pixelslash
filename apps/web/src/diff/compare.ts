@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { ENGINE_VERSION, diffPngs, identicalResult, summarizeDiff } from "@pixelslash/engine/diff";
+import { release } from "@pixelslash/engine/release";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
@@ -78,10 +79,17 @@ export function serverComparer(deps: {
     // `measureAll` resolved them (ob 1495); the engine's defaults fill any key left out. The ignore
     // areas are the union of both shots', so an element that moved is covered at both places, and
     // of the boxes drawn on the test in the review UI (ob 1499).
-    const result = diff(main, branch, shot.resolvedDiff?.options ?? shot.diffOptions, {
-      main: baseline.ignore,
-      branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)],
-    });
+    let result: ReturnType<typeof diff>;
+    try {
+      result = diff(main, branch, shot.resolvedDiff?.options ?? shot.diffOptions, {
+        main: baseline.ignore,
+        branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)],
+      });
+    } finally {
+      // The uploads are read once and dead now. A Worker has no gc(): freed here, a burst of
+      // full-page shots does not leave workerd holding gigabytes until it restarts (PS-200).
+      release(main, branch);
+    }
     return {
       changed: result.changed,
       diffResult: summarizeDiff(result),

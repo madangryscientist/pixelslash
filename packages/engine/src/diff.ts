@@ -14,6 +14,7 @@ import { clipRects, ignoreMask } from "./ignore-mask.ts";
 import { identicalBytes } from "./identical.ts";
 import { clock, reportLoop, type DiffProbe, type Raster } from "./diff-probe.ts";
 import { decodePng, encodePng } from "./png-codec.ts";
+import { release, releasing } from "./release.ts";
 
 export { identicalResult, readPngSize } from "./identical.ts";
 
@@ -286,7 +287,9 @@ export function diffPngs(
   ignore: DiffIgnore = {},
 ): PixelDiff {
   const same = identicalBytes(main, branch);
-  return same ?? diffRasters(decodePng(main), decodePng(branch), options, { ignore });
+  if (same) return same;
+  const [a, b] = [decodePng(main), decodePng(branch)];
+  return releasing([a.data, b.data], () => diffRasters(a, b, options, { ignore }));
 }
 
 /**
@@ -355,6 +358,8 @@ export function diffRasters(
   const encodeStarted = clock(probe);
   const encoded = encode(overlay);
   probe?.("overlay_encode", clock(probe) - encodeStarted);
+  // A caller's own `encode` may keep the overlay (the bench's capture does), so only ours is freed.
+  release(field.kind, field.amplitude, field.lighter, encode === encodePng && overlay.data);
   return {
     changed,
     ignoredPixels,
