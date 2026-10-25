@@ -14,6 +14,25 @@ export function routeSlug(path: string): string {
   );
 }
 
+/** Names the run writes at its own root (the index report) or that are not a directory name. */
+const RUN_NAMES = new Set(["index.html", ".", ".."]);
+
+/**
+ * Each route's output directory name, in the order the routes are given. A route keeps its slug
+ * unless an earlier route already has it or it is a run name, then it gets `-2`, `-3`… so no two
+ * routes share a directory and none lands on the run's index report.
+ */
+export function routeOutNames(paths: string[]): { path: string; name: string }[] {
+  const taken = new Set<string>();
+  return paths.map((path) => {
+    const slug = routeSlug(path);
+    let name = slug;
+    for (let n = 2; taken.has(name) || RUN_NAMES.has(name); n++) name = `${slug}-${n}`;
+    taken.add(name);
+    return { path, name };
+  });
+}
+
 /** An absolute `http:` or `https:` URL. */
 export function isHttpUrl(value: string): boolean {
   return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);

@@ -16,7 +16,7 @@ import {
   type Violation,
 } from "./judge.ts";
 import { renderIndex, renderPixelReport, renderReport, type RouteRow } from "./report.ts";
-import { joinOrigin, routeSlug } from "./routes.ts";
+import { joinOrigin, routeOutNames, routeSlug } from "./routes.ts";
 import { writeRunFiles, writeRunTimings, type RunManifest } from "./run.ts";
 import { withTimings } from "./report-timings.ts";
 import { buildTimings, timed, type ShotTiming, type Timings } from "./timings.ts";
@@ -77,10 +77,9 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
   let skipped = false;
   let skipReason: string | undefined;
   try {
-    for (const path of routes) {
-      const slug = routeSlug(path);
-      const one = await compare(routeOptions(opts, path, slug), deps, browser, path);
-      rows.push(routeRow(path, slug, one));
+    for (const { path, name } of routeOutNames(routes)) {
+      const one = await compare(routeOptions(opts, path, name), deps, browser, path);
+      rows.push(routeRow(path, name, one));
       shots.push(...(one.timings?.shots ?? []));
       already.push(...one.already);
       fresh.push(...one.fresh);
@@ -115,7 +114,9 @@ function routeRow(path: string, slug: string, one: CompareResult): RouteRow {
   };
 }
 
-function routeOptions(opts: CompareOptions, path: string, slug: string): CompareOptions {
+function routeOptions(opts: CompareOptions, path: string, name: string): CompareOptions {
+  // PNG inputs keep their route slug: a route's input name does not change when its output does.
+  const slug = routeSlug(path);
   return {
     ...opts,
     live: opts.live ? joinOrigin(opts.live, path) : undefined,
@@ -123,7 +124,7 @@ function routeOptions(opts: CompareOptions, path: string, slug: string): Compare
     livePng: opts.livePngDir ? join(opts.livePngDir, `${slug}.png`) : undefined,
     localPng: opts.localPngDir ? join(opts.localPngDir, `${slug}.png`) : undefined,
     routes: undefined,
-    out: join(opts.out, slug),
+    out: join(opts.out, name),
   };
 }
 

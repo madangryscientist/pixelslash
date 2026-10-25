@@ -182,4 +182,43 @@ describe("routes", () => {
     expect(code).toBe(2);
     expect(cap.stderr).toMatch(/--routes/);
   });
+
+  test("routes that collide with the run's index report or each other each get a directory", async () => {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const liveDir = join(dir, "live");
+    const localDir = join(dir, "local");
+    for (const name of ["index.png", "index.html.png"]) {
+      await Bun.write(join(liveDir, name), Bun.file(join(DS, "button.png")));
+      await Bun.write(join(localDir, name), Bun.file(join(DS, "button.png")));
+    }
+    const routes = join(dir, "routes.txt");
+    await Bun.write(routes, "/\n/index.html\n/index\n");
+    const cap = capture();
+    const code = await run(
+      [
+        "--live-png-dir",
+        liveDir,
+        "--local-png-dir",
+        localDir,
+        "--routes",
+        routes,
+        "--ds",
+        DS,
+        "--out",
+        out,
+      ],
+      cap.io,
+      { which: () => null },
+    );
+    expect(code).toBe(0);
+    const index = await Bun.file(join(out, "index.html")).text();
+    expect(index.match(/report\.html"/g)).toHaveLength(3);
+    expect(index).toContain('href="index/report.html"');
+    expect(index).toContain('href="index.html-2/report.html"');
+    expect(index).toContain('href="index-2/report.html"');
+    expect(existsSync(join(out, "index/report.html"))).toBe(true);
+    expect(existsSync(join(out, "index.html-2/report.html"))).toBe(true);
+    expect(existsSync(join(out, "index-2/report.html"))).toBe(true);
+  });
 });
