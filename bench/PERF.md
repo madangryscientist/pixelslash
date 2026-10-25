@@ -98,7 +98,7 @@ Bold is the biggest stage in each column. Where each one lies, and what is aimed
 | --- | --- | --- | --- | --- |
 | **Diff** | **regions** (ts 159 ms, cs 76 ms on long), then pixcmp (ts 172 ms, cs 48 ms). aa is small | every cs page, and ts phone and desktop | a faster region pass; SIMD pixel compare | **not ticketed** |
 | **Encode** | deflating the overlay PNG; the deflate level does not move it | ts long: 37% | napi-image encodes it in 27 ms (CLI only) | measured in PS-168; production unchanged |
-| **Load** | unfilter, for pngjs and stb (56% and 65% of decode) | ts long: 25% | measured in PS-168: SkiaSharp is the cs default; napi-image is the ts bench default | done for the bench; production unchanged |
+| **Load** | unfilter, for pngjs and stb (56% and 65% of decode) | ts long: 25% | measured in PS-168: SkiaSharp is the cs default; napi-image is the ts bench default | done for the bench; the CLI ships napi-image (PS-185), workerd stays on pngjs |
 | Startup | Bun loading the engine's imports | ts phone: 16% | `bun build --compile` measured: no gain | done (PS-168) |
 | Rest | spawn, JSON, exit; cs's grew to ~27 ms with SkiaSharp (stb ~20 ms in the same run) | cs phone: 28% | not targeted | — |
 

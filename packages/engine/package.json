@@ -7,11 +7,13 @@
     ".": "./src/index.ts",
     "./diff": "./src/diff.ts",
     "./judge": "./src/judge.ts",
+    "./png-native": "./src/png-native.ts",
     "./ci-diff": "./src/ci-diff.ts",
     "./region-crops": "./src/region-crops.ts",
     "./composition-entry": "./src/composition-entry.ts"
   },
   "dependencies": {
+    "@napi-rs/image": "1.15.0",
     "playwright": "1.60.0",
     "pngjs": "^7.0.0"
   },

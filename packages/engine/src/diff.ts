@@ -1,4 +1,3 @@
-import { PNG } from "pngjs";
 import {
   findRegions,
   newField,
@@ -14,6 +13,7 @@ import { clearsFloors } from "./summary.ts";
 import { clipRects, ignoreMask } from "./ignore-mask.ts";
 import { identicalBytes } from "./identical.ts";
 import { clock, reportLoop, type DiffProbe, type Raster } from "./diff-probe.ts";
+import { decodePng, encodePng } from "./png-codec.ts";
 
 export { identicalResult, readPngSize } from "./identical.ts";
 
@@ -211,7 +211,7 @@ function classify(a: Raster, b: Raster, at: number, o: Overlap) {
 function diffOverlap(
   a: Raster,
   b: Raster,
-  overlay: PNG,
+  overlay: Raster,
   {
     threshold,
     ignore,
@@ -247,7 +247,7 @@ function diffOverlap(
 }
 
 /** The per-pixel loop of `diffOverlap`: classify each pixel and paint the changed ones. */
-function scanOverlap(a: Raster, b: Raster, overlay: PNG, o: Overlap) {
+function scanOverlap(a: Raster, b: Raster, overlay: Raster, o: Overlap) {
   const counts = { changedPixels: 0, antialiased: 0 };
   for (let y = 0; y < o.height; y++) {
     for (let x = 0; x < o.width; x++) {
@@ -286,7 +286,7 @@ export function diffPngs(
   ignore: DiffIgnore = {},
 ): PixelDiff {
   const same = identicalBytes(main, branch);
-  return same ?? diffRasters(PNG.sync.read(main), PNG.sync.read(branch), options, { ignore });
+  return same ?? diffRasters(decodePng(main), decodePng(branch), options, { ignore });
 }
 
 /**
@@ -299,7 +299,7 @@ export function measurePngs(
   options: DiffOptions = {},
   ignore: DiffIgnore = {},
 ): PixelDiff & { overlay: Buffer } {
-  return diffRasters(PNG.sync.read(main), PNG.sync.read(branch), options, { ignore });
+  return diffRasters(decodePng(main), decodePng(branch), options, { ignore });
 }
 
 /** Region grouping, the shift labels and the floors, timed as `regions` when a probe is attached. */
@@ -326,8 +326,8 @@ function groupRegions(
 /**
  * `diffPngs` from decoded pixels: the benchmark decodes (and times the decoding) itself, and may
  * decode both at once. A `probe` is told how long each phase took; without one nothing is timed.
- * `encode` turns the overlay into its PNG bytes; pngjs unless the benchmark measures another
- * encoder (PS-168). The engine itself never passes one.
+ * `encode` turns the overlay into its PNG bytes; the engine's PNG codec (pngjs, or
+ * the CLI's native one) unless the benchmark measures another encoder (PS-168).
  */
 export function diffRasters(
   a: Raster,
@@ -336,13 +336,12 @@ export function diffRasters(
   {
     ignore = {},
     probe,
-    encode = (overlay) => PNG.sync.write(overlay),
-  }: { ignore?: DiffIgnore; probe?: DiffProbe; encode?: (overlay: PNG) => Buffer } = {},
+    encode = encodePng,
+  }: { ignore?: DiffIgnore; probe?: DiffProbe; encode?: (overlay: Raster) => Buffer } = {},
 ): PixelDiff & { overlay: Buffer } {
-  const overlay = new PNG({
-    width: Math.max(a.width, b.width),
-    height: Math.max(a.height, b.height),
-  });
+  const width = Math.max(a.width, b.width);
+  const height = Math.max(a.height, b.height);
+  const overlay: Raster = { data: Buffer.alloc(width * height * 4), width, height };
   const { changedPixels, antialiased, ignoredPixels, ignored, field } = diffOverlap(a, b, overlay, {
     threshold: options.threshold ?? DEFAULT_THRESHOLD,
     ignore,
