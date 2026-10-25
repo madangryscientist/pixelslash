@@ -120,6 +120,13 @@ the CT for tens of minutes; with it stopped the whole update takes about 12 s an
 that long. The stub stays up. If a step fails after the stop, the previous build is put back and the
 server is started on it, and the script exits 1.
 
+**workerd's memory (PS-155).** A day of `/workerd-rss.log` samples (every 10 min, 2026-10-23 to 25) shows workerd at 127-140 MB idle
+and stepping to 1.5-1.8 GB (peak 1.82 GB) within one 10-minute sample of an upload burst (the snapshot PUTs and `finalize`),
+then holding there for hours until the unit restarts, which brings it back to 130 MB. It does not grow without bound, but it
+does not give the memory back, and with `vite preview` (~0.5 GB) beside it the peak is more than the CT's 2 GiB: that was the
+two OOM kills of 2026-10-25. `pixelslash-web.service` therefore carries `MemoryHigh=1400M`, `MemoryMax=1700M` and
+`OOMPolicy=stop`; `update.sh` installs the unit, so the cap survives an update.
+
 ```bash
 ssh -i ~/.ssh/id_ed25519_mac root@192.168.0.20 \
   pct exec 135 -- /home/pixelslash/pixelslash/apps/web/deploy/lan/update.sh

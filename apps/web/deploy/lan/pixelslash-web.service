@@ -12,6 +12,14 @@ Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/pixelslash/.bun/bin/bunx vite preview --host 0.0.0.0 --port 3000 --strictPort
 Restart=on-failure
 RestartSec=2
+# workerd steps from ~135 MB to 1.5-1.8 GB on an upload burst and keeps it until a restart (ob 1887,
+# PS-155; apps/web/README.md, "Run it on the Proxmox server"). vite preview adds ~0.5 GB of its own,
+# so on the CT's 2 GiB that is the OOM kill. MemoryHigh makes the unit reclaim and swap its own
+# pages first; MemoryMax kills it before the CT thrashes, and OOMPolicy=stop turns that into a
+# failed unit that Restart= brings back whole, not a vite with a dead workerd under it.
+MemoryHigh=1400M
+MemoryMax=1700M
+OOMPolicy=stop
 
 [Install]
 WantedBy=multi-user.target
