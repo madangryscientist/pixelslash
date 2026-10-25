@@ -204,8 +204,8 @@ describe("ts-diff --decode (ob 1932)", () => {
   }, 180_000);
 
   // PS-210: the decode and the pixel loop are one call into diff.wasm, so the phases are the file
-  // read (all of decode_ms) and the overlay encode (part of diff_ms), and --decode changes nothing.
-  test("decode_read is decode_ms, and overlay_encode is inside diff_ms", async () => {
+  // read (all of decode_ms), and --decode changes nothing. The overlay is not encoded (PS-211).
+  test("decode_read is decode_ms, and the file read is the only phase", async () => {
     const {
       phases = {},
       decode_ms,
@@ -213,12 +213,28 @@ describe("ts-diff --decode (ob 1932)", () => {
       startup_ms,
       peak_rss_bytes,
     } = await desktop("sequential");
-    expect(Object.keys(phases).toSorted()).toEqual(["decode_read", "overlay_encode"]);
+    expect(Object.keys(phases)).toEqual(["decode_read"]);
     expect(phases["decode_read"]).toBe(decode_ms);
-    expect(phases["overlay_encode"]).toBeLessThanOrEqual(diff_ms);
+    expect(diff_ms).toBeGreaterThanOrEqual(0);
     expect(startup_ms).toBeGreaterThan(0);
     // Its own VmHWM: more than an empty Bun, far less than the runner's high-water mark it would inherit.
     expect(peak_rss_bytes).toBeGreaterThan(10e6);
+  });
+
+  // PS-211: the pngjs and napi-image engines and their overlay encoders are gone, so the switches
+  // that picked them are usage errors, not silently ignored.
+  test("--decoder and --overlay are usage errors, since the JS engine has neither", async () => {
+    for (const extra of [
+      ["--decoder", "pngjs"],
+      ["--overlay", "pngjs"],
+      ["--engine", "pngjs"],
+    ]) {
+      const proc = Bun.spawn(
+        [...TS_DIFF.split(" "), ...extra, "diff", "a.png", "b.png", "--json"],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      expect(await proc.exited).toBe(2);
+    }
   });
 
   test("a bad --decode is a usage error", async () => {
@@ -258,7 +274,7 @@ describe("bench:perf --impl", () => {
     writeFixtures(fixtures);
     const phased = fake(
       "phased",
-      `process.stdout.write(JSON.stringify({ verdict: "changed", regions: [{ x: 0, y: 0, w: 1, h: 1 }], decode_ms: 4, diff_ms: 3, startup_ms: 5, phases: { decode_inflate: 2, pixel_compare: 1.5, regions: 1, overlay_encode: 0.5 } }));`,
+      `process.stdout.write(JSON.stringify({ verdict: "changed", regions: [{ x: 0, y: 0, w: 1, h: 1 }], decode_ms: 4, diff_ms: 3, startup_ms: 5, phases: { decode_inflate: 2, pixel_compare: 1.5, regions: 1, anti_alias: 0.5 } }));`,
     );
     const measured = await measureImpls([phased, good], ["diff-phone"], {
       fixtures,
@@ -272,7 +288,7 @@ describe("bench:perf --impl", () => {
       "decode_inflate",
       "pixel_compare",
       "regions",
-      "overlay_encode",
+      "anti_alias",
       "startup",
       "rest",
       "wall",

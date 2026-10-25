@@ -162,7 +162,6 @@ const PHASE_ORDER = [
   "pixel_compare",
   "anti_alias",
   "regions",
-  "overlay_encode",
 ];
 
 /** A phase table per step, when any implementation reported phases. Medians, ms; `-` is not reported. */

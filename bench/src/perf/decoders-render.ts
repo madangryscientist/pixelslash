@@ -10,14 +10,8 @@ import { IMPL_STEP_IDS } from "./steps.ts";
 export type Candidate = {
   /** The row's name in the table. */
   label: string;
-  engine: "C#" | "TS";
-  /** What the row measures: a decoder, an overlay encoder (pngjs decode), or the compiled binary's start-up. */
-  kind: "decoder" | "overlay" | "startup";
   command: string;
   licence: string;
-  workerd: boolean;
-  cli: boolean;
-  csharp: boolean;
   /** Files or directories whose size is the install weight. */
   weight: string[];
   /** Why it may never ship, when it may not. */
@@ -28,10 +22,6 @@ export type Candidate = {
 
 /** What `native/build.sh` could not make and why, for the "could not build" list. */
 export const COULD_NOT_BUILD: { name: string; why: string }[] = [
-  {
-    name: "libspng or Wuffs as WASM (TS)",
-    why: "no maintained npm build of either; building one is a new toolchain (emscripten) for a bench row",
-  },
   {
     name: "ImageSharp 3.2 / 4.x (C#)",
     why: "the build stops without a Six Labors licence key; buying one is not ours to do, so 3.1.12 is measured",
@@ -46,7 +36,6 @@ function bytesOf(path: string): number {
 }
 
 const mb = (bytes: number): string => (bytes / 1e6).toFixed(1);
-const yn = (b: boolean): string => (b ? "yes" : "no");
 
 type Step = {
   decode: number[];
@@ -89,10 +78,9 @@ function noNumbers(r: Candidate, step: Step | undefined, missing: string): strin
 
 type Table = { rows: Candidate[]; byCommand: Map<string, Dumped> };
 
-/** Each engine's own default before PS-168, the `vs baseline` column's zero. */
-function baselineMs(t: Table, engine: string): number | null {
-  const label = engine === "C#" ? "stb sequential" : "pngjs sequential";
-  const row = t.rows.find((r) => r.engine === engine && r.label === label);
+/** The C# decoders' `vs baseline` column is against `stb sequential`, the decoder before PS-168. */
+function baselineMs(t: Table): number | null {
+  const row = t.rows.find((r) => r.label === "stb sequential");
   const xs = selfMs(t.byCommand.get(row?.command ?? ""), "diff-long");
   return xs.length > 0 ? median(xs) : null;
 }
@@ -103,29 +91,29 @@ function headline(t: Table): string[] {
     const xs = selfMs(d, "diff-long");
     const step = d?.steps["diff-long"];
     if (r.missing || !step || xs.length === 0)
-      return `| ${r.label} | ${r.engine} | ${noNumbers(r, step, `not built: ${r.missing}`)} | | | | | ${r.licence} | |`;
-    const base = baselineMs(t, r.engine);
+      return `| ${r.label} | ${noNumbers(r, step, `not built: ${r.missing}`)} | | | | | ${r.licence} | |`;
+    const base = baselineMs(t);
     const vs = base === null ? "-" : `${(((median(xs) - base) / base) * 100).toFixed(0)}%`;
-    return `| ${r.label} | ${r.engine} | ${median(xs).toFixed(1)} | ${percentile(xs, 95).toFixed(1)} | ${vs} | ${f1(step.decode)} | ${rssMb(step)} | ${r.licence} | ${r.never ? `never: ${r.never}` : "permissive"} |`;
+    return `| ${r.label} | ${median(xs).toFixed(1)} | ${percentile(xs, 95).toFixed(1)} | ${vs} | ${f1(step.decode)} | ${rssMb(step)} | ${r.licence} | ${r.never ? `never: ${r.never}` : "permissive"} |`;
   });
 }
 
 const DECODE_PHASES = ["decode_read", "decode_inflate", "decode_unfilter", "decode_other"];
-const DIFF_PHASES = ["pixel_compare", "regions", "overlay_encode"];
+const DIFF_PHASES = ["pixel_compare", "regions"];
 
 function pageRows(t: Table, r: Candidate): string[] {
   // None of its files found (another install layout): not measured, so not 0.
   const found = r.weight.filter((w) => existsSync(w));
   const weight = found.length === 0 ? "-" : mb(found.reduce((sum, w) => sum + bytesOf(w), 0));
-  const tail = `${r.licence} | ${yn(r.workerd)} | ${yn(r.cli)} | ${yn(r.csharp)} | ${weight} |`;
+  const tail = `${r.licence} | ${weight} |`;
   const d = t.byCommand.get(r.command);
   return IMPL_STEP_IDS.map((page) => {
     const step = d?.steps[page];
     const xs = selfMs(d, page);
     if (r.missing || !step || xs.length === 0)
-      return `| ${r.label} | ${r.engine} | ${page} | ${noNumbers(r, step, "not built")} | | | | | | | ${tail}`;
+      return `| ${r.label} | ${page} | ${noNumbers(r, step, "not built")} | | | | | | | ${tail}`;
     const phases = (names: string[]) => names.map((n) => f1(step.phases[n])).join(" / ");
-    return `| ${r.label} | ${r.engine} | ${page} | ${median(xs).toFixed(1)} | ${percentile(xs, 95).toFixed(1)} | ${f1(step.wall)} | ${f1(step.startup)} | ${phases(DECODE_PHASES)} | ${phases(DIFF_PHASES)} | ${rssMb(step)} | ${tail}`;
+    return `| ${r.label} | ${page} | ${median(xs).toFixed(1)} | ${percentile(xs, 95).toFixed(1)} | ${f1(step.wall)} | ${f1(step.startup)} | ${phases(DECODE_PHASES)} | ${phases(DIFF_PHASES)} | ${rssMb(step)} | ${tail}`;
   });
 }
 
@@ -138,26 +126,25 @@ export function render(
 ): string {
   const t: Table = { rows, byCommand: new Map(dumped.map((d) => [d.command, d])) };
   const out: string[] = [
-    `# Decoders and overlay encoders, ${date} (PS-168)`,
+    `# Decoders, ${date} (PS-168)`,
     "",
     "Written by `bun run bench:decoders`; do not edit by hand. Each row is one `--impl` of `bench:perf`,",
     "all rows interleaved in one run, so the numbers compare with each other and with no other run.",
     "`self` is the implementation's own decode + diff ms; `wall` is the whole process. Peak RSS is what",
-    "the process reports (`peak_rss_bytes`), runtime included: compare it within an engine, not across. Install weight is the files the candidate adds on disk. `workerd` is",
-    "from each package's docs (a native addon cannot load there), not run here.",
+    "the process reports (`peak_rss_bytes`), runtime included. Install weight is the files the candidate adds on disk.",
     "",
     ...header.map((l) => `    ${l}`),
     "",
     "## Headline: diff-long (1440x6000)",
     "",
-    "| candidate | engine | self median | self p95 | vs baseline | decode | peak RSS MB | licence | ships? |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+    "| candidate | self median | self p95 | vs baseline | decode | peak RSS MB | licence | ships? |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
     ...headline(t),
     "",
     "## Every row, every page",
     "",
-    "| candidate | engine | page | self median | self p95 | wall | startup | decode read / inflate / unfilter / other | pixel_compare / regions / overlay_encode | peak RSS MB | licence | workerd | CLI (Bun) | C# | install MB |",
-    "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- | --- | ---: |",
+    "| candidate | page | self median | self p95 | wall | startup | decode read / inflate / unfilter / other | pixel_compare / regions | peak RSS MB | licence | install MB |",
+    "| --- | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | ---: |",
     ...rows.flatMap((r) => pageRows(t, r)),
     "",
     "## Could not build",

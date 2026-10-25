@@ -1,22 +1,22 @@
 #!/usr/bin/env bun
 /**
- * `bun run bench:decoders` (PS-168): every PNG decoder the C# engine can run and every overlay
- * encoder the TS impl can, timed against each other by `bench:perf --impl`, and the table written
- * to `bench/results/decoders-<yyyy-mm>.md`. The TS impl has no decoder rows since PS-210: its
- * decode is inside `diff.wasm`, so there is none to choose.
+ * `bun run bench:decoders` (PS-168): every PNG decoder the C# engine can run, timed against each
+ * other by `bench:perf --impl`, and the table written to `bench/results/decoders-<yyyy-mm>.md`.
+ * Only the C# engine has a decoder to choose: the JS engine (`diff.wasm`) decodes inside its own
+ * diff, so the TS rows and their overlay encoders went in PS-211 with the pngjs and napi-image engines.
  *
  *   bun bench/src/perf/decoders.ts [--runs <n>] [--env none|dedicated] [--only <step,...>]
  *
  * It builds what it times first: the C# engine with every candidate compiled in
  * (`-p:DecoderCandidates=true`, into native/out/candidates). The `bun build --compile` start-up row
- * went in PS-210: a compiled binary does not carry `diff.wasm`, which the engine reads from disk. The native libraries come from `native/build.sh`, which
- * fetches sources and so is not run from here; a candidate whose library is missing is a "could not
- * build" row with the reason, not a failure. On demand only, like `bench:perf`: never in the gate.
+ * went in PS-210: a compiled binary does not carry `diff.wasm`, which the engine reads from disk.
+ * The native libraries come from `native/build.sh`, which fetches sources and so is not run from
+ * here; a candidate whose library is missing is a "could not build" row with the reason, not a
+ * failure. On demand only, like `bench:perf`: never in the gate.
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CODECS, OVERLAYS, isLibrary, type Codec, type OverlayName } from "../impl/ts-codecs.ts";
 import { say, warn } from "../say.ts";
 import { isDump, render, type Candidate } from "./decoders-render.ts";
 
@@ -25,7 +25,6 @@ const DOTNET = join(ROOT, "engines/dotnet");
 const NATIVE_OUT = join(DOTNET, "native/out");
 const CANDIDATES_DIR = join(NATIVE_OUT, "candidates");
 const CSHARP_BIN = join(CANDIDATES_DIR, "PixelSlash.Diff");
-const TS_DIFF = join(ROOT, "bench/src/impl/ts-diff.ts");
 
 type CsDecoder = {
   name: string;
@@ -70,38 +69,12 @@ const CS_DECODERS: CsDecoder[] = [
   },
 ];
 
-/** The installed size of an npm package, wherever the isolated linker put it. */
-function packageDirs(name: string): string[] {
-  const store = join(ROOT, "node_modules/.bun");
-  if (!existsSync(store)) return [];
-  if (name === "@img") {
-    return readdirSync(store)
-      .filter((d) => d.startsWith("@img+"))
-      .flatMap((d) => {
-        const scope = join(store, d, "node_modules/@img");
-        return existsSync(scope) ? readdirSync(scope).map((p) => join(scope, p)) : [];
-      });
-  }
-  const prefix = `${name.replace("/", "+")}@`;
-  return readdirSync(store)
-    .filter((d) => d.startsWith(prefix))
-    .map((d) => join(store, d, "node_modules", name))
-    .filter((p) => existsSync(p));
-}
-
-const tsWeight = (packages: string[]): string[] => [...new Set(packages.flatMap(packageDirs))];
-
 function csRows(): Candidate[] {
   return CS_DECODERS.flatMap((d) =>
     (d.name === "stb" ? ["sequential", "parallel"] : ["parallel"]).map((mode): Candidate => ({
       label: `${d.name} ${mode}`,
-      engine: "C#",
-      kind: "decoder",
       command: `${CSHARP_BIN} --decoder ${d.name} --decode ${mode}`,
       licence: d.licence,
-      workerd: false,
-      cli: false,
-      csharp: true,
       weight: d.weight.map((w) => join(CANDIDATES_DIR, w)),
       ...(d.never ? { never: d.never } : {}),
       ...(d.library && !existsSync(join(NATIVE_OUT, d.library))
@@ -111,38 +84,9 @@ function csRows(): Candidate[] {
   );
 }
 
-const tsCommand = (overlay: OverlayName): string => `bun ${TS_DIFF} --overlay ${overlay}`;
-
-/** A TS row's licence and reach, from the codec it loads. */
-function tsRow(codec: Codec): Omit<Candidate, "label" | "engine" | "kind" | "command"> {
-  return {
-    licence: codec.licence,
-    workerd: codec.workerd,
-    cli: codec.cli,
-    csharp: false,
-    weight: tsWeight(codec.packages),
-    ...(codec.never ? { never: codec.never } : {}),
-  };
-}
-
-/** The pngjs levels are pngjs; every other encoder is the library of its name. */
-function overlayCodec(overlay: OverlayName): Codec {
-  return CODECS[isLibrary(overlay) ? overlay : "pngjs"];
-}
-
-function overlayRows(): Candidate[] {
-  return OVERLAYS.filter((o) => o !== "none").map((overlay): Candidate => ({
-    label: `overlay ${overlay}`,
-    engine: "TS",
-    kind: "overlay",
-    command: tsCommand(overlay),
-    ...tsRow(overlayCodec(overlay)),
-  }));
-}
-
 /** Every row the table has, measurable or not. Pure: what is on disk only decides `missing`. */
 export function candidates(): Candidate[] {
-  return [...csRows(), ...overlayRows()];
+  return csRows();
 }
 
 async function sh(argv: string[], cwd = ROOT): Promise<void> {

@@ -20,7 +20,7 @@ function spin(ms: number): void {
 }
 
 /**
- * `diffPngs` (decode, pixel diff, region clustering, overlay encode) on one fixed pair. The
+ * `diffPngs` (decode, pixel diff, region clustering) on one fixed pair. The
  * identical pair is the same file twice: a tree with the byte-equal shortcut (ob 1948) skips all of
  * it, one without pays the full diff for an answer of no change.
  */

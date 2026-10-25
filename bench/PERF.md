@@ -20,35 +20,30 @@ Perf runs are on demand only and never in the gate.
 > from the same run.
 
 Pages: **phone** 390×844 · **desktop** 1440×900 · **long** 1440×6000.
-Engines: **ts** = `bun bench/src/impl/ts-diff.ts`, the production engine's `diffRasters`; since PS-168 it
-decodes with napi-image and encodes no overlay by default, so the production-shaped run is
-`--decoder pngjs --overlay pngjs`. It imports `@pixelslash/engine/diff`, not the package root the CLI
-loads, so it leaves out the CLI's Playwright import (about 80 ms of start-up) · **cs** = `engines/dotnet` Release (C# port; SkiaSharp decode, in
-parallel, by default since PS-168; StbImageSharp before).
+Engines: **ts** = `bun bench/src/impl/ts-diff.ts --engine wasm`, `diff.wasm` through `wasmDiff`, the one
+diff the CLI and the server run (PS-210); it encodes no overlay, as the bench contract does not ask for one · **cs** =
+`engines/dotnet` Release (C# port; SkiaSharp decode, in parallel, the shipped C# default since PS-168). The JS pngjs
+and napi-image engines were retired in PS-211 (see the run log); their rows in older entries stay as measured.
 
 ## Dashboard
 
-Best known wall time per page, against ts doing the same work (the same run, `env` dedicated). Every
-column decodes, diffs and finds regions, and none encodes an overlay PNG, because cs has no overlay.
-The production-shaped ts also encodes the overlay, which cs does not do, so it is shown for scale but
-is not a baseline:
+Wall time per page for the two engines, from the one run that timed both: PS-209, `--env dedicated
+--runs 10`, 2026-10-25 (`bench/perf-results/2026-10-25T17-51-22-485Z.json`). Both sides do the same
+work: decode, diff and regions, and no overlay image, since the bench's WASM encode is a no-op (PS-211).
 
-| Page | ts, production-shaped (+ overlay) | ts, pngjs, no overlay | ts, napi-image, no overlay | Best so far | Config | vs pngjs | vs napi-image | Shipped cs default (skia, parallel) | vs pngjs | vs napi-image |
-| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| phone | 128.1 ms | 105.5 ms | 88.0 ms | **87.1 ms** | cs, libspng on zlib-ng, parallel | −17% | −1% | 95.3 ms | −10% | +8% |
-| desktop | 247.4 ms | 163.3 ms | 122.2 ms | **95.1 ms** | cs, libspng on zlib-ng, parallel | −42% | −22% | 105.7 ms | −35% | −14% |
-| long | 1114.8 ms | 706.4 ms | 438.6 ms | **195.0 ms** | cs, libspng on zlib-ng, parallel | −72% | −56% | 207.2 ms | −71% | −53% |
+| Page | ts (`diff.wasm`), wall | cs (SkiaSharp, parallel, shipped default), wall | cs vs ts |
+| --- | ---: | ---: | ---: |
+| phone | 65.0 ms | 98.5 ms | +52% |
+| desktop | 94.9 ms | 107.6 ms | +13% |
+| long | 400.0 ms | 206.6 ms | −48% |
 
-**Work done.** cs does less than the production engine: it has no overlay image and no ignore areas
-(`engines/dotnet/PixelSlash.Diff/Diff.cs`, "not ported"). Its numbers compare only against a ts row
-with `--overlay none`. Before 2026-10-25 this table measured "Change" against the production-shaped
-row (−32% / −62% / −83% best, −26% / −57% / −81% shipped), which credited cs for skipping the overlay
-encode.
+**Work done.** The table before PS-211 compared cs with a production-shaped ts that encoded an
+overlay, which credited cs for skipping that encode; those rows are retired with the pngjs engine.
+libspng on zlib-ng is the fastest cs decoder (PS-168: 87.1 / 95.1 / 195.0 ms wall, from that run,
+not compared here). It needs `native/build.sh`, so the shipped cs default is SkiaSharp.
 
-Source: the PS-168 run, 2026-10-25, `--env dedicated`. It is not comparable with the ob 1932
-dashboard (`shared`, boost on), which it replaces. The production engine (CLI and web) is still ts
-with pngjs. The C# engine is bench-only so far. libspng on zlib-ng is the fastest, but it needs
-`native/build.sh`; the shipped cs default is SkiaSharp, from NuGet (see the PS-168 entry).
+Source: PS-209, 2026-10-25, `--env dedicated`. The production engine (CLI and web) is `diff.wasm`
+(PS-210); cs is bench-only so far.
 
 The phase-by-phase breakdown behind the [Bottlenecks](#bottlenecks) section.
 
@@ -189,6 +184,8 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
   `MemoryHigh=1400M` on the RSS burst (1519–1588 MB peak, 1124 MB with the sidecar).
 
 ## Run log
+
+2026-10-25 · PS-211: the JS pngjs and napi-image engines are retired from the bench, with their overlay encoders, `--decoder` and `--overlay`. The bench times one JS engine, `diff.wasm` (PS-210), and the C# engine. Their rows below stay as measured.
 
 Newest first. One entry per perf run that landed. The `env` column says what the machine was doing
 (see the note at the top): the runs before ob 1947 are all `desktop, shared`.
