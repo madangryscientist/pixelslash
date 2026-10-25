@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { SERVER, SERVER_PORT, STUB, STUB_PORT } from "./e2e/ports";
+import { SERVER, SERVER_PORT, SIDECAR, SIDECAR_PORT, STUB, STUB_PORT } from "./e2e/ports";
 
 // The web server starts before `globalSetup` scopes TMPDIR, so it gets its own under .wrangler/e2e,
 // which the next run clears: miniflare and wrangler leave nothing in /tmp.
@@ -9,6 +9,11 @@ const SERVER_TMP = fileURLToPath(new URL(".wrangler/e2e/tmp", import.meta.url));
 // `PIXELSLASH_E2E_DEV=1` serves with `vite dev` instead of a production build, so the server diff
 // (pngjs in workerd) is also run through the dev module graph (ob 1625).
 const dev = process.env["PIXELSLASH_E2E_DEV"] === "1";
+
+// The production run diffs in the diff sidecar (PS-203), as on the LAN self-host. The dev run keeps
+// pngjs in workerd, as on Cloudflare, so that path stays under an e2e run; so does
+// `PIXELSLASH_E2E_NO_SIDECAR=1` on a production run (the before of PS-203's burst measurement).
+const sidecar = !dev && process.env["PIXELSLASH_E2E_NO_SIDECAR"] !== "1";
 
 // Happy paths only, against a local production build signing in through a GitHub stub.
 // Each run starts from an empty local D1 (`.wrangler/e2e`).
@@ -28,6 +33,16 @@ export default defineConfig({
       url: `${STUB}/health`,
       reuseExistingServer: false,
     },
+    ...(sidecar
+      ? [
+          {
+            command: "bun deploy/lan/diff-sidecar.ts",
+            env: { PIXELSLASH_DIFF_SIDECAR_PORT: String(SIDECAR_PORT) },
+            url: `${SIDECAR}/health`,
+            reuseExistingServer: false,
+          },
+        ]
+      : []),
     {
       command: [
         "rm -rf .wrangler/e2e",
@@ -42,6 +57,8 @@ export default defineConfig({
         TMPDIR: SERVER_TMP,
         // `vite.config.ts` points the worker at this port instead of the one in `wrangler.jsonc`.
         PIXELSLASH_E2E_STUB_PORT: String(STUB_PORT),
+        // And at this sidecar, or at none (`vite.config.ts`).
+        PIXELSLASH_E2E_SIDECAR: sidecar ? SIDECAR : "",
       },
       url: SERVER,
       reuseExistingServer: false,

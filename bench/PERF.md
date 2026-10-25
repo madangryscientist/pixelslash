@@ -136,6 +136,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | — | — |
 | 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | — | — |
 | 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
+| 19 | Self-host server diff in a Bun sidecar with napi-image (workerd keeps pngjs on Cloudflare) | web (self-host) | ✅ measured, shipped | PS-200 burst, 50 shots 1280×5000: diff time 29.7/37.9 → 11.9/14.3 s; workerd settled RSS 660/691 → 357/363 MB | PS-203 |
 | 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
@@ -164,7 +165,8 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
   pngjs's RGBA byte for byte on every corpus PNG (`bench/test/codecs.test.ts`).
 - **Constraint:** the web app's server diff runs in workerd, which can load WASM but no native
   code. The CLI (Bun) can load native code. So the fastest production ts option differs per path:
-  napi-image for the CLI, pngjs (or jsquash) for workerd.
+  napi-image for the CLI, pngjs (or jsquash) for workerd. Since PS-203 the self-host's Worker sends
+  the diff to a Bun sidecar with napi-image; only the Cloudflare deploy still diffs with pngjs.
 
 ## Run log
 
@@ -173,6 +175,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-203 | desktop, shared | the self-host's server diff in a Bun sidecar with napi-image |
 | 2026-10-25 | PS-195 | desktop, shared | capture split into navigate, settle, screenshot and launch; pages shot at once |
 | 2026-10-25 | PS-190 | desktop, shared | where a real run's time goes: capture vs diff, CLI and server (measurement, no code) |
 | 2026-10-25 | PS-168 | desktop, dedicated | decoders and encoders: every candidate for both engines |
@@ -180,6 +183,46 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · PS-203 · desktop, shared · the self-host's server diff in a Bun sidecar
+
+**The self-host's server diff is 2.5–2.7× faster, and workerd settles at about half the memory.**
+On PS-200's burst the 50 diffs took 29.7 and 37.9 s in-process and 11.9 and 14.3 s through the
+sidecar; workerd settled at 660 and 691 MB before and 357 and 363 MB after, under PS-200's 665 MB.
+The diff now decodes and encodes with napi-image in a Bun process on loopback instead of pngjs in
+workerd; the result is the same (fields equal, overlay pixels equal, `src/diff/sidecar.test.ts`).
+
+**Env.** Linux desktop, 12 cores, load average 8 to 15 (other worktrees' gates running), browser and
+editor up (`shared`). All four runs in one session, alternating. The burst is
+`apps/web/e2e/rss-burst.spec.ts` against the e2e production build: 50 shots of 1280×5000 uploaded to
+main, then 50 changed ones to a branch, each finalised; "diff" is the branch upload's time less
+main's (main has no baseline, so it diffs nothing). Before is `PIXELSLASH_E2E_NO_SIDECAR=1` on the
+same build.
+
+```bash
+cd apps/web
+PIXELSLASH_E2E_NO_SIDECAR=1 PIXELSLASH_RSS_BURST=50 bunx playwright test rss-burst   # before
+PIXELSLASH_RSS_BURST=50 bunx playwright test rss-burst                              # after
+```
+
+| Run | diff | branch upload | workerd idle / peak / settled | sidecar idle / peak / settled | finalises |
+| --- | ---: | ---: | --- | --- | ---: |
+| before #1 | 29.7 s | — | 177 / 681 / 660 MB | — | 1 |
+| after #1 | **11.9 s** | — | 178 / 371 / 357 MB | 39 / 317 / 51 MB | 1 |
+| before #2 | 37.9 s | 42.0 s | 181 / 725 / 691 MB | — | 1 |
+| after #2 | **14.3 s** | 18.5 s | 178 / 392 / 363 MB | 35 / 343 / 58 MB | 1 |
+
+The first pair's branch upload was not printed (the line gained it after). The load moved between
+runs, so compare each after with the before beside it, not across pairs.
+
+**Memory.** workerd's peak halves because it no longer holds pngjs's decoded rasters and overlays;
+the sidecar holds them instead, and gives them back (settled 51–58 MB). Worst case, both peaks at
+once, is about 735 MB against 725 MB before; settled the two together are about 420 MB against
+691 MB. The sidecar's unit is capped at 450M/600M, and `pixelslash-web`'s PS-155 cap is unchanged.
+
+**Not measured.** The CT itself (2 vCPU): the brief forbids running anything there. The desktop is
+faster per core, so the CT's absolute times are higher, but the decode and encode the sidecar removes
+are the same share of each diff.
 
 ### 2026-10-25 · PS-195 · desktop, shared · split settle out of capture, then cut it
 

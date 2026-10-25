@@ -12,6 +12,11 @@
 # pixelslash-opencode, and points every org without a model of its own at the helper. Without the
 # file nothing about the helper is installed, and one that was is disabled and removed. See
 # apps/web/README.md, "The AI explain step through opencode".
+#
+# The diff sidecar (PS-203) is always installed: pixelslash-diff runs the server diff with the
+# napi-image codec on 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come
+# up is reported and the update goes on, since the Worker then diffs in-process with pngjs, as it
+# did before the sidecar. See apps/web/README.md, "The diff sidecar".
 set -Eeuo pipefail
 
 HELPER_SWITCH=/etc/pixelslash/opencode-helper
@@ -70,6 +75,16 @@ SQL
     rm -f "$sql"
   }
 
+  # `restart` returns once the process is forked, so a unit that dies on start is seen by waiting
+  # for its port: up to 10 s.
+  wait_for_port() {
+    for _ in $(seq 20); do
+      if (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null; then return 0; fi
+      sleep 0.5
+    done
+    return 1
+  }
+
   # A deploy checkout: nothing is edited or committed here, so main's tip wins.
   as_app "git fetch --quiet origin main && git reset --quiet --hard origin/main && git log --oneline -1"
 
@@ -109,6 +124,7 @@ SQL
   as_app "cd apps/web && bunx wrangler d1 migrations apply DB --local --env e2e"
   as_app "cd apps/web && CLOUDFLARE_ENV=e2e bun run build"
   install -m 644 "$repo"/apps/web/deploy/lan/pixelslash-stub.service \
+    "$repo"/apps/web/deploy/lan/pixelslash-diff.service \
     "$repo"/apps/web/deploy/lan/pixelslash-web.service /etc/systemd/system/
   if [[ -n $helper_model ]]; then
     install -m 644 "$repo"/apps/web/deploy/lan/pixelslash-opencode.service /etc/systemd/system/
@@ -117,6 +133,14 @@ SQL
     rm -f /etc/systemd/system/pixelslash-opencode.service
   fi
   systemctl daemon-reload
+  # The sidecar is up before the server that sends to it. Waited for like the helper, but a sidecar
+  # that does not come up costs speed, not a result: it is reported, and the update goes on.
+  systemctl enable --quiet pixelslash-diff
+  systemctl restart pixelslash-diff
+  if ! wait_for_port 4181; then
+    journalctl -u pixelslash-diff -n 5 --no-pager >&2 || true
+    echo "pixelslash-diff did not come up on :4181: server diffs run in-process (pngjs)" >&2
+  fi
   # The helper is up before any org is pointed at it: a unit that will not start fails the update
   # here, and no row aims at a port with nothing behind it.
   if [[ -n $helper_model ]]; then
@@ -124,12 +148,7 @@ SQL
     systemctl restart pixelslash-opencode
     # `restart` returns once the process is forked, so a helper that dies on start (a missing
     # module, a bad key file) is only seen by waiting for its port. Without it no row points there.
-    local up=0
-    for _ in $(seq 20); do
-      if (echo >/dev/tcp/127.0.0.1/4180) 2>/dev/null; then up=1; break; fi
-      sleep 0.5
-    done
-    if [[ $up == 0 ]]; then
+    if ! wait_for_port 4180; then
       journalctl -u pixelslash-opencode -n 5 --no-pager >&2 || true
       echo "pixelslash-opencode did not come up on :4180" >&2
       rollback

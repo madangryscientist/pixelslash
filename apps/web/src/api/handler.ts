@@ -37,6 +37,8 @@ export type ApiDeps = {
   minCliVersion?: string | undefined;
   /** The engine's diff for finalise; a test passes one that throws (ob 1727). */
   diff?: ProcessDeps["diff"];
+  /** The self-host's diff sidecar for finalise (PS-203); unset measures in-process. */
+  diffSidecar?: ProcessDeps["diffSidecar"];
   /** Where a finalised build's changed shots go to be explained (ob 1875). */
   explainQueue?: ProcessDeps["explainQueue"];
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
@@ -110,8 +112,11 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // after `errored`.
   // The model's explanations are not in it: they are queued once the verdict is written (ob 1875).
   const blobs = orgBlobs(ctx.store, orgId);
-  const { db, diff, explainQueue, modelKeySecret } = ctx;
-  const result = await processBuild({ db, blobs, diff, explainQueue, modelKeySecret }, done);
+  const { db, diff, diffSidecar, explainQueue, modelKeySecret } = ctx;
+  const result = await processBuild(
+    { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret },
+    done,
+  );
   return json({
     id: done.id,
     status: result.status,

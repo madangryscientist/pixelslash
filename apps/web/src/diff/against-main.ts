@@ -86,7 +86,12 @@ export async function diffAgainstMain(
  * unmeasured stays null, and the branch page says "not measured against main".
  */
 export async function measureAgainstMain(
-  deps: { db: Db; blobs: BlobStore; diff?: typeof diffPngs | undefined },
+  deps: {
+    db: Db;
+    blobs: BlobStore;
+    diff?: typeof diffPngs | undefined;
+    diffSidecar?: string | undefined;
+  },
   { buildId, only }: { buildId: string; only?: Set<string> | undefined },
   baselines: Baselines,
   budget: Budget | null,

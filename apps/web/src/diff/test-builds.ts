@@ -129,7 +129,8 @@ export async function explaining<T>(
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
  * front of the diff only, so a failure there is not the store the assertions read back from;
- * `blobs` does the same for the images; `diff` stands in for the engine's diff; `modelFetch` for
+ * `blobs` does the same for the images; `diff` stands in for the engine's diff; `diffSidecar` names
+ * a diff sidecar (PS-203); `modelFetch` for
  * the project's model. The explain queue (ob 1875) is drained before it returns, unless the test
  * passes its own `queue` to drain when it chooses.
  */
@@ -141,6 +142,7 @@ export async function upload(
     db = ctx.db,
     blobs = ctx.scoped,
     diff,
+    diffSidecar,
     modelFetch,
     modelKeySecret = TEST_MODEL_KEY_SECRET,
     queue,
@@ -149,6 +151,7 @@ export async function upload(
     db?: Db;
     blobs?: BlobStore;
     diff?: typeof diffPngs | undefined;
+    diffSidecar?: string | undefined;
     modelFetch?: ModelFetch | undefined;
     /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
     modelKeySecret?: string | null;
@@ -159,7 +162,7 @@ export async function upload(
   const explain = queue ?? memoryQueue();
   const secret = modelKeySecret ?? undefined;
   await processBuild(
-    { db, blobs, now, diff, explainQueue: explain.queue, modelKeySecret: secret },
+    { db, blobs, now, diff, diffSidecar, explainQueue: explain.queue, modelKeySecret: secret },
     done,
   );
   if (!queue)

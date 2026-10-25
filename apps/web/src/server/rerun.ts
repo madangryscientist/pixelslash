@@ -4,7 +4,7 @@ import { getProjectWithOrg } from "#/db/orgs";
 import { NoRecoveryError } from "#/diff/claim";
 import { RerunError, rerunShots } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database, explainQueue, modelKeySecret } from "./env";
+import { blobStore, database, diffSidecarUrl, explainQueue, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
 
@@ -30,7 +30,13 @@ export const rerunBuildShots = createServerFn({ method: "POST" })
     const blobs = orgBlobs(blobStore(), project.orgId);
     try {
       return await rerunShots(
-        { db, blobs, modelKeySecret: modelKeySecret(), explainQueue: explainQueue() },
+        {
+          db,
+          blobs,
+          diffSidecar: diffSidecarUrl(),
+          modelKeySecret: modelKeySecret(),
+          explainQueue: explainQueue(),
+        },
         build,
         data.snapshotId,
       );

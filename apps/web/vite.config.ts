@@ -30,13 +30,22 @@ const pngjsSyncInflate: Plugin = {
 
 /**
  * The e2e run's GitHub stand-in listens on a free port picked per run (`e2e/ports.ts`), so the
- * URLs in `wrangler.jsonc` (:4174, for running the stand-in by hand) are replaced with it.
+ * URLs in `wrangler.jsonc` (:4174, for running the stand-in by hand) are replaced with it. So is
+ * the diff sidecar's (:4181, the LAN's), with the run's own sidecar or with none (PS-203).
  */
 function pointAtStub(config: { vars?: Record<string, unknown> }) {
   const port = process.env["PIXELSLASH_E2E_STUB_PORT"];
   if (!port) return {};
   const base = `http://localhost:${port}`;
-  return { vars: { ...config.vars, GITHUB_OAUTH_BASE: base, GITHUB_API_BASE: base } };
+  const sidecar = process.env["PIXELSLASH_E2E_SIDECAR"] ?? "";
+  return {
+    vars: {
+      ...config.vars,
+      GITHUB_OAUTH_BASE: base,
+      GITHUB_API_BASE: base,
+      DIFF_SIDECAR_URL: sidecar,
+    },
+  };
 }
 
 export default defineConfig({

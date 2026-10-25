@@ -2,8 +2,9 @@
 # apps/web/.wrangler/state. See apps/web/README.md, "Run it on the Proxmox server".
 [Unit]
 Description=PixelSlash review app
-After=network-online.target pixelslash-stub.service
-Wants=network-online.target pixelslash-stub.service
+# The diff sidecar (PS-203) is wanted, not required: without it the Worker diffs in-process.
+After=network-online.target pixelslash-stub.service pixelslash-diff.service
+Wants=network-online.target pixelslash-stub.service pixelslash-diff.service
 
 [Service]
 User=pixelslash

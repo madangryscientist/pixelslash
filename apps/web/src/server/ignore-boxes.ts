@@ -9,7 +9,7 @@ import { NoRecoveryError } from "#/diff/claim";
 import { addBoxAndRediff, clearBoxAndRediff } from "#/diff/ignore-box";
 import { RerunError } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database, explainQueue, modelKeySecret } from "./env";
+import { blobStore, database, diffSidecarUrl, explainQueue, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
 import { scopeInput } from "./overrides";
 import { requireViewer } from "./session";
@@ -54,6 +54,7 @@ async function openBuild(projectId: string, buildId: string) {
     deps: {
       db,
       blobs: orgBlobs(blobStore(), project.orgId),
+      diffSidecar: diffSidecarUrl(),
       modelKeySecret: modelKeySecret(),
       explainQueue: explainQueue(),
     },

@@ -61,6 +61,8 @@ export type ProcessDeps = {
   now?: (() => number) | undefined;
   /** The engine's diff; a test passes one that throws to prove a CI build never calls it. */
   diff?: typeof diffPngs | undefined;
+  /** The self-host's diff sidecar (PS-203), `DIFF_SIDECAR_URL`; unset measures in-process. */
+  diffSidecar?: string | undefined;
   /** Where the changed shots go to be explained (ob 1875); a test passes one in memory. */
   explainQueue?: ExplainQueue | undefined;
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */

@@ -29,6 +29,12 @@ export function imageSigningSecret(): string {
  */
 export const modelKeySecret = (): string | undefined => env.MODEL_KEY_SECRET || undefined;
 
+/**
+ * The self-host's diff sidecar (PS-203): a loopback URL where a Bun process runs the diff with the
+ * native codec. Cloudflare never sets it; unset, the server diff runs here with pngjs.
+ */
+export const diffSidecarUrl = (): string | undefined => env.DIFF_SIDECAR_URL || undefined;
+
 /** The oldest CLI the API takes (`x.y.z`, ob 1729); empty takes any. Set in `vars`. */
 export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || undefined;
 

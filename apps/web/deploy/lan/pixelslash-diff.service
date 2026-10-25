@@ -1,0 +1,28 @@
+# The diff sidecar on 127.0.0.1:4181 (diff-sidecar.ts, PS-203): the server diff with the napi-image
+# codec, which workerd cannot load. pixelslash-web sends it each shot's two PNGs over loopback
+# (wrangler.jsonc `env.e2e` DIFF_SIDECAR_URL) and measures in-process with pngjs when it is down.
+# Installed, enabled and restarted by update.sh. See apps/web/README.md, "The diff sidecar".
+[Unit]
+Description=PixelSlash diff sidecar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pixelslash
+WorkingDirectory=/home/pixelslash/pixelslash/apps/web
+Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/diff-sidecar.ts
+Restart=on-failure
+RestartSec=2
+# The CT has 2 GiB and pixelslash-web may hold 1.7 GB of it (PS-155). The sidecar idles at ~40 MB,
+# peaked at ~320-340 MB on PS-200's burst (50 shots of 1280x5000) and was back at ~55 MB 10 s later.
+# MemoryHigh reclaims first; MemoryMax kills a runaway before it takes the review app with it, and
+# the Worker then measures in-process until Restart= brings it back.
+MemoryHigh=450M
+MemoryMax=600M
+OOMPolicy=stop
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

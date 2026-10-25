@@ -1,10 +1,25 @@
 import { Buffer } from "node:buffer";
-import { ENGINE_VERSION, diffPngs, identicalResult, summarizeDiff } from "@pixelslash/engine/diff";
+import {
+  type DiffIgnore,
+  type DiffOptions,
+  ENGINE_VERSION,
+  type PixelDiff,
+  diffPngs,
+  identicalResult,
+  summarizeDiff,
+} from "@pixelslash/engine/diff";
 import { release } from "@pixelslash/engine/release";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
 import { checkCiResult } from "./ci-result";
+import {
+  type SidecarDiff,
+  SidecarError,
+  logFallbackOnce,
+  sidecarDiff,
+  sidecarEndpoint,
+} from "./sidecar";
 
 /**
  * The two ways a shot is compared with a baseline (ob 1727): measured here with the engine, or
@@ -53,12 +68,61 @@ function sameBytes(
   return shot.imageSize && baseline.imageSize ? shot.imageSize : null;
 }
 
-/** The server diff: both PNGs read and measured here. */
+/**
+ * The self-host's sidecar when one is named, else none (PS-203). Unset is logged once: Cloudflare
+ * never sets it, and a self-host that meant to can see it did not. A URL that is not on loopback is
+ * refused, and the shots stay in-process.
+ */
+function sidecarOf(url: string | undefined): SidecarDiff | null {
+  if (!url) {
+    logFallbackOnce("unset", "DIFF_SIDECAR_URL is not set");
+    return null;
+  }
+  const endpoint = sidecarEndpoint(url);
+  if (endpoint) return sidecarDiff(endpoint);
+  logFallbackOnce("refused", `DIFF_SIDECAR_URL ${url} is not an http URL on loopback`);
+  return null;
+}
+
+/**
+ * One comparer's diffs: in the sidecar when there is one, and in-process (pngjs in workerd) when
+ * there is none or it fails. Either way the same engine measures with the same options, so the
+ * result is the same; only the overlay's PNG bytes differ, as two encoders deflate the same pixels
+ * differently.
+ */
+function measurer(
+  diff: typeof diffPngs,
+  url: string | undefined,
+): (
+  pair: [Buffer, Buffer],
+  args: { options: DiffOptions | undefined; ignore: DiffIgnore },
+) => Promise<PixelDiff> {
+  let sidecar = sidecarOf(url);
+  return async ([main, branch], { options, ignore }) => {
+    if (sidecar) {
+      try {
+        return await sidecar(main, branch, options ?? {}, ignore);
+      } catch (e) {
+        if (!(e instanceof SidecarError)) throw e;
+        // A file the sidecar could not diff is not its failure: pngjs says why, as on Cloudflare.
+        if (e.kind !== "rejected") logFallbackOnce(e.kind, e.message);
+        // Not reached once, not tried again this run: a hung sidecar costs the diff budget one
+        // timeout, not one per shot.
+        if (e.kind === "unreachable") sidecar = null;
+      }
+    }
+    return diff(main, branch, options, ignore);
+  };
+}
+
+/** The server diff: both PNGs read here, and measured here or in the self-host's sidecar. */
 export function serverComparer(deps: {
   blobs: BlobStore;
   diff?: typeof diffPngs | undefined;
+  /** The self-host's diff sidecar (PS-203), `DIFF_SIDECAR_URL`; unset measures in-process. */
+  diffSidecar?: string | undefined;
 }): Comparer {
-  const diff = deps.diff ?? diffPngs;
+  const measure = measurer(deps.diff ?? diffPngs, deps.diffSidecar);
   return async (shot, baseline) => {
     // The same bytes, known from the uploads' hashes: unchanged, with nothing read and no overlay.
     // A shot without a hash or a size (older, or a marker) is read like any other.
@@ -79,11 +143,11 @@ export function serverComparer(deps: {
     // `measureAll` resolved them (ob 1495); the engine's defaults fill any key left out. The ignore
     // areas are the union of both shots', so an element that moved is covered at both places, and
     // of the boxes drawn on the test in the review UI (ob 1499).
-    let result: ReturnType<typeof diff>;
+    let result: PixelDiff;
     try {
-      result = diff(main, branch, shot.resolvedDiff?.options ?? shot.diffOptions, {
-        main: baseline.ignore,
-        branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)],
+      result = await measure([main, branch], {
+        options: shot.resolvedDiff?.options ?? shot.diffOptions,
+        ignore: { main: baseline.ignore, branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)] },
       });
     } finally {
       // The uploads are read once and dead now. A Worker has no gc(): freed here, a burst of

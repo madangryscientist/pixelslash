@@ -103,7 +103,7 @@ public DNS. Real GitHub sign-in is a later ticket.
 | Container | CT 135 `pixelslash` on `192.168.0.20`: Debian 13, unprivileged, 2 vCPU, 2 GB, 10 GB on `local-lvm`, starts on boot. The address is static in the CT config, below the router's DHCP pool. |
 | Checkout | `/home/pixelslash/pixelslash`, user `pixelslash`, `origin/main` over a read-only deploy key ("pixelslash CT 135"); the push URL is `no-push-from-this-ct`. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
 | State | D1 and R2 in `apps/web/.wrangler/state` on the CT's disk, kept across restarts and updates. |
-| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`vite preview` of the production build), from `deploy/lan/`. Both restart on failure and start on boot. With the opencode switch on (below) a third, `pixelslash-opencode`, runs the same way. |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`vite preview` of the production build), from `deploy/lan/`. `pixelslash-diff` (`bun deploy/lan/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
 
 The build is the `e2e` environment's with three values replaced. `apps/web/.dev.vars.e2e` on the CT
 (mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://192.168.0.34:4174`, so the
@@ -143,6 +143,39 @@ for a Worker's CPU limit. On the CT's 2 vCPU a build of hackcove's 145 shots mea
 then stops at the budget: the build reads `errored` and names how many shots are left. A finalise
 sent again resumes (it keeps what was measured and diffs the rest), and `pixelslash upload` sends it
 again by itself while the count falls, so the build ends with all 145 measured and its real verdict.
+
+### The diff sidecar
+
+workerd cannot load a native addon, so in-process the server diff decodes and encodes PNGs with
+pngjs, the slow part of a diff (`bench/PERF.md`). On the self-host the Worker instead sends each
+shot's two PNGs to a Bun process on the same box: `deploy/lan/diff-sidecar.ts`, unit
+`pixelslash-diff`, on `127.0.0.1:4181`. It runs the engine's own `diffPngs` with the same options and
+ignore areas, with the CLI's napi-image codec (PS-185), and answers with the result and the overlay.
+The verdict, the counts and the regions are the same as in-process, and the overlay's pixels are the
+same; only its PNG bytes differ, as two encoders deflate the same pixels differently
+(`src/diff/sidecar.test.ts` holds this on every `bench/corpus` pair and the e2e fixtures).
+
+`DIFF_SIDECAR_URL` names it, in `wrangler.jsonc`'s `env.e2e` vars only, so the CT build and the
+production e2e run use it (that run starts a sidecar of its own on a free port;
+`PIXELSLASH_E2E_NO_SIDECAR=1` runs it without one). `test:e2e:dev` starts none, so pngjs in workerd
+stays under an e2e run. The Cloudflare deploy never sets it and never bundles the addon. Only a
+loopback URL (`127.0.0.1`, `localhost`, `[::1]`) is used; any other is refused, so a typo cannot send
+shots off the box. When it is unset, refused, down, times out (15 s) or answers with an error, the
+shot is measured in-process with pngjs, and the reason is logged once per kind, not once per shot.
+After the first shot it cannot reach, the rest of that build skips it, so a hung sidecar costs one
+timeout, not one per shot. A PNG the sidecar cannot decode is measured in-process too, without a log
+line, so pngjs reports it in its own words as on Cloudflare.
+
+```
+server diff: in-process pngjs (unreachable): http://127.0.0.1:4181/v1/diff: Unable to connect...
+```
+
+The shots go over loopback to a process bound to 127.0.0.1 and nowhere else; nothing is written to
+disk (invariant 4). `update.sh` installs and restarts the unit before `pixelslash-web` starts, and a
+sidecar that does not come up is a warning, not a rollback: the Worker measures in-process. The unit
+is capped at `MemoryHigh=450M` / `MemoryMax=600M` (it idles at ~40 MB and peaked at ~340 MB on
+PS-200's burst); `pixelslash-web`'s cap is unchanged. Logs, one line per diff with its time:
+`journalctl -u pixelslash-diff -f`.
 
 ### The AI explain step through opencode
 
