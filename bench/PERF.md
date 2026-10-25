@@ -172,11 +172,100 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-190 | desktop, shared | where a real run's time goes: capture vs diff, CLI and server (measurement, no code) |
 | 2026-10-25 | PS-168 | desktop, dedicated | decoders and encoders: every candidate for both engines |
 | 2026-10-24 | ob 1947 | desktop, dedicated | `--env dedicated` against `--env none`: spread of p95 over median |
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · PS-190 · desktop, shared · where a real run's time goes
+
+**diff is 13% of a real CLI run and 22% of a server build** (CLI: a 5-route pair run at 1440 wide, no
+upload; server: the three finished hackcove builds, pooled. Per build the server share is 0.5%, 1.1%
+and 41%, so the pooled 22% rests on one 448-shot build.)
+
+**Tile hashes:** on the CLI, diff is 13% of the run, so removing all of the diff would move the total by
+13%. Tile hashes would clear the 10% bar only if they skipped about three-quarters of the diff time, and
+the routes run diffs just two of its five shots (the other three are identical bytes and never reach the
+diff). On the server the answer depends on one heavy build, and three builds are too few to call it.
+The next ticket should not be assumed to pay for itself on the CLI.
+
+This is a measurement entry. No product code changed, and nothing was added to the gate or CI.
+
+**Question.** How much of a real run is the diff, against capture and the upload? The bench times only the
+diff, so until now nobody knew its share of a whole run.
+
+**Env.** Linux desktop (12 cores, load average 1.9 to 2.2 during the runs), browser and editor running,
+so `shared` in the run-log table. `--env dedicated` is for `bench:perf` and does not apply to CLI runs.
+Bun 1.4.2, Playwright 1.64.1, Chromium 148 headless shell, `fingerprint: bare`: the CLI warned that it
+ran outside the pinned capture image, so local fonts may skew pixels (timings are not affected by that).
+Commit e875c57 (ps-190). Fixture pages came from a local `python3 -m http.server`, not the hosted app.
+
+**Commands.** `CLI=packages/cli/src/index.ts`, run from a scratch dir outside the repo:
+
+```bash
+# capture: 5 routes x 2 variants (1440x900, 390x844), 10 shots, three runs with --json
+bun $CLI capture --config capture/pixelslash.config.json --out capture/jsonN --json
+
+# pair, one long page (1440 wide, about 6080 px tall), live and local differ in one block
+bun $CLI --live http://127.0.0.1:8765/long-live.html --local http://127.0.0.1:8765/long-local.html --width 1440 --out capture/pairN
+
+# pair, five routes (--routes), live on :8765, local on a copy with two changed pages on :8766
+bun $CLI --live http://127.0.0.1:8765 --local http://127.0.0.1:8766 --routes routes.txt --width 1440 --out capture/routesN
+```
+
+Medians and p95 are over three runs. With three samples, p95 by nearest rank is the slowest run, so read
+the p95 column as the maximum. Raw samples are in `bench/perf-results/ps-190/` (gitignored).
+
+**CLI, median ms and share of the total** (the three columns of shares add up to 100%; the remainder is
+under 30 ms of overhead):
+
+| Run | total | capture (incl. settle) | diff | upload | p95 total | p95 diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 5-route pair, 1440 wide, 5 shots, 2 changed | 7348 | 6345 · 86% | 975 · **13%** | not run | 7350 | 1003 |
+| long page pair, 1440 × 6080, 1 shot | 2156 | 1456 · 68% | 691 · **32%** | not run | 2164 | 705 |
+| capture only, 10 shots (5 routes × 2 variants) | 6613 | 6166 · 93% | — (no diff in capture) | not run | 6639 | — |
+
+The capture-only total is 447 ms above its captures: browser launch and app start, which `captureMs` leaves out.
+
+**Server (hackcove, CT 135), median and p95 ms per step.** Finished builds with `rerun = 0`, the same rows the
+org Timings tab reads. Read-only `SELECT` against the server's D1 SQLite on CT 135 (`python3 -I` with `sqlite3` in `mode=ro`, over ssh and `pct exec`, per `ob hosts pixelslash`); the
+Timings tab and the build page were not opened, because they need a signed-in session.
+
+| Build | uploaded shots | queue (before diff) | diff | explain | summary | total (claim to finish) | diff share of queue + total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| A, passed | 1 | 1116 | 28 | — | 4252 | 4357 | 0.5% |
+| B, changes | 1 | 2851 | 238 | 3296 | 15092 | 18699 | 1.1% |
+| C, passed | 448 | 17493 | 12512 | — | — | 12733 | 41% |
+| **median (n = 3)** | | 2851 | 238 | 3296 (n = 1) | 9672 (n = 2) | 12733 | |
+| **p95 (n = 3, = max)** | | 17493 | 12512 | 3296 | 15092 | 18699 | |
+| **pooled** | | 21460 | 12778 · **22%** | | | 35789 | 22% of 57249 |
+
+Diff share of a server build is diff over queue plus total, the whole server run from the upload's creation to
+the last AI step. The pooled 22% is the one figure to quote, and only with that caveat.
+
+**Upload.** The CLI's own upload time is in each server build's `timings` (`upload.totalMs`, which matches the
+queue on build C to within 74 ms: 17419 against 17493). The CLI runs above did not upload, so the CLI's
+upload share is not measured here.
+
+**Not in the numbers, and what would fill the gap**
+
+- **Settle is not split from capture.** `captureMs` covers page load, settle and the screenshot together.
+  Proposal: a `settleMs` per shot in the timings (a field, so additive under the `/api/v1` rule).
+- **CLI upload was not run.** An upload would write fixture builds into the hackcove project and into its
+  Timings tab, so it was skipped. Proposal: a throwaway project for perf runs.
+- **The Timings tab and the build page were not read.** Chrome was not running with remote debugging, and
+  the build page redirects to sign-in without a session. The table above is the same data read from D1.
+- **Three server builds are in `processing` with `finished_at` set before the claim**, so their total is
+  negative and they are left out. They look stuck (or finished by a step that never moved the status), and
+  the Timings tab would read them the same way. Worth a look on the server.
+- **Rerun builds are left out**, as the Timings tab leaves them out. There are 33 of them, and their diff
+  median is 15.7 s, which says more about re-diffing a whole build than about one run.
+
+**Observed while measuring (not fixed here).** A `--routes` run whose route is `/index.html` fails with
+`EISDIR`: its per-route directory `index.html/` collides with the run's own `index.html` report, and the
+route `/` is written to `index/` instead. Repro: `--routes` file with `/index.html` in pair mode.
 
 ### 2026-10-25 · PS-168 · desktop, dedicated · decoders and encoders
 
