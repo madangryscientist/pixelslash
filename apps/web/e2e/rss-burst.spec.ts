@@ -12,7 +12,7 @@ import { SERVER, SERVER_PORT, SIDECAR_PORT, STUB } from "./ports";
  * Linux only (/proc).
  *
  * PS-203 added the diff sidecar's RSS and the diff's time. The run diffs in the sidecar, as the LAN
- * does; `PIXELSLASH_E2E_NO_SIDECAR=1` diffs in workerd with pngjs, as Cloudflare does. A finalise
+ * does; `PIXELSLASH_E2E_NO_SIDECAR=1` diffs in workerd, as Cloudflare does. A finalise
  * stops at the Worker's diff budget, so the branch build is finalised again until nothing is left
  * unmeasured, as the CLI does; `diffSeconds` is the branch upload less the main one (the same PUTs,
  * no diff).

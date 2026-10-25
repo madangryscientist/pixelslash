@@ -32,13 +32,15 @@ export const modelKeySecret = (): string | undefined => env.MODEL_KEY_SECRET || 
 
 /**
  * The self-host's diff sidecar (PS-203): a loopback URL where a Bun process runs the diff with the
- * native codec. Cloudflare never sets it; unset, the server diff runs here with pngjs.
+ * native codec. Cloudflare never sets it; unset, the server diff runs here in-process (WebAssembly,
+ * or pngjs when `DIFF_WASM` is not `1`).
  */
 export const diffSidecarUrl = (): string | undefined => env.DIFF_SIDECAR_URL || undefined;
 
 /**
  * The in-process diff (PS-204): the WebAssembly one when `DIFF_WASM` is `1`, else undefined, which
- * is the engine's pngjs `diffPngs`. A spike: off in every config, byte-identical either way.
+ * is the engine's pngjs `diffPngs`. On in every config since PS-207; byte-identical either way, so
+ * any other value (`""` included) is the rollback to pngjs.
  */
 export const inProcessDiff = (): typeof wasmDiff | undefined =>
   env.DIFF_WASM === "1" ? wasmDiff : undefined;

@@ -10,7 +10,7 @@ merging boxes, noise, shift labels, the floors and the overlay's encode. The fas
 RGB and RGBA, uninterlaced, with no critical chunk besides IHDR, IDAT and IEND and no `tRNS`.
 Any other PNG (16-bit, palette, interlaced) goes to `diffPngs`, which gives the same answer.
 
-The web app uses it only when `DIFF_WASM=1` (off by default; `apps/web/src/server/env.ts`).
+The web app uses it when `DIFF_WASM=1`, which every config sets since PS-207; any other value is pngjs (`apps/web/src/server/env.ts`).
 
 ## Building
 

@@ -85,8 +85,8 @@ function sidecarOf(url: string | undefined): SidecarDiff | null {
 }
 
 /**
- * One comparer's diffs: in the sidecar when there is one, and in-process (pngjs in workerd) when
- * there is none or it fails. Either way the same engine measures with the same options, so the
+ * One comparer's diffs: in the sidecar when there is one, and in-process (WebAssembly in workerd,
+ * or pngjs) when there is none or it fails. Either way the same engine measures with the same options, so the
  * result is the same; only the overlay's PNG bytes differ, as two encoders deflate the same pixels
  * differently.
  */

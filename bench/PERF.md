@@ -147,7 +147,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
 | 19 | Self-host server diff in a Bun sidecar with napi-image (workerd keeps pngjs on Cloudflare) | web (self-host) | ✅ measured, shipped | PS-200 burst, 50 shots 1280×5000: diff time 29.7/37.9 → 11.9/14.3 s; workerd settled RSS 660/691 → 357/363 MB | PS-203 |
 | 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
-| 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, a flag (`DIFF_WASM`, off) | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
+| 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, on (`DIFF_WASM`, on by default since PS-207) | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
 | 21 | Free the explain queue's full-page decodes: `regionCrops` decodes one PNG at a time and releases its raster, `explainShot` releases the three blobs it read | web + engine | ✅ measured, shipped | burst 50 × 1280×9500 with the model on: workerd peak 1497 → 783 / 728 MB, settled 1499 → 611 / 617 MB; crops unchanged | PS-206 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
@@ -181,8 +181,8 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 - **Constraint:** the web app's server diff runs in workerd, which can load WASM but no native
   code. The CLI (Bun) can load native code. So the fastest production ts option differs per path:
   napi-image for the CLI, pngjs (or jsquash) for workerd. Since PS-203 the self-host's Worker sends
-  the diff to a Bun sidecar with napi-image; only the Cloudflare deploy still diffs with pngjs
-  (or, behind `DIFF_WASM`, with PS-204's WASM).
+  the diff to a Bun sidecar with napi-image; the Cloudflare deploy diffs in workerd with PS-204's
+  WASM (`DIFF_WASM`, on by default since PS-207), and pngjs when the flag is set to anything else.
 
 ## Run log
 
