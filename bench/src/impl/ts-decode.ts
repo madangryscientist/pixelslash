@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { Raster } from "@pixelslash/engine";
 import { PNG } from "pngjs";
+import { decodeWith, type DecoderName } from "./ts-codecs.ts";
 
 export type DecodeTimes = { read: number; inflate: number; unfilter: number; other: number };
 export type Decoded = { raster: Raster; times: DecodeTimes };
@@ -53,11 +54,21 @@ wrap(asObject(nodeRequire("pngjs/lib/filter-parse-sync"), "filter-parse-sync"), 
   unfilterMs += ms;
 });
 
-/** Read and decode one file, timing the parts. Throws what pngjs throws. */
-export function decodeFile(path: string): Decoded {
+/**
+ * Read and decode one file with `decoder` (PS-168), timing the parts. Throws what the decoder
+ * throws. Only pngjs is split; any other decoder's time is all `other`.
+ */
+export async function decodeFile(path: string, decoder: DecoderName = "pngjs"): Promise<Decoded> {
   const started = performance.now();
   const file = readFileSync(path);
   const read = performance.now();
+  if (decoder !== "pngjs") {
+    const raster = await decodeWith(decoder, file);
+    return {
+      raster,
+      times: { read: read - started, inflate: 0, unfilter: 0, other: performance.now() - read },
+    };
+  }
   inflateMs = 0;
   unfilterMs = 0;
   const png = PNG.sync.read(file);

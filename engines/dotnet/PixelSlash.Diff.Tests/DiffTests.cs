@@ -205,15 +205,44 @@ public class DiffTests
     }
 
     [Theory]
-    [InlineData(new string[] { "diff", "a.png", "b.png", "--json" }, true, false)]
-    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "sequential" }, true, false)]
-    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "parallel" }, true, true)]
-    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "both" }, false, false)]
-    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode" }, false, false)]
-    [InlineData(new string[] { "diff", "a.png", "b.png" }, false, false)]
-    public void TheDecodeSwitchIsParsed(string[] args, bool valid, bool parallel)
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json" }, true, Contract.DefaultParallel, Decoders.Default)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "sequential" }, true, false, Decoders.Default)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "parallel" }, true, true, Decoders.Default)]
+    [InlineData(new string[] { "--decoder", "wuffs", "diff", "a.png", "b.png", "--json", "--decode", "sequential" }, true, false, "wuffs")]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decoder", "spng" }, true, Contract.DefaultParallel, "spng")]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode", "both" }, false, Contract.DefaultParallel, Decoders.Default)]
+    [InlineData(new string[] { "diff", "a.png", "b.png", "--json", "--decode" }, false, Contract.DefaultParallel, Decoders.Default)]
+    [InlineData(new string[] { "--decoder", "spng", "--decoder", "wuffs", "diff", "a.png", "b.png", "--json" }, false, Contract.DefaultParallel, "spng")]
+    [InlineData(new string[] { "diff", "--decoder", "spng", "a.png", "b.png", "--json" }, true, Contract.DefaultParallel, "spng")]
+    [InlineData(new string[] { "diff", "a.png", "b.png" }, false, Contract.DefaultParallel, Decoders.Default)]
+    public void TheDecodeSwitchesAreParsed(string[] args, bool valid, bool parallel, string decoder)
     {
-        Assert.Equal(valid, Contract.TryParse(args, out _, out _, out var got));
+        Assert.Equal(valid, Contract.TryParse(args, out _, out _, out var got, out var name));
+        if (!valid) return;
         Assert.Equal(parallel, got);
+        Assert.Equal(decoder, name);
+    }
+
+    [Fact]
+    public void EveryDecoderThatRunsHereGivesStbsBytes()
+    {
+        var root = RepoRoot();
+        var files = new[] { "bench/corpus", "bench/corpus-holdout", "fixtures/ds" }
+            .SelectMany(dir => Directory.EnumerateFiles(Path.Combine(root, dir), "*.png", SearchOption.AllDirectories))
+            .ToList();
+        Assert.NotEmpty(files);
+        var ran = Decoders.Names.Where(name => Decoders.Unavailable(name) is null).ToList();
+        Assert.Contains("stb", ran);
+        Assert.Contains(Decoders.Default, ran);
+        foreach (var file in files)
+        {
+            var stb = Contract.Decode(file);
+            foreach (var name in ran)
+            {
+                var (image, _) = Decoders.Read(name, file);
+                Assert.True((stb.Width, stb.Height) == (image.Width, image.Height), $"{name}: {file}");
+                Assert.True(stb.Data.AsSpan().SequenceEqual(image.Data), $"{name}: {file}");
+            }
+        }
     }
 }

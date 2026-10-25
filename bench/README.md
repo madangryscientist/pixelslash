@@ -191,6 +191,7 @@ time went; an output without them still conforms, and nothing reads them but the
 ```jsonc
 {
   "startup_ms": 41.2,                        // spawn stamp to its first line of engine code
+  "peak_rss_bytes": 104857600,               // its own peak resident set as it finishes (PS-168)
   "phases": {                                // ms per named phase, each >= 0
     "decode_read": 0.4, "decode_inflate": 9.1, "decode_unfilter": 2.3, "decode_other": 1.0,
     "pixel_compare": 5.0, "anti_alias": 1.2, "regions": 0.6, "overlay_encode": 3.1
@@ -201,6 +202,7 @@ time went; an output without them still conforms, and nothing reads them but the
 ```json
 {
   "startup_ms": { "type": "number", "minimum": 0 },
+  "peak_rss_bytes": { "type": "integer", "minimum": 0 },
   "phases": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0 } }
 }
 ```
@@ -231,6 +233,11 @@ same run. An engine run by hand has no stamp and omits `startup_ms`. The perf ta
 `rest` = wall - `startup_ms` - `decode_ms` - `diff_ms`: exit, the JSON write, and the harness's own
 pipe read.
 
+`peak_rss_bytes` (PS-168, optional) is the process's own peak resident set, read as it finishes
+(`VmHWM` in `/proc/self/status` on Linux); the perf table prints its median. The harness does not
+take it from the child's rusage, because Linux carries the parent's high-water mark through fork
+and exec, so every child would report at least the runner's own size.
+
 **`--decode parallel|sequential` (ob 1932).** The harness appends it after `--json` when
 `bench:perf -- --impl ... --decode <mode>` is given; an implementation that supports it decodes the
 base and head at the same time for `parallel` and one after the other for `sequential`, its default.
@@ -256,13 +263,16 @@ reported against that case, by name, and the run goes on with the next one.
 
 **The reference implementation** is `bench/src/impl/ts-diff.ts`: the TypeScript engine's diff
 behind the contract. It is the baseline, and the first thing to run to check the harness. It decodes
-the two files itself (`ts-decode.ts`, pngjs, with its read, inflate and unfilter steps timed by
-patching two methods of pngjs's synchronous path on the module's own prototype, not by swapping
-the decoder) and hands the pixels to the engine's `diffRasters`, the call `diffPngs` makes after its
+the two files itself (`ts-decode.ts`) and hands the pixels to the engine's `diffRasters`, the call `diffPngs` makes after its
 own decode. `diffPngs` is that decode plus `diffRasters`, so the verdict and regions are the engine's
-and the CLI's output does not move. `diff_ms` is the `diffRasters` call, which also encodes the
-overlay image the contract does not ask for (reported as `overlay_encode`, so a leaner engine is not
-being beaten by work it never did). The engine's timing hook is an optional callback that is
+and the CLI's output does not move. The decoder is `napi-image` by default, the fastest permissive
+one measured (PS-168), which gives pngjs's RGBA byte for byte; `--decoder pngjs` is the engine's own,
+with its read, inflate and unfilter steps timed by patching two methods of pngjs's synchronous path
+on the module's own prototype, not by swapping the decoder. Every other decoder reports its decode
+as `decode_read` and `decode_other`. `diff_ms` is the `diffRasters` call. The overlay image the
+contract does not ask for is not encoded by default (`--overlay none`, PS-168), so the TS side does
+not pay for work C# never does; `--overlay pngjs` encodes it as the engine does, and
+`overlay_encode` reports it. The engine's timing hook is an optional callback that is
 `undefined` in production. `--decode parallel` decodes the head on a Bun `Worker` while the base
 decodes on the main thread; the worker's start-up is inside `decode_ms`, because the decode waits for
 it, and it is why parallel can lose on a small image. And a cold process is slower than the warm in-process loop of `bench:perf`
@@ -363,7 +373,8 @@ reserved cores too, and `irqaffinity=` moves the interrupts away. Use them if th
 `engines/dotnet/PixelSlash.Diff` is the TypeScript engine's diff ported to C# (.NET 10) behind the
 contract: the same YIQ threshold, anti-alias test, 24 px region grouping, speck, noise and shift
 rules, and the same overlap-only rule for shots of different sizes. PNGs are decoded with
-StbImageSharp (Unlicense or MIT). `engines/dotnet/PixelSlash.Diff.Tests` holds its xunit tests on
+SkiaSharp (MIT, Skia BSD-3), base and head at once, since PS-168; `--decoder stb --decode
+sequential` is the StbImageSharp (Unlicense or MIT) path it had before. See "Decoders and encoders". `engines/dotnet/PixelSlash.Diff.Tests` holds its xunit tests on
 tiny rasters. Both are Nx projects through `@nx/dotnet`, named after their `.csproj`, so
 `bun run test` builds and runs them. It needs the .NET SDK that `global.json` pins (see AGENTS.md).
 
@@ -399,6 +410,56 @@ starts in tier-0 JIT, so the first image through a freshly started process pays 
 stb's row loops, and that time lands in whichever phase runs the code first (mostly `decode_other`
 and `decode_unfilter`); a long-lived process would not. And `decode_other` includes the copy out of
 stb's buffer and the RGB to RGBA expansion, which stb does inside `FromMemory` too.
+
+### Decoders and encoders: `bench:decoders` (PS-168)
+
+Both bench implementations take a decoder by name, and the TS one an overlay encoder; the
+production engine (`packages/engine`) is not touched by either and decodes and encodes with pngjs.
+
+```bash
+bun run bench:decoders -- --env dedicated            # every candidate below, written to bench/results/decoders-<yyyy-mm>.md
+engines/dotnet/native/build.sh                        # once: libspng (zlib and zlib-ng) and Wuffs, into native/out/
+<csharp> [--decoder stb|spng|spng-zlibng|wuffs|skia|imagesharp] diff a.png b.png --json [--decode parallel|sequential]
+bun bench/src/impl/ts-diff.ts [--decoder <name>] [--overlay <name>] diff a.png b.png --json [--decode parallel|sequential]
+```
+
+Each switch is given at most once, before `diff` (how `--impl` passes an implementation's own
+flags) or after the operands (where the harness puts `--decode`). An unknown name is exit 2, and a
+decoder whose library is not built or not compiled in is a usage error, never a silent fallback.
+Every decoder must give the baseline's RGBA byte for byte (StbImageSharp in C#, pngjs in TS): a gate
+test decodes every PNG in both corpora and `fixtures/ds` with each one that is present.
+
+| engine | decoder | licence | where it runs | how it gets here |
+| --- | --- | --- | --- | --- |
+| C# | `skia` (default, parallel) | MIT (SkiaSharp), BSD-3 (Skia) | C# | NuGet |
+| C# | `stb` | Unlicense or MIT | C# | NuGet; the only one that splits its decode into phases |
+| C# | `spng`, `spng-zlibng` | BSD-2 (libspng), zlib (zlib, zlib-ng) | C# | `native/build.sh` |
+| C# | `wuffs` | Apache-2.0 | C# | `native/build.sh` |
+| C# | `imagesharp` | Six Labors Split (paid for commercial use) | C# | `-p:DecoderCandidates=true` only; measured, never shipped |
+| TS | `pngjs` | MIT | CLI, workerd | npm; the engine's, and the only one that splits its decode into phases |
+| TS | `fast-png`, `upng` | MIT | CLI, workerd | npm |
+| TS | `napi-image` (default, sequential) | MIT | CLI (native addon) | npm |
+| TS | `jsquash` | Apache-2.0 | CLI, workerd (WASM) | npm |
+| TS | `cf-wasm` | MIT | CLI, workerd (WASM) | npm |
+| TS | `sharp` | Apache-2.0, libvips LGPL-3.0 | CLI (native addon) | npm; measured, never shipped |
+
+The TS overlay encoders (`--overlay`): `none` (default), `pngjs` (the engine's), `pngjs-l6`,
+`pngjs-l1` (deflate levels), `sharp`, `napi-image` and `cf-wasm`, with the decoders' licences.
+
+`native/build.sh` fetches each library's source at a pinned sha256 into
+`~/.cache/pixelslash-native`, builds it with the system `gcc` and writes `native/out/*.so`
+(gitignored). It needs the network once. Without it, the decoder tests skip the native decoders
+and the C# default still runs: that is why the default is `skia`, the fastest permissive decoder
+that comes from NuGet, and not `spng-zlibng` or `wuffs`, which measured faster (`bench/PERF.md`).
+
+`bench:decoders` builds the C# engine with `-p:DecoderCandidates=true` and the TS impl with
+`bun build --compile` into `~/.cache/pixelslash-perf`, then runs `bench:perf --impl` over every
+candidate in one interleaved run (its flags, such as `--env dedicated`, `--runs` or `--only`, go
+through). Peak RSS is what each process reports as `peak_rss_bytes` (its own `VmHWM`), because the
+kernel's rusage for a child carries the parent's high-water mark through fork and exec. Two cannot
+run under `--compile`: `jsquash` (its `.wasm` is not embedded) and `sharp` (its native module does
+not load); the table says so under "Could not build", with libspng and Wuffs as WASM (no maintained
+npm build) and ImageSharp 3.2 and 4.x (they need a licence key).
 
 ## The regression guard
 

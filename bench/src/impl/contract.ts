@@ -22,6 +22,12 @@ export type ImplOutput = {
   startup_ms?: number;
   /** Optional (ob 1932): ms per named phase of `decode_ms` and `diff_ms`; an engine reports the ones it can. */
   phases?: Record<string, number>;
+  /**
+   * Optional (PS-168): the process's own peak resident set in bytes, read as it finishes (`VmHWM` on
+   * Linux). The harness cannot take it from the child's rusage: Linux carries the parent's high-water
+   * mark through fork and exec, so every child would report at least the runner's own size.
+   */
+  peak_rss_bytes?: number;
 };
 
 /** The spawn stamp the harness puts in the child's environment: epoch ms, fractional. */
@@ -49,27 +55,30 @@ export function parseImplOutput(text: string): ImplOutput {
     throw new Error(`stdout is not JSON: ${shown === "" ? "(empty)" : JSON.stringify(shown)}`);
   }
   if (!isRecord(raw) || Array.isArray(raw)) throw new Error("stdout is not a JSON object");
-  const { verdict, regions, decode_ms, diff_ms, startup_ms, phases } = raw;
+  const { verdict, regions, decode_ms, diff_ms, startup_ms, phases, peak_rss_bytes } = raw;
   if (verdict !== "changed" && verdict !== "unchanged")
     throw new Error(`verdict must be "changed" or "unchanged", got ${JSON.stringify(verdict)}`);
   if (!Array.isArray(regions)) throw new Error("regions must be an array");
   if (!isMs(decode_ms)) throw new Error("decode_ms must be a number >= 0");
   if (!isMs(diff_ms)) throw new Error("diff_ms must be a number >= 0");
   const out: ImplOutput = { verdict, regions: regions.map(parseRegion), decode_ms, diff_ms };
-  return { ...out, ...parseTimings(startup_ms, phases) };
+  return { ...out, ...parseTimings(startup_ms, phases, peak_rss_bytes) };
 }
 
-/** The optional startup_ms and phases (ob 1932): only the ones present. */
-function parseTimings(
-  startup: unknown,
-  phases: unknown,
-): Pick<ImplOutput, "startup_ms" | "phases"> {
-  const out: Pick<ImplOutput, "startup_ms" | "phases"> = {};
+type Timings = Pick<ImplOutput, "startup_ms" | "phases" | "peak_rss_bytes">;
+
+/** The optional startup_ms and phases (ob 1932) and peak_rss_bytes (PS-168): only the ones present. */
+function parseTimings(startup: unknown, phases: unknown, rss: unknown): Timings {
+  const out: Timings = {};
   if (startup !== undefined) {
     if (!isMs(startup)) throw new Error("startup_ms must be a number >= 0");
     out.startup_ms = startup;
   }
   if (phases !== undefined) out.phases = parsePhases(phases);
+  if (rss !== undefined) {
+    if (!isCoord(rss)) throw new Error("peak_rss_bytes must be a whole number >= 0");
+    out.peak_rss_bytes = rss;
+  }
   return out;
 }
 

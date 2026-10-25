@@ -63,6 +63,15 @@ describe("parseImplOutput", () => {
     expect(badInput({ startup_ms: -3 })).toThrow("startup_ms");
     expect(badInput({ startup_ms: "3" })).toThrow("startup_ms");
   });
+
+  test("peak_rss_bytes is optional and a whole number (PS-168)", () => {
+    expect(parseImplOutput(JSON.stringify({ ...OK, peak_rss_bytes: 4096 })).peak_rss_bytes).toBe(
+      4096,
+    );
+    expect("peak_rss_bytes" in parseImplOutput(JSON.stringify(OK))).toBe(false);
+    expect(badInput({ peak_rss_bytes: 1.5 })).toThrow("peak_rss_bytes");
+    expect(badInput({ peak_rss_bytes: -1 })).toThrow("peak_rss_bytes");
+  });
 });
 
 describe("invokeImpl", () => {
@@ -200,9 +209,17 @@ describe("ts-diff --decode (ob 1932)", () => {
   }, 180_000);
 
   test("sequential: the diff phases and the decode split add up to diff_ms and decode_ms", async () => {
-    const { phases = {}, decode_ms, diff_ms, startup_ms } = await desktop("sequential");
+    const {
+      phases = {},
+      decode_ms,
+      diff_ms,
+      startup_ms,
+      peak_rss_bytes,
+    } = await desktop("sequential");
     expect(Object.values(phases).every((v) => v >= 0)).toBe(true);
     expect(startup_ms).toBeGreaterThan(0);
+    // Its own VmHWM: more than an empty Bun, far less than the runner's high-water mark it would inherit.
+    expect(peak_rss_bytes).toBeGreaterThan(10e6);
     expect(Math.abs(sumOf(phases, DIFF_PHASES) - diff_ms)).toBeLessThanOrEqual(
       Math.max(2, diff_ms * 0.1),
     );

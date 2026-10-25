@@ -20,46 +20,51 @@ Perf runs are on demand only and never in the gate.
 > from the same run.
 
 Pages: **phone** 390×844 · **desktop** 1440×900 · **long** 1440×6000.
-Engines: **ts** = `bun bench/src/impl/ts-diff.ts` (the production engine, pngjs) · **cs** =
-`engines/dotnet` Release (C# port, StbImageSharp).
+Engines: **ts** = `bun bench/src/impl/ts-diff.ts`, the production engine's `diffRasters`; since PS-168 it
+decodes with napi-image and encodes no overlay by default, so the production-shaped run is
+`--decoder pngjs --overlay pngjs`. It imports `@pixelslash/engine/diff`, not the package root the CLI
+loads, so it leaves out the CLI's Playwright import (about 80 ms of start-up) · **cs** = `engines/dotnet` Release (C# port; SkiaSharp decode, in
+parallel, by default since PS-168; StbImageSharp before).
 
 ## Dashboard
 
-Best known wall time per page, and the baseline it's measured against (the same run):
+Best known wall time per page, and the baseline it's measured against (the same run, `env` dedicated):
 
-| Page | Baseline: ts, sequential | Best so far | Config | Change |
-| --- | ---: | ---: | --- | ---: |
-| phone | 180.5 ms | **81.8 ms** | cs, sequential | −55% |
-| desktop | 264.3 ms | **97.5 ms** | cs, parallel decode | −63% |
-| long | 986.2 ms | **223.5 ms** | cs, parallel decode | −77% |
+| Page | Baseline: ts, production-shaped | Best so far | Config | Change | Shipped cs default (skia, parallel) | Change |
+| --- | ---: | ---: | --- | ---: | ---: | ---: |
+| phone | 128.1 ms | **87.1 ms** | cs, libspng on zlib-ng, parallel | −32% | 95.3 ms | −26% |
+| desktop | 247.4 ms | **95.1 ms** | cs, libspng on zlib-ng, parallel | −62% | 105.7 ms | −57% |
+| long | 1114.8 ms | **195.0 ms** | cs, libspng on zlib-ng, parallel | −83% | 207.2 ms | −81% |
 
-Source: the ob 1932 run, 2026-10-24. The production engine (CLI and web) is still ts. The C#
-engine is bench-only so far.
+Source: the PS-168 run, 2026-10-25, `--env dedicated`. It is not comparable with the ob 1932
+dashboard (`shared`, boost on), which it replaces. The production engine (CLI and web) is still ts
+with pngjs. The C# engine is bench-only so far. libspng on zlib-ng is the fastest, but it needs
+`native/build.sh`; the shipped cs default is SkiaSharp, from NuGet (see the PS-168 entry).
 
 The phase-by-phase breakdown behind the [Bottlenecks](#bottlenecks) section.
 
-Where the best long-page time goes now (cs parallel, 223.5 ms):
+Where the shipped cs long-page time goes (skia parallel, 207.2 ms):
 
 | Phase | ms | Share | Next lever |
 | --- | ---: | ---: | --- |
-| decode (wall, two files in parallel) | 92.3 | 41% | native SIMD decoder (ob 1942) |
-| regions | 56.1 | 25% | not targeted yet |
-| pixel_compare | 37.8 | 17% | not targeted yet (SIMD compare) |
-| startup | 23.7 | 11% | AOT / ReadyToRun (not ticketed) |
-| rest (spawn, JSON, exit) | 9.2 | 4% | — |
-| anti_alias | 3.1 | 1% | — |
+| regions | 76.4 | 37% | not ticketed (lever 15) |
+| pixel_compare | 48.1 | 23% | not ticketed (SIMD compare, lever 15) |
+| decode (wall, two files in parallel) | 32.7 | 16% | libspng on zlib-ng: 16.9 ms, needs a native build |
+| rest (spawn, JSON, exit) | 27.6 | 13% | — |
+| startup | 16.0 | 8% | AOT / ReadyToRun (lever 16) |
+| anti_alias | 4.2 | 2% | — |
 
-Where the production ts long-page time goes (sequential, 986.2 ms):
+Where the production-shaped ts long-page time goes (pngjs, sequential, pngjs overlay, 1114.8 ms):
 
 | Phase | ms | Share | Next lever |
 | --- | ---: | ---: | --- |
-| overlay_encode | 321.2 | 33% | skip in the bench, cheaper encoder (ob 1942) |
-| decode | 242.1 | 25% | faster decoder: native for the CLI, WASM for workerd (ob 1942) |
-| regions | 127.4 | 13% | not targeted yet |
-| pixel_compare | 125.8 | 13% | not targeted yet |
-| startup | 102.4 | 10% | `bun build --compile` (ob 1942) |
-| rest | 39.9 | 4% | — |
-| anti_alias | 21.7 | 2% | — |
+| overlay_encode | 415.8 | 37% | napi-image encode: 27.3 ms (CLI only); not changed in production |
+| decode | 274.7 | 25% | napi-image: 29.8 ms (CLI only); not changed in production |
+| pixel_compare | 171.8 | 15% | not ticketed (lever 15) |
+| regions | 158.6 | 14% | not ticketed (lever 15) |
+| anti_alias | 31.9 | 3% | — |
+| rest | 29.6 | 3% | — |
+| startup | 21.1 | 2% | — (was ~103 ms; see "What we know") |
 
 ## Bottlenecks
 
@@ -67,35 +72,35 @@ Every run is five stages. Each one is a bottleneck we name, measure and target s
 
 1. **Load**: read the two PNGs and decode them to RGBA. The bench splits it into read,
    inflate (zlib), unfilter (undoing PNG's row filters) and other (allocation, colour
-   conversion).
+   conversion). Only pngjs and stb split it; every other decoder is one `other` span.
 2. **Diff**: compare the pixels (pixcmp), find anti-aliasing (aa), and group changed pixels
    into regions.
 3. **Encode**: write the overlay PNG. Only ts does this; the bench contract doesn't ask for it.
 4. **Startup**: start the process and load the engine.
 5. **Rest**: spawn, JSON out, exit.
 
-Per stage, in ms (share of wall). The ob 1932 run, ts sequential (how production runs it),
-cs in its best config: sequential on phone, parallel decode on desktop and long. Stages don't sum exactly to wall,
-because each is its own median.
+Per stage, in ms (share of wall). The PS-168 run, `env` dedicated: ts production-shaped (pngjs,
+sequential, pngjs overlay), cs in its shipped default (skia, parallel). Stages don't sum exactly to
+wall, because each is its own median.
 
 | Stage | ts phone | ts desktop | ts long | cs phone | cs desktop | cs long |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Load | 18.7 (10%) | 43.6 (16%) | 242.1 (25%) | **29.0 (35%)** | **36.2 (37%)** | 92.3 (41%) |
-| Diff | 32.3 (18%) | 52.6 (20%) | 274.9 (28%) | 19.8 (24%) | 27.6 (28%) | **97.0 (43%)** |
-| Encode | 17.2 (10%) | 53.0 (20%) | **321.2 (33%)** | – | – | – |
-| Startup | **103.1 (57%)** | **104.0 (39%)** | 102.4 (10%) | 24.0 (29%) | 24.2 (25%) | 23.7 (11%) |
-| Rest | 9.0 (5%) | 10.3 (4%) | 39.9 (4%) | 8.4 (10%) | 8.8 (9%) | 9.2 (4%) |
-| **Wall** | 180.5 | 264.3 | 986.2 | 81.8 | 97.5 | 223.5 |
+| Load | 25.7 (20%) | 52.4 (21%) | 274.7 (25%) | 19.3 (20%) | 20.9 (20%) | 32.7 (16%) |
+| Diff | **51.4 (40%)** | **81.4 (33%)** | 362.3 (32%) | **31.4 (33%)** | **40.0 (38%)** | **128.7 (62%)** |
+| Encode | 23.4 (18%) | 80.8 (33%) | **415.8 (37%)** | – | – | – |
+| Startup | 21.1 (16%) | 21.1 (9%) | 21.1 (2%) | 16.4 (17%) | 16.3 (15%) | 16.0 (8%) |
+| Rest | 6.2 (5%) | 9.1 (4%) | 29.6 (3%) | 26.7 (28%) | 26.9 (25%) | 27.6 (13%) |
+| **Wall** | 128.1 | 247.4 | 1114.8 | 95.3 | 105.7 | 207.2 |
 
 Bold is the biggest stage in each column. Where each one lies, and what is aimed at it:
 
 | Bottleneck | Hot spot inside it | Biggest where | Lever | Ticket |
 | --- | --- | --- | --- | --- |
-| **Startup** | Bun loading the engine's imports (a flat ~103 ms) | ts on small pages: 57% of phone, 39% of desktop | `bun build --compile`; for cs, AOT / ReadyToRun | ob 1942 (ts); cs not ticketed |
-| **Encode** | deflating the overlay PNG | ts long: 33%, the biggest ts stage | skip it where nothing reads it; a lower deflate level; sharp or WASM | ob 1942 |
-| **Load** | **unfilter**: 52% of ts decode, 60% of cs decode. Inflate is 26% (ts) and 17% (cs) | cs on every page (35–41%); ts long (25%) | a SIMD native decoder (libspng, Wuffs, Skia); WASM for workerd; parallel decode on by default | ob 1942 |
-| **Diff** | **regions** (ts 127 ms, cs 56 ms on long), then pixcmp (ts 126 ms, cs 38 ms). aa is small | cs long: 43%, now the biggest cs stage | a faster region pass; SIMD pixel compare | **not ticketed** |
-| Rest | spawn and JSON | never above 10% | — | — |
+| **Diff** | **regions** (ts 159 ms, cs 76 ms on long), then pixcmp (ts 172 ms, cs 48 ms). aa is small | every cs page, and ts phone and desktop | a faster region pass; SIMD pixel compare | **not ticketed** |
+| **Encode** | deflating the overlay PNG; the deflate level does not move it | ts long: 37% | napi-image encodes it in 27 ms (CLI only) | measured in PS-168; production unchanged |
+| **Load** | unfilter, for pngjs and stb (56% and 65% of decode) | ts long: 25% | measured in PS-168: SkiaSharp is the cs default; napi-image is the ts bench default | done for the bench; production unchanged |
+| Startup | Bun loading the engine's imports | ts phone: 16% | `bun build --compile` measured: no gain | done (PS-168) |
+| Rest | spawn, JSON, exit; cs's grew to ~27 ms with SkiaSharp (stb ~20 ms in the same run) | cs phone: 28% | not targeted | — |
 
 **A pair that is byte-equal skips all five.** The identical-bytes shortcut (ob 1948) compares the
 two files' bytes first: equal, and there is no decode, no diff and no overlay. The `diff-identical`
@@ -104,10 +109,13 @@ tree (the in-process timed diff; the file reads are not in it). A re-run of an u
 which is most pages in most builds, costs a byte compare. It does nothing for a pair that differs
 by even one byte, so it moves none of the stages above for a changed page.
 
-So once ob 1942 lands, **Diff is the bottleneck with no ticket**: it is already the largest cs
-stage on the long page, and nothing targets it yet.
+So after PS-168, **Diff is the bottleneck, and it has no ticket**: it is the largest cs stage on
+every page (62% of the long page) and the largest ts stage on phone and desktop.
 
 ## Levers: tried and queued
+
+Rows 5–14 are the PS-168 run (2026-10-25, `env` dedicated), long page, `self` median (decode +
+diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`.
 
 | # | Lever | Engine | Status | Measured effect (same run) | Ticket |
 | --- | --- | --- | --- | --- | --- |
@@ -115,41 +123,47 @@ stage on the long page, and nothing targets it yet.
 | 2 | Decode base and head in parallel | ts | ✅ measured, a switch | +4% phone (Worker start-up costs more than it saves), −0.3% desktop, −11% long | ob 1932 |
 | 3 | Decode base and head in parallel | cs | ✅ measured, a switch | 0% phone, −9% desktop, −22% long (285 → 224 ms) | ob 1932 |
 | 4 | Phase probe overhead (the timing itself) | ts | ✅ measured | ≤1% (24.0/24.2, 80.5/80.4, 536.6/541.9 ms) | ob 1932 |
-| 5 | Parallel decode on by default | cs | ⏳ queued | — | ob 1942 |
-| 6 | SkiaSharp decoder (MIT) | cs | ⏳ queued | — | ob 1942 |
-| 7 | libspng via P/Invoke (BSD-2), zlib and zlib-ng | cs | ⏳ queued | — | ob 1942 |
-| 8 | Wuffs PNG decoder (Apache-2.0) | cs | ⏳ queued | — | ob 1942 |
-| 9 | ImageSharp (paid for commercial use) | cs | ⏳ queued, measure only | — | ob 1942 |
-| 10 | fast-png, upng-js | ts | ⏳ queued | — | ob 1942 |
-| 11 | sharp (Apache-2.0; libvips LGPL, dynamic), @napi-rs/image | ts (CLI only) | ⏳ queued | — | ob 1942 |
-| 12 | WASM decoders (@jsquash/png; libspng or Wuffs in WASM) | ts (workerd-safe) | ⏳ queued | — | ob 1942 |
-| 13 | Overlay encode: lower deflate level, sharp, WASM, skip | ts | ⏳ queued | — | ob 1942 |
-| 14 | `bun build --compile` for startup | ts | ⏳ queued | — | ob 1942 |
+| 5 | Parallel decode on by default | cs | ✅ measured, shipped | stb: 318.7 → 253.1 ms (−21%) | PS-168 |
+| 6 | SkiaSharp decoder (MIT) | cs | ✅ measured, shipped as the default | 163.7 ms (−49% against stb sequential); decode 32.7 ms | PS-168 |
+| 7 | libspng via P/Invoke (BSD-2), zlib and zlib-ng | cs | ✅ measured, a switch (needs `native/build.sh`) | zlib 215.1 ms (−33%); zlib-ng 147.6 ms (−54%), the fastest; decode 16.9 ms | PS-168 |
+| 8 | Wuffs PNG decoder (Apache-2.0) | cs | ✅ measured, a switch (needs `native/build.sh`) | 156.6 ms (−51%) | PS-168 |
+| 9 | ImageSharp (paid for commercial use) | cs | ✅ measured, never shipped | 271.2 ms (−15%), slower than every permissive native decoder | PS-168 |
+| 10 | fast-png, upng-js | ts | ✅ measured, a switch | slower than pngjs: fast-png +81%, upng +21% (sequential) | PS-168 |
+| 11 | sharp (Apache-2.0; libvips LGPL, dynamic), @napi-rs/image | ts (CLI only) | ✅ measured; napi-image is the bench default | napi-image 402.6 ms (−39% against pngjs sequential, decode 29.8 ms); sharp 465.7 ms (−29%), LGPL, never shipped | PS-168 |
+| 12 | WASM decoders (@jsquash/png; libspng or Wuffs in WASM) | ts (workerd-safe) | ✅ measured, a switch | jsquash parallel 528.9 ms, tied with pngjs parallel (523.8); @cf-wasm/png +442%; libspng and Wuffs in WASM could not build | PS-168 |
+| 13 | Overlay encode: lower deflate level, sharp, WASM, skip | ts | ✅ measured; `none` is the bench default | long `overlay_encode`: pngjs 415.8, level 6 414.6, level 1 404.1, cf-wasm 231.2, sharp 35.3, napi-image 27.3 ms; wall 1114.8 → 706.4 ms with none | PS-168 |
+| 14 | `bun build --compile` for startup | ts | ✅ measured, not adopted | startup 21.2 → 26.4 ms (slower); self −2% | PS-168 |
 | 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | — | — |
 | 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | — | — |
 | 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
-- ts long without the overlay encode: about 986 − 321 = 665 ms (−33%).
-- cs long with decode halved: about 223 − 46 = 177 ms (−21%).
+- cs long with regions free: about 207 − 76 = 131 ms (−37%).
+- cs long with pixel_compare free: about 207 − 48 = 159 ms (−23%).
 
 ## What we know
 
-- **Both engines' decode is limited by unfiltering, not inflating.** Unfilter is 50–60% of
-  decode. Swapping only the inflate stage (for example zlib-ng) caps out at about 25–30% of
-  decode in C#.
-- **ts loses in the diff, not the decode.** Its biggest phase is encoding an overlay PNG the
-  bench contract never asks for.
-- **ts startup is a flat ~103 ms.** The engine imports are inside it. cs starts in ~24 ms.
-- **Parallel decode only pays on big images.** On phone, the Worker's start-up costs more than
-  it takes off the main thread.
-- **cs anti-alias is nearly free** (0.3–3.1 ms, against ts's 5–22 ms).
-- **Accuracy is unchanged.** cs matches ts row for row on both corpora (157 pairs: same
-  verdicts, same regions). Every speed change must keep that, and ob 1942 adds a
-  byte-identical decode test for every decoder candidate.
+- **Diff is now the biggest stage for both engines.** Regions plus pixel_compare are 124 ms of
+  cs's 207 ms long page, and 330 ms of ts's 1115 ms. No decoder change moves them.
+- **A SIMD native decoder takes cs decode from 189.5 ms (stb, sequential) to 16.9–32.7 ms** on the
+  long page (libspng on zlib-ng, Wuffs, SkiaSharp, all parallel). Unfilter was the part stb was slow at.
+- **ts's fastest decoder is native** (napi-image, CLI only). Among what workerd can load (WASM or
+  JS), nothing beats pngjs: pngjs parallel 523.8 ms and jsquash parallel 528.9 ms are a tie.
+- **The overlay's deflate level does not matter** (404–416 ms at every pngjs level); the encoder does
+  (napi-image 27 ms, sharp 35 ms).
+- **ts startup is now ~21 ms**, against ~103 ms in the ob 1932 run. The bench imports
+  `@pixelslash/engine/diff` instead of the package root, which loaded Playwright. That is two runs
+  in two envs, so it is not a percentage. `bun build --compile` does not improve it (26 ms).
+- **Parallel decode only pays on big images, and only for a slow decoder.** On phone the Worker's
+  start-up costs more than it saves; with napi-image, parallel is slower even on the long page
+  (449.2 against 402.6 ms).
+- **cs anti-alias is nearly free** (0.4–4.2 ms, against ts's 8–32 ms).
+- **Accuracy is unchanged.** cs matches ts row for row on both corpora (157 pairs: same verdicts,
+  same regions), with SkiaSharp parallel as with stb sequential. Every TS decoder candidate gives
+  pngjs's RGBA byte for byte on every corpus PNG (`bench/test/codecs.test.ts`).
 - **Constraint:** the web app's server diff runs in workerd, which can load WASM but no native
-  code. The CLI (Bun) can load native code. So the fastest production ts option may differ per
-  path.
+  code. The CLI (Bun) can load native code. So the fastest production ts option differs per path:
+  napi-image for the CLI, pngjs (or jsquash) for workerd.
 
 ## Run log
 
@@ -158,10 +172,55 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-168 | desktop, dedicated | decoders and encoders: every candidate for both engines |
 | 2026-10-24 | ob 1947 | desktop, dedicated | `--env dedicated` against `--env none`: spread of p95 over median |
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · PS-168 · desktop, dedicated · decoders and encoders
+
+`bun run bench:decoders`: every decoder and overlay candidate as one `--impl` of `bench:perf --env
+dedicated`, 28 implementations, 10 interleaved rounds, one run (reserved CPUs 4-5,10-11 at about
+3121 MHz, boost off). The full table, every page, licences and install weight, is
+`bench/results/decoders-2026-10.md`. Long page, median ms; "self" is decode + diff, "change" is self
+against the engine's own baseline row (stb sequential for C#, pngjs sequential with no overlay for TS):
+
+| Candidate | Engine | self | change | decode | peak RSS MB | wall | Licence |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| stb, sequential | cs | 318.7 | 0% | 189.5 | 168.6 | 356.1 | Unlicense or MIT |
+| stb, parallel | cs | 253.1 | −21% | 120.5 | 228.6 | 290.7 | Unlicense or MIT |
+| libspng on zlib, parallel | cs | 215.1 | −33% | 84.6 | 158.2 | 262.5 | BSD-2 + zlib |
+| libspng on zlib-ng, parallel | cs | **147.6** | −54% | 16.9 | 158.3 | 195.0 | BSD-2 + zlib |
+| Wuffs, parallel | cs | 156.6 | −51% | 26.1 | 163.7 | 202.9 | Apache-2.0 or MIT |
+| SkiaSharp, parallel (**shipped default**) | cs | 163.7 | −49% | 32.7 | 161.1 | 207.2 | MIT + BSD-3 |
+| ImageSharp 3.1.12, parallel | cs | 271.2 | −15% | 141.2 | 235.9 | 313.7 | Six Labors Split (paid) |
+| pngjs, sequential | ts | 656.6 | 0% | 282.3 | 411.0 | 706.4 | MIT |
+| pngjs, parallel | ts | 523.8 | −20% | 166.0 | 398.1 | 573.9 | MIT |
+| fast-png, sequential | ts | 1188.6 | +81% | 823.2 | 399.0 | 1242.3 | MIT |
+| upng-js, sequential | ts | 795.3 | +21% | 435.5 | 281.0 | 838.1 | MIT |
+| sharp, sequential | ts | 465.7 | −29% | 90.2 | 274.2 | 504.0 | Apache-2.0 + LGPL-3.0 libvips |
+| @napi-rs/image, sequential (**bench default**) | ts | **402.6** | −39% | 29.8 | 308.6 | 438.6 | MIT |
+| @jsquash/png, parallel | ts | 528.9 | −19% | 163.1 | 282.7 | 572.2 | Apache-2.0 |
+| @cf-wasm/png, parallel | ts | 2043.2 | +211% | 1657.1 | 1175.8 | 2087.9 | MIT |
+| pngjs + pngjs overlay (production-shaped) | ts | 1065.2 | +62% | 274.7 | 410.4 | 1114.8 | MIT |
+| pngjs + napi-image overlay | ts | 677.3 | +3% | 275.8 | 424.9 | 732.0 | MIT |
+| pngjs, `bun build --compile` | ts | 643.1 | −2% | 284.4 | 472.0 | 705.4 | MIT |
+
+- **cs ships SkiaSharp, parallel.** libspng on zlib-ng is 10% faster on self (147.6 against 163.7
+  ms) and Wuffs 4%, but both need `native/build.sh` (a C toolchain, and zlib-ng built from source)
+  where SkiaSharp is one NuGet package. `--decoder` keeps every candidate a switch, and `--decode
+  sequential` the old mode. No paid or copyleft candidate is faster than SkiaSharp.
+- **The ts bench decodes with napi-image, sequential, and encodes no overlay.** The production
+  engine still decodes and encodes with pngjs. For the CLI the fastest is napi-image both ways;
+  for workerd it is pngjs parallel, tied with jsquash parallel.
+- **Peak RSS is self-reported** (`peak_rss_bytes`: `VmHWM`, `PeakWorkingSet64`). rusage's maxRSS of
+  a child carries the parent's high-water mark through fork and exec, so it read the same on every row.
+- **Could not build:** libspng or Wuffs as WASM (no maintained npm build), ImageSharp 3.2+ (needs a
+  licence key), jsquash and sharp under `bun build --compile` (their .wasm and native addon are not
+  embedded).
+- **Parity:** cs's verdicts and regions, SkiaSharp parallel against main's stb sequential, on both
+  corpora: 157 cases, 0 mismatches.
 
 ### 2026-10-24 · ob 1947 · desktop, dedicated · `--env dedicated` against `--env none`
 
@@ -258,3 +317,4 @@ The ts diff includes encoding the overlay PNG.
 - ob 1910: the C# engine behind the contract.
 - ob 1932: per-phase timings, `startup_ms`, `--decode parallel|sequential`.
 - ob 1947: `--env dedicated`, reserved cores and memory for the run, and the `env` header in every result.
+- PS-168: `bench:decoders`, `--decoder` on both engines and `--overlay` on ts, `peak_rss_bytes` in the contract.

@@ -9,3 +9,4 @@ engines/dotnet/**/TestResults/
 
 # the compiled root helper (bench/env/install.sh builds it)
 bench/env/dist/
+engines/dotnet/native/out/

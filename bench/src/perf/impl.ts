@@ -11,6 +11,7 @@
  * diff: reading the files' directory entries, writing JSON, exit). A dash is a phase it does not report.
  */
 import { join } from "node:path";
+import type { ImplOutput } from "../impl/contract.ts";
 import { describeFailure, invokeImpl, type DecodeMode, type ImplFailure } from "../impl/invoke.ts";
 import { branchFile, mainFile } from "./fixtures.ts";
 import { median, percentile } from "./stats.ts";
@@ -27,6 +28,8 @@ type ImplSamples = {
   rest: number[];
   /** One list per phase name the implementation reported. */
   phases: Record<string, number[]>;
+  /** Peak resident set of each process, bytes, as it reported it (PS-168); empty when it does not. */
+  rss: number[];
 };
 
 /** One implementation on one step: its samples, or the failure that ended it (the rest of its rounds are skipped). */
@@ -38,7 +41,7 @@ export type ImplMeasured = {
 };
 
 const empty = (): ImplStep => ({
-  samples: { decode: [], diff: [], wall: [], startup: [], rest: [], phases: {} },
+  samples: { decode: [], diff: [], wall: [], startup: [], rest: [], phases: {}, rss: [] },
   failure: null,
 });
 
@@ -68,18 +71,21 @@ async function sampleOnce(
   if (!run.ok) slot.failure = run.failure;
   else if (run.output.verdict !== "changed")
     slot.failure = { kind: "output", message: "said unchanged on a pair that differs" };
-  else if (keep) {
-    slot.samples.decode.push(run.output.decode_ms);
-    slot.samples.diff.push(run.output.diff_ms);
-    slot.samples.wall.push(run.wallMs);
-    const { startup_ms: startup, phases } = run.output;
-    if (startup !== undefined) {
-      slot.samples.startup.push(startup);
-      slot.samples.rest.push(run.wallMs - startup - run.output.decode_ms - run.output.diff_ms);
-    }
-    for (const [name, value] of Object.entries(phases ?? {})) {
-      (slot.samples.phases[name] ??= []).push(value);
-    }
+  else if (keep) keepSample(slot.samples, run.output, run.wallMs);
+}
+
+function keepSample(samples: ImplSamples, output: ImplOutput, wallMs: number): void {
+  samples.decode.push(output.decode_ms);
+  samples.diff.push(output.diff_ms);
+  samples.wall.push(wallMs);
+  const { startup_ms: startup, phases, peak_rss_bytes: rss } = output;
+  if (rss !== undefined) samples.rss.push(rss);
+  if (startup !== undefined) {
+    samples.startup.push(startup);
+    samples.rest.push(wallMs - startup - output.decode_ms - output.diff_ms);
+  }
+  for (const [name, value] of Object.entries(phases ?? {})) {
+    (samples.phases[name] ??= []).push(value);
   }
 }
 

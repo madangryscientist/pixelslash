@@ -3,13 +3,20 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@cf-wasm/png": "0.4.0",
+    "@jsquash/png": "3.1.1",
+    "@napi-rs/image": "1.15.0",
     "@pixelslash/engine": "workspace:*",
+    "fast-png": "8.0.0",
     "playwright": "1.60.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "sharp": "0.35.5",
+    "upng-js": "2.1.0"
   },
   "devDependencies": {
     "@types/bun": "1.4.3",
     "@types/pngjs": "^6.0.5",
+    "@types/upng-js": "2.1.5",
     "vitest": "5.0.5"
   }
 }

@@ -8,7 +8,7 @@ function measuredRow(
   wall: number,
   phases: Record<string, number[]>,
 ): ImplMeasured {
-  const samples = { decode: [4], diff: [3], wall: [wall], startup: [], rest: [], phases };
+  const samples = { decode: [4], diff: [3], wall: [wall], startup: [], rest: [], phases, rss: [] };
   return { command, steps: new Map([["diff-phone", { samples, failure: null }]]) };
 }
 

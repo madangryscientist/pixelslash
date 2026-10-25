@@ -33,6 +33,10 @@
       "command": "bun bench/src/perf/run.ts --check",
       "cache": false
     },
+    "decoders": {
+      "command": "bun bench/src/perf/decoders.ts",
+      "cache": false
+    },
     "check": {
       "command": "bun bench/src/check.ts",
       "cache": true,

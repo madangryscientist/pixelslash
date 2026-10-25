@@ -13,6 +13,22 @@
   <ItemGroup>
     <!-- Unlicense OR MIT. Not ImageSharp: its licence is not permissive. -->
     <PackageReference Include="StbImageSharp" Version="2.30.16" />
+    <!-- The default decoder since PS-168: SkiaSharp is MIT, Skia BSD-3. NoDependencies: the native
+         library without fontconfig, which a decode does not need. -->
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.1" />
+  </ItemGroup>
+
+  <!-- PS-168's measured-only candidate, in a build only the decoder bench asks for:
+       dotnet build -c Release -p:DecoderCandidates=true. ImageSharp is the Six Labors Split
+       License, measured and never shipped. -->
+  <PropertyGroup Condition="'$(DecoderCandidates)' == 'true'">
+    <DefineConstants>$(DefineConstants);DECODER_CANDIDATES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(DecoderCandidates)' == 'true'">
+    <!-- 4.x and 3.2 refuse to build without a paid Six Labors licence key; 3.1.12 does not. Its
+         advisories are suppressed in Directory.Build.props. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 
 </Project>

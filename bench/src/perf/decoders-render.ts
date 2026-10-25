@@ -1,0 +1,176 @@
+/**
+ * The decoder table `bench:decoders` writes (PS-168): its rows, the `bench:perf` numbers file they
+ * are read from, and the markdown, `bench/results/decoders-<yyyy-mm>.md`.
+ */
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { median, percentile } from "./stats.ts";
+import { IMPL_STEP_IDS } from "./steps.ts";
+
+export type Candidate = {
+  /** The row's name in the table. */
+  label: string;
+  engine: "C#" | "TS";
+  /** What the row measures: a decoder, an overlay encoder (pngjs decode), or the compiled binary's start-up. */
+  kind: "decoder" | "overlay" | "startup";
+  command: string;
+  licence: string;
+  workerd: boolean;
+  cli: boolean;
+  csharp: boolean;
+  /** Files or directories whose size is the install weight. */
+  weight: string[];
+  /** Why it may never ship, when it may not. */
+  never?: string;
+  /** Set when it cannot be timed here; the row says why. */
+  missing?: string;
+};
+
+/** What `native/build.sh` could not make and why, for the "could not build" list. */
+export const COULD_NOT_BUILD: { name: string; why: string }[] = [
+  {
+    name: "libspng or Wuffs as WASM (TS)",
+    why: "no maintained npm build of either; building one is a new toolchain (emscripten) for a bench row",
+  },
+  {
+    name: "ImageSharp 3.2 / 4.x (C#)",
+    why: "the build stops without a Six Labors licence key; buying one is not ours to do, so 3.1.12 is measured",
+  },
+  {
+    name: "jsquash under bun build --compile (TS)",
+    why: "its .wasm is loaded by path and is not embedded: ENOENT on /$bunfs/root/squoosh_png_bg.wasm",
+  },
+  {
+    name: "sharp under bun build --compile (TS)",
+    why: 'its native addon and libvips are not embedded: "Could not load the sharp module"',
+  },
+];
+
+function bytesOf(path: string): number {
+  if (!existsSync(path)) return 0;
+  const s = statSync(path);
+  if (!s.isDirectory()) return s.size;
+  return readdirSync(path).reduce((sum, f) => sum + bytesOf(join(path, f)), 0);
+}
+
+const mb = (bytes: number): string => (bytes / 1e6).toFixed(1);
+const yn = (b: boolean): string => (b ? "yes" : "no");
+
+type Step = {
+  decode: number[];
+  diff: number[];
+  wall: number[];
+  startup: number[];
+  phases: Record<string, number[]>;
+  rss: number[];
+  failure: string | null;
+};
+
+type Dumped = { command: string; steps: Record<string, Step> };
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+
+/** A `bench:perf` numbers file, as far as the table reads it: each impl's command and steps. */
+export function isDump(v: unknown): v is { impls: Dumped[] } {
+  return (
+    isObject(v) &&
+    Array.isArray(v.impls) &&
+    v.impls.every((d) => isObject(d) && typeof d.command === "string" && isObject(d.steps))
+  );
+}
+
+const f1 = (xs: number[] | undefined): string =>
+  xs && xs.length > 0 ? median(xs).toFixed(1) : "-";
+
+const rssMb = (step: Step): string => (step.rss.length > 0 ? mb(median(step.rss)) : "-");
+
+/** The implementation's own decode + diff per sample on `page`; none when it has no step there. */
+function selfMs(d: Dumped | undefined, page: string): number[] {
+  const s = d?.steps[page];
+  return s ? s.decode.map((x, i) => x + (s.diff[i] ?? 0)) : [];
+}
+
+/** Why a row has no numbers on a page: not built, or failed (with the runner's reason). */
+function noNumbers(r: Candidate, step: Step | undefined, missing: string): string {
+  return r.missing ? missing : `failed: ${step?.failure ?? "no samples"}`;
+}
+
+type Table = { rows: Candidate[]; byCommand: Map<string, Dumped> };
+
+/** Each engine's own default before PS-168, the `vs baseline` column's zero. */
+function baselineMs(t: Table, engine: string): number | null {
+  const label = engine === "C#" ? "stb sequential" : "pngjs sequential";
+  const row = t.rows.find((r) => r.engine === engine && r.label === label);
+  const xs = selfMs(t.byCommand.get(row?.command ?? ""), "diff-long");
+  return xs.length > 0 ? median(xs) : null;
+}
+
+function headline(t: Table): string[] {
+  return t.rows.map((r) => {
+    const d = t.byCommand.get(r.command);
+    const xs = selfMs(d, "diff-long");
+    const step = d?.steps["diff-long"];
+    if (r.missing || !step || xs.length === 0)
+      return `| ${r.label} | ${r.engine} | ${noNumbers(r, step, `not built: ${r.missing}`)} | | | | | ${r.licence} | |`;
+    const base = baselineMs(t, r.engine);
+    const vs = base === null ? "-" : `${(((median(xs) - base) / base) * 100).toFixed(0)}%`;
+    return `| ${r.label} | ${r.engine} | ${median(xs).toFixed(1)} | ${percentile(xs, 95).toFixed(1)} | ${vs} | ${f1(step.decode)} | ${rssMb(step)} | ${r.licence} | ${r.never ? `never: ${r.never}` : "permissive"} |`;
+  });
+}
+
+const DECODE_PHASES = ["decode_read", "decode_inflate", "decode_unfilter", "decode_other"];
+const DIFF_PHASES = ["pixel_compare", "regions", "overlay_encode"];
+
+function pageRows(t: Table, r: Candidate): string[] {
+  // None of its files found (another install layout): not measured, so not 0.
+  const found = r.weight.filter((w) => existsSync(w));
+  const weight = found.length === 0 ? "-" : mb(found.reduce((sum, w) => sum + bytesOf(w), 0));
+  const tail = `${r.licence} | ${yn(r.workerd)} | ${yn(r.cli)} | ${yn(r.csharp)} | ${weight} |`;
+  const d = t.byCommand.get(r.command);
+  return IMPL_STEP_IDS.map((page) => {
+    const step = d?.steps[page];
+    const xs = selfMs(d, page);
+    if (r.missing || !step || xs.length === 0)
+      return `| ${r.label} | ${r.engine} | ${page} | ${noNumbers(r, step, "not built")} | | | | | | | ${tail}`;
+    const phases = (names: string[]) => names.map((n) => f1(step.phases[n])).join(" / ");
+    return `| ${r.label} | ${r.engine} | ${page} | ${median(xs).toFixed(1)} | ${percentile(xs, 95).toFixed(1)} | ${f1(step.wall)} | ${f1(step.startup)} | ${phases(DECODE_PHASES)} | ${phases(DIFF_PHASES)} | ${rssMb(step)} | ${tail}`;
+  });
+}
+
+/** `bench/results/decoders-<yyyy-mm>.md`: the headline on diff-long, then every row on every page. */
+export function render(
+  rows: Candidate[],
+  dumped: Dumped[],
+  header: string[],
+  date: string,
+): string {
+  const t: Table = { rows, byCommand: new Map(dumped.map((d) => [d.command, d])) };
+  const out: string[] = [
+    `# Decoders and overlay encoders, ${date} (PS-168)`,
+    "",
+    "Written by `bun run bench:decoders`; do not edit by hand. Each row is one `--impl` of `bench:perf`,",
+    "all rows interleaved in one run, so the numbers compare with each other and with no other run.",
+    "`self` is the implementation's own decode + diff ms; `wall` is the whole process. Peak RSS is what",
+    "the process reports (`peak_rss_bytes`), runtime included: compare it within an engine, not across. Install weight is the files the candidate adds on disk. `workerd` is",
+    "from each package's docs (a native addon cannot load there), not run here.",
+    "",
+    ...header.map((l) => `    ${l}`),
+    "",
+    "## Headline: diff-long (1440x6000)",
+    "",
+    "| candidate | engine | self median | self p95 | vs baseline | decode | peak RSS MB | licence | ships? |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+    ...headline(t),
+    "",
+    "## Every row, every page",
+    "",
+    "| candidate | engine | page | self median | self p95 | wall | startup | decode read / inflate / unfilter / other | pixel_compare / regions / overlay_encode | peak RSS MB | licence | workerd | CLI (Bun) | C# | install MB |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- | --- | ---: |",
+    ...rows.flatMap((r) => pageRows(t, r)),
+    "",
+    "## Could not build",
+    "",
+    ...COULD_NOT_BUILD.map((c) => `- **${c.name}**: ${c.why}`),
+  ];
+  return `${out.join("\n")}\n`;
+}

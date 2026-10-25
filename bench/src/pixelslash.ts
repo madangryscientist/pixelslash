@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { diffPngs, type PixelDiff } from "@pixelslash/engine";
+import { diffPngs, type PixelDiff } from "@pixelslash/engine/diff";
 import { caseKey, type CorpusCase } from "./corpus.ts";
 import type { Rect } from "./regions.ts";
 import type { ToolResult } from "./types.ts";

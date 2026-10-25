@@ -326,12 +326,18 @@ function groupRegions(
 /**
  * `diffPngs` from decoded pixels: the benchmark decodes (and times the decoding) itself, and may
  * decode both at once. A `probe` is told how long each phase took; without one nothing is timed.
+ * `encode` turns the overlay into its PNG bytes; pngjs unless the benchmark measures another
+ * encoder (PS-168). The engine itself never passes one.
  */
 export function diffRasters(
   a: Raster,
   b: Raster,
   options: DiffOptions = {},
-  { ignore = {}, probe }: { ignore?: DiffIgnore; probe?: DiffProbe } = {},
+  {
+    ignore = {},
+    probe,
+    encode = (overlay) => PNG.sync.write(overlay),
+  }: { ignore?: DiffIgnore; probe?: DiffProbe; encode?: (overlay: PNG) => Buffer } = {},
 ): PixelDiff & { overlay: Buffer } {
   const overlay = new PNG({
     width: Math.max(a.width, b.width),
@@ -348,7 +354,7 @@ export function diffRasters(
     probe,
   });
   const encodeStarted = clock(probe);
-  const encoded = PNG.sync.write(overlay);
+  const encoded = encode(overlay);
   probe?.("overlay_encode", clock(probe) - encodeStarted);
   return {
     changed,
