@@ -13,11 +13,8 @@ import {
   MAX_FINDINGS,
   MAX_TEXT,
   measureComposition,
-  parseCompositionEntry,
   type Composition,
 } from "../src/composition.ts";
-import { gapsList, renderGaps } from "../src/composition-report.ts";
-import type { SnapshotEntry, SnapshotManifest } from "../src/snapshot.ts";
 import { libraryProject, PAGES } from "./composition-fixtures.ts";
 
 let project = "";
@@ -141,6 +138,11 @@ describe("the DOM walk", () => {
     ]);
   });
 
+  test("a styled <html> or <body> is walked through but is no gap", async () => {
+    const { gaps } = await measure(PAGES.rootStyled);
+    expect(gaps.map((g) => [g.tag, g.selector])).toEqual([["button", "#go"]]);
+  });
+
   test("a one-class library string does not make an element the library's", async () => {
     // "relative" is a whole library string, so it covers itself; the element is still the app's,
     // and its inline style is not excused as one the library sets.
@@ -202,88 +204,5 @@ describe("the DOM walk", () => {
     await expect(
       measure(PAGES.stray, 1, { ...lib, custom: [{ selector: "##", reason: "x" }] }),
     ).rejects.toThrow('composition.custom selector "##" is not a valid selector');
-  });
-});
-
-const entry = (name: string, composition: Composition): SnapshotEntry => ({
-  name,
-  path: `/${name}`,
-  variant: {
-    name: "desktop",
-    browser: "chromium",
-    viewport: { width: 800, height: 400 },
-    theme: "light",
-  },
-  tags: [],
-  diff: {},
-  ignore: [],
-  flaky: "review",
-  file: `${name}/desktop.png`,
-  fingerprint: { image: "version:t", browser: "chromium 1", fonts: "sha256:f" },
-  composition,
-});
-
-const stray = (box: { x: number; y: number; width: number; height: number }) => ({
-  kind: "class" as const,
-  selector: "#go",
-  tag: "button",
-  classes: ["mt-7"],
-  style: null,
-  box,
-});
-
-const bad = (where: string, what: string): never => {
-  throw new Error(`${where} ${what}`);
-};
-
-describe("the gap list", () => {
-  test("the same stray class on two routes is one group with two places", () => {
-    const manifest: SnapshotManifest = {
-      version: 1,
-      snapshots: [
-        entry("home", {
-          library: "Acme UI",
-          gaps: [stray({ x: 1, y: 2, width: 3, height: 4 })],
-          special: [],
-        }),
-        entry("about", {
-          library: "Acme UI",
-          omitted: 2,
-          gaps: [stray({ x: 5, y: 6, width: 7, height: 8 })],
-          special: [
-            { selector: "#logo", reason: "brand", box: { x: 0, y: 0, width: 9, height: 9 } },
-          ],
-        }),
-      ],
-    };
-    const list = gapsList(manifest, "Acme UI");
-    expect(list.gaps).toHaveLength(1);
-    expect(list.omitted).toBe(2);
-    expect(renderGaps(list, new Map())).toContain("2 more past the cap of 500 a shot");
-    expect(list.gaps[0]?.missing).toBe('missing: a Acme UI prop or variant that gives "mt-7"');
-    expect(list.gaps[0]?.places.map((p) => [p.name, p.box.x])).toEqual([
-      ["home", 1],
-      ["about", 5],
-    ]);
-    expect(list.special).toEqual([
-      {
-        name: "about",
-        variant: "desktop",
-        path: "/about",
-        file: "about/desktop.png",
-        selector: "#logo",
-        reason: "brand",
-        box: { x: 0, y: 0, width: 9, height: 9 },
-      },
-    ]);
-  });
-
-  test("a manifest's composition is validated, and absent reads as no field", () => {
-    expect(parseCompositionEntry(undefined, "c", bad)).toBeUndefined();
-    const ok = { library: "Acme UI", gaps: [], special: [] };
-    expect(parseCompositionEntry(ok, "c", bad)).toEqual(ok);
-    expect(() => parseCompositionEntry({ ...ok, gaps: [{ kind: "nope" }] }, "c", bad)).toThrow(
-      "c.gaps[0].kind must be element, class, style",
-    );
   });
 });

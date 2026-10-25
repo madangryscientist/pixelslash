@@ -1,5 +1,16 @@
 import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import {
+  GAP_COLOUR,
   MAX_FINDINGS,
+  SPECIAL_COLOUR,
+  gapReason,
   type Composition,
   type Gap,
   type SpecialCase,
@@ -22,22 +33,51 @@ const place = (r: Rect, width: number, height: number) => ({
   height: `${(r.height / height) * 100}%`,
 });
 
-/** What a gap adds that the library does not give. */
-export function gapWhat(gap: Gap): string {
-  const parts = [
-    gap.classes.length > 0 ? `class ${gap.classes.join(" ")}` : null,
-    gap.style ? `style ${gap.style}` : null,
-  ];
-  return parts.filter(Boolean).join("; ");
+/** One finding, as a box and its list row know each other by. */
+type Finding = { kind: "gap" | "special"; index: number };
+
+const FocusContext = createContext<{
+  focus: Finding | null;
+  setFocus: (f: Finding | null) => void;
+}>({ focus: null, setFocus: () => {} });
+
+/** Shares the finding under the pointer between the boxes on the shot and the rows under it. */
+export function CompositionFocus({ children }: { children: ReactNode }) {
+  const [focus, setFocus] = useState<Finding | null>(null);
+  const value = useMemo(() => ({ focus, setFocus }), [focus]);
+  return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>;
 }
 
-const KIND: Record<Gap["kind"], string> = {
-  element: "styled element with no library root",
-  class: "classes the library does not give",
-  style: "inline style",
-};
+const isFocused = (focus: Finding | null, kind: Finding["kind"], index: number) =>
+  focus?.kind === kind && focus.index === index;
 
-/** The findings' boxes over the branch image `width`×`height` px: gaps in amber, special cases in violet. */
+/** Hex colour `hex` at `alpha` (0-255) as an 8-digit hex. */
+const tint = (hex: string, alpha: number) => `${hex}${alpha.toString(16).padStart(2, "0")}`;
+
+const swatch = (colour: string, dashed: boolean): CSSProperties => ({
+  borderColor: colour,
+  borderStyle: dashed ? "dashed" : "solid",
+  backgroundColor: tint(colour, 0x30),
+});
+
+/** The legend for the boxes: what each colour is, with how many on this shot. */
+export function CompositionLegend({ composition }: { composition: Composition }) {
+  const { library, gaps, special } = composition;
+  return (
+    <ul aria-label="Composition legend" className="flex flex-wrap items-center gap-3 text-xs">
+      <li className="flex items-center gap-1.5">
+        <span className="inline-block size-3 border-2" style={swatch(GAP_COLOUR, false)} />
+        Not from {library} ({gaps.length})
+      </li>
+      <li className="flex items-center gap-1.5">
+        <span className="inline-block size-3 border-2" style={swatch(SPECIAL_COLOUR, true)} />
+        Special case ({special.length})
+      </li>
+    </ul>
+  );
+}
+
+/** The findings' boxes over the branch image `width`×`height` px: gaps in amber, special cases dashed in violet. */
 export function CompositionBoxes({
   width,
   height,
@@ -47,6 +87,18 @@ export function CompositionBoxes({
   height: number;
   composition: Composition;
 }) {
+  const { focus, setFocus } = useContext(FocusContext);
+  const box = (
+    kind: Finding["kind"],
+    i: number,
+    colour: string,
+    dashed: boolean,
+  ): CSSProperties => ({
+    borderColor: colour,
+    borderStyle: dashed ? "dashed" : "solid",
+    backgroundColor: tint(colour, isFocused(focus, kind, i) ? 0x66 : 0x1f),
+    zIndex: isFocused(focus, kind, i) ? 1 : undefined,
+  });
   return (
     <div aria-label="Composition findings" className="pointer-events-none absolute inset-0">
       {composition.gaps.map((gap, i) => (
@@ -54,9 +106,11 @@ export function CompositionBoxes({
           // Findings are stored in walk order: the index is a stable key.
           key={`g${i}`}
           data-testid="gap-box"
-          title={`${gap.selector}: ${gapWhat(gap)}`}
-          className="absolute border-2 border-amber-500 bg-amber-400/15"
-          style={place(gap.box, width, height)}
+          title={`${gap.selector}: ${gapReason(gap, composition.library)}`}
+          className="pointer-events-auto absolute border-2"
+          style={{ ...place(gap.box, width, height), ...box("gap", i, GAP_COLOUR, false) }}
+          onMouseEnter={() => setFocus({ kind: "gap", index: i })}
+          onMouseLeave={() => setFocus(null)}
         />
       ))}
       {composition.special.map((s, i) => (
@@ -64,48 +118,65 @@ export function CompositionBoxes({
           key={`s${i}`}
           data-testid="special-box"
           title={`${s.selector}: ${s.reason}`}
-          className="absolute border-2 border-dashed border-violet-500 bg-violet-400/10"
-          style={place(s.box, width, height)}
+          className="pointer-events-auto absolute border-2"
+          style={{ ...place(s.box, width, height), ...box("special", i, SPECIAL_COLOUR, true) }}
+          onMouseEnter={() => setFocus({ kind: "special", index: i })}
+          onMouseLeave={() => setFocus(null)}
         />
       ))}
     </div>
   );
 }
 
-function GapItem({ gap }: { gap: Gap }) {
+function Row({ finding, children }: { finding: Finding; children: ReactNode }) {
+  const { focus, setFocus } = useContext(FocusContext);
   return (
-    <li className="py-1.5">
-      <code className="text-xs break-all">{gap.selector}</code>
-      <p className="text-sm">
-        {KIND[gap.kind]}: <code className="text-xs break-all">{gapWhat(gap)}</code>
-      </p>
+    <li
+      data-focused={isFocused(focus, finding.kind, finding.index) || undefined}
+      className="py-1.5 data-[focused]:bg-slate-100"
+      onMouseEnter={() => setFocus(finding)}
+      onMouseLeave={() => setFocus(null)}
+    >
+      {children}
     </li>
   );
 }
 
-function SpecialItem({ special }: { special: SpecialCase }) {
+function GapItem({ gap, index, library }: { gap: Gap; index: number; library: string }) {
   return (
-    <li className="py-1.5">
-      <code className="text-xs break-all">{special.selector}</code>
-      <p className="text-sm">{special.reason}</p>
-    </li>
+    <Row finding={{ kind: "gap", index }}>
+      <code className="text-xs break-words">{gap.selector}</code>
+      <p className="text-sm break-words">{gapReason(gap, library)}</p>
+    </Row>
   );
 }
 
-/** The two lists under the shot; nothing for a project that is not composition-only. */
+function SpecialItem({ special, index }: { special: SpecialCase; index: number }) {
+  return (
+    <Row finding={{ kind: "special", index }}>
+      <code className="text-xs break-words">{special.selector}</code>
+      <p className="text-sm break-words">{special.reason}</p>
+    </Row>
+  );
+}
+
+/**
+ * The two lists under the shot, full width: they describe Branch, and a column under Main would
+ * read as Main's. Nothing for a project that is not composition-only.
+ */
 export function CompositionPanel({ composition }: { composition: Composition | null }) {
   if (!composition) return null;
   const { library, gaps, special, omitted } = composition;
   return (
-    <section aria-label="Composition" className="grid gap-4 sm:grid-cols-2">
+    <section aria-label="Composition" className="space-y-4">
       {omitted ? (
-        <p className="text-sm text-slate-500 sm:col-span-2">
+        <p className="text-sm text-slate-500">
           {omitted} more past the cap of {MAX_FINDINGS} a shot were not kept.
         </p>
       ) : null}
       <div>
         <h2 className="text-sm font-semibold">
-          {library} gaps ({gaps.length})
+          {library} gaps on Branch ({gaps.length})
         </h2>
         {gaps.length === 0 ? (
           <p className="text-sm text-slate-500">Everything styled here comes from {library}.</p>
@@ -113,19 +184,19 @@ export function CompositionPanel({ composition }: { composition: Composition | n
           <ul aria-label={`${library} gaps`} className="divide-y divide-slate-200">
             {gaps.map((gap, i) => (
               // Walk order, fixed for one page load.
-              <GapItem key={i} gap={gap} />
+              <GapItem key={i} gap={gap} index={i} library={library} />
             ))}
           </ul>
         )}
       </div>
       <div>
-        <h2 className="text-sm font-semibold">Special cases ({special.length})</h2>
+        <h2 className="text-sm font-semibold">Special cases on Branch ({special.length})</h2>
         {special.length === 0 ? (
           <p className="text-sm text-slate-500">Nothing on this shot is declared custom.</p>
         ) : (
           <ul aria-label="Special cases" className="divide-y divide-slate-200">
             {special.map((s, i) => (
-              <SpecialItem key={i} special={s} />
+              <SpecialItem key={i} special={s} index={i} />
             ))}
           </ul>
         )}

@@ -1,5 +1,12 @@
 import { join } from "node:path";
-import { MAX_FINDINGS, type Gap, type GapKind } from "./composition-entry.ts";
+import {
+  GAP_COLOUR,
+  GAP_LABEL,
+  MAX_FINDINGS,
+  SPECIAL_COLOUR,
+  type Gap,
+  type GapKind,
+} from "./composition-entry.ts";
 import type { IgnoreRect } from "./diff.ts";
 import { esc } from "./report.ts";
 import { CROP_CSS, slabStyle } from "./report-crop.ts";
@@ -8,7 +15,7 @@ import type { SnapshotManifest } from "./snapshot.ts";
 /**
  * The gap list of a composition-only capture (ob 1850), as `gaps.json` and `gaps.html` beside the
  * manifest. The same classes or style on several shots is one group listing every place. A file,
- * never filed anywhere.
+ * never sent anywhere.
  */
 
 /** Where a finding is: the shot (route + variant), the element, and its box in image px. */
@@ -23,12 +30,12 @@ export type Place = {
   box: IgnoreRect;
 };
 
-/** One gap across every shot it appears on, with what the library would need to cover it. */
+/** One gap across every shot it appears on, with what the DOM showed that is not the library's. */
 export type GapGroup = {
   kind: GapKind;
   classes: string[];
   style: string | null;
-  missing: string;
+  reason: string;
   places: Place[];
 };
 
@@ -42,15 +49,17 @@ export type GapsList = {
   omitted: number;
 };
 
-/** A one-line "missing: ..." for a group, by kind. Heuristic text; nothing is asked. */
-function missing(library: string, g: Pick<Gap, "kind" | "classes" | "style">, tags: string[]) {
+/**
+ * A one-line "not from <library>: ..." for a group, by kind. Only the DOM was read, so it says what
+ * is on the element, not what the library lacks.
+ */
+function reason(library: string, g: Pick<Gap, "kind" | "classes" | "style">, tags: string[]) {
   const classes = `"${g.classes.join(" ")}"`;
   const tag = tags.map((t) => `<${t}>`).join("/");
-  if (g.kind === "element")
-    return `missing: a ${library} component for the ${tag} styled ${classes}${g.style ? ` and "${g.style}"` : ""}`;
-  if (g.kind === "class")
-    return `missing: a ${library} prop or variant that gives ${classes}${g.style ? ` and "${g.style}"` : ""}`;
-  return `missing: a ${library} prop or token for the inline style "${g.style ?? ""}"`;
+  const style = g.style ? ` and "${g.style}"` : "";
+  if (g.kind === "element") return `not from ${library}: the ${tag} styled ${classes}${style}`;
+  if (g.kind === "class") return `not from ${library}: the classes ${classes}${style}`;
+  return `not from ${library}: the inline style "${g.style ?? ""}"`;
 }
 
 /** Group a manifest's gaps by kind, classes and style, in first-seen order. */
@@ -74,7 +83,7 @@ export function gapsList(manifest: SnapshotManifest, library: string): GapsList 
     kind: gap.kind,
     classes: gap.classes,
     style: gap.style,
-    missing: missing(library, gap, [...new Set(places.map((p) => p.tag))]),
+    reason: reason(library, gap, [...new Set(places.map((p) => p.tag))]),
     places,
   }));
   return { library, gaps, special, omitted };
@@ -82,6 +91,12 @@ export function gapsList(manifest: SnapshotManifest, library: string): GapsList 
 
 /** Padding around a finding's box in its crop, in image px. */
 const PAD = 16;
+
+/** A crop is never blown up past this, so a three-pixel gap does not fill the page. */
+const MAX_ZOOM = 6;
+
+/** The widest a crop is drawn, in CSS px. */
+const MAX_CROP_WIDTH = 480;
 
 const pct = (n: number, of: number) => `${((n / of) * 100).toFixed(3)}%`;
 
@@ -93,7 +108,7 @@ function crop(src: string, size: { width: number; height: number }, box: IgnoreR
   const h = Math.min(size.height, box.y + box.height + PAD) - y;
   const slab = slabStyle(size, { x, y, w, h });
   const mark = `left:${pct(box.x, size.width)};top:${pct(box.y, size.height)};width:${pct(box.width, size.width)};height:${pct(box.height, size.height)}`;
-  return `<a class="crop" href="${esc(src)}" style="aspect-ratio:${w}/${h}"><span class="slab" style="${slab}"><img src="${esc(src)}" alt=""><span class="mark ${cls}" style="${mark}"></span></span></a>`;
+  return `<a class="crop" href="${esc(src)}" style="aspect-ratio:${w}/${h};max-width:${Math.min(MAX_CROP_WIDTH, w * MAX_ZOOM)}px"><span class="slab" style="${slab}"><img src="${esc(src)}" alt=""><span class="mark ${cls}" style="${mark}"></span></span></a>`;
 }
 
 type Sizes = Map<string, { width: number; height: number }>;
@@ -123,8 +138,8 @@ export function renderGaps(list: GapsList, sizes: Sizes): string {
         .filter(Boolean)
         .join(" ");
       const places = g.places.map((p) => placeItem(p, sizes, "gap")).join("\n        ");
-      return `<li class="group"><p class="what">${g.kind}: ${what} — ${g.places.length} ${g.places.length === 1 ? "place" : "places"}</p>
-      <p class="missing">${esc(g.missing)}</p>
+      return `<li class="group"><p class="what">${GAP_LABEL[g.kind]}: ${what} — ${g.places.length} ${g.places.length === 1 ? "place" : "places"}</p>
+      <p class="reason">${esc(g.reason)}</p>
       <ul>
         ${places}
       </ul></li>`;
@@ -149,21 +164,21 @@ export function renderGaps(list: GapsList, sizes: Sizes): string {
     li { margin: 0 0 12px; }
     .group > ul { margin-top: 8px; }
     .what { color: #eee; margin: 0; }
-    .missing { color: #ffd400; margin: 4px 0 0; }
+    .reason { color: #ffd400; margin: 4px 0 0; }
     .shot { color: #888; }
-    code { color: #fc9; }
+    code { color: #fc9; overflow-wrap: break-word; }
     a { color: #9cf; }
     ${CROP_CSS}
-    .crop { max-width: 480px; margin-top: 6px; }
+    .crop { margin-top: 6px; }
     .mark { position: absolute; box-sizing: border-box; outline: 2px solid; }
-    .mark.gap { outline-color: #ff4d6d; }
-    .mark.special { outline-color: #9cf; }
+    .mark.gap { outline-color: ${GAP_COLOUR}; }
+    .mark.special { outline: 2px dashed ${SPECIAL_COLOUR}; }
   </style>
 </head>
 <body>
   <header>
     <h1>${title}</h1>
-    <p>${list.gaps.length} ${list.gaps.length === 1 ? "gap" : "gaps"} · ${list.special.length} special ${list.special.length === 1 ? "case" : "cases"}.${list.omitted > 0 ? ` ${list.omitted} more past the cap of ${MAX_FINDINGS} a shot were not kept.` : ""} Measured from the live DOM at capture; nothing was filed.</p>
+    <p>${list.gaps.length} ${list.gaps.length === 1 ? "gap" : "gaps"} · ${list.special.length} special ${list.special.length === 1 ? "case" : "cases"}.${list.omitted > 0 ? ` ${list.omitted} more past the cap of ${MAX_FINDINGS} a shot were not kept.` : ""} Measured from the live DOM at capture; nothing was sent anywhere.</p>
   </header>
   <section><h2>${title} (${list.gaps.length})</h2>
     ${list.gaps.length === 0 ? none("gaps") : `<ul>\n    ${groups}\n    </ul>`}

@@ -28,6 +28,30 @@ export type Gap = {
   box: IgnoreRect;
 };
 
+/** The plain name of each kind, as the lists and gap pages say it. */
+export const GAP_LABEL: Record<GapKind, string> = {
+  element: "hand-styled element",
+  class: "extra classes",
+  style: "inline style",
+};
+
+/** What a gap adds: its classes, then its inline declarations (alone, for a `style` gap). */
+export function gapWhat(gap: Pick<Gap, "kind" | "classes" | "style">): string {
+  const style = gap.style && (gap.kind === "style" ? gap.style : `inline style ${gap.style}`);
+  return [gap.classes.join(" "), style].filter(Boolean).join("; ");
+}
+
+/** One gap in a sentence, e.g. "hand-styled element: banner glow"; says only what the DOM showed. */
+export function gapReason(gap: Pick<Gap, "kind" | "classes" | "style">, library: string): string {
+  const lead =
+    gap.kind === "class" ? `extra classes on a ${library} component` : GAP_LABEL[gap.kind];
+  return `${lead}: ${gapWhat(gap)}`;
+}
+
+/** The boxes' colours on the review app and in `gaps.html`: one source, so the two agree. */
+export const GAP_COLOUR = "#f59e0b";
+export const SPECIAL_COLOUR = "#8b5cf6";
+
 /** An element declared custom, with its reason; its subtree is not walked. */
 export type SpecialCase = { selector: string; reason: string; box: IgnoreRect };
 

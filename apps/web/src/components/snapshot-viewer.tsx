@@ -1,34 +1,12 @@
-import { Button } from "@hackcove/ui";
 import { useState } from "react";
 import { type Crop, changeCrop } from "../../../../packages/engine/src/report-crop.ts";
-import {
-  DrawLayer,
-  FlagMarks,
-  type IgnoreArea,
-  IgnoreAreas,
-  RegionBoxes,
-  type Scale,
-  Viewport,
-} from "#/components/snapshot-frame";
-import { type Composition, CompositionBoxes } from "#/components/composition";
+import type { Composition } from "#/components/composition";
+import { type Mode, ViewerControls } from "#/components/snapshot-controls";
+import type { Scale } from "#/components/snapshot-frame";
+import { type Marking, Pane } from "#/components/snapshot-pane";
 import { SnapshotOverlay } from "#/components/snapshot-overlay";
 import { SnapshotSlider } from "#/components/snapshot-slider";
-import { useHydrated } from "#/components/ui";
 import type { DiffResult, IgnoreRect } from "#/db/schema";
-
-type Mode = "side" | "overlay" | "slider";
-
-const MODES: { id: Mode; label: string }[] = [
-  { id: "side", label: "Side by side" },
-  { id: "overlay", label: "Overlay" },
-  { id: "slider", label: "Slider" },
-];
-
-const SCALES: { id: Scale; label: string; title: string }[] = [
-  { id: "fit", label: "Fit", title: "Fit the shot to the stage" },
-  { id: "actual", label: "1:1", title: "One screen pixel per shot pixel" },
-  { id: "zoom", label: "Zoom to change", title: "Crop to the measured change" },
-];
 
 /** One side's measured size, and its caption; all null when nothing measured it. */
 function sideSize(result: DiffResult | null, side: "main" | "branch") {
@@ -38,135 +16,6 @@ function sideSize(result: DiffResult | null, side: "main" | "branch") {
   return { width, height, caption: `${width}×${height}` };
 }
 
-/** One row of buttons where exactly one is pressed. */
-function Segmented<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  options: { id: T; label: string; title?: string }[];
-  value: T;
-  onChange: (value: T) => void;
-  /** Why an option cannot be picked, by id; absent means it can. */
-  disabled?: Partial<Record<T, string>>;
-}) {
-  const hydrated = useHydrated();
-  return (
-    <div role="group" aria-label={label} className="flex gap-1">
-      {options.map(({ id, label: text, title }) => (
-        <Button
-          key={id}
-          variant={value === id ? "primary" : "outline"}
-          aria-pressed={value === id}
-          disabled={!hydrated || disabled?.[id] !== undefined}
-          title={disabled?.[id] ?? title}
-          onClick={() => onChange(id)}
-          className="px-3 py-1.5"
-        >
-          {text}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-/**
- * The ignored areas and flagged areas on a shot, and the layer that draws a new one while drawing
- * is on.
- */
-function Marked({
-  width,
-  height,
-  marks,
-  onDraw,
-  ignored,
-  composition,
-}: { width: number; height: number } & Marking) {
-  return (
-    <>
-      {composition && <CompositionBoxes width={width} height={height} composition={composition} />}
-      {ignored.length > 0 && <IgnoreAreas width={width} height={height} areas={ignored} />}
-      {marks.length > 0 && <FlagMarks width={width} height={height} marks={marks} />}
-      {onDraw && <DrawLayer width={width} height={height} onDraw={onDraw} />}
-    </>
-  );
-}
-
-function Pane({
-  label,
-  caption,
-  url,
-  alt,
-  empty,
-  width,
-  height,
-  boxes,
-  scale,
-  crop,
-  marks,
-  onDraw,
-  ignored,
-  composition,
-}: {
-  label: string;
-  caption: string | null;
-  url: string | null;
-  alt: string;
-  empty: string;
-  width: number | null;
-  height: number | null;
-  boxes: DiffResult["regions"] | null;
-  scale: Scale;
-  crop: Crop | null;
-} & Marking) {
-  return (
-    <figure className="min-w-0">
-      <figcaption className="mb-2 text-sm font-medium">
-        {label}
-        {caption && <span className="ml-2 font-normal text-slate-500">{caption}</span>}
-      </figcaption>
-      {url ? (
-        <Viewport width={width} scale={scale} crop={crop}>
-          <div className="relative border border-slate-200">
-            <img src={url} alt={alt} loading="lazy" className="block w-full" />
-            {boxes && width && height && (
-              <RegionBoxes width={width} height={height} regions={boxes} />
-            )}
-            {width && height && (
-              <Marked
-                width={width}
-                height={height}
-                marks={marks}
-                onDraw={onDraw}
-                ignored={ignored}
-                composition={composition}
-              />
-            )}
-          </div>
-        </Viewport>
-      ) : (
-        <p className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
-          {empty}
-        </p>
-      )}
-    </figure>
-  );
-}
-
-/**
- * Flagged and ignored areas to show, and while one is being drawn, where it goes. Side by side only.
- */
-type Marking = {
-  marks: IgnoreRect[];
-  onDraw: ((rect: IgnoreRect) => void) | null;
-  ignored: IgnoreArea[];
-  /** The branch's composition findings (ob 1850), drawn on the branch pane only. */
-  composition?: Composition | null | undefined;
-};
-
 type Shots = {
   name: string;
   mainUrl: string | null;
@@ -174,6 +23,8 @@ type Shots = {
   diffUrl: string | null;
   result: DiffResult | null;
   removed: boolean;
+  /** The branch's composition findings (ob 1850); drawn on the branch pane only. */
+  composition?: Composition | null | undefined;
 };
 
 /** Main and Branch next to each other, each at its own measured size. */
@@ -184,14 +35,17 @@ function SideBySide({
   result,
   removed,
   composition,
-  regions,
+  showFindings,
+  highlight,
   scale,
   crop,
   marks,
   onDraw,
   ignored,
-}: Shots & Marking & { regions: DiffResult["regions"] | null; scale: Scale; crop: Crop | null }) {
+}: Shots &
+  Marking & { showFindings: boolean; highlight: boolean; scale: Scale; crop: Crop | null }) {
   const marking = { marks, onDraw, ignored };
+  const regions = result && highlight ? result.regions : null;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Pane
@@ -214,54 +68,8 @@ function SideBySide({
         boxes={regions}
         scale={scale}
         crop={crop}
-        composition={composition}
+        composition={showFindings ? composition : null}
         {...marking}
-      />
-    </div>
-  );
-}
-
-/** The mode, the highlight and the scale: one row above the stage. */
-function ViewerControls({
-  mode,
-  onMode,
-  highlight,
-  onHighlight,
-  scale,
-  onScale,
-  measured,
-  crop,
-}: {
-  mode: Mode;
-  onMode: (mode: Mode) => void;
-  highlight: boolean;
-  onHighlight: (on: boolean) => void;
-  scale: Scale;
-  onScale: (scale: Scale) => void;
-  measured: boolean;
-  crop: Crop | null;
-}) {
-  const hydrated = useHydrated();
-  return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <Segmented label="View mode" options={MODES} value={mode} onChange={onMode} />
-      <Button
-        variant={highlight ? "primary" : "outline"}
-        aria-pressed={highlight}
-        disabled={!hydrated || !measured}
-        title={measured ? "Draw the measured regions" : "Nothing was measured, so nothing to draw"}
-        onClick={() => onHighlight(!highlight)}
-        className="px-3 py-1.5"
-      >
-        Highlight
-      </Button>
-      <span className="flex-1" />
-      <Segmented
-        label="Scale"
-        options={SCALES}
-        value={crop || scale !== "zoom" ? scale : "fit"}
-        onChange={onScale}
-        disabled={crop ? {} : { zoom: "No measured change to zoom to" }}
       />
     </div>
   );
@@ -308,6 +116,7 @@ export function SnapshotViewer({
   const mode = onDraw ? "side" : chosen;
   const [scale, setScale] = useState<Scale>("fit");
   const [highlight, setHighlight] = useState(true);
+  const [showFindings, setShowFindings] = useState(true);
   const { result } = shots;
   const crop = cropOf(result);
   const view = { highlight, scale, crop };
@@ -323,11 +132,14 @@ export function SnapshotViewer({
         onScale={setScale}
         measured={result !== null}
         crop={crop}
+        composition={shots.composition}
+        showFindings={showFindings}
+        onShowFindings={setShowFindings}
       />
       {mode === "side" && (
         <SideBySide
           {...shots}
-          regions={result && highlight ? result.regions : null}
+          showFindings={showFindings}
           {...view}
           marks={marks}
           onDraw={draw}

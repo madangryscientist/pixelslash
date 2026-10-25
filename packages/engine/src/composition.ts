@@ -20,8 +20,13 @@ import { toImageRects } from "./page-areas.ts";
 
 export {
   CUSTOM_ATTRIBUTE,
+  GAP_COLOUR,
+  GAP_LABEL,
   MAX_FINDINGS,
   MAX_TEXT,
+  SPECIAL_COLOUR,
+  gapReason,
+  gapWhat,
   parseCompositionEntry,
   type Composition,
   type Gap,

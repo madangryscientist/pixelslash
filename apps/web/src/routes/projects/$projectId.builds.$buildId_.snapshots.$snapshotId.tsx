@@ -2,7 +2,7 @@ import { Breadcrumbs, Container, FullBleedLayout } from "@hackcove/ui";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
-import { CompositionPanel } from "#/components/composition";
+import { CompositionFocus, CompositionPanel } from "#/components/composition";
 import { DiffOverride } from "#/components/diff-override";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
@@ -194,21 +194,23 @@ function SnapshotPage() {
         <DecisionError error={error} />
         <div className="min-w-0 space-y-3 p-4">
           <EdgeWarning result={snapshot.diffResult} />
-          <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
-            <SnapshotViewer
-              name={snapshot.name}
-              mainUrl={images.main}
-              branchUrl={images.branch}
-              diffUrl={images.diff}
-              result={snapshot.diffResult}
-              removed={snapshot.diffStatus === "removed"}
-              composition={snapshot.composition}
-              marks={flag.marks}
-              onDraw={flag.onDraw ?? ignore.onDraw}
-              ignored={ignored}
-            />
-          </RegionNotesProvider>
-          <CompositionPanel composition={snapshot.composition} />
+          <CompositionFocus>
+            <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
+              <SnapshotViewer
+                name={snapshot.name}
+                mainUrl={images.main}
+                branchUrl={images.branch}
+                diffUrl={images.diff}
+                result={snapshot.diffResult}
+                removed={snapshot.diffStatus === "removed"}
+                composition={snapshot.composition}
+                marks={flag.marks}
+                onDraw={flag.onDraw ?? ignore.onDraw}
+                ignored={ignored}
+              />
+            </RegionNotesProvider>
+            <CompositionPanel composition={snapshot.composition} />
+          </CompositionFocus>
         </div>
       </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Pill } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
+import type { Composition } from "#/components/composition";
 import type { SnapshotView } from "#/db/review";
 import { labelSummary } from "#/components/ai-notes";
 import { FlakyBadge } from "#/components/flake";
@@ -137,6 +138,21 @@ export function measured(shot: SnapshotView, baseline: boolean): string {
   return changed;
 }
 
+/** A composition-only shot's findings in a line: the gaps, and the special cases when there are any. */
+export function findingsLine({ library, gaps, special }: Composition): string {
+  const gap = `${gaps.length} ${gaps.length === 1 ? "gap" : "gaps"} not from ${library}`;
+  return special.length > 0 ? `${gap} · ${special.length} special` : gap;
+}
+
+function GapsLine({ composition }: { composition: Composition | null | undefined }) {
+  if (!composition) return null;
+  return (
+    <p className="mt-1 text-sm text-slate-600" data-testid="shot-gaps">
+      {findingsLine(composition)}
+    </p>
+  );
+}
+
 /** One changed or new shot as a card: the crop, a readable name, its variants and its review. */
 export function ShotCard({
   projectId,
@@ -203,6 +219,7 @@ export function ShotCard({
           </p>
         )}
         <p className="mt-2 text-sm text-slate-600">{line}</p>
+        <GapsLine composition={shot.composition} />
       </Link>
       {/* Beside the card's link, not in it: a link inside a link is not HTML. */}
       {shot.flakeId && (

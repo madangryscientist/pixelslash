@@ -41,8 +41,13 @@ test("one gap and one special case are listed and drawn on the branch shot", asy
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
   const panel = page.getByRole("region", { name: "Composition" });
-  await expect(panel.getByRole("heading", { name: "Hack Cove UI gaps (1)" })).toBeVisible();
-  await expect(panel.getByRole("list", { name: "Hack Cove UI gaps" })).toContainText("class mt-7");
+  await expect(
+    panel.getByRole("heading", { name: "Hack Cove UI gaps on Branch (1)" }),
+  ).toBeVisible();
+  await expect(panel.getByRole("list", { name: "Hack Cove UI gaps" })).toContainText(
+    "extra classes on a Hack Cove UI component: mt-7",
+  );
+  await expect(panel.getByRole("heading", { name: "Special cases on Branch (1)" })).toBeVisible();
   await expect(panel.getByRole("list", { name: "Special cases" })).toContainText(
     "the brand mark is drawn by hand",
   );
@@ -51,10 +56,56 @@ test("one gap and one special case are listed and drawn on the branch shot", asy
   const gap = page.getByTestId("gap-box");
   await expect(gap).toHaveCount(1);
   await expect(page.getByTestId("special-box")).toHaveCount(1);
-  await expect(gap).toHaveAttribute("title", "#go: class mt-7");
+  await expect(gap).toHaveAttribute(
+    "title",
+    "#go: extra classes on a Hack Cove UI component: mt-7",
+  );
   const branch = page.getByRole("figure").filter({ hasText: "Branch" }).locator("img");
   const [img, box] = await Promise.all([branch.boundingBox(), gap.boundingBox()]);
   if (!img || !box) throw new Error("no image or box");
   expect(box.x - img.x).toBeCloseTo(img.width / 4, 0);
   expect(box.width).toBeCloseTo(img.width / 4, 0);
+
+  // Hovering a box lights its row, and a row its box.
+  const row = panel.getByRole("list", { name: "Hack Cove UI gaps" }).getByRole("listitem");
+  await expect(row).not.toHaveAttribute("data-focused");
+  await gap.hover();
+  await expect(row).toHaveAttribute("data-focused", "true");
+  await page.mouse.move(0, 0);
+  await expect(row).not.toHaveAttribute("data-focused");
+  await row.hover();
+  await expect(gap).toHaveCSS("background-color", "rgba(245, 158, 11, 0.4)");
+
+  // The boxes have their own toggle and a legend.
+  const toggle = page.getByRole("button", { name: "Composition" });
+  await expect(page.getByRole("list", { name: "Composition legend" })).toContainText(
+    "Not from Hack Cove UI (1)",
+  );
+  await toggle.click();
+  await expect(gap).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Composition legend" })).toHaveCount(0);
+  await toggle.click();
+  await expect(gap).toHaveCount(1);
+
+  // The build page's card counts the gaps.
+  await page.goBack();
+  await expect(page.getByTestId("shot-gaps")).toHaveText("1 gap not from Hack Cove UI · 1 special");
+});
+
+test("a new shot, which nothing measured, still has its boxes, placed on the image's own size", async ({
+  page,
+}) => {
+  const { token, projectId } = await provision(page, "Fresh Co", "fresh");
+  const buildId = await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
+    { name: "hero", png: CHANGED, composition },
+  ]);
+  await open(page, `/projects/${projectId}/builds/${buildId}`);
+  await page.getByTestId("snapshot-row").first().getByRole("link").click();
+  const gap = page.getByTestId("gap-box");
+  await expect(gap).toHaveCount(1);
+  await expect(page.getByTestId("special-box")).toHaveCount(1);
+  const branch = page.getByRole("figure").filter({ hasText: "Branch" }).locator("img");
+  const [img, box] = await Promise.all([branch.boundingBox(), gap.boundingBox()]);
+  if (!img || !box) throw new Error("no image or box");
+  expect(box.x - img.x).toBeCloseTo(img.width / 4, 0);
 });

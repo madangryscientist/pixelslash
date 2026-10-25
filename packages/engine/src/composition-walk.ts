@@ -81,6 +81,8 @@ function selectorOf(el: El): string {
  * and no more.
  */
 function styledOf(el: El, { byToken, libraryStyle }: Library): Styled | null {
+  // `<html>` and `<body>` are walked through but never reported: one tints the whole shot.
+  if (el === document.documentElement || el.tagName === "BODY") return null;
   const tokens = [...new Set(Array.from(el.classList))];
   const has = new Set(tokens);
   const whole = tokens.flatMap((t) =>

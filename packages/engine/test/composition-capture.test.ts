@@ -65,7 +65,7 @@ describe("a composition-only capture", () => {
     const html = await Bun.file(join(out, "gaps.html")).text();
     expect(html).toContain("Acme UI gaps (1)");
     expect(html).toContain("Special cases (1)");
-    expect(html).toContain("missing: a Acme UI prop or variant that gives &quot;mt-7&quot;");
+    expect(html).toContain("not from Acme UI: the classes &quot;mt-7&quot;");
   });
 
   test("any other project's manifest has no composition and no gap list", async () => {

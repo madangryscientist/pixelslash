@@ -64,6 +64,8 @@ export const PAGES = {
     `<div id="hero" class="relative mt-7" style="background-color: blue">Hi</div>`,
     at("#hero", [0, 0, 100, 50]),
   ),
+  // Styled `<html>` and `<body>` (a page background) around one real gap: only the gap is reported.
+  rootStyled: `<!doctype html><html class="theme-dark" style="color-scheme: dark"><head><style>body{margin:0}${at("#go", [20, 40, 100, 24])}</style></head><body class="shell" style="background: #111"><button id="go" class="inline-flex items-center rounded px-3 focus:ring-2 mt-7">Go</button></body></html>`,
   marked: page(
     `<div data-pixelslash-custom="the brand mark is drawn by hand" class="logo spin"><span class="inner" style="color: red">x</span></div>`,
     at(".logo", [5, 5, 64, 64]),
