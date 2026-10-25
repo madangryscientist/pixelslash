@@ -96,11 +96,12 @@ bun run bench:perf -- --only diff-phone,capture
 bun run bench:perf:check                 # same run; exit 1 if any step's head median is >25% slower
 ```
 
-It times six steps, with the warm-up discarded, and reports the median and p95 in ms:
+It times eight steps, with the warm-up discarded, and reports the median and p95 in ms:
 
 | Step | What is timed |
 | --- | --- |
 | `diff-phone`, `diff-desktop`, `diff-long` | `diffPngs` (decode, diff, region clustering) on a 390x844, a 1440x900 and a 1440x6000 pair |
+| `diff-long-small`, `diff-long-shift` | `diffPngs` on the long page against itself with one 40x16 badge recoloured, and with its lower half drawn 10 px down: the case tile hashes are for and their worst case (PS-191) |
 | `diff-identical` | `diffPngs` on the long page twice, the same file: the byte-equal shortcut (ob 1948) answers without decoding, so a tree without it pays the whole diff for "no change" |
 | `capture` | the real Playwright settle path (`settleCapture` plus a full-page screenshot) of a fixed page served by `Bun.serve` on localhost |
 | `server-build` | the web app as the e2e starts it (production build, `vite preview`, a fresh local D1, GitHub stubbed): ten 800x600 shots uploaded and finalised, timed from the start of the build to the verdict |
@@ -308,7 +309,7 @@ bun run bench:perf -- --impl ./a --impl ./b --only diff-long --runs 5
 ```
 
 Compares **implementations**, not git refs (the ref comparison above is unchanged). Each takes the
-existing phone, desktop and long diff fixtures, one process per measurement, interleaved
+phone, desktop and long diff fixtures and the long page's two small changes, one process per measurement, interleaved
 (implementation A, then B, per step, per round) after one discarded warm-up round. For each step
 the table shows the medians of `decode_ms`, `diff_ms`, their sum (`self`), the wall time around
 the process, `self`'s p95 and each implementation's `self` against the first. When an
@@ -445,7 +446,7 @@ PS-210, the overlay encoders in PS-211. Their numbers stay in `PERF.md`.
 bun run bench:decoders -- --env dedicated            # every candidate below, written to bench/results/decoders-<yyyy-mm>.md
 engines/dotnet/native/build.sh                        # once: libspng (zlib and zlib-ng) and Wuffs, into native/out/
 <csharp> [--decoder stb|spng|spng-zlibng|wuffs|skia|imagesharp] diff a.png b.png --json [--decode parallel|sequential]
-bun bench/src/impl/ts-diff.ts [--engine wasm] diff a.png b.png --json
+bun bench/src/impl/ts-diff.ts [--engine wasm] [--no-tiles] diff a.png b.png --json
 ```
 
 Each switch is given at most once, before `diff` (how `--impl` passes an implementation's own

@@ -4,18 +4,28 @@ export const STEP_IDS = [
   "diff-phone",
   "diff-desktop",
   "diff-long",
+  "diff-long-small",
+  "diff-long-shift",
   "diff-identical",
   "capture",
   "server-build",
 ] as const;
 /** The steps an outside implementation of the diff contract can be timed on (ob 1909). */
-export const IMPL_STEP_IDS = ["diff-phone", "diff-desktop", "diff-long"] as const;
+export const IMPL_STEP_IDS = [
+  "diff-phone",
+  "diff-desktop",
+  "diff-long",
+  "diff-long-small",
+  "diff-long-shift",
+] as const;
 export type StepId = (typeof STEP_IDS)[number];
 
 export const STEP_LABELS: Record<StepId, string> = {
   "diff-phone": "diff + regions, phone 390x844",
   "diff-desktop": "diff + regions, desktop 1440x900",
   "diff-long": "diff + regions, long page 1440x6000",
+  "diff-long-small": "diff + regions, long page 1440x6000, one 40x16 badge changed",
+  "diff-long-shift": "diff + regions, long page 1440x6000, lower half 10 px down",
   "diff-identical": "identical pair, long page 1440x6000, same file twice",
   capture: "capture, local static page",
   "server-build": "server build, 10 shots, start to verdict",

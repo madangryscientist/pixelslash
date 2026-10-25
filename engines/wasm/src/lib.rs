@@ -753,11 +753,87 @@ fn js_round(v: f64) -> f64 {
     if v - r >= 0.5 { r + 1.0 } else { r }
 }
 
+/// One pixel loop over the overlap: the two shots, the field and overlay it writes, and its counts.
+struct Compare<'a> {
+    a: Img<'a>,
+    b: Img<'a>,
+    ow: usize,
+    kind: &'a mut [u8],
+    amplitude: &'a mut [u8],
+    lighter: &'a mut [u8],
+    paint: &'a mut [u8],
+    paint_w: usize,
+    skip: Option<&'a [u8]>,
+    max_delta: f64,
+    changed: u32,
+    antialiased: u32,
+}
+
+impl<'a> Compare<'a> {
+    /// The loop's state for `diff`'s arguments, with the field and the overlay zeroed.
+    #[allow(clippy::too_many_arguments)]
+    fn new(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, skip: usize, max_delta: f64, field: usize, overlay: usize) -> Self {
+        let a = Img { d: bytes(a, aw as usize * ah as usize * 4), w: aw as usize, h: ah as usize };
+        let b = Img { d: bytes(b, bw as usize * bh as usize * 4), w: bw as usize, h: bh as usize };
+        let (ow, oh) = (a.w.min(b.w), a.h.min(b.h));
+        let n = ow * oh;
+        let fields = bytes_mut(field, n * 3);
+        fields.fill(0);
+        let (kind, rest) = fields.split_at_mut(n);
+        let (amplitude, lighter) = rest.split_at_mut(n);
+        let paint_w = a.w.max(b.w);
+        let paint = bytes_mut(overlay, paint_w * a.h.max(b.h) * 4);
+        paint.fill(0);
+        let skip = if skip == 0 { None } else { Some(bytes(skip, n)) };
+        Compare { a, b, ow, kind, amplitude, lighter, paint, paint_w, skip, max_delta, changed: 0, antialiased: 0 }
+    }
+
+    /// The pixel loop over columns `x0..x1` of rows `y0..y1`, row by row.
+    #[inline(always)]
+    fn rect(&mut self, x0: usize, y0: usize, x1: usize, y1: usize) {
+        let (a, b, ow) = (&self.a, &self.b, self.ow);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let at = y * ow + x;
+                if let Some(s) = self.skip {
+                    if s[at] != 0 {
+                        continue;
+                    }
+                }
+                let delta = colour_delta(a.d, (y * a.w + x) * 4, b.d, (y * b.w + x) * 4);
+                let size = if delta < 0.0 { -delta } else { delta };
+                if size <= self.max_delta {
+                    continue;
+                }
+                if is_antialiased(a, x, y, b) || is_antialiased(b, x, y, a) {
+                    self.kind[at] = PIXEL_ANTIALIASED;
+                    self.antialiased += 1;
+                    continue;
+                }
+                self.kind[at] = PIXEL_CHANGED;
+                let level = js_round((size / MAX_YIQ_DELTA).sqrt() * 255.0);
+                self.amplitude[at] = if level > 255.0 { 255 } else { level as u8 };
+                self.lighter[at] = if delta < 0.0 { 1 } else { 0 };
+                self.changed += 1;
+                let p = (y * self.paint_w + x) * 4;
+                self.paint[p..p + 4].copy_from_slice(&[255, 0, 255, 255]);
+            }
+        }
+    }
+
+    fn finish(&self, out: usize) {
+        let out = unsafe { slice::from_raw_parts_mut(out as *mut u32, 2) };
+        out[0] = self.changed;
+        out[1] = self.antialiased;
+    }
+}
+
 /// The pixel loop of `diffOverlap`. `a` and `b` are RGBA; the overlap is their smaller width and
 /// height. `skip` (overlap-sized, or 0 for none) marks ignored pixels. Writes the field
 /// (`kind`, `amplitude`, `lighter`, overlap-sized, zeroed here) and paints the changed pixels
 /// magenta on `overlay` (the larger size, zeroed here). `out` gets [changed, antialiased].
 #[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
 pub extern "C" fn diff(
     a: usize,
     aw: u32,
@@ -771,49 +847,133 @@ pub extern "C" fn diff(
     overlay: usize,
     out: usize,
 ) {
+    let mut pass = Compare::new(a, aw, ah, b, bw, bh, skip, max_delta, field, overlay);
+    let (ow, oh) = (pass.ow, pass.a.h.min(pass.b.h));
+    pass.rect(0, 0, ow, oh);
+    pass.finish(out);
+}
+
+/// The tile side, in pixels (PS-191): the overlap is cut into `TILE` x `TILE` tiles, the last
+/// column and row of tiles clipped to it.
+const TILE: usize = 64;
+
+/// The tiles across and down a `w` x `h` overlap.
+fn tile_grid(w: usize, h: usize) -> (usize, usize) {
+    (w.div_ceil(TILE), h.div_ceil(TILE))
+}
+
+/// The bytes `tiles` marks at `map` for a `w` x `h` overlap: one per tile, so the caller sizes the
+/// map from the module's `TILE` and not a copy of it.
+#[unsafe(no_mangle)]
+pub extern "C" fn tile_map_len(w: u32, h: u32) -> u32 {
+    let (tw, th) = tile_grid(w as usize, h as usize);
+    (tw * th) as u32
+}
+
+const SEED: u64 = 0x9e37_79b9_7f4a_7c15;
+
+/// One step of the tile hash. For a fixed `h` it is a bijection of `w` (xor, multiply by an odd
+/// constant, rotate), and for a fixed `w` a bijection of `h`, so two inputs that differ in exactly
+/// one word always hash apart.
+#[inline(always)]
+fn mix(h: u64, w: u64) -> u64 {
+    (h ^ w).wrapping_mul(SEED).rotate_left(31)
+}
+
+#[inline(always)]
+fn word(bytes: &[u8], at: usize) -> u64 {
+    let mut w = [0u8; 8];
+    w.copy_from_slice(&bytes[at..at + 8]);
+    u64::from_le_bytes(w)
+}
+
+/// A 64-bit hash of the RGBA in columns `x0..x1` of rows `y0..y1` of `img`: four lanes over the
+/// row's 8-byte words, so the multiplies overlap, then the lanes folded together. Not a
+/// cryptographic hash. One differing word in a tile always changes it (each step is a bijection);
+/// more than one collides with odds near 2^-64 for ordinary pixels, and an adversary who chooses
+/// both shots could build a collision, which would hide that tile's change.
+fn tile_hash(img: &Img, x0: usize, y0: usize, x1: usize, y1: usize) -> u64 {
+    let mut lanes = [SEED, SEED.rotate_left(16), SEED.rotate_left(32), SEED.rotate_left(48)];
+    for y in y0..y1 {
+        let row = &img.d[(y * img.w + x0) * 4..(y * img.w + x1) * 4];
+        let mut chunks = row.chunks_exact(32);
+        for c in &mut chunks {
+            lanes[0] = mix(lanes[0], word(c, 0));
+            lanes[1] = mix(lanes[1], word(c, 8));
+            lanes[2] = mix(lanes[2], word(c, 16));
+            lanes[3] = mix(lanes[3], word(c, 24));
+        }
+        let mut words = chunks.remainder().chunks_exact(8);
+        for (lane, w) in (&mut words).enumerate() {
+            lanes[lane] = mix(lanes[lane], word(w, 0));
+        }
+        // A row is a whole number of pixels, so what is left is one pixel or nothing.
+        let tail = words.remainder();
+        if !tail.is_empty() {
+            let mut w = [0u8; 8];
+            w[..tail.len()].copy_from_slice(tail);
+            lanes[3] = mix(lanes[3], u64::from_le_bytes(w));
+        }
+    }
+    lanes.iter().fold(SEED, |h, &lane| mix(h, lane))
+}
+
+/// Hash both shots in tiles of their overlap and mark the tiles whose hashes differ: one byte per
+/// tile at `map`, row-major (see `tile_grid`), 1 for a differing tile. Returns how many differ.
+/// Each shot is hashed on its own, from its decoded pixels.
+#[unsafe(no_mangle)]
+pub extern "C" fn tiles(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, map: usize) -> u32 {
     let a = Img { d: bytes(a, aw as usize * ah as usize * 4), w: aw as usize, h: ah as usize };
     let b = Img { d: bytes(b, bw as usize * bh as usize * 4), w: bw as usize, h: bh as usize };
     let (ow, oh) = (a.w.min(b.w), a.h.min(b.h));
-    let n = ow * oh;
-    let fields = bytes_mut(field, n * 3);
-    fields.fill(0);
-    let (kind, rest) = fields.split_at_mut(n);
-    let (amplitude, lighter) = rest.split_at_mut(n);
-    let paint_w = a.w.max(b.w);
-    let paint = bytes_mut(overlay, paint_w * a.h.max(b.h) * 4);
-    paint.fill(0);
-    let skip = if skip == 0 { None } else { Some(bytes(skip, n)) };
-    let (mut changed, mut antialiased) = (0u32, 0u32);
-    for y in 0..oh {
-        for x in 0..ow {
-            let at = y * ow + x;
-            if let Some(s) = skip {
-                if s[at] != 0 {
-                    continue;
-                }
-            }
-            let delta = colour_delta(a.d, (y * a.w + x) * 4, b.d, (y * b.w + x) * 4);
-            let size = if delta < 0.0 { -delta } else { delta };
-            if size <= max_delta {
-                continue;
-            }
-            if is_antialiased(&a, x, y, &b) || is_antialiased(&b, x, y, &a) {
-                kind[at] = PIXEL_ANTIALIASED;
-                antialiased += 1;
-                continue;
-            }
-            kind[at] = PIXEL_CHANGED;
-            let level = js_round((size / MAX_YIQ_DELTA).sqrt() * 255.0);
-            amplitude[at] = if level > 255.0 { 255 } else { level as u8 };
-            lighter[at] = if delta < 0.0 { 1 } else { 0 };
-            changed += 1;
-            let p = (y * paint_w + x) * 4;
-            paint[p..p + 4].copy_from_slice(&[255, 0, 255, 255]);
+    let (tw, th) = tile_grid(ow, oh);
+    let map = bytes_mut(map, tw * th);
+    let mut dirty = 0;
+    for ty in 0..th {
+        let (y0, y1) = (ty * TILE, (ty * TILE + TILE).min(oh));
+        for tx in 0..tw {
+            let (x0, x1) = (tx * TILE, (tx * TILE + TILE).min(ow));
+            let differs = tile_hash(&a, x0, y0, x1, y1) != tile_hash(&b, x0, y0, x1, y1);
+            map[ty * tw + tx] = differs as u8;
+            dirty += differs as u32;
         }
     }
-    let out = unsafe { slice::from_raw_parts_mut(out as *mut u32, 2) };
-    out[0] = changed;
-    out[1] = antialiased;
+    dirty
+}
+
+/// `diff`, with the pixel loop run only over the tiles `map` marks (from `tiles`). The result is
+/// `diff`'s: a pixel in a tile whose bytes match in both shots has a colour delta of 0, so `diff`
+/// would leave it unmarked too, and the anti-alias test of a pixel in a marked tile still reads
+/// its neighbours from the whole shots.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn diff_tiled(
+    a: usize,
+    aw: u32,
+    ah: u32,
+    b: usize,
+    bw: u32,
+    bh: u32,
+    skip: usize,
+    max_delta: f64,
+    field: usize,
+    overlay: usize,
+    out: usize,
+    map: usize,
+) {
+    let mut pass = Compare::new(a, aw, ah, b, bw, bh, skip, max_delta, field, overlay);
+    let (ow, oh) = (pass.ow, pass.a.h.min(pass.b.h));
+    let (tw, th) = tile_grid(ow, oh);
+    let map = bytes(map, tw * th);
+    for ty in 0..th {
+        for tx in 0..tw {
+            if map[ty * tw + tx] != 0 {
+                let (x0, y0) = (tx * TILE, ty * TILE);
+                pass.rect(x0, y0, (x0 + TILE).min(ow), (y0 + TILE).min(oh));
+            }
+        }
+    }
+    pass.finish(out);
 }
 
 /// `blobBoxes(field, dilatedChanged(field, gap))`: the changed pixels of `kind` (`w` x `h`)
@@ -822,19 +982,90 @@ pub extern "C" fn diff(
 /// returns how many there are, or u32::MAX when memory ran out.
 #[unsafe(no_mangle)]
 pub extern "C" fn blob_boxes(kind: usize, w: u32, h: u32, gap: f64, out: usize) -> u32 {
+    let h = h as usize;
+    banded_boxes(bytes(kind, w as usize * h), w as usize, &[(0, h)], gap, out)
+}
+
+/// `blob_boxes` over the rows the tiles in `map` (from `tiles`) can reach: each row of tiles with a
+/// marked tile, widened by the rows `gap` dilates across, bands that touch or overlap joined. The
+/// result is `blob_boxes`'s. A changed pixel lies in a marked tile, so every blob cell lies in a
+/// band; bands are at least a row apart, so no blob crosses from one to the next; and the bands go
+/// top down, so the boxes keep their order. A `gap` that reaches every row (infinite, or the height
+/// or more) is one band of the whole field.
+#[unsafe(no_mangle)]
+pub extern "C" fn blob_boxes_tiled(kind: usize, w: u32, h: u32, gap: f64, map: usize, out: usize) -> u32 {
     let (w, h) = (w as usize, h as usize);
-    let n = w * h;
-    let kind = bytes(kind, n);
+    let kind = bytes(kind, w * h);
+    if gap >= h as f64 {
+        return banded_boxes(kind, w, &[(0, h)], gap, out);
+    }
+    // NaN and a negative gap dilate nothing, so they reach no further rows.
+    let reach = if gap >= 0.0 { gap.floor() as usize } else { 0 };
+    let (tw, th) = tile_grid(w, h);
+    let map = bytes(map, tw * th);
+    let at = alloc(th * 2 * size_of::<usize>());
+    if at == 0 {
+        return u32::MAX;
+    }
+    let spans = unsafe { slice::from_raw_parts_mut(at as *mut (usize, usize), th) };
+    let mut bands = 0;
+    for ty in 0..th {
+        if map[ty * tw..(ty + 1) * tw].iter().all(|&m| m == 0) {
+            continue;
+        }
+        let start = (ty * TILE).saturating_sub(reach);
+        let end = ((ty + 1) * TILE + reach).min(h);
+        if bands > 0 && start <= spans[bands - 1].1 {
+            spans[bands - 1].1 = end;
+        } else {
+            spans[bands] = (start, end);
+            bands += 1;
+        }
+    }
+    banded_boxes(kind, w, &spans[..bands], gap, out)
+}
+
+/// The blob boxes of each band of rows `start..end` of `kind` (`w` wide) on its own, in band
+/// order, as one run of boxes. The scratch is sized once, for the tallest band, so the boxes
+/// that follow it are contiguous.
+fn banded_boxes(kind: &[u8], w: usize, bands: &[(usize, usize)], gap: f64, out: usize) -> u32 {
+    let rows = bands.iter().map(|&(start, end)| end - start).max().unwrap_or(0);
+    let n = w * rows;
     let (first, second, lasts, stack) = (alloc(n), alloc(n), alloc(w * 8), alloc(n * 4));
     if first == 0 || second == 0 || lasts == 0 || stack == 0 {
         return u32::MAX;
     }
-    let changed = bytes_mut(first, n);
+    let scratch = Scratch { first, second, lasts, stack };
+    let boxes = mark().next_multiple_of(8);
+    let mut count = 0u32;
+    for &(start, end) in bands {
+        match band_boxes(&kind[start * w..end * w], w, end - start, start, gap, &scratch) {
+            Some(found) => count += found,
+            None => return u32::MAX,
+        }
+    }
+    unsafe { *(out as *mut usize) = boxes };
+    count
+}
+
+/// `banded_boxes`'s scratch: two byte planes and a stack for the tallest band, and one f64 a column.
+struct Scratch {
+    first: usize,
+    second: usize,
+    lasts: usize,
+    stack: usize,
+}
+
+/// The blob boxes of `kind` (`w` x `h`, the rows from `top` down), allocated one after another,
+/// with `top` added to their y. None when memory ran out.
+fn band_boxes(kind: &[u8], w: usize, h: usize, top: usize, gap: f64, scratch: &Scratch) -> Option<u32> {
+    let n = w * h;
+    let changed = bytes_mut(scratch.first, n);
     for i in 0..n {
         changed[i] = (kind[i] == PIXEL_CHANGED) as u8;
     }
     // x: each row on its own, forward then backward, as `dilateAxis` does.
-    let wide = bytes_mut(second, n);
+    let wide = bytes_mut(scratch.second, n);
     wide.fill(0);
     for y in 0..h {
         let src = &changed[y * w..(y + 1) * w];
@@ -859,9 +1090,9 @@ pub extern "C" fn blob_boxes(kind: usize, w: u32, h: u32, gap: f64, out: usize) 
         }
     }
     // y: every column at once, a row at a time, which is the same per-column scan in cache order.
-    let blob = bytes_mut(first, n);
+    let blob = bytes_mut(scratch.first, n);
     blob.fill(0);
-    let lasts = unsafe { slice::from_raw_parts_mut(lasts as *mut f64, w) };
+    let lasts = unsafe { slice::from_raw_parts_mut(scratch.lasts as *mut f64, w) };
     lasts.fill(f64::NEG_INFINITY);
     for y in 0..h {
         for x in 0..w {
@@ -885,10 +1116,9 @@ pub extern "C" fn blob_boxes(kind: usize, w: u32, h: u32, gap: f64, out: usize) 
         }
     }
     // Flood each blob; a box is the bounds of a set, so the visiting order does not change it.
-    let seen = bytes_mut(second, n);
+    let seen = bytes_mut(scratch.second, n);
     seen.fill(0);
-    let stack = unsafe { slice::from_raw_parts_mut(stack as *mut u32, n) };
-    let boxes = mark().next_multiple_of(8);
+    let stack = unsafe { slice::from_raw_parts_mut(scratch.stack as *mut u32, n) };
     let mut count = 0u32;
     for start in 0..n {
         if blob[start] == 0 || seen[start] != 0 {
@@ -925,13 +1155,12 @@ pub extern "C" fn blob_boxes(kind: usize, w: u32, h: u32, gap: f64, out: usize) 
         if found {
             let at = alloc(16);
             if at == 0 {
-                return u32::MAX;
+                return None;
             }
             let cell = unsafe { slice::from_raw_parts_mut(at as *mut u32, 4) };
-            cell.copy_from_slice(&[x0 as u32, y0 as u32, x1 as u32, y1 as u32]);
+            cell.copy_from_slice(&[x0 as u32, (top + y0) as u32, x1 as u32, (top + y1) as u32]);
             count += 1;
         }
     }
-    unsafe { *(out as *mut usize) = boxes };
-    count
+    Some(count)
 }

@@ -205,7 +205,7 @@ describe("ts-diff --decode (ob 1932)", () => {
 
   // PS-210: the decode and the pixel loop are one call into diff.wasm, and --decode changes nothing.
   // PS-212: the call times its own steps, so decode_ms is the file read plus its decode_* phases. The
-  // overlay is not encoded (PS-211).
+  // overlay is not encoded (PS-211). PS-191: the tile pass is on, so its hashing is a phase too.
   test("decode_ms is the file read and the call's decode phases", async () => {
     const {
       phases = {},
@@ -214,8 +214,8 @@ describe("ts-diff --decode (ob 1932)", () => {
       startup_ms,
       peak_rss_bytes,
     } = await desktop("sequential");
-    expect(Object.keys(phases)).toEqual(
-      "decode_read decode_inflate decode_unfilter decode_other pixel_compare regions".split(" "),
+    expect(Object.keys(phases).join(" ")).toBe(
+      "decode_read decode_inflate decode_unfilter decode_other tile_hash pixel_compare regions",
     );
     const decoding = Object.entries(phases).filter(([name]) => name.startsWith("decode_"));
     expect(decoding.reduce((sum, [, ms]) => sum + ms, 0)).toBeCloseTo(decode_ms, 6);
@@ -257,7 +257,7 @@ describe("bench:perf --impl", () => {
   test("flags: implementations repeat, refs do not mix with them, only the diff steps apply", () => {
     const a = parseArgs(["--impl", "x y", "--impl", "z"]);
     expect(a.impls).toEqual(["x y", "z"]);
-    expect(a.only).toEqual(["diff-phone", "diff-desktop", "diff-long"]);
+    expect(a.only.join()).toBe("diff-phone,diff-desktop,diff-long,diff-long-small,diff-long-shift");
     expect(parseArgs(["--impl", "x", "--only", "diff-long"]).only).toEqual(["diff-long"]);
     expect(() => parseArgs(["--impl", "x", "--base", "main"])).toThrow("compare refs");
     expect(() => parseArgs(["--impl", "x", "--check"])).toThrow("compare refs");

@@ -17,6 +17,12 @@ export const DIFF_SIZES = {
 /** The long page twice, byte for byte: what a build's unchanged shots are (ob 1948). */
 export const IDENTICAL_STEP = "diff-identical";
 
+/**
+ * The long page with one small change (PS-191): a badge-sized change, and a 10 px layout shift
+ * below the middle. The first is what tile hashes are for; the second is their worst case.
+ */
+const LONG_CHANGES = { "diff-long-small": "badge", "diff-long-shift": "shift" } as const;
+
 export const BUILD_SHOTS = 10;
 export const BUILD_SIZE = { width: 800, height: 600 };
 
@@ -47,16 +53,26 @@ function fill(png: PNG, [x, y, w, h]: Rect, [r, g, b]: Rgb): void {
 }
 
 const CARD_H = 140;
+/** The card a long-page change starts at: about halfway down the 6000 px page. */
+const CHANGED_CARD = 19;
 
-/** `head` recolours every third button and moves every fifth card 3 px right. */
-export function page(width: number, height: number, seed: number, head: boolean): Buffer {
+/**
+ * What the head side changes. `head` recolours every third button and moves every fifth card 3 px
+ * right; `badge` recolours one 40x16 badge on card 19; `shift` draws card 19 and every card after
+ * it 10 px lower.
+ */
+type Change = "none" | "head" | "badge" | "shift";
+
+export function page(width: number, height: number, seed: number, change: Change): Buffer {
+  const head = change === "head";
   const png = new PNG({ width, height });
   fill(png, [0, 0, width, height], [255, 255, 255]);
   fill(png, [0, 0, width, 56], [31, 41, 55]);
   const rand = mulberry32(seed);
   const cardW = Math.min(width - 32, 640);
-  for (let n = 0, y = 72; y + CARD_H < height; n += 1, y += CARD_H + 16) {
+  for (let n = 0, top = 72; top + CARD_H < height; n += 1, top += CARD_H + 16) {
     const x = 16 + (head && n % 5 === 4 ? 3 : 0);
+    const y = top + (change === "shift" && n >= CHANGED_CARD ? 10 : 0);
     fill(png, [x, y, cardW, CARD_H], [226, 232, 240]);
     fill(png, [x + 1, y + 1, cardW - 2, CARD_H - 2], [248, 250, 252]);
     fill(png, [x + 12, y + 12, Math.round(cardW * (0.3 + rand() * 0.3)), 14], [30, 41, 59]);
@@ -70,6 +86,10 @@ export function page(width: number, height: number, seed: number, head: boolean)
     const button: Rgb = head && n % 3 === 2 ? [220, 38, 38] : [37, 99, 235];
     fill(png, [x + 12, y + CARD_H - 34, 96, 22], button);
   }
+  if (change === "badge") {
+    const y = 72 + CHANGED_CARD * (CARD_H + 16);
+    fill(png, [16 + cardW - 52, y + 12, 40, 16], [220, 38, 38]);
+  }
   return PNG.sync.write(png);
 }
 
@@ -77,22 +97,32 @@ export const mainFile = (name: string): string => `${name}-main.png`;
 export const branchFile = (name: string): string => `${name}-branch.png`;
 export const buildShotName = (i: number): string => `shot-${String(i).padStart(2, "0")}`;
 
-/** Write every pair under `dir`: three diff sizes and the ten shots of the server build. */
+/**
+ * Write every pair under `dir`: three diff sizes, the identical pair, the long page's two small
+ * changes and the ten shots of the server build.
+ */
 export function writeFixtures(dir: string): void {
   mkdirSync(dir, { recursive: true });
   Object.entries(DIFF_SIZES).forEach(([name, { width, height }], i) => {
-    writeFileSync(join(dir, mainFile(name)), page(width, height, 100 + i, false));
-    writeFileSync(join(dir, branchFile(name)), page(width, height, 100 + i, true));
+    writeFileSync(join(dir, mainFile(name)), page(width, height, 100 + i, "none"));
+    writeFileSync(join(dir, branchFile(name)), page(width, height, 100 + i, "head"));
   });
   const long = DIFF_SIZES["diff-long"];
-  const identical = page(long.width, long.height, 100 + 2, false);
+  const identical = page(long.width, long.height, 100 + 2, "none");
   writeFileSync(join(dir, mainFile(IDENTICAL_STEP)), identical);
   writeFileSync(join(dir, branchFile(IDENTICAL_STEP)), identical);
+  for (const [name, change] of Object.entries(LONG_CHANGES)) {
+    writeFileSync(join(dir, mainFile(name)), identical);
+    writeFileSync(join(dir, branchFile(name)), page(long.width, long.height, 100 + 2, change));
+  }
   for (let i = 0; i < BUILD_SHOTS; i += 1) {
     const { width, height } = BUILD_SIZE;
     const name = buildShotName(i);
-    writeFileSync(join(dir, mainFile(name)), page(width, height, 200 + i, false));
+    writeFileSync(join(dir, mainFile(name)), page(width, height, 200 + i, "none"));
     // Four shots change, six stay as they were: a typical build is mostly unchanged.
-    writeFileSync(join(dir, branchFile(name)), page(width, height, 200 + i, i % 5 < 2));
+    writeFileSync(
+      join(dir, branchFile(name)),
+      page(width, height, 200 + i, i % 5 < 2 ? "head" : "none"),
+    );
   }
 }

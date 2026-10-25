@@ -159,6 +159,7 @@ const PHASE_ORDER = [
   "decode_inflate",
   "decode_unfilter",
   "decode_other",
+  "tile_hash",
   "pixel_compare",
   "anti_alias",
   "regions",

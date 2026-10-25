@@ -42,6 +42,10 @@ overlay, which credited cs for skipping that encode; those rows are retired with
 libspng on zlib-ng is the fastest cs decoder (PS-168: 87.1 / 95.1 / 195.0 ms wall, from that run,
 not compared here). It needs `native/build.sh`, so the shipped cs default is SkiaSharp.
 
+Since PS-191 the tile pass is on: in its own dedicated run, ts's self time on the long page went
+367.5 → 253.3 ms (−31%), and with one badge changed 306.6 → 175.0 ms (−43%). That run did not time
+cs, so the table above stays as PS-212 measured it.
+
 Source: PS-212, 2026-10-26, `--env dedicated` (PS-209's run had long at 400.0 against 206.6 ms). The production engine (CLI and web) is `diff.wasm`
 (PS-210); cs is bench-only so far.
 
@@ -146,6 +150,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 21 | Free the explain queue's full-page decodes: `regionCrops` decodes one PNG at a time and releases its raster, `explainShot` releases the three blobs it read | web + engine | ✅ measured, shipped | burst 50 × 1280×9500 with the model on: workerd peak 1497 → 783 / 728 MB, settled 1499 → 611 / 617 MB; crops unchanged | PS-206 |
 | 22 | The WASM differ's overlay encode: pngjs's adaptive filter pass in the module (wasm SIMD), deflate in workerd's zlib at pngjs's level and strategy, chunks in JS | web (workerd) | ✅ measured, shipped; the only overlay encode since PS-210 | workerd, 15 rounds, wasm with pngjs's encode → its own: phone 23.1 → 12.2 ms (−47%), desktop 76.0 → 32.2 (−58%), long 528.8 → 238.0 (−55%); against pngjs −71 to −74%; overlay byte-equal | PS-205 |
 | 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1–4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
+| 24 | Tile hashes: hash both shots in 64 px tiles (a hand-written 4-lane multiply-rotate hash over the decoded pixels) and run the pixel loop and the region pass only over the tiles that differ, the region pass over each dirty tile row plus the rows the merge gap reaches | ts + web | ✅ measured, shipped as the default (`--no-tiles` / `tiles: false` turn it off) | dedicated, self, off → on: phone 34.3 → 28.9 ms (−16%), desktop 52.8 → 50.0 (−5%), long 367.5 → 253.3 (−31%), long + one badge 306.6 → 175.0 (−43%), long + 10 px shift 422.4 → 388.0 (−8%); hashing 0.7 / 2.9 / 10.6 / 9.6 / 9.6 ms; same result on all 157 corpus pairs, overlay included | PS-191 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -200,6 +205,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-26 | PS-191 | desktop, dedicated | tile hashes: diff.wasm compares only the 64 px tiles that differ, off against on |
 | 2026-10-26 | PS-212 | desktop, dedicated | why diff.wasm is 2.3x slower than cs on the long page: each step in wasm, natively and in cs; the unfilter fixed |
 | 2026-10-25 | PS-205 | desktop, shared | the WASM differ's overlay encode: pngjs's filter pass in the module, timed in workerd |
 | 2026-10-25 | PS-206 | desktop, shared | workerd's memory on an HC-124-sized burst, with the explain queue on |
@@ -325,6 +331,51 @@ on it. The burst shows `/` answering throughout.
 workerd and vite peak together there is not measured either. A real
 model's latency is not measured either: the stub answers at once. A slow model keeps fewer crops
 in flight per shot, not more rasters, because the rasters are freed before the call.
+
+### 2026-10-26 · PS-191 · desktop, dedicated · tile hashes, off against on
+
+The question: how much of a diff is spent on pixels that did not change, and does skipping them pay
+when a layout shift makes half the page differ? `diff.wasm` now hashes both decoded shots in 64x64
+tiles (`tiles`: four 64-bit lanes, each word xor-ed in, multiplied by a constant and rotated; not
+cryptographic), then runs the pixel loop (`diff_tiled`) only on tiles whose hashes differ and the
+region pass (`blob_boxes_tiled`) only over bands of dirty tile rows, each grown by the merge gap's
+reach so a blob that bridges a clean row is still one blob. The result is the full diff's: tiles on
+and off agreed on all 157 corpus pairs, every field and the overlay's sha256, when this was
+built. The gate keeps it through the golden test (`diff-wasm.test.ts`: tiles on, against the
+whole-overlap answer on every pair), and `diff-tiles.test.ts` checks the edges and the halo directly.
+
+Two pages were added to the bench (`diff-long-small`, `diff-long-shift`): the long page against
+itself with one 40x16 badge recoloured at card 19 (about y 3040), and with card 19 onwards drawn
+10 px lower, so the lower half differs.
+
+`bun run bench:perf -- --env dedicated --impl "bun bench/src/impl/ts-diff.ts" --impl "bun bench/src/impl/ts-diff.ts --tiles" --runs 5`
+(the run was made while the switch was `--tiles`, off by default; it is now on by default and
+`--no-tiles` is the off side). Boost off, CPUs 4-5,10-11 reserved, host load 8.6 → 7.9, nothing
+else on the reserved CPUs. `bench/perf-results/2026-10-25T23-00-49-470Z.json`. Median ms, 5 rounds:
+
+| Page | off: self | on: self | on vs off | off: wall | on: wall | on: tile_hash |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| phone 390x844 | 34.3 | 28.9 | −15.7% | 57.8 | 51.8 | 0.7 |
+| desktop 1440x900 | 52.8 | 50.0 | −5.3% | 78.2 | 74.9 | 2.9 |
+| long 1440x6000 | 367.5 | 253.3 | −31.1% | 401.2 | 287.8 | 10.6 |
+| long, one badge | 306.6 | 175.0 | −42.9% | 339.6 | 215.3 | 9.6 |
+| long, 10 px shift | 422.4 | 388.0 | −8.2% | 456.9 | 420.5 | 9.6 |
+
+Where it moved (off → on, ms): long `pixel_compare` 50.5 → 22.6 and `regions` 168.2 → 68.7; the
+badge 47.7 → 14.7 and 112.3 → 4.3; the shift 91.3 → 73.1 and 183.3 → 152.1. Decode is the same on
+both sides (143–148 ms on every long page).
+
+- **The hashing costs about 10 ms on the long page** (3% of its self time), 3 ms on desktop and
+  under 1 on phone. That is the most tiles can cost: a pair where every tile differs pays it and
+  saves nothing. No page in the bench is that pair; the shift, with half the page moved, is still
+  8% faster, so the brief's bar (the shift no more than 5% slower) holds with room.
+- **What is left on the badge is fixed cost.** One dirty tile still pays the hashing (9.6 ms) and
+  `pixel_compare`'s 14.7 ms. One tile is about 0.02 ms of comparing (4096 of the page's 8.6 million pixels), so that phase is now the
+  fixed cost of clearing (and, in a fresh process, first touching) the whole page's field and
+  overlay, about 60 MB, before the loop. That split was not timed; clearing only what is written is
+  the next lever if the small change matters.
+- **In workerd** the harness (`apps/web/perf/diff-wasm/run.ts`, tiles on) checked that every page
+  gives Bun's answer before timing; its numbers are a shared-desktop run and not compared here.
 
 ### 2026-10-26 · PS-212 · desktop, dedicated · where diff.wasm loses to cs, step by step
 

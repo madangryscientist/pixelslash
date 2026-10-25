@@ -6,6 +6,15 @@ Adam7), the per-pixel loop (YIQ delta, anti-alias test, the overlay paint), the 
 boxes and (PS-205) pngjs's adaptive filter for the overlay's encode, which picks each row's filter as
 pngjs does and runs 16 bytes at a time in wasm SIMD. It was written from our TypeScript
 (`packages/engine/src/diff.ts`, `yiq.ts`, `regions.ts`) and the PNG spec, not from a rival's code.
+Since PS-191 the pixel loop and the region pass run only where the shots differ: `tiles` hashes
+both shots in 64x64 tiles (a hand-written, non-cryptographic 4-lane hash of the decoded pixels; one
+changed word always changes it, and an accidental collision is about 2^-64, though a pair built to
+collide could hide a change; `tile_map_len` sizes its map), `diff_tiled` compares only the tiles whose hashes differ, and
+`blob_boxes_tiled` runs the blob pass over bands of dirty tile rows, each grown by the rows the
+merge gap reaches, so a blob that bridges a clean row comes out whole. The answer is the
+whole-overlap answer, field, boxes and overlay; `wasmDiff`'s `tiles: false` runs the old
+`diff` and `blob_boxes` for an A/B. The exports keep their arguments, so the native harness calls
+them unchanged.
 It gives the result the pngjs diff gave before PS-210, byte for byte, overlay included
 (`packages/engine/test/fixtures/pngjs-golden.json` holds that answer for every bench corpus pair).
 Everything else stays in JS (`packages/engine/src/diff-wasm.ts`): chunk parsing (pngjs's checks
@@ -45,7 +54,7 @@ both run it. The module uses std only for
 ## Timing
 
 Timing is on demand only, never in the gate. The bench times this diff, split into its phases
-(`decode_inflate`, `decode_unfilter`, `decode_other`, `pixel_compare`, `regions`; `bun run
+(`decode_inflate`, `decode_unfilter`, `decode_other`, `tile_hash`, `pixel_compare`, `regions`; `bun run
 bench:perf`, see `bench/README.md`). Two harnesses time the module on its own:
 
 - `bun run bench:native` (PS-212) times each step in wasm and in the same `lib.rs` built for the
@@ -56,4 +65,4 @@ bench:perf`, see `bench/README.md`). Two harnesses time the module on its own:
   after checking it gives Bun's answer (PS-204's harness, restored minimal in PS-212). For an A/B,
   run it in a checkout of each side.
 
-The results are in `bench/PERF.md`, levers 20, 22 and 23.
+The results are in `bench/PERF.md`, levers 20, 22, 23 and 24.

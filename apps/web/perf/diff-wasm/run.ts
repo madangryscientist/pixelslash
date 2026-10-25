@@ -31,8 +31,8 @@ const WARMUP = 3;
 /** The perf pages and their seeds (`writeFixtures`). */
 const PAGES = Object.entries(DIFF_SIZES).map(([name, { width, height }], i) => ({
   name: name.replace("diff-", ""),
-  main: page(width, height, 100 + i, false),
-  branch: page(width, height, 100 + i, true),
+  main: page(width, height, 100 + i, "none"),
+  branch: page(width, height, 100 + i, "head"),
 }));
 
 async function ready(): Promise<void> {

@@ -18,7 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { say, warn } from "../say.ts";
-import { isDump, render, type Candidate } from "./decoders-render.ts";
+import { isDump, PAGES, render, type Candidate } from "./decoders-render.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const DOTNET = join(ROOT, "engines/dotnet");
@@ -121,6 +121,8 @@ async function main(argv: string[]): Promise<number> {
       "bun",
       join(ROOT, "bench/src/perf/run.ts"),
       ...timed.flatMap((r) => ["--impl", r.command]),
+      "--only",
+      PAGES.join(","),
       ...argv,
     ],
     { cwd: ROOT, stdout: "pipe", stderr: "inherit" },

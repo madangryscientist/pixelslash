@@ -4,7 +4,7 @@
  * the contract in `bench/README.md`.
  *
  *   bun bench/src/impl/ts-diff.ts diff <base.png> <head.png> --json
- *     [--engine wasm] [--decode parallel|sequential]
+ *     [--engine wasm] [--decode parallel|sequential] [--no-tiles]
  *
  * It runs the engine's one diff, `wasmDiff` (PS-210: `diff.wasm`, the same module the CLI and the
  * server run), so the verdict and regions are the engine's. The decode is inside that call, with
@@ -16,7 +16,10 @@
  * `--engine` takes `wasm` only (PS-209's spelling, kept so a recorded command still runs). The
  * pngjs and napi-image engines went in PS-210 and PS-211: this is the only one left in JS. There is
  * no decoder to choose, so `--decoder` and `--overlay` are usage errors, and the runner's `--decode`
- * is accepted and ignored. Exit 2 on bad usage, 1 when a file cannot be read or decoded.
+ * is accepted and ignored. `--no-tiles` turns off the engine's tile pass (PS-191: hash 64 px
+ * tiles, compare only the ones that differ; on by default), so a tiles-off/tiles-on A/B is two
+ * `--impl`s in one run.
+ * Exit 2 on bad usage, 1 when a file cannot be read or decoded.
  */
 // The diff entry, not the package root: the root also exports capture, which loads Playwright.
 import { readFileSync } from "node:fs";
@@ -26,11 +29,13 @@ import { changeRegions } from "../pixelslash.ts";
 import { say, warn } from "../say.ts";
 
 const USAGE =
-  "usage: ts-diff.ts [--engine wasm] [--decode parallel|sequential] diff <base.png> <head.png> --json";
+  "usage: ts-diff.ts [--engine wasm] [--decode parallel|sequential] [--no-tiles] diff <base.png> <head.png> --json";
 
-type Args = { basePath: string; headPath: string };
+type Args = { basePath: string; headPath: string; tiles: boolean };
 
 const SWITCHES = ["--decode", "--engine"];
+/** Switches that take no value. */
+const FLAGS = ["--no-tiles"];
 
 /** The switches and the operands apart; null when a switch has no value or comes twice. */
 function splitSwitches(argv: string[]): { seen: Map<string, string>; operands: string[] } | null {
@@ -38,6 +43,11 @@ function splitSwitches(argv: string[]): { seen: Map<string, string>; operands: s
   const operands: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i] ?? "";
+    if (FLAGS.includes(name)) {
+      if (seen.has(name)) return null;
+      seen.set(name, "");
+      continue;
+    }
     if (!SWITCHES.includes(name)) {
       operands.push(name);
       continue;
@@ -66,7 +76,9 @@ export function parseArgs(argv: string[]): Args | null {
   const paths = split && diffOperands(split.operands);
   if (!split || !paths) return null;
   const [basePath, headPath] = paths;
-  return switchesKnown(split.seen) ? { basePath, headPath } : null;
+  return switchesKnown(split.seen)
+    ? { basePath, headPath, tiles: !split.seen.has("--no-tiles") }
+    : null;
 }
 
 /** A switch's value, defaulted; null when it is not one `isKnown` accepts. */
@@ -101,7 +113,11 @@ function diffPair(args: Args): ImplOutput {
   const phases: Record<string, number> = {};
   const diffing = performance.now();
   // No overlay PNG: the contract does not ask for one, and its encode is not timed.
-  const result = wasmDiff([baseBytes, headBytes], { encode: () => Buffer.alloc(0), phases });
+  const result = wasmDiff([baseBytes, headBytes], {
+    encode: () => Buffer.alloc(0),
+    phases,
+    tiles: args.tiles,
+  });
   const callMs = performance.now() - diffing;
   const decoding = Object.entries(phases)
     .filter(([name]) => name.startsWith("decode_"))

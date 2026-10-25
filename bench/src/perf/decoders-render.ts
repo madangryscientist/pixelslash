@@ -5,7 +5,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { median, percentile } from "./stats.ts";
-import { IMPL_STEP_IDS } from "./steps.ts";
 
 export type Candidate = {
   /** The row's name in the table. */
@@ -98,6 +97,8 @@ function headline(t: Table): string[] {
   });
 }
 
+/** The decoder survey's pages: the three sizes, not the long page's small changes (PS-191). */
+export const PAGES = ["diff-phone", "diff-desktop", "diff-long"] as const;
 const DECODE_PHASES = ["decode_read", "decode_inflate", "decode_unfilter", "decode_other"];
 const DIFF_PHASES = ["pixel_compare", "regions"];
 
@@ -107,7 +108,7 @@ function pageRows(t: Table, r: Candidate): string[] {
   const weight = found.length === 0 ? "-" : mb(found.reduce((sum, w) => sum + bytesOf(w), 0));
   const tail = `${r.licence} | ${weight} |`;
   const d = t.byCommand.get(r.command);
-  return IMPL_STEP_IDS.map((page) => {
+  return PAGES.map((page) => {
     const step = d?.steps[page];
     const xs = selfMs(d, page);
     if (r.missing || !step || xs.length === 0)

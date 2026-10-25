@@ -9,6 +9,7 @@
 import { constants, deflateSync, inflateSync } from "node:zlib";
 import { diffModule } from "#diff-module";
 import type { DiffIgnore, DiffOptions, PixelDiff } from "./diff.ts";
+import { type DiffExports, isDiffExports } from "./diff-exports.ts";
 import { type WasmPhases, timed, untimed } from "./diff-phases.ts";
 import type { Raster } from "./diff-probe.ts";
 import { clipRects, ignoreMask } from "./ignore-mask.ts";
@@ -17,54 +18,6 @@ import { type Png, SIGNATURE, plainChannels, walkPng } from "./png-walk.ts";
 import { type Box, DEFAULT_MERGE_DISTANCE, type DiffField } from "./regions.ts";
 import { release } from "./release.ts";
 import { MAX_YIQ_DELTA } from "./yiq.ts";
-
-/** The exports of `engines/wasm/src/lib.rs`; addresses and sizes are byte offsets in `memory`. */
-type DiffExports = {
-  memory: WebAssembly.Memory;
-  reset(): void;
-  mark(): number;
-  rewind(to: number): void;
-  alloc(len: number): number;
-  crc32(ptr: number, len: number): number;
-  unfilter(src: number, width: number, height: number, channels: number, dst: number): number;
-  inflated_len(
-    width: number,
-    height: number,
-    depth: number,
-    colour: number,
-    interlace: number,
-  ): number;
-  decode(
-    src: number,
-    width: number,
-    height: number,
-    depth: number,
-    colour: number,
-    interlace: number,
-    palette: number,
-    entries: number,
-    transN: number,
-    t0: number,
-    t1: number,
-    t2: number,
-    dst: number,
-  ): number;
-  filter(src: number, width: number, height: number, dst: number): number;
-  diff(
-    a: number,
-    aw: number,
-    ah: number,
-    b: number,
-    bw: number,
-    bh: number,
-    skip: number,
-    maxDelta: number,
-    field: number,
-    overlay: number,
-    out: number,
-  ): void;
-  blob_boxes(kind: number, width: number, height: number, gap: number, out: number): number;
-};
 
 /**
  * The inflated lines, `size` bytes, as pngjs inflates them: Adam7 through a plain `inflateSync`,
@@ -226,12 +179,46 @@ type WasmDiffOptions = {
   encode?: ((overlay: Raster) => Buffer) | undefined;
   /** Filled with where the time went, when given (the bench's phase split). */
   phases?: WasmPhases | undefined;
+  /**
+   * Hash both shots in 64 px tiles and run the pixel loop and the region pass only where the
+   * tiles differ (PS-191). On unless `false`: the result is the same, only the time moves, and the
+   * off side is the bench's A/B.
+   */
+  tiles?: boolean | undefined;
 };
+
+/** The pixel loop and the blob boxes: over the whole overlap, or over the differing tiles. */
+function compare(
+  wasm: DiffExports,
+  shots: readonly [number, number, number, number, number, number],
+  [skip, maxDelta, field, overlay, out]: [number, number, number, number, number],
+  {
+    gap,
+    tiles,
+    phases,
+  }: { gap: number; tiles: boolean | undefined; phases: WasmPhases | undefined },
+): number {
+  const [, aw, ah, , bw, bh] = shots;
+  const width = Math.min(aw, bw);
+  const height = Math.min(ah, bh);
+  if (tiles === false) {
+    timed(phases, "pixel_compare", () => wasm.diff(...shots, skip, maxDelta, field, overlay, out));
+    return timed(phases, "regions", () => wasm.blob_boxes(field, width, height, gap, out + 8));
+  }
+  const map = alloc(wasm, wasm.tile_map_len(width, height));
+  timed(phases, "tile_hash", () => wasm.tiles(...shots, map));
+  timed(phases, "pixel_compare", () =>
+    wasm.diff_tiled(...shots, skip, maxDelta, field, overlay, out, map),
+  );
+  return timed(phases, "regions", () =>
+    wasm.blob_boxes_tiled(field, width, height, gap, map, out + 8),
+  );
+}
 
 function run(
   wasm: DiffExports,
   [main, branch]: [Buffer, Buffer],
-  { options = {}, ignore = {}, encode, phases }: WasmDiffOptions,
+  { options = {}, ignore = {}, encode, phases, tiles }: WasmDiffOptions,
 ): PixelDiff & { overlay: Buffer } {
   wasm.reset();
   // The chunk walk and the copies into the module are decode_other.
@@ -250,9 +237,8 @@ function run(
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
   const maxDelta = MAX_YIQ_DELTA * threshold * threshold;
   const shots = [ma.at, ma.width, ma.height, br.at, br.width, br.height] as const;
-  timed(phases, "pixel_compare", () => wasm.diff(...shots, skip, maxDelta, field, overlay, out));
   const gap = options.mergeDistance ?? DEFAULT_MERGE_DISTANCE;
-  const count = timed(phases, "regions", () => wasm.blob_boxes(field, width, height, gap, out + 8));
+  const count = compare(wasm, shots, [skip, maxDelta, field, overlay, out], { gap, tiles, phases });
   if (count === 0xffffffff) throw new Error("diff.wasm: memory is full");
   let encodeWith = encode;
   if (!encodeWith) {
@@ -287,27 +273,6 @@ function run(
       { changedPixels, antialiased, ignoredPixels, ignored, field: fieldOf },
       { options, blobs: () => boxes, encode: encodeWith },
     ),
-  );
-}
-
-const EXPORTS = [
-  "reset",
-  "mark",
-  "rewind",
-  "alloc",
-  "crc32",
-  "unfilter",
-  "inflated_len",
-  "decode",
-  "filter",
-  "diff",
-  "blob_boxes",
-];
-
-function isDiffExports(exports: WebAssembly.Instance["exports"]): exports is DiffExports {
-  return (
-    exports["memory"] instanceof WebAssembly.Memory &&
-    EXPORTS.every((name) => typeof exports[name] === "function")
   );
 }
 
