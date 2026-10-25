@@ -255,6 +255,32 @@ on it. The burst shows `/` answering throughout.
 workerd and vite peak together there is not measured either. A real
 model's latency is not measured either: the stub answers at once. A slow model keeps fewer crops
 in flight per shot, not more rasters, because the rasters are freed before the call.
+
+### 2026-10-25 · PS-209 · desktop, dedicated · the WASM diff as a bench engine, against ts and cs
+
+`bun run bench:perf -- --env dedicated --runs 10`, five implementations, interleaved: `ts-diff --engine wasm` (no overlay),
+ts with pngjs and napi-image, each with no overlay, ts pngjs with its overlay, and cs. The overlay is off for every
+row except the last, so the four no-overlay rows are equal work. Reserved CPUs 4-5,10-11 and 4G, with no other tasks
+on them; host load 4.6. Raw: `bench/perf-results/2026-10-25T17-51-22-485Z.json`.
+
+Self (decode + diff, no process) and wall, median ms:
+
+| Page | wasm | ts pngjs, none | ts napi-image, none | ts pngjs + overlay | cs | cs vs wasm, self |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| phone | 35.4 / 65.0 | 78.2 / 107.1 | 61.9 / 91.6 | 103.0 / 132.3 | 45.6 / 98.5 | +29% |
+| desktop | 62.8 / 94.9 | 136.5 / 168.7 | 94.4 / 125.1 | 216.8 / 248.4 | 55.3 / 107.6 | −12% |
+| long | 361.1 / 400.0 | 655.3 / 709.0 | 398.5 / 435.1 | 1051.3 / 1104.6 | 153.8 / 206.6 | −57% |
+
+- **The WASM engine is the fastest ts-shaped engine on every page, self and wall.** On the long page it is 9% faster
+  than napi-image with no overlay (361 against 399 ms self) and 1.8x faster than pngjs with none. Its `decode` column is
+  the file read alone, because inflate, unfilter and compare run in one call; compare the `self` sums, not the split.
+- **cs is still faster on desktop and long, and slower on phone.** On phone its start-up (29 ms against 22) and rest
+  cost more than the diff saves. On long it wins 57% on self, so the gap to cs is the WASM pixel loop, not the decode.
+- **The overlay encode is the largest cost on the long page** for the pngjs production shape: 399 ms of the 1051 ms self
+  with pngjs, against napi-image's 48 ms in the planner run.
+- **Dashboard unchanged.** None of these rows beats the best-so-far wall in the dashboard (cs, libspng, parallel: 87.1 /
+  95.1 / 195.0 ms), and this run's cs row uses the shipped SkiaSharp default, so the dashboard keeps its numbers.
+
 ### 2026-10-25 · planner · desktop, dedicated · the overlay encode on and off, against cs
 
 Asked for by Jacobus, so it ran on demand, not as part of a ticket. Five implementations of `bench:perf --env dedicated --runs
