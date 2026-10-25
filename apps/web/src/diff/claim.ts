@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
 import { builds } from "#/db/schema";
+import { unfinished } from "#/db/server-timings";
 
 /**
  * How long a `processing` build is presumed alive. A run killed mid-diff (the isolate hits its
@@ -60,7 +61,7 @@ export async function claim(
   const cutoff = new Date(Date.now() - STALE_PROCESSING_MS);
   const claimed = await db
     .update(builds)
-    .set({ status: "processing", error: null, processingStartedAt: startedAt })
+    .set({ status: "processing", error: null, processingStartedAt: startedAt, ...unfinished })
     .where(
       and(
         eq(builds.id, build.id),
@@ -90,7 +91,7 @@ export const dead = (build: Build) =>
 export async function claimForRerun(db: Db, build: Build, startedAt: Date): Promise<boolean> {
   const claimed = await db
     .update(builds)
-    .set({ status: "processing", error: null, processingStartedAt: startedAt })
+    .set({ status: "processing", error: null, processingStartedAt: startedAt, ...unfinished })
     .where(and(eq(builds.id, build.id), inArray(builds.status, ["changes", "passed", "failed"])))
     .returning({ id: builds.id });
   return claimed.length > 0;

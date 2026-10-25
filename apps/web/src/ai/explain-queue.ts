@@ -5,7 +5,7 @@ import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
 import { refreshBuildStatus } from "#/db/review";
 import { builds, projects, snapshots } from "#/db/schema";
-import { msBetween, recordExplained } from "#/db/server-timings";
+import { finishedAfter, msBetween, recordExplained } from "#/db/server-timings";
 import { projectOf } from "#/diff/build-writes";
 import { warn } from "#/lib/log";
 import type { BlobStore } from "#/storage/blobs";
@@ -334,7 +334,7 @@ async function summarizeWhenExplained(deps: ConsumerDeps, buildId: string): Prom
         aiSummaryQueuedAt: null,
         aiSummaryClaimedAt: null,
         summaryMs: msBetween(began, now()),
-        finishedAt: new Date(),
+        finishedAt: finishedAfter(Date.now()),
       })
       .where(and(eq(builds.id, buildId), eq(builds.aiSummaryQueuedAt, queuedAt)));
   }

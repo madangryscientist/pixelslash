@@ -33,6 +33,28 @@ export const runFields = (run: RunTimings) => ({
   summaryMs: null,
 });
 
+/**
+ * What a claim writes over the run before it: a build with `finished_at` has ended (PS-193). A
+ * claim moves a build back to `processing`, and a run killed after it (the Worker is OOM-killed
+ * mid-diff) never writes its own end, so the earlier run's `finished_at` would sit on a build that
+ * is not finished, before its new `processing_started_at`. The earlier run's numbers go with it:
+ * they are not this run's, and the next end writes all of them again (`runFields`).
+ */
+export const unfinished = {
+  finishedAt: null,
+  queueMs: null,
+  diffMs: null,
+  explainMs: null,
+  summaryMs: null,
+} as const;
+
+/**
+ * `finished_at` for a late write by the explain queue: now, never earlier than the build's own,
+ * and untouched while a run holds the build, whose end is that run's to write.
+ */
+export const finishedAfter = (at: number) =>
+  sql`case when ${builds.status} = 'processing' then ${builds.finishedAt} else max(coalesce(${builds.finishedAt}, 0), ${at}) end`;
+
 export async function recordRun(db: Db, buildId: string, run: RunTimings): Promise<void> {
   await db.update(builds).set(runFields(run)).where(eq(builds.id, buildId));
 }
@@ -52,7 +74,7 @@ export async function recordExplained(
     .update(builds)
     .set({
       explainMs: sql`max(coalesce(${builds.explainMs}, 0), ${msBetween(queuedAt, now)})`,
-      finishedAt: sql`max(coalesce(${builds.finishedAt}, 0), ${finished})`,
+      finishedAt: finishedAfter(finished),
     })
     .where(eq(builds.id, buildId));
 }
