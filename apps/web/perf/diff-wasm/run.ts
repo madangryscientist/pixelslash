@@ -1,12 +1,14 @@
 /**
- * PS-204's timing run: the server diff with pngjs against the WebAssembly diff, in workerd. On
- * demand only, never in the gate:
+ * PS-204's timing run: the server diff with pngjs against the WebAssembly diff, in workerd, and
+ * (PS-205) the WebAssembly diff with pngjs's overlay encode against its own. On demand only, never
+ * in the gate:
  *
  *   cd apps/web && bun perf/diff-wasm/run.ts [--rounds 15]
  *
  * It builds `worker.ts` with the Cloudflare Vite plugin and serves it twice with `vite preview`
- * (each its own workerd): one for pngjs and the overlay encode, one for wasm, so each process's
- * peak RSS (VmHWM) is one implementation's. Every pair is checked equal between the two first. Then
+ * (each its own workerd): one for pngjs, the overlay encode and its deflate, one for wasm with
+ * either encode, so each process's peak RSS (VmHWM) is one engine's. Every pair is checked equal
+ * across the three diffs first. Then
  * the rounds interleave the implementations; each request is one diff, timed from here, and the
  * median of the rounds is reported. Raw samples go to the gitignored `bench/perf-results/`.
  */
@@ -109,6 +111,7 @@ const median = (samples: number[] = []) => {
 };
 
 const say = (line = "") => process.stdout.write(`${line}\n`);
+const pct = (now: number, was: number) => `${((now / was - 1) * 100).toFixed(0)}%`;
 const mb = (m: { rss: number; peak: number }) => `${m.rss.toFixed(0)} / ${m.peak.toFixed(0)} MB`;
 
 async function load(server: Server): Promise<void> {
@@ -126,10 +129,12 @@ async function load(server: Server): Promise<void> {
 async function checkEqual(pngjs: Server, wasm: Server): Promise<void> {
   for (const { name } of PAGES) {
     const want = JSON.stringify({ ...(await run(pngjs, "pngjs", name, true)), fellBack: [] });
-    const got = await run(wasm, "wasm", name, true);
-    if (got.fellBack.length > 0) throw new Error(`wasm fell back: ${got.fellBack.join("; ")}`);
-    if (JSON.stringify({ ...got, fellBack: [] }) !== want)
-      throw new Error(`${name}: wasm and pngjs differ in workerd`);
+    for (const impl of ["wasm", "wasm-pngjs"]) {
+      const got = await run(wasm, impl, name, true);
+      if (got.fellBack.length > 0) throw new Error(`${impl} fell back: ${got.fellBack.join("; ")}`);
+      if (JSON.stringify({ ...got, fellBack: [] }) !== want)
+        throw new Error(`${name}: ${impl} and pngjs differ in workerd`);
+    }
   }
 }
 
@@ -166,7 +171,9 @@ try {
   const samples = await rounds([
     [pngjs, "pngjs"],
     [wasm, "wasm"],
+    [wasm, "wasm-pngjs"],
     [pngjs, "encode"],
+    [pngjs, "deflate"],
     [wasm, "noop"],
   ]);
   const peak = { pngjs: memory(pngjs.port), wasm: memory(wasm.port) };
@@ -178,18 +185,21 @@ try {
       bytes: main.length + branch.length,
       pngjs: at("pngjs"),
       wasm: at("wasm"),
+      wasmPngjs: at("wasm-pngjs"),
       encode: at("encode"),
+      deflate: at("deflate"),
       noop: at("noop"),
     };
   });
   say(`\n${ROUNDS} rounds after ${WARMUP} warm-up, median ms per request (workerd)\n`);
-  say("| page | pngjs | wasm | change | overlay encode | request alone |");
-  say("| --- | ---: | ---: | ---: | ---: | ---: |");
+  say(
+    "| page | pngjs | wasm, pngjs encode | wasm | change | vs pngjs | pngjs encode | its deflate | request alone |",
+  );
+  say("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const r of rows) {
-    const change = ((r.wasm / r.pngjs - 1) * 100).toFixed(0);
-    say(
-      `| ${r.page} | ${r.pngjs.toFixed(1)} | ${r.wasm.toFixed(1)} | ${change}% | ${r.encode.toFixed(1)} | ${r.noop.toFixed(1)} |`,
-    );
+    const ms = [r.pngjs, r.wasmPngjs, r.wasm].map((v) => v.toFixed(1)).join(" | ");
+    const parts = [r.encode, r.deflate, r.noop].map((v) => v.toFixed(1)).join(" | ");
+    say(`| ${r.page} | ${ms} | ${pct(r.wasm, r.wasmPngjs)} | ${pct(r.wasm, r.pngjs)} | ${parts} |`);
   }
   say(`\nworkerd RSS / peak after load: pngjs ${mb(idle.pngjs)}, wasm ${mb(idle.wasm)}`);
   say(`workerd RSS / peak after the rounds: pngjs ${mb(peak.pngjs)}, wasm ${mb(peak.wasm)}`);

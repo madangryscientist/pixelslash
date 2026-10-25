@@ -1,7 +1,8 @@
 //! The server diff's hot loops for workerd (PS-204), written from the engine's TypeScript
 //! (`packages/engine/src/diff.ts`, `regions.ts`) and pngjs's unfilter, which it must match byte
-//! for byte. JS keeps everything else: chunk parsing, inflate (workerd's zlib), the ignore mask,
-//! merging boxes, the noise call, shift labels, the floors and the overlay's PNG encode.
+//! for byte, and pngjs's adaptive filter for the overlay's encode (PS-205). JS keeps everything
+//! else: chunk parsing, inflate and deflate (workerd's zlib), the ignore mask, merging boxes, the
+//! noise call, shift labels, the floors and the encode's PNG chunks.
 //!
 //! The module owns one linear memory and a bump allocator over it: `reset` at the start of a diff,
 //! `alloc` for each buffer, `mark`/`rewind` for scratch. Nothing is freed one by one; the memory
@@ -10,7 +11,7 @@
 //! It uses std only for `f64::sqrt` and `f64::floor` (core has no stable float math), which lower
 //! to the wasm instructions; nothing allocates through std, and a panic aborts (a trap in JS).
 
-use std::arch::wasm32;
+use std::arch::wasm32::{self, *};
 use std::slice;
 
 unsafe extern "C" {
@@ -174,6 +175,177 @@ pub extern "C" fn unfilter(src: usize, width: u32, height: u32, channels: u32, d
             }
         }
     }
+    0
+}
+
+/// Bytes per pixel of the RGBA overlay: the left neighbour is 4 bytes back.
+const BPP: usize = 4;
+
+/// The predictor of `filter` (1 Sub, 2 Up, 3 Average, 4 Paeth; 0 None) for one byte.
+#[inline(always)]
+fn predict(filter: usize, left: i32, above: i32, up_left: i32) -> i32 {
+    match filter {
+        0 => 0,
+        1 => left,
+        2 => above,
+        3 => (left + above) >> 1,
+        _ => paeth(left as u8, above as u8, up_left as u8) as i32,
+    }
+}
+
+/// The byte at `x` and its left, above and upper-left neighbours (0 off the row's left edge).
+#[inline(always)]
+fn neighbours(line: &[u8], up: &[u8], x: usize) -> (i32, i32, i32, i32) {
+    let (left, up_left) = if x >= BPP { (line[x - BPP] as i32, up[x - BPP] as i32) } else { (0, 0) };
+    (line[x] as i32, left, up[x] as i32, up_left)
+}
+
+/// Eight bytes at `at`, widened to i16 lanes: `high` picks the upper half of the 16.
+#[inline]
+#[target_feature(enable = "simd128")]
+fn widen(v: v128, high: bool) -> v128 {
+    if high { u16x8_extend_high_u8x16(v) } else { u16x8_extend_low_u8x16(v) }
+}
+
+/// `paeth` on eight i16 lanes, with p − left, p − above and p − upper-left written as
+/// above − upper-left, left − upper-left and left + above − 2 × upper-left.
+#[inline]
+#[target_feature(enable = "simd128")]
+fn paeth_v(left: v128, above: v128, up_left: v128) -> v128 {
+    let p_left = i16x8_abs(i16x8_sub(above, up_left));
+    let p_above = i16x8_abs(i16x8_sub(left, up_left));
+    let p_up_left = i16x8_abs(i16x8_sub(i16x8_add(left, above), i16x8_add(up_left, up_left)));
+    let pick_left = v128_and(i16x8_le(p_left, p_above), i16x8_le(p_left, p_up_left));
+    let above_or_up_left = v128_bitselect(above, up_left, i16x8_le(p_above, p_up_left));
+    v128_bitselect(left, above_or_up_left, pick_left)
+}
+
+/// 16 bytes from `at` (unaligned); the caller keeps `at + 16` inside the slice it came from.
+#[inline]
+#[target_feature(enable = "simd128")]
+fn load(bytes: &[u8], at: usize) -> v128 {
+    debug_assert!(at + 16 <= bytes.len());
+    unsafe { v128_load(bytes.as_ptr().add(at) as *const v128) }
+}
+
+/// The five filters' sums over one row: for each byte, |byte − predictor| unwrapped, as pngjs
+/// adds them. `up` is the row above, all zeros for the first. 16 bytes at a time in i16 lanes;
+/// the first pixel (no left neighbour) and the tail are added one byte at a time.
+#[target_feature(enable = "simd128")]
+fn filter_sums(line: &[u8], up: &[u8]) -> [u64; 5] {
+    let mut sums = [0u64; 5];
+    let add = |sums: &mut [u64; 5], x: usize| {
+        let (cur, left, above, up_left) = neighbours(line, up, x);
+        for (f, sum) in sums.iter_mut().enumerate() {
+            *sum += (cur - predict(f, left, above, up_left)).unsigned_abs() as u64;
+        }
+    };
+    let row = line.len();
+    let head = BPP.min(row);
+    (0..head).for_each(|x| add(&mut sums, x));
+    let mut x = head;
+    // Each step adds at most 4 × 255 to a u32 lane, so lanes are flushed to `sums` well before
+    // they could wrap.
+    const FLUSH: usize = 1 << 20;
+    while x + 16 <= row {
+        let mut acc = [u32x4_splat(0); 5];
+        let mut steps = 0;
+        while x + 16 <= row && steps < FLUSH {
+            let (cur, left) = (load(line, x), load(line, x - BPP));
+            let (above, up_left) = (load(up, x), load(up, x - BPP));
+            for high in [false, true] {
+                let (c, l) = (widen(cur, high), widen(left, high));
+                let (a, ul) = (widen(above, high), widen(up_left, high));
+                let avg = i16x8_shr(i16x8_add(l, a), 1);
+                let preds = [i16x8_splat(0), l, a, avg, paeth_v(l, a, ul)];
+                for (lane, pred) in acc.iter_mut().zip(preds) {
+                    let diff = i16x8_abs(i16x8_sub(c, pred));
+                    *lane = i32x4_add(*lane, i32x4_extadd_pairwise_i16x8(diff));
+                }
+            }
+            x += 16;
+            steps += 1;
+        }
+        for (sum, lane) in sums.iter_mut().zip(acc) {
+            let total = u32x4_extract_lane::<0>(lane) as u64
+                + u32x4_extract_lane::<1>(lane) as u64
+                + u32x4_extract_lane::<2>(lane) as u64
+                + u32x4_extract_lane::<3>(lane) as u64;
+            *sum += total;
+        }
+    }
+    (x..row).for_each(|x| add(&mut sums, x));
+    sums
+}
+
+/// One row filtered with `filter` into `to`, each byte wrapped to u8 as pngjs's Buffer stores it.
+#[target_feature(enable = "simd128")]
+fn filter_row(filter: usize, line: &[u8], up: &[u8], to: &mut [u8]) {
+    let row = line.len();
+    let one = |x: usize, to: &mut [u8]| {
+        let (cur, left, above, up_left) = neighbours(line, up, x);
+        to[x] = (cur - predict(filter, left, above, up_left)) as u8;
+    };
+    if filter == 0 {
+        to.copy_from_slice(line);
+        return;
+    }
+    let head = BPP.min(row);
+    (0..head).for_each(|x| one(x, to));
+    let mut x = head;
+    while x + 16 <= row {
+        let (cur, left) = (load(line, x), load(line, x - BPP));
+        let (above, up_left) = (load(up, x), load(up, x - BPP));
+        let pred = |high: bool| {
+            let (l, a, ul) = (widen(left, high), widen(above, high), widen(up_left, high));
+            match filter {
+                1 => l,
+                2 => a,
+                3 => i16x8_shr(i16x8_add(l, a), 1),
+                _ => paeth_v(l, a, ul),
+            }
+        };
+        let pred = u8x16_narrow_i16x8(pred(false), pred(true));
+        unsafe { v128_store(to.as_mut_ptr().add(x) as *mut v128, u8x16_sub(cur, pred)) };
+        x += 16;
+    }
+    (x..row).for_each(|x| one(x, to));
+}
+
+/// pngjs's adaptive filter for an 8-bit RGBA image (`PNG.sync.write`'s default, PS-205): for each
+/// row, the sum of the absolute differences between each byte and its predictor, unwrapped, under
+/// None, Sub, Up, Average and Paeth, and the first filter with the smallest sum wins. Writes the
+/// filtered rows (`(width * 4 + 1) * height` bytes, each led by its filter type) to `dst`. 0 on
+/// success, 1 when memory for the zero row above the first ran out.
+#[unsafe(no_mangle)]
+pub extern "C" fn filter(src: usize, width: u32, height: u32, dst: usize) -> u32 {
+    let (w, h) = (width as usize, height as usize);
+    let row = w * 4;
+    let scratch = mark();
+    let zeros = alloc(row);
+    if zeros == 0 {
+        return 1;
+    }
+    let zeros = bytes_mut(zeros, row);
+    zeros.fill(0);
+    let data = bytes(src, row * h);
+    let out = bytes_mut(dst, (row + 1) * h);
+    for y in 0..h {
+        let line = &data[y * row..(y + 1) * row];
+        let up: &[u8] = if y == 0 { zeros } else { &data[(y - 1) * row..y * row] };
+        // wasm SIMD: workerd's V8 and Bun both run it, and a runtime without it refuses the module.
+        let sums = filter_sums(line, up);
+        let mut best = 0;
+        for f in 1..5 {
+            if sums[f] < sums[best] {
+                best = f;
+            }
+        }
+        let (kind, to) = out[y * (row + 1)..(y + 1) * (row + 1)].split_first_mut().unwrap();
+        *kind = best as u8;
+        filter_row(best, line, up, to);
+    }
+    rewind(scratch);
     0
 }
 

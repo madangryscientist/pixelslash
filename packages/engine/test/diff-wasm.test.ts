@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
 import { DIFF_SIZES, page } from "../../../bench/src/perf/fixtures.ts";
@@ -68,6 +68,22 @@ describe("wasmDiffer matches diffPngs byte for byte (PS-204)", () => {
     expect(reasons).toEqual([]);
   });
 
+  test("the corpus's overlays pick every filter type, so each choice of the wasm filter is held", () => {
+    // PS-205: the overlay's filter pass runs in wasm and must pick pngjs's filter on every row.
+    // The byte-for-byte checks above only hold that for the filters the overlays actually choose.
+    const picked = new Set<number>();
+    for (const name of cases) {
+      const main = readFileSync(join(corpus, name, "base.png"));
+      const { overlay } = diff(main, readFileSync(join(corpus, name, "head.png")));
+      if (!overlay) continue;
+      const { width, height } = PNG.sync.read(overlay);
+      // The one IDAT both encoders write: after the signature and IHDR, before its CRC and IEND.
+      const rows = inflateSync(overlay.subarray(41, overlay.length - 16));
+      for (let y = 0; y < height; y++) picked.add(rows[y * (width * 4 + 1)] ?? -1);
+    }
+    expect([...picked].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+  });
+
   test.each(Object.entries(DIFF_SIZES))(
     "perf page: %s",
     (_, { width, height }) => {
@@ -102,6 +118,22 @@ describe("wasmDiffer matches diffPngs byte for byte (PS-204)", () => {
     const main = PNG.sync.write(PNG.sync.read(page(200, 120, 9, false)), { colorType: 2 });
     for (const filterType of [0, 1, 2, 3, 4, -1]) {
       expectSame(diff, [main, PNG.sync.write(rgba, { filterType })]);
+    }
+    expect(reasons).toEqual([]);
+  });
+
+  test("narrow and odd widths: the wasm filter's first pixel, its 16-byte steps and its tail", () => {
+    let seed = 7;
+    const noise = (width: number, height: number) => {
+      const png = new PNG({ width, height });
+      for (let i = 0; i < png.data.length; i++) {
+        seed = (seed * 1103515245 + 12345) >>> 0;
+        png.data[i] = i % 4 === 3 ? 255 : seed >>> 24;
+      }
+      return PNG.sync.write(png);
+    };
+    for (const width of [1, 2, 3, 4, 5, 7, 8, 9, 13, 33]) {
+      expectSame(diff, [noise(width, 5), noise(width, 5)]);
     }
     expect(reasons).toEqual([]);
   });

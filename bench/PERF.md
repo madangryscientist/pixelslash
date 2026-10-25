@@ -149,6 +149,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
 | 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, on (`DIFF_WASM`, on by default since PS-207) | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
 | 21 | Free the explain queue's full-page decodes: `regionCrops` decodes one PNG at a time and releases its raster, `explainShot` releases the three blobs it read | web + engine | ✅ measured, shipped | burst 50 × 1280×9500 with the model on: workerd peak 1497 → 783 / 728 MB, settled 1499 → 611 / 617 MB; crops unchanged | PS-206 |
+| 22 | The WASM differ's overlay encode: pngjs's adaptive filter pass in the module (wasm SIMD), deflate in workerd's zlib at pngjs's level and strategy, chunks in JS | web (workerd) | ✅ measured, on with `DIFF_WASM` | workerd, 15 rounds, wasm with pngjs's encode → its own: phone 23.1 → 12.2 ms (−47%), desktop 76.0 → 32.2 (−58%), long 528.8 → 238.0 (−55%); against pngjs −71 to −74%; overlay byte-equal | PS-205 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -175,9 +176,10 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
   same regions), with SkiaSharp parallel as with stb sequential. Every TS decoder candidate gives
   pngjs's RGBA byte for byte on every corpus PNG (`bench/test/codecs.test.ts`).
 - **In workerd, the hot loops in WASM take 40–47% off the diff** (PS-204), and the long page drops
-  from 892 to 532 ms. The overlay encode (pngjs, about 330 ms on the long page) is then 62% of what
-  is left, so it is the next lever there. Without the encode, the long page is about 560 ms against
-  about 200 ms. The module is 26 KB.
+  from 892 to 532 ms. The overlay encode (pngjs, about 330 ms on the long page) was then 62% of what
+  was left. **Its filter pass was the cost, not deflate** (PS-205): deflate alone is 13.5 of pngjs's
+  330 ms. With the filter in the module (wasm SIMD) the WASM diff takes the long page to 238 ms,
+  −73% against pngjs (885 ms) in the same run. The module is 29 KB.
 - **Constraint:** the web app's server diff runs in workerd, which can load WASM but no native
   code. The CLI (Bun) can load native code. So the fastest production ts option differs per path:
   napi-image for the CLI, pngjs (or jsquash) for workerd. Since PS-203 the self-host's Worker sends
@@ -191,6 +193,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-205 | desktop, shared | the WASM differ's overlay encode: pngjs's filter pass in the module, timed in workerd |
 | 2026-10-25 | PS-206 | desktop, shared | workerd's memory on an HC-124-sized burst, with the explain queue on |
 | 2026-10-25 | planner | desktop, dedicated | ts with the overlay encode on and off, pngjs and napi-image, against cs |
 | 2026-10-25 | PS-204 | desktop, shared | the server diff's hot loops in Rust→WASM, timed in workerd |
@@ -202,6 +205,65 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · PS-205 · desktop, shared · the overlay encode's filter pass in WASM, in workerd
+
+**With its own encode, the WASM diff is 47–58% faster than the WASM diff with pngjs's encode, and
+71–74% faster than pngjs.** The overlay is the same byte for byte.
+
+**Question.** After PS-204, pngjs's overlay encode was 62% of the WASM diff on the long page. Is it
+the filter pass or deflate? If it is the filter, can the module do it and keep pngjs's bytes?
+
+**Split first.** The same harness timed pngjs's whole encode against its deflate alone, run on the
+inflated IDAT of pngjs's own overlay at pngjs's options (`level: 9`, `strategy: 3`, Z_RLE, 32 KiB
+chunks). Deflate is 4–12% of the encode, so the filter pass is the cost:
+
+| Page | pngjs encode | its deflate | Deflate's share |
+| --- | ---: | ---: | ---: |
+| phone | 15.5 ms | 2.5 ms | 16% |
+| desktop | 51.9 ms | 3.4 ms | 7% |
+| long | 330.1 ms | 13.5 ms | 4% |
+
+**What moved.** pngjs's adaptive filter, written from the PNG spec in `engines/wasm` (no crates):
+for each row it tries filters 0–4, sums |byte − predictor| unwrapped, and keeps the first smallest
+sum, so ties go to the lower filter as in pngjs. The sums and the chosen row's bytes go 16 bytes at
+a time in i16 lanes (wasm SIMD); the first pixel and the tail go one byte at a time. A scalar
+version took 157 ms on the long page in Bun, and SIMD takes 28 ms. JS deflates the filtered rows
+with workerd's zlib at pngjs's options and writes the signature, IHDR, one IDAT and IEND with the
+module's CRC, which is what pngjs writes for the overlay. The encode runs before the differ makes any
+view of the module's memory, because the rows buffer can grow it. The module is 29920 bytes, up
+from 26475.
+
+**Env.** As PS-204: Linux desktop, 12 cores, other worktrees running (`shared`); two workerd
+processes from `vite preview`; the PS-168 pages (seeds 100–102); every pair checked equal across
+pngjs, wasm and wasm with pngjs's encode (every field and the overlay's sha256) before any timing;
+15 rounds after 3 warm-up, interleaved and reversed on odd rounds, medians from the client. "Before"
+is `wasm-pngjs`, the WASM differ with pngjs's encode passed through its `encode` hook, in the same
+process and the same rounds as "after".
+
+```bash
+cd apps/web && bun perf/diff-wasm/run.ts [--rounds 15]
+```
+
+| Page | pngjs | wasm, pngjs encode | wasm | Change | vs pngjs | Request alone |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| phone | 42.5 ms | 23.1 ms | **12.2 ms** | −47% | −71% | 2.6 ms |
+| desktop | 124.6 ms | 76.0 ms | **32.2 ms** | −58% | −74% | 1.5 ms |
+| long | 885.3 ms | 528.8 ms | **238.0 ms** | −55% | −73% | 1.6 ms |
+
+"wasm, pngjs encode" is within 2% of PS-204's wasm column (22.6 / 75.7 / 531.7 ms), so the two runs
+agree on the before.
+
+**Memory.** After the rounds pngjs's workerd was at 2403 MB RSS and wasm's at 564 MB (VmHWM 618).
+wasm's process also served `wasm-pngjs`, so its peak includes pngjs's encodes; the filter itself
+needs one row of zeros and the filtered rows (the overlay's size plus one byte per row) in the module.
+
+**Tests.** `packages/engine/test/diff-wasm.test.ts` holds the overlay byte-equal to pngjs's on the
+bench corpus (whose overlays use all five filters, which a test asserts), on the three perf pages,
+and on noise at widths 1–33 pixels, which covers the first pixel, the 16-byte steps and the tail.
+`apps/web/src/diff/wasm.test.ts` covers the app's server-diff fixtures.
+
+**Not measured.** Cloudflare's own runtime: nothing was deployed.
 
 ### 2026-10-25 · PS-206 · desktop, shared · workerd's memory on a burst that is explained
 

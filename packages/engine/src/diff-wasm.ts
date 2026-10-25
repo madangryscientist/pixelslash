@@ -1,11 +1,12 @@
 /**
  * The server diff with its hot loops in WebAssembly (PS-204, a spike behind a flag). The Rust in
- * `engines/wasm` unfilters both PNGs, runs the pixel loop and finds the blob boxes; inflate stays
- * in the runtime's zlib, and everything after the boxes (merging, noise, shift labels, floors, the
- * overlay's encode) is the engine's own `measuredDiff`. The result is byte-identical to
+ * `engines/wasm` unfilters both PNGs, runs the pixel loop, finds the blob boxes and runs the
+ * overlay encode's filter pass (PS-205); inflate and deflate stay in the runtime's zlib, and
+ * everything after the boxes (merging, noise, shift labels, floors) is the engine's own
+ * `measuredDiff`. The result is byte-identical to
  * `diffPngs`, and any PNG the fast path does not read falls back to `diffPngs` whole.
  */
-import { inflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 import {
   type DiffIgnore,
   type DiffOptions,
@@ -30,6 +31,7 @@ type DiffExports = {
   alloc(len: number): number;
   crc32(ptr: number, len: number): number;
   unfilter(src: number, width: number, height: number, channels: number, dst: number): number;
+  filter(src: number, width: number, height: number, dst: number): number;
   diff(
     a: number,
     aw: number,
@@ -149,6 +151,47 @@ function decodeInto(
   return { at: rgba, width, height };
 }
 
+/** pngjs's deflate options for `PNG.sync.write`: level 9, Z_RLE, 32 KiB chunks. */
+const DEFLATE = { chunkSize: 32 * 1024, level: 9, strategy: 3 };
+
+/**
+ * The RGBA overlay at `at` as the PNG `PNG.sync.write` writes, byte for byte: the rows filtered in
+ * wasm, deflated in the runtime's zlib with pngjs's options, then IHDR (8-bit RGBA), one IDAT and
+ * IEND. Grows the memory, so it runs before any view of it is made.
+ */
+function encodeOverlay(wasm: DiffExports, at: number, width: number, height: number): Buffer {
+  const scratch = wasm.mark();
+  const rowsLen = (width * 4 + 1) * height;
+  const rows = alloc(wasm, rowsLen);
+  if (wasm.filter(at, width, height, rows) !== 0) throw new NotFast("wasm memory is full");
+  const idat = deflateSync(new Uint8Array(wasm.memory.buffer, rows, rowsLen), DEFLATE);
+  wasm.rewind(scratch);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  const parts = [
+    ["IHDR", ihdr],
+    ["IDAT", idat],
+    ["IEND", Buffer.alloc(0)],
+  ] as const;
+  const length = SIGNATURE.length + parts.reduce((sum, [, data]) => sum + 12 + data.length, 0);
+  const file = alloc(wasm, length);
+  const png = Buffer.from(wasm.memory.buffer, file, length);
+  png.set(SIGNATURE);
+  let pos = SIGNATURE.length;
+  for (const [type, data] of parts) {
+    png.writeUInt32BE(data.length, pos);
+    png.write(type, pos + 4, "latin1");
+    png.set(data, pos + 8);
+    png.writeUInt32BE(wasm.crc32(file + pos + 4, 4 + data.length) >>> 0, pos + 8 + data.length);
+    pos += 12 + data.length;
+  }
+  const copy = Buffer.from(png);
+  wasm.rewind(scratch);
+  return copy;
+}
+
 function alloc(wasm: DiffExports, len: number): number {
   const at = wasm.alloc(len);
   if (at === 0) throw new NotFast("wasm memory is full");
@@ -218,6 +261,11 @@ function fastDiff(
   const gap = options.mergeDistance ?? DEFAULT_MERGE_DISTANCE;
   const count = wasm.blob_boxes(field, width, height, gap, out + 8);
   if (count === 0xffffffff) throw new NotFast("wasm memory is full");
+  let encodeWith = encode;
+  if (!encodeWith) {
+    const png = encodeOverlay(wasm, overlay, overlayWidth, overlayHeight);
+    encodeWith = () => png;
+  }
   // Views only now: a call that grows the memory detaches every view made before it.
   const memory = wasm.memory.buffer;
   const [boxesPtr = 0] = new Uint32Array(memory, out + 8, 1);
@@ -247,11 +295,21 @@ function fastDiff(
       ignored,
       field: fieldOf,
     },
-    { options, blobs: () => boxes, ...(encode && { encode }) },
+    { options, blobs: () => boxes, encode: encodeWith },
   );
 }
 
-const EXPORTS = ["reset", "mark", "rewind", "alloc", "crc32", "unfilter", "diff", "blob_boxes"];
+const EXPORTS = [
+  "reset",
+  "mark",
+  "rewind",
+  "alloc",
+  "crc32",
+  "unfilter",
+  "filter",
+  "diff",
+  "blob_boxes",
+];
 
 function isDiffExports(exports: WebAssembly.Instance["exports"]): exports is DiffExports {
   return (
@@ -274,7 +332,7 @@ const size = ({ width, height }: { width: number; height: number }) => ({ width,
  * instance and the pair goes to `diffPngs`, which gives the same answer or the same error;
  * `fellBack` is told why (the tests use it to prove the fast path ran). `encode` replaces the
  * overlay's PNG encode on the fast path, as `measuredDiff`'s does (the bench's `--overlay none`);
- * left out, it is the engine's own.
+ * left out, it is pngjs's encode with the filter pass in wasm (PS-205), which writes the same bytes.
  */
 export function wasmDiffer(
   module: WebAssembly.Module,

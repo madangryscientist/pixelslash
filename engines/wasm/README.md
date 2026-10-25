@@ -1,12 +1,14 @@
 # engines/wasm: the server diff's hot loops in WebAssembly (PS-204, a spike)
 
-A Rust crate compiled to `wasm32-unknown-unknown`. It holds the three loops that dominate the
+A Rust crate compiled to `wasm32-unknown-unknown`. It holds the loops that dominate the
 server diff in workerd: pngjs's unfilter, the per-pixel loop (YIQ delta, anti-alias test, the
-overlay paint) and the region pass's blob boxes. It was written from our TypeScript
+overlay paint), the region pass's blob boxes and (PS-205) pngjs's adaptive filter for the overlay's
+encode, which picks each row's filter as pngjs does and runs 16 bytes at a time in wasm SIMD. It was written from our TypeScript
 (`packages/engine/src/diff.ts`, `yiq.ts`, `regions.ts`) and the PNG spec's filter definitions, not
 from a rival's code. It must give `diffPngs`'s result byte for byte. Everything else stays in JS
 (`packages/engine/src/diff-wasm.ts`): chunk parsing, inflate (workerd's zlib), the ignore mask,
-merging boxes, noise, shift labels, the floors and the overlay's encode. The fast path reads 8-bit
+merging boxes, noise, shift labels, the floors, and the encode's deflate (workerd's zlib at
+pngjs's level and strategy) and PNG chunks. The fast path reads 8-bit
 RGB and RGBA, uninterlaced, with no critical chunk besides IHDR, IDAT and IEND and no `tRNS`.
 Any other PNG (16-bit, palette, interlaced) goes to `diffPngs`, which gives the same answer.
 
@@ -31,7 +33,9 @@ With rustup instead of mise, `cargo` reads `rust-toolchain.toml` itself
 
 ## Dependencies
 
-None. There are no crates, no wasm-bindgen and no allocator crate. The module uses std only for
+None. There are no crates, no wasm-bindgen and no allocator crate. The filter pass uses wasm SIMD
+(`#[target_feature(enable = "simd128")]` on its functions, so no build flag); workerd's V8 and Bun
+both run it. The module uses std only for
 `f64::sqrt` and `f64::floor`, and its memory comes from a bump allocator over linear memory.
 
 ## Timing
@@ -42,4 +46,4 @@ Timing is on demand only, never in the gate:
 cd apps/web && bun perf/diff-wasm/run.ts
 ```
 
-The results are in `bench/PERF.md`, lever 20.
+The results are in `bench/PERF.md`, levers 20 and 22.
