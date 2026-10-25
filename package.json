@@ -19,7 +19,9 @@
     "bench:perf": "bun bench/src/perf/run.ts",
     "bench:perf:check": "bun bench/src/perf/run.ts --check",
     "bench:decoders": "bun bench/src/perf/decoders.ts",
-    "bench:import-flags": "bun bench/src/import-flags.ts"
+    "bench:import-flags": "bun bench/src/import-flags.ts",
+    "wasm:build": "bun scripts/build-wasm.ts",
+    "wasm:check": "bun scripts/build-wasm.ts --check"
   },
   "devDependencies": {
     "@nx/dotnet": "23.3.0",

@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./diff": "./src/diff.ts",
+    "./diff-wasm": "./src/diff-wasm.ts",
+    "./diff.wasm": "./wasm/diff.wasm",
+    "./png-codec": "./src/png-codec.ts",
     "./release": "./src/release.ts",
     "./judge": "./src/judge.ts",
     "./png-native": "./src/png-native.ts",

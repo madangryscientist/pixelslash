@@ -44,6 +44,8 @@
     "MIN_CLI_VERSION": "",
     // Where a new project diffs (ob 1727): `ci` here; unset or anything else is `server`, the self-host default.
     "DEFAULT_DIFF_LOCATION": "ci",
+    // `1` runs the server diff's hot loops in WebAssembly (PS-204, a spike); anything else is pngjs.
+    "DIFF_WASM": "",
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
@@ -81,6 +83,8 @@
         // Playwright run points it at its own sidecar's port (vite.config.ts). Cloudflare's vars
         // above never set it: there the server diff stays in-process with pngjs.
         "DIFF_SIDECAR_URL": "http://127.0.0.1:4181",
+        // Off; the Playwright run sets it from PIXELSLASH_E2E_WASM (vite.config.ts).
+        "DIFF_WASM": "",
       },
     },
   },

@@ -22,7 +22,7 @@ function swapSyncInflate(source: string, importer: string | undefined): string |
 }
 
 /** The build resolves pngjs through this plugin. */
-const pngjsSyncInflate: Plugin = {
+export const pngjsSyncInflate: Plugin = {
   name: "pngjs-sync-inflate",
   enforce: "pre",
   resolveId: swapSyncInflate,
@@ -44,6 +44,7 @@ function pointAtStub(config: { vars?: Record<string, unknown> }) {
       GITHUB_OAUTH_BASE: base,
       GITHUB_API_BASE: base,
       DIFF_SIDECAR_URL: sidecar,
+      DIFF_WASM: process.env["PIXELSLASH_E2E_WASM"] ?? "",
     },
   };
 }

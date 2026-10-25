@@ -4,6 +4,7 @@ import type { GithubConfig } from "#/auth/github";
 import type { Db } from "#/db/db";
 import type { ExplainQueue } from "#/ai/explain-queue";
 import { diffLocationOf } from "#/db/orgs";
+import { wasmDiff } from "#/diff/wasm";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
 
@@ -34,6 +35,13 @@ export const modelKeySecret = (): string | undefined => env.MODEL_KEY_SECRET || 
  * native codec. Cloudflare never sets it; unset, the server diff runs here with pngjs.
  */
 export const diffSidecarUrl = (): string | undefined => env.DIFF_SIDECAR_URL || undefined;
+
+/**
+ * The in-process diff (PS-204): the WebAssembly one when `DIFF_WASM` is `1`, else undefined, which
+ * is the engine's pngjs `diffPngs`. A spike: off in every config, byte-identical either way.
+ */
+export const inProcessDiff = (): typeof wasmDiff | undefined =>
+  env.DIFF_WASM === "1" ? wasmDiff : undefined;
 
 /** The oldest CLI the API takes (`x.y.z`, ob 1729); empty takes any. Set in `vars`. */
 export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || undefined;

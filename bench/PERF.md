@@ -138,6 +138,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
 | 19 | Self-host server diff in a Bun sidecar with napi-image (workerd keeps pngjs on Cloudflare) | web (self-host) | ✅ measured, shipped | PS-200 burst, 50 shots 1280×5000: diff time 29.7/37.9 → 11.9/14.3 s; workerd settled RSS 660/691 → 357/363 MB | PS-203 |
 | 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
+| 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, a flag (`DIFF_WASM`, off) | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -163,10 +164,15 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 - **Accuracy is unchanged.** cs matches ts row for row on both corpora (157 pairs: same verdicts,
   same regions), with SkiaSharp parallel as with stb sequential. Every TS decoder candidate gives
   pngjs's RGBA byte for byte on every corpus PNG (`bench/test/codecs.test.ts`).
+- **In workerd, the hot loops in WASM take 40–47% off the diff** (PS-204), and the long page drops
+  from 892 to 532 ms. The overlay encode (pngjs, about 330 ms on the long page) is then 62% of what
+  is left, so it is the next lever there. Without the encode, the long page is about 560 ms against
+  about 200 ms. The module is 26 KB.
 - **Constraint:** the web app's server diff runs in workerd, which can load WASM but no native
   code. The CLI (Bun) can load native code. So the fastest production ts option differs per path:
   napi-image for the CLI, pngjs (or jsquash) for workerd. Since PS-203 the self-host's Worker sends
-  the diff to a Bun sidecar with napi-image; only the Cloudflare deploy still diffs with pngjs.
+  the diff to a Bun sidecar with napi-image; only the Cloudflare deploy still diffs with pngjs
+  (or, behind `DIFF_WASM`, with PS-204's WASM).
 
 ## Run log
 
@@ -175,6 +181,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-10-25 | PS-204 | desktop, shared | the server diff's hot loops in Rust→WASM, timed in workerd |
 | 2026-10-25 | PS-203 | desktop, shared | the self-host's server diff in a Bun sidecar with napi-image |
 | 2026-10-25 | PS-195 | desktop, shared | capture split into navigate, settle, screenshot and launch; pages shot at once |
 | 2026-10-25 | PS-190 | desktop, shared | where a real run's time goes: capture vs diff, CLI and server (measurement, no code) |
@@ -183,6 +190,61 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-10-25 · PS-204 · desktop, shared · the server diff's hot loops in WASM, in workerd
+
+**In workerd, the WASM diff is 40–47% faster than pngjs, and it holds a sixth of the memory.** The
+result is the same byte for byte: every field, and the overlay's bytes.
+
+Three loops moved to a 26475-byte Rust module (`engines/wasm`): the unfilter, the per-pixel loop
+and the region pass's blob boxes. Inflate stays on workerd's zlib, and the overlay is still encoded
+by pngjs. A PNG the fast path does not read goes to pngjs. No fixture fell back in this run.
+
+**Question.** The Cloudflare deploy cannot load native code, so PS-203's napi-image sidecar does
+not apply there. Can WASM win in workerd, where jsquash's WASM decoder tied pngjs in PS-168?
+
+**Env.** Linux desktop, 12 cores; other worktrees' gates were running (`shared`). The harness is
+`apps/web/perf/diff-wasm/`, a Worker built with the Cloudflare Vite plugin and served by
+`vite preview`. Two workerd processes run side by side: one serves pngjs and the encode-only probe,
+the other serves wasm and an empty request. That way each process's VmHWM belongs to one
+implementation. The pages are the PS-168 run's (seeds 100–102). Every pair is checked equal across
+the two processes before any timing, using every field plus the overlay's sha256. Each request is
+one diff, and the implementations interleave, in reverse order on odd rounds. The figures are
+medians of 15 rounds after 3 warm-up rounds, taken from the client.
+
+```bash
+cd apps/web && bun perf/diff-wasm/run.ts [--rounds 15]
+```
+
+| Page | pngjs | wasm | Change | Overlay encode (pngjs) | Request alone |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| phone | 42.4 ms | **22.6 ms** | −47% | 14.5 ms | 2.7 ms |
+| desktop | 126.3 ms | **75.7 ms** | −40% | 51.8 ms | 1.6 ms |
+| long | 891.8 ms | **531.7 ms** | −40% | 329.8 ms | 1.6 ms |
+
+A second 15-round run, right after, landed within 1.5%: long 889.2 against 539.2 ms. Both
+implementations pay the same encode. Taking it out, the long page is about 562 ms for pngjs
+against 202 ms for wasm (−64%).
+
+**Memory.** Both processes idled at 113–122 MB after the pages loaded. After 18 rounds, pngjs's
+workerd was at 2140 MB RSS (VmHWM 2140), and it was still growing: it was 1108 MB after 4 rounds.
+wasm's was at 347 MB RSS (VmHWM 434) after 18 rounds and also after 4. The pngjs process also served
+the encode probe, so its figure covers pngjs's diffs and encodes together. The wasm module's memory
+grows to the largest diff and stays there, which is about 300 MB for two 1440×6000 rasters, the
+field and the overlay.
+
+**Size.** The module is 26475 bytes (25.85 KiB in `wrangler deploy --dry-run`). The whole Worker is
+1922.21 KiB, or 461.21 KiB gzipped, against Cloudflare's 3 MB compressed limit on the free plan
+(10 MB paid).
+
+**Recommendation.** Ship it behind the flag for every size. It is faster on every page, by more on
+the smallest. It is the same answer, and it removes most of pngjs's peak. Before anyone turns it
+on, the overlay encode is the next lever for workerd: on the wasm path it is 62% of the long page.
+Turning the flag on is Jacobus's call, and this ticket does not make it.
+
+**Not measured.** Cloudflare's own runtime and its CPU limits: the run used local workerd, and
+nothing was deployed. Also not measured: the self-host, which diffs in PS-203's sidecar and does
+not use this path.
 
 ### 2026-10-25 · PS-203 · desktop, shared · the self-host's server diff in a Bun sidecar
 

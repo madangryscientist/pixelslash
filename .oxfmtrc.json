@@ -12,6 +12,7 @@
     "**/*.gen.ts",
     "**/routeTree.gen.ts",
     "**/worker-configuration.d.ts",
-    "apps/web/drizzle/**"
+    "apps/web/drizzle/**",
+    "packages/engine/wasm/diff.wasm.json"
   ]
 }

@@ -73,7 +73,15 @@ const MIN_MIXED_SHARE = 0.2;
 /** Noise scatters amplitudes (compression: 0.4 and up); a moved flat element has one colour delta (0). */
 const MIN_AMPLITUDE_SPREAD = 0.3;
 
-type Box = { x0: number; y0: number; x1: number; y1: number };
+/** A box of changed pixels, inclusive on all four sides. */
+export type Box = { x0: number; y0: number; x1: number; y1: number };
+
+/**
+ * The boxes of the changed pixels in each blob of the field's changed mask dilated by `gap`, in
+ * index order of each blob's first cell, before they are merged. The WASM diff (PS-204) supplies
+ * its own; it must return the same boxes in the same order.
+ */
+export type BlobBoxes = (field: DiffField, gap: number) => Box[];
 
 /** Dilate a mask by `gap` along one axis. */
 function dilateAxis(
@@ -274,18 +282,19 @@ function noiseReason(stats: BoxStats, options: RegionOptions): string | null {
   return "faint, uneven, lighter and darker";
 }
 
-/** The merged boxes of the changed pixels, before the speck floor and the noise call. */
-function clusterBoxes(field: DiffField, mergeDistance: number): Box[] {
-  const boxes = blobBoxes(field, dilatedChanged(field, mergeDistance));
-  return mergeBoxes(boxes, mergeDistance);
-}
+const dilatedBlobBoxes: BlobBoxes = (field, gap) => blobBoxes(field, dilatedChanged(field, gap));
 
-export function findRegions(field: DiffField, options: RegionOptions = {}): RegionResult {
+export function findRegions(
+  field: DiffField,
+  options: RegionOptions = {},
+  blobs: BlobBoxes = dilatedBlobBoxes,
+): RegionResult {
   const gap = options.mergeDistance ?? DEFAULT_MERGE_DISTANCE;
   const minArea = options.minRegionArea ?? DEFAULT_MIN_REGION_AREA;
   const regions: Region[] = [];
   const specks: Specks = { count: 0, pixels: 0 };
-  for (const box of clusterBoxes(field, gap)) {
+  // The merged boxes of the changed pixels, before the speck floor and the noise call.
+  for (const box of mergeBoxes(blobs(field, gap), gap)) {
     const w = box.x1 - box.x0 + 1;
     const h = box.y1 - box.y0 + 1;
     const stats = boxStats(field, box);

@@ -3,6 +3,7 @@ import {
   newField,
   PIXEL_ANTIALIASED,
   PIXEL_CHANGED,
+  type BlobBoxes,
   type DiffField,
   type Region,
   type RegionOptions,
@@ -12,6 +13,7 @@ import { labelShifts, type ShiftOptions } from "./shift.ts";
 import { clearsFloors } from "./summary.ts";
 import { clipRects, ignoreMask } from "./ignore-mask.ts";
 import { identicalBytes } from "./identical.ts";
+import { colourDelta, isAntialiased, MAX_YIQ_DELTA } from "./yiq.ts";
 import { clock, reportLoop, type DiffProbe, type Raster } from "./diff-probe.ts";
 import { decodePng, encodePng } from "./png-codec.ts";
 import { release, releasing } from "./release.ts";
@@ -75,96 +77,6 @@ export type PixelDiff = {
 
 /** Measured on bench/corpus: keeps every real change there except one-level colour steps (ob 1485). */
 export const DEFAULT_THRESHOLD = 0.01;
-
-/** Largest YIQ delta (squared, weighted) between black and white. */
-const MAX_YIQ_DELTA = 35215;
-
-function lumaIq(data: Uint8Array, i: number): [number, number, number] {
-  let r = data[i] ?? 0;
-  let g = data[i + 1] ?? 0;
-  let b = data[i + 2] ?? 0;
-  const a = (data[i + 3] ?? 0) / 255;
-  if (a < 1) {
-    r = 255 + (r - 255) * a;
-    g = 255 + (g - 255) * a;
-    b = 255 + (b - 255) * a;
-  }
-  return [
-    r * 0.29889531 + g * 0.58662247 + b * 0.11448223,
-    r * 0.59597799 - g * 0.2741761 - b * 0.32180189,
-    r * 0.21147017 - g * 0.52261711 + b * 0.31114694,
-  ];
-}
-
-/** Perceptual distance between two pixels, signed: negative when `b` is the lighter one. */
-function colourDelta(a: Uint8Array, ia: number, b: Uint8Array, ib: number): number {
-  const same =
-    a[ia] === b[ib] &&
-    a[ia + 1] === b[ib + 1] &&
-    a[ia + 2] === b[ib + 2] &&
-    a[ia + 3] === b[ib + 3];
-  if (same) return 0;
-  const [ya, ia_, qa] = lumaIq(a, ia);
-  const [yb, ib_, qb] = lumaIq(b, ib);
-  const dy = ya - yb;
-  const di = ia_ - ib_;
-  const dq = qa - qb;
-  const delta = 0.5053 * dy * dy + 0.299 * di * di + 0.1957 * dq * dq;
-  return dy > 0 ? -delta : delta;
-}
-
-/** Brightness difference of a neighbour against the centre pixel of the same shot. */
-function brightnessDelta(d: Uint8Array, centre: number, neighbour: number): number {
-  return lumaIq(d, centre)[0] - lumaIq(d, neighbour)[0];
-}
-
-function sameRgba(d: Uint8Array, a: number, b: number): boolean {
-  return d[a] === d[b] && d[a + 1] === d[b + 1] && d[a + 2] === d[b + 2] && d[a + 3] === d[b + 3];
-}
-
-/** In-bounds 8-neighbourhood of (x, y), as [x, y] pairs. */
-function neighbours(img: Raster, x: number, y: number): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let ny = Math.max(y - 1, 0); ny <= Math.min(y + 1, img.height - 1); ny++) {
-    for (let nx = Math.max(x - 1, 0); nx <= Math.min(x + 1, img.width - 1); nx++) {
-      if (nx !== x || ny !== y) out.push([nx, ny]);
-    }
-  }
-  return out;
-}
-
-/** More than two of the 8 neighbours share the pixel's exact colour: it sits in a flat area. */
-function hasManySiblings(img: Raster, x: number, y: number): boolean {
-  const at = (y * img.width + x) << 2;
-  const same = neighbours(img, x, y).filter(([nx, ny]) =>
-    sameRgba(img.data, at, (ny * img.width + nx) << 2),
-  );
-  return same.length > 2;
-}
-
-type Extreme = { delta: number; x: number; y: number };
-
-/**
- * Whether (x, y) is an anti-aliased edge pixel of `img` (Vysniauskas, "On the detection of
- * anti-aliased pixels", 2009): its neighbours run both darker and lighter, few match it, and the
- * extreme neighbour sits in a flat area in both shots, i.e. the edge is a real, hard one.
- */
-function isAntialiased(img: Raster, x: number, y: number, other: Raster): boolean {
-  const centre = (y * img.width + x) << 2;
-  let equal = 0;
-  const min: Extreme = { delta: 0, x: 0, y: 0 };
-  const max: Extreme = { delta: 0, x: 0, y: 0 };
-  for (const [nx, ny] of neighbours(img, x, y)) {
-    const delta = brightnessDelta(img.data, centre, (ny * img.width + nx) << 2);
-    if (delta === 0) equal++;
-    else if (delta < min.delta) Object.assign(min, { delta, x: nx, y: ny });
-    else if (delta > max.delta) Object.assign(max, { delta, x: nx, y: ny });
-  }
-  if (equal > 2 || min.delta === 0 || max.delta === 0) return false;
-  const flatBoth = (e: Extreme) =>
-    hasManySiblings(img, e.x, e.y) && hasManySiblings(other, e.x, e.y);
-  return flatBoth(min) || flatBoth(max);
-}
 
 type Counts = {
   changedPixels: number;
@@ -313,10 +225,16 @@ function groupRegions(
     ignoredPixels,
     options,
     probe,
-  }: { ignoredPixels: number; options: DiffOptions; probe: DiffProbe | undefined },
+    blobs,
+  }: {
+    ignoredPixels: number;
+    options: DiffOptions;
+    probe: DiffProbe | undefined;
+    blobs: BlobBoxes | undefined;
+  },
 ) {
   const started = clock(probe);
-  const found = findRegions(field, options);
+  const found = findRegions(field, options, blobs);
   // The ratio floor is a share of what was measured: ignored pixels are not part of the denominator.
   const measured = field.width * field.height - ignoredPixels;
   const sizeChanged = a.width !== b.width || a.height !== b.height;
@@ -345,21 +263,48 @@ export function diffRasters(
   const width = Math.max(a.width, b.width);
   const height = Math.max(a.height, b.height);
   const overlay: Raster = { data: Buffer.alloc(width * height * 4), width, height };
-  const { changedPixels, antialiased, ignoredPixels, ignored, field } = diffOverlap(a, b, overlay, {
+  const counts = diffOverlap(a, b, overlay, {
     threshold: options.threshold ?? DEFAULT_THRESHOLD,
     ignore,
     probe,
   });
+  const result = measuredDiff([a, b], overlay, counts, { options, probe, encode });
+  // A caller's own `encode` may keep the overlay (the bench's capture does), so only ours is freed.
+  const { field } = counts;
+  release(field.kind, field.amplitude, field.lighter, encode === encodePng && overlay.data);
+  return result;
+}
+
+/**
+ * Everything after the pixel loop: regions, shift labels, floors and the overlay's encode. Shared
+ * with the WASM diff (PS-204), which runs the loop and the blob pass itself (`blobs`) and must give
+ * the same result. Frees nothing: the buffers are the caller's.
+ */
+export function measuredDiff(
+  [a, b]: [Raster, Raster],
+  overlay: Raster,
+  { changedPixels, antialiased, ignoredPixels, ignored, field }: Counts,
+  {
+    options = {},
+    probe,
+    encode = encodePng,
+    blobs,
+  }: {
+    options?: DiffOptions;
+    probe?: DiffProbe | undefined;
+    encode?: (overlay: Raster) => Buffer;
+    blobs?: BlobBoxes;
+  } = {},
+): PixelDiff & { overlay: Buffer } {
   const { regions, specks, changed } = groupRegions(field, [a, b], {
     ignoredPixels,
     options,
     probe,
+    blobs,
   });
   const encodeStarted = clock(probe);
   const encoded = encode(overlay);
   probe?.("overlay_encode", clock(probe) - encodeStarted);
-  // A caller's own `encode` may keep the overlay (the bench's capture does), so only ours is freed.
-  release(field.kind, field.amplitude, field.lighter, encode === encodePng && overlay.data);
   return {
     changed,
     ignoredPixels,

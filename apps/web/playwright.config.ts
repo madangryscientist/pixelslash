@@ -59,6 +59,8 @@ export default defineConfig({
         PIXELSLASH_E2E_STUB_PORT: String(STUB_PORT),
         // And at this sidecar, or at none (`vite.config.ts`).
         PIXELSLASH_E2E_SIDECAR: sidecar ? SIDECAR : "",
+        // `PIXELSLASH_E2E_WASM=1` diffs in-process with the WebAssembly diff (PS-204, a spike).
+        PIXELSLASH_E2E_WASM: process.env["PIXELSLASH_E2E_WASM"] ?? "",
       },
       url: SERVER,
       reuseExistingServer: false,

@@ -8,6 +8,18 @@
     "lint": {
       "command": "oxlint --type-aware --deny-warnings packages/engine && bun scripts/check-slop.ts packages/engine"
     },
-    "test": { "command": "bun --bun vitest run", "options": { "cwd": "packages/engine" } }
+    "test": {
+      "command": "bun --bun vitest run",
+      "options": { "cwd": "packages/engine" },
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/fixtures/**/*",
+        "{workspaceRoot}/engines/wasm/**/*",
+        "!{workspaceRoot}/engines/wasm/target/**/*",
+        "{workspaceRoot}/bench/corpus/**/*",
+        "{workspaceRoot}/bench/src/perf/fixtures.ts"
+      ]
+    }
   }
 }
