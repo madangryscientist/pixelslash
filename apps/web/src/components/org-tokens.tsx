@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import {
   Body,
   Callout,
+  Card,
   Input,
   Pill,
   Table,
@@ -43,7 +44,7 @@ export function OrgTokensPanel({
 }) {
   const [issued, setIssued] = useState<string | null>(null);
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6">
+    <Card>
       <Body as="p" className="mb-4">
         An org token lets CI reach every project in {orgName}: it creates a project by name with{" "}
         <code>pixelslash project create</code> and uploads to one with <code>--project NAME</code>.
@@ -62,7 +63,7 @@ export function OrgTokensPanel({
       )}
       <IssueForm orgId={orgId} onIssued={setIssued} />
       <TokenTable tokens={tokens} hydrated={hydrated} />
-    </section>
+    </Card>
   );
 }
 

@@ -1,4 +1,13 @@
 import { Link } from "@tanstack/react-router";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  rowLinkClass,
+} from "@hackcove/ui";
 import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
 import { StatusBadge } from "#/components/ui";
 import type { LatestBuild, OrgOverview, ProjectOverview } from "#/db/orgs";
@@ -8,8 +17,6 @@ import { formatNumber, formatRelative } from "#/lib/format";
 export function plural(count: number, one: string, many = `${one}s`): string {
   return `${formatNumber(count)} ${count === 1 ? one : many}`;
 }
-
-const HEAD = "text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 /** Which build is latest (verdict, branch, commit, PR), or how to get a first one. */
 function BuildCell({ project }: { project: ProjectOverview }) {
@@ -48,11 +55,7 @@ function BuildCell({ project }: { project: ProjectOverview }) {
 function Updated({ project, now }: { project: ProjectOverview; now: Date }) {
   const { latest } = project;
   return (
-    <span
-      data-testid="rel-time"
-      className="text-sm text-slate-400"
-      title={(latest?.createdAt ?? project.createdAt).toISOString()}
-    >
+    <span data-testid="rel-time" title={(latest?.createdAt ?? project.createdAt).toISOString()}>
       {latest
         ? formatRelative(latest.createdAt, now)
         : `created ${formatRelative(project.createdAt, now)}`}
@@ -64,48 +67,48 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
   const { latest } = project;
   const shots = latest ? latest.total - latest.counts.removed : 0;
   return (
-    <li
-      data-testid="project-row"
-      className="relative grid items-center gap-x-4 gap-y-2 border-t border-slate-100 py-3.5 pr-4 pl-5 first:border-t-0 hover:bg-slate-50 lg:grid-cols-[1.3fr_1.6fr_1.3fr_110px_92px_34px]"
-    >
-      <span
-        aria-hidden="true"
-        style={latest ? { background: stripeOf(latest) } : undefined}
-        className={`absolute inset-y-0 left-0 w-1 ${latest ? "" : "bg-slate-200"}`}
-      />
-      <div className="min-w-0">
-        <Link
-          to="/projects/$projectId"
-          params={{ projectId: project.id }}
-          className="block truncate text-[15px] font-semibold text-slate-900 after:absolute after:inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-violet-600"
-        >
+    <TableRow data-testid="project-row">
+      <TableCell secondary={latest ? plural(shots, "shot") : "no builds yet"}>
+        <span
+          aria-hidden="true"
+          style={latest ? { background: stripeOf(latest) } : undefined}
+          className={`absolute inset-y-0 left-0 w-1 ${latest ? "" : "bg-slate-200"}`}
+        />
+        <Link to="/projects/$projectId" params={{ projectId: project.id }} className={rowLinkClass}>
           {project.name}
         </Link>
-        <p className="mt-px text-[12.5px] text-slate-400">
-          {latest ? plural(shots, "shot") : "no builds yet"}
-        </p>
-      </div>
-      <BuildCell project={project} />
-      {latest ? <MixBar counts={latest.counts} /> : <span className="text-slate-400">—</span>}
-      <ToReview build={latest} defaultBranch={project.defaultBranch} />
-      <Updated project={project} now={now} />
-      <Link
-        to="/projects/$projectId/settings"
-        params={{ projectId: project.id }}
-        aria-label={`${project.name} settings`}
-        title="Settings"
-        className="relative z-10 grid h-8 w-8 place-items-center justify-self-end rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-violet-600"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-          className="h-4 w-4 fill-none stroke-current stroke-2"
+      </TableCell>
+      <TableCell>
+        <BuildCell project={project} />
+      </TableCell>
+      <TableCell>
+        {latest ? <MixBar counts={latest.counts} /> : <span className="text-slate-400">—</span>}
+      </TableCell>
+      <TableCell>
+        <ToReview build={latest} defaultBranch={project.defaultBranch} />
+      </TableCell>
+      <TableCell tone="muted">
+        <Updated project={project} now={now} />
+      </TableCell>
+      <TableCell align="end">
+        <Link
+          to="/projects/$projectId/settings"
+          params={{ projectId: project.id }}
+          aria-label={`${project.name} settings`}
+          title="Settings"
+          className="relative z-10 grid h-8 w-8 place-items-center rounded-lg ml-auto text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-violet-600"
         >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
-        </svg>
-      </Link>
-    </li>
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="h-4 w-4 fill-none stroke-current stroke-2"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+          </svg>
+        </Link>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -151,23 +154,24 @@ export function WaitingStrip({ org }: { org: OrgOverview }) {
 
 export function ProjectTable({ org, now }: { org: OrgOverview; now: Date }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div
-        aria-hidden="true"
-        className={`hidden items-center gap-4 bg-slate-50 py-2.5 pr-4 pl-5 lg:grid lg:grid-cols-[1.3fr_1.6fr_1.3fr_110px_92px_34px] ${HEAD}`}
-      >
-        <span>Project</span>
-        <span>Latest build</span>
-        <span>Snapshots</span>
-        <span>To review</span>
-        <span>Updated</span>
-        <span />
-      </div>
-      <ul>
+    <Table caption="Projects">
+      <TableHead>
+        <TableRow>
+          <TableHeaderCell>Project</TableHeaderCell>
+          <TableHeaderCell>Latest build</TableHeaderCell>
+          <TableHeaderCell>Snapshots</TableHeaderCell>
+          <TableHeaderCell>To review</TableHeaderCell>
+          <TableHeaderCell>Updated</TableHeaderCell>
+          <TableHeaderCell align="end">
+            <span className="sr-only">Settings</span>
+          </TableHeaderCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
         {org.projects.map((project) => (
           <ProjectRow key={project.id} project={project} now={now} />
         ))}
-      </ul>
-    </div>
+      </TableBody>
+    </Table>
   );
 }

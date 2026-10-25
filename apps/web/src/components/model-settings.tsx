@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { Body, Checkbox, Input, SectionHeading } from "@hackcove/ui";
+import { Body, Card, Checkbox, Input, SectionHeading } from "@hackcove/ui";
 import { ActionButton } from "#/components/action-button";
 import type { ModelView, ModelSource } from "#/db/models";
 import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
@@ -34,10 +34,7 @@ export function ModelSettings({
   const { fields, setFields, busy, error, save, remove } = useModelForm(scope, saved);
 
   return (
-    <section
-      className="rounded-xl border border-slate-200 bg-white p-6"
-      data-testid="model-settings"
-    >
+    <Card data-testid="model-settings">
       <SectionHeading className="mb-1.5">AI explanations</SectionHeading>
       {source && <ModelInUse source={source} orgSettingsHref={orgSettingsHref} />}
       <Body as="p" className="mb-4">
@@ -69,7 +66,7 @@ export function ModelSettings({
           </p>
         )}
       </form>
-    </section>
+    </Card>
   );
 }
 

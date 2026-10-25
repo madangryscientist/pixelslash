@@ -4,6 +4,7 @@ import {
   Body,
   Breadcrumbs,
   Callout,
+  Card,
   ListLayout,
   Pill,
   SectionHeading,
@@ -52,7 +53,7 @@ function ProjectSettings() {
         breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), "Settings"]} />}
         title={`${project.name} · settings`}
       >
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
+        <Card>
           <SectionHeading className="mb-1.5">CI tokens</SectionHeading>
           <Body as="p" className="mb-4">
             CI uploads builds with a token. It is shown once, when issued; store it as a CI secret.
@@ -75,8 +76,8 @@ function ProjectSettings() {
             onSubmit={issue}
           />
           <TokenTable tokens={tokens} hydrated={hydrated} />
-        </section>
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
+        </Card>
+        <Card>
           <SectionHeading className="mb-1.5">Default branch</SectionHeading>
           <Body as="p" className="mb-4">
             Builds on this branch are accepted without review and become the baseline for branch
@@ -93,7 +94,7 @@ function ProjectSettings() {
               await router.invalidate();
             }}
           />
-        </section>
+        </Card>
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
         <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
         <IgnoreBoxSettings
@@ -117,7 +118,7 @@ function ProjectSettings() {
 
 function UploadCommand({ serverUrl, hydrated }: { serverUrl: string; hydrated: boolean }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6">
+    <Card>
       <SectionHeading className="mb-1.5">Upload a build</SectionHeading>
       <Body as="p" className="mb-3">
         From CI or your machine, with the token in{" "}
@@ -128,7 +129,7 @@ function UploadCommand({ serverUrl, hydrated }: { serverUrl: string; hydrated: b
         hydrated={hydrated}
         testId="upload-command"
       />
-    </section>
+    </Card>
   );
 }
 
@@ -169,10 +170,7 @@ function DiffLocationForm({
     }
   };
   return (
-    <section
-      className="rounded-xl border border-slate-200 bg-white p-6"
-      data-testid="diff-location"
-    >
+    <Card data-testid="diff-location">
       <SectionHeading className="mb-1.5">Diff location</SectionHeading>
       <Body as="p" className="mb-4">
         Where this project&apos;s shots are compared with their baselines. Every shot of a build is
@@ -208,7 +206,7 @@ function DiffLocationForm({
       <ActionButton waiting={!hydrated} busy={busy} busyLabel="Saving…" onClick={() => void save()}>
         Save diff location
       </ActionButton>
-    </section>
+    </Card>
   );
 }
 

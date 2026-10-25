@@ -1,5 +1,17 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Breadcrumbs, Card, ListLayout, buttonClass } from "@hackcove/ui";
+import {
+  Breadcrumbs,
+  Card,
+  ListLayout,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  buttonClass,
+  rowLinkClass,
+} from "@hackcove/ui";
 import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
 import { CopyLine } from "#/components/copy-button";
 import { orgCrumb } from "#/components/crumbs";
@@ -14,9 +26,6 @@ export const Route = createFileRoute("/projects/$projectId/")({
   loader: ({ params }) => getProjectPage({ data: { projectId: params.projectId } }),
   component: ProjectPage,
 });
-
-const COLUMNS = "lg:grid-cols-[1.4fr_110px_1.6fr_120px_92px]";
-const HEAD = "text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
 
 function ProjectPage() {
   const { project, org, builds, flags, now, serverUrl } = Route.useLoaderData();
@@ -53,18 +62,17 @@ function ProjectPage() {
         {builds.length === 0 ? (
           <EmptyProject projectId={project.id} serverUrl={serverUrl} hydrated={hydrated} />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div
-              aria-hidden="true"
-              className={`hidden items-center gap-4 bg-slate-50 py-2.5 pr-4 pl-5 lg:grid ${COLUMNS} ${HEAD}`}
-            >
-              <span>Branch</span>
-              <span>Status</span>
-              <span>Snapshots</span>
-              <span>Review</span>
-              <span>When</span>
-            </div>
-            <ul>
+          <Table caption="Builds">
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Branch</TableHeaderCell>
+                <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell>Snapshots</TableHeaderCell>
+                <TableHeaderCell>Review</TableHeaderCell>
+                <TableHeaderCell>When</TableHeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {builds.map((build) => (
                 <BuildRow
                   key={build.id}
@@ -74,8 +82,8 @@ function ProjectPage() {
                   now={now}
                 />
               ))}
-            </ul>
-          </div>
+            </TableBody>
+          </Table>
         )}
         <ProjectFlags projectId={project.id} flags={flags} />
       </ListLayout>
@@ -95,52 +103,54 @@ function BuildRow({
   now: Date;
 }) {
   return (
-    <li
-      data-testid="build-row"
-      className={`relative grid items-center gap-x-4 gap-y-2 border-t border-slate-100 py-3.5 pr-4 pl-5 first:border-t-0 hover:bg-slate-50 ${COLUMNS}`}
-    >
-      <span
-        aria-hidden="true"
-        style={{ background: stripeOf(build) }}
-        className="absolute inset-y-0 left-0 w-1"
-      />
-      <div className="min-w-0">
+    <TableRow data-testid="build-row">
+      <TableCell
+        secondary={
+          <span className="flex gap-2">
+            <span className="font-mono">{build.commitSha.slice(0, 7)}</span>
+            {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
+            {build.branch !== defaultBranch && (
+              // Above the row's covering link, so it is a link of its own.
+              <Link
+                to="/projects/$projectId/branches/$branch"
+                params={{ projectId, branch: build.branch }}
+                className="relative z-10 hover:text-slate-700 hover:underline"
+                data-testid="branch-link"
+              >
+                whole branch
+              </Link>
+            )}
+          </span>
+        }
+      >
+        <span
+          aria-hidden="true"
+          style={{ background: stripeOf(build) }}
+          className="absolute inset-y-0 left-0 w-1"
+        />
         <Link
           to="/projects/$projectId/builds/$buildId"
           params={{ projectId, buildId: build.id }}
-          className="block truncate text-[15px] font-semibold text-slate-900 after:absolute after:inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-violet-600"
+          className={rowLinkClass}
         >
           {build.branch}
         </Link>
-        <p className="mt-px flex gap-2 text-[12.5px] text-slate-400">
-          <span className="font-mono">{build.commitSha.slice(0, 7)}</span>
-          {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
-          {build.branch !== defaultBranch && (
-            // Above the row's covering link, so it is a link of its own.
-            <Link
-              to="/projects/$projectId/branches/$branch"
-              params={{ projectId, branch: build.branch }}
-              className="relative z-10 hover:text-slate-700 hover:underline"
-              data-testid="branch-link"
-            >
-              whole branch
-            </Link>
-          )}
-        </p>
-      </div>
-      <div>
+      </TableCell>
+      <TableCell>
         <StatusBadge status={build.status} />
-      </div>
-      <MixBar counts={build.counts} />
-      <ToReview build={build} defaultBranch={defaultBranch} />
-      <span
-        data-testid="rel-time"
-        className="text-sm text-slate-400"
-        title={build.createdAt.toISOString()}
-      >
-        {formatRelative(build.createdAt, now)}
-      </span>
-    </li>
+      </TableCell>
+      <TableCell>
+        <MixBar counts={build.counts} />
+      </TableCell>
+      <TableCell>
+        <ToReview build={build} defaultBranch={defaultBranch} />
+      </TableCell>
+      <TableCell tone="muted">
+        <span data-testid="rel-time" title={build.createdAt.toISOString()}>
+          {formatRelative(build.createdAt, now)}
+        </span>
+      </TableCell>
+    </TableRow>
   );
 }
 

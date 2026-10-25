@@ -1,5 +1,6 @@
 import {
   Body,
+  Card,
   SectionHeading,
   Table,
   TableBody,
@@ -129,10 +130,7 @@ export function IgnoreBoxSettings({
   hydrated: boolean;
 }) {
   return (
-    <section
-      className="rounded-xl border border-slate-200 bg-white p-6"
-      data-testid="ignore-box-settings"
-    >
+    <Card data-testid="ignore-box-settings">
       <SectionHeading className="mb-1.5">Ignore boxes drawn in review</SectionHeading>
       <Body as="p" className="mb-4">
         Drawn on a shot&apos;s screen, for a test or one variant of it, in image px; the server diff
@@ -174,6 +172,6 @@ export function IgnoreBoxSettings({
       )}
       <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700">Trail</h3>
       <BoxTrail trail={trail} />
-    </section>
+    </Card>
   );
 }

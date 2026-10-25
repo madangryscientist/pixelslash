@@ -1,4 +1,13 @@
 import { Link } from "@tanstack/react-router";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  rowLinkClass,
+} from "@hackcove/ui";
 import type { ProjectTimings } from "#/db/timings-stats";
 import { formatDuration } from "#/lib/format";
 import { P95_MIN_BUILDS, STEPS, STEP_LABELS, TOTAL_EXPLAINED, type Step } from "#/lib/timings";
@@ -8,10 +17,6 @@ import { plural } from "./org-projects";
  * The org's Timings tab (ob 1792): for each project, the median and the 95th percentile of every
  * server step over the builds that finished in the last 30 days.
  */
-
-const HEAD = "text-[11px] font-semibold tracking-wider text-slate-400 uppercase";
-
-const GRID = "grid-cols-[1.4fr_70px_repeat(5,1fr)]";
 
 /** The figures of one step: the median, then the tail (the 95th percentile, or the slowest under 20 builds). */
 function Cell({
@@ -25,27 +30,29 @@ function Cell({
 }) {
   if (!stats)
     return (
-      <span data-testid={`timings-${step}`} className="text-slate-400">
-        —
-      </span>
+      <TableCell tone="muted">
+        <span data-testid={`timings-${step}`}>—</span>
+      </TableCell>
     );
   return (
-    <span data-testid={`timings-${step}`} className="flex flex-col">
-      <span className="font-mono text-[13px] whitespace-nowrap text-slate-800 tabular-nums">
+    <TableCell
+      mono
+      secondary={
+        stats.n !== builds && (
+          <span data-testid={`timings-${step}-count`}>{plural(stats.n, "build")}</span>
+        )
+      }
+    >
+      <span data-testid={`timings-${step}`}>
         {formatDuration(stats.p50)} <span className="text-slate-400">/</span>{" "}
         {formatDuration(stats.tail === "max" ? stats.max : stats.p95)}
         {stats.tail === "max" && (
-          <span data-testid={`timings-${step}-tail`} className="ml-1 text-[11px] text-slate-500">
+          <span data-testid={`timings-${step}-tail`} className="ml-1 text-slate-500">
             max
           </span>
         )}
       </span>
-      {stats.n !== builds && (
-        <span data-testid={`timings-${step}-count`} className="text-[11px] text-slate-500">
-          {plural(stats.n, "build")}
-        </span>
-      )}
-    </span>
+    </TableCell>
   );
 }
 
@@ -60,30 +67,29 @@ export function emptyReason(project: Pick<ProjectTimings, "rerunBuilds">): strin
 
 function Row({ project }: { project: ProjectTimings }) {
   return (
-    <li
-      data-testid="timings-row"
-      className={`grid items-center gap-x-4 border-t border-slate-100 py-3 pr-4 pl-5 first:border-t-0 ${GRID}`}
-    >
-      <Link
-        to="/projects/$projectId"
-        params={{ projectId: project.projectId }}
-        className="truncate text-[15px] font-semibold text-slate-900 hover:underline"
-      >
-        {project.name}
-      </Link>
-      <span data-testid="timings-builds" className="text-sm text-slate-600">
-        {project.builds}
-      </span>
+    <TableRow data-testid="timings-row">
+      <TableCell>
+        <Link
+          to="/projects/$projectId"
+          params={{ projectId: project.projectId }}
+          className={rowLinkClass}
+        >
+          {project.name}
+        </Link>
+      </TableCell>
+      <TableCell tone="muted">
+        <span data-testid="timings-builds">{project.builds}</span>
+      </TableCell>
       {project.builds === 0 ? (
-        <span data-testid="timings-empty" className="col-span-5 text-sm text-slate-500">
-          {emptyReason(project)}
-        </span>
+        <TableCell tone="muted" colSpan={STEPS.length}>
+          <span data-testid="timings-empty">{emptyReason(project)}</span>
+        </TableCell>
       ) : (
         STEPS.map((step) => (
           <Cell key={step} step={step} stats={project.steps[step]} builds={project.builds} />
         ))
       )}
-    </li>
+    </TableRow>
   );
 }
 
@@ -117,25 +123,22 @@ export function TimingsPanel({ projects }: { projects: ProjectTimings[] }) {
   return (
     <section aria-label="Timings">
       {explained}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <div className="min-w-[760px]">
-          <div
-            aria-hidden="true"
-            className={`grid items-center gap-x-4 bg-slate-50 py-2.5 pr-4 pl-5 ${GRID} ${HEAD}`}
-          >
-            <span>Project</span>
-            <span>Builds</span>
+      <Table caption="Timings per project">
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Project</TableHeaderCell>
+            <TableHeaderCell>Builds</TableHeaderCell>
             {STEPS.map((step) => (
-              <span key={step}>{STEP_LABELS[step]}</span>
+              <TableHeaderCell key={step}>{STEP_LABELS[step]}</TableHeaderCell>
             ))}
-          </div>
-          <ul>
-            {projects.map((project) => (
-              <Row key={project.projectId} project={project} />
-            ))}
-          </ul>
-        </div>
-      </div>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {projects.map((project) => (
+            <Row key={project.projectId} project={project} />
+          ))}
+        </TableBody>
+      </Table>
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import {
   Body,
+  Card,
   SectionHeading,
   Table,
   TableBody,
@@ -179,10 +180,7 @@ export function OverrideSettings({
   hydrated: boolean;
 }) {
   return (
-    <section
-      className="rounded-xl border border-slate-200 bg-white p-6"
-      data-testid="diff-overrides"
-    >
+    <Card data-testid="diff-overrides">
       <SectionHeading className="mb-1.5">Diff thresholds set in review</SectionHeading>
       <Body as="p" className="mb-4">
         Set from a shot&apos;s screen, for a test or one variant of it; they beat the config&apos;s
@@ -228,6 +226,6 @@ export function OverrideSettings({
       )}
       <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700">Changes</h3>
       <OverrideChanges changes={overrides.changes} />
-    </section>
+    </Card>
   );
 }

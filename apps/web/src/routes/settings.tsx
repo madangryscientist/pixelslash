@@ -4,6 +4,7 @@ import {
   Body,
   Breadcrumbs,
   Callout,
+  Card,
   Input,
   ListLayout,
   Pill,
@@ -36,7 +37,7 @@ function AccountSettings() {
   return (
     <Page>
       <ListLayout breadcrumbs={<Breadcrumbs crumbs={["Settings"]} />} title="Settings">
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
+        <Card>
           <SectionHeading className="mb-1.5">API tokens</SectionHeading>
           <Body as="p" className="mb-4">
             The CLI and MCP server act as you with a personal token: they see the organizations and
@@ -63,7 +64,7 @@ function AccountSettings() {
             hydrated={hydrated}
             testId="token-usage"
           />
-        </section>
+        </Card>
       </ListLayout>
     </Page>
   );
