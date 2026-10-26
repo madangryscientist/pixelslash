@@ -691,8 +691,14 @@ fn window(img: &Img, x: usize, y: usize) -> (usize, usize, usize, usize) {
     (y.saturating_sub(1), (y + 1).min(img.h - 1), x.saturating_sub(1), (x + 1).min(img.w - 1))
 }
 
-/// `hasManySiblings`: more than two of the 8 neighbours have the pixel's exact RGBA.
+/// `hasManySiblings`: more than two of the 8 neighbours have the pixel's exact RGBA. A pixel
+/// outside `img` is not flat in it (PS-222): `is_antialiased` asks about the other shot at a
+/// neighbour of the overlap's last row or column, and when the shots differ in size that
+/// neighbour lies past the smaller one's edge.
 fn has_many_siblings(img: &Img, x: usize, y: usize) -> bool {
+    if x >= img.w || y >= img.h {
+        return false;
+    }
     let at = (y * img.w + x) * 4;
     let centre = &img.d[at..at + 4];
     let (y0, y1, x0, x1) = window(img, x, y);
