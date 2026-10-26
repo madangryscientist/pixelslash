@@ -7,7 +7,7 @@ Wants=network-online.target
 
 [Service]
 User=pixelslash
-WorkingDirectory=/home/pixelslash/pixelslash/apps/web
+WorkingDirectory=/home/pixelslash/releases/current/apps/web
 ExecStart=/home/pixelslash/.bun/bin/bun e2e/github-stub.ts
 Restart=on-failure
 RestartSec=2

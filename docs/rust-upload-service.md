@@ -535,7 +535,8 @@ LAN first, Cloudflare second; each step lands on its own and leaves the system w
 3. **T3** the fs blob store, its loopback API, `HttpBlobStore`, and the migration of the LAN blobs.
    The web app now reads and writes blobs through Rust; nothing else changes.
 4. **T4** the native service as a pure pass-through front door on `:3000`, vite preview moved to
-   `127.0.0.1:3001`; systemd unit, `update.sh` builds it with `cargo build --release`.
+   `127.0.0.1:3001`; systemd unit; the binary is built on the desktop by `release.sh` and ships in the release
+   (PS-225: the CT never builds).
 5. **T5** the internal endpoints in the web app, `putSnapshot` split from its blob write; unused
    until T7.
 6. **T6** Rust serves the sidecar's synchronous wire at `127.0.0.1:4181/v1/diff`, with the
@@ -599,7 +600,7 @@ repo's own code and its own measurements.
 | T1 | M | Split `lib.rs` into `pixelslash-diff` (target-neutral, scalar + SIMD paths with identical bytes) and `pixelslash-diff-wasm`; cargo workspace; Rust in the gate (`.tool-versions`, Nx run-commands, clippy, fmt, cargo-deny). `diff.wasm` unchanged. | — |
 | T2 | L | Port `png-walk`, inflate, deflate (per Q1), `ignore-mask`, `regions`, `measured`, `shift`, `identical`, `yiq` to the core; `pngjs-golden.json` in `cargo test`; a bench leg for the Rust core. | T1 |
 | T3 | M | fs blob store and its loopback API in a minimal native bin; `HttpBlobStore` in the web app; the miniflare → fs migration script and runbook; the LAN switched over. | T1 |
-| T4 | L | `pixelslash-upload-native` as the front door: hyper pass-through to vite preview on loopback, `/internal` stripping, config, the systemd unit, `update.sh`, the internal secret. | T3 |
+| T4 | L | `pixelslash-upload-native` as the front door: hyper pass-through to vite preview on loopback, `/internal` stripping, config, the systemd unit, the binary in `release.sh`'s release (built on the desktop, PS-225), the internal secret. | T3 |
 | T5 | M | The internal endpoints in the web app (`/internal/v1/*`), the secret check, `putSnapshot` split from its blob write, `processBuild` split into plan and commit; TS tests for each. | — |
 | T6 | M | Rust serves the sidecar wire at `127.0.0.1:4181/v1/diff` with the native core behind K slots (synchronous calls first); `compare.ts`'s in-process fallback removed when a sidecar URL is set; the Bun sidecar and its unit removed. Every server diff (finalize, re-run, override, against-main) now runs in Rust, still called synchronously. | T2, T4 |
 | T7 | L | The async job runner (dedupe, retries, the in-job carry fallback); streaming PUT and finalize in `pixelslash-upload`, behind `PIXELSLASH_UPLOAD_RUST`; admission by byte budget and the per-shot pixel cap (§3, "The memory limit"); the orphan sweep; the `/api/v1` contract suite run against both paths; the PS-214 re-run at K = 1, 2 written into `apps/web/perf/README.md`. | T5, T6 |

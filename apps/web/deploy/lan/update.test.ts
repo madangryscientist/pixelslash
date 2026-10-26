@@ -1,46 +1,30 @@
-import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 
-// update.sh run against a real git checkout of a local bare origin. The root-only pieces are stubbed:
-// `runuser` runs its command as this user, and `systemctl` and `journalctl` only log.
+// update.sh, the CT-side half of a LAN deploy, run against temp directories. The root-only pieces
+// are stubbed: `runuser` runs its command as this user; `systemctl`, `journalctl`, `bun` and `bunx`
+// only log. `wait_for_port` is replaced after the script is sourced: :3000 never opens while
+// `current` is a release holding a BROKEN file, which stands in for a serve.ts that exits.
 const SCRIPT = fileURLToPath(new URL("./update.sh", import.meta.url));
-const REPO_PATH = "apps/web/deploy/lan/update.sh";
-const MARK = 'echo "NEW BODY args: $*" >&2';
-
-const sha = (text: string) => createHash("sha256").update(text).digest("hex");
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync(
-    "git",
-    ["-c", "user.name=test", "-c", "user.email=test@example.invalid", ...args],
-    {
-      cwd,
-      stdio: "pipe",
-    },
-  )
-    .toString()
-    .trim();
-}
-
-// Writes the files and commits them on main of `work`, then pushes to origin.
-function commit(work: string, files: Record<string, string>, message: string) {
-  for (const [path, body] of Object.entries(files)) {
-    mkdirSync(dirname(join(work, path)), { recursive: true });
-    writeFileSync(join(work, path), body);
-  }
-  git(work, "add", "-A");
-  git(work, "commit", "-q", "-m", message);
-  git(work, "push", "-q", "origin", "main");
-}
-
-// The script with a line added right after `set -Eeuo pipefail`: the new body announces itself.
-const withMarker = (text: string) =>
-  text.replace("set -Eeuo pipefail\n", `set -Eeuo pipefail\n${MARK}\n`);
+const LAN = fileURLToPath(new URL(".", import.meta.url));
+const UNITS = ["pixelslash-stub.service", "pixelslash-diff.service", "pixelslash-web.service"];
 
 let root = "";
 afterEach(() => {
@@ -49,101 +33,209 @@ afterEach(() => {
 });
 
 function setup() {
-  root = mkdtempSync(join(tmpdir(), "update-sh-"));
-  const origin = join(root, "origin.git");
-  const work = join(root, "work");
-  const checkout = join(root, "checkout");
+  root = realpathSync(mkdtempSync(join(tmpdir(), "update-sh-")));
+  const home = join(root, "home");
+  const legacyWeb = join(home, "pixelslash/apps/web");
   const stubs = join(root, "stubs");
-  const log = join(root, "systemctl.log");
+  const unitDir = join(root, "units");
+  const log = join(root, "commands.log");
 
-  git(root, "init", "-q", "--bare", "-b", "main", origin);
-  git(root, "clone", "-q", origin, work);
-  commit(work, { [REPO_PATH]: readFileSync(SCRIPT, "utf8"), "README.md": "v1\n" }, "initial");
-  git(root, "clone", "-q", origin, checkout);
+  // The checkout the CT served from before PS-225: its state and its secrets.
+  mkdirSync(join(legacyWeb, ".wrangler/state/v3"), { recursive: true });
+  writeFileSync(join(legacyWeb, ".wrangler/state/v3/builds"), "42 builds\n");
+  writeFileSync(join(legacyWeb, ".dev.vars.e2e"), "IMAGE_SIGNING_SECRET=ct-secret\n");
+  mkdirSync(unitDir);
 
   mkdirSync(stubs);
-  writeFileSync(
-    join(stubs, "runuser"),
-    '#!/usr/bin/env bash\nwhile [[ $1 != -- ]]; do shift; done\nshift\nexec "$@"\n',
-  );
-  // `stop` fails, so the run ends in the ERR trap's rollback before any install: nothing it reaches
-  // needs bun or a real /home/pixelslash.
-  writeFileSync(
-    join(stubs, "systemctl"),
-    '#!/usr/bin/env bash\necho "systemctl $* REEXEC=${PIXELSLASH_UPDATE_REEXEC:-}" >>"$STUB_LOG"\n[[ $1 != stop ]]\n',
-  );
-  writeFileSync(join(stubs, "journalctl"), "#!/usr/bin/env bash\nexit 0\n");
-  for (const name of ["runuser", "systemctl", "journalctl"]) chmodSync(join(stubs, name), 0o755);
+  const stub = (name: string, body: string) => {
+    writeFileSync(join(stubs, name), `#!/usr/bin/env bash\n${body}\n`);
+    chmodSync(join(stubs, name), 0o755);
+  };
+  stub("runuser", 'while [[ $1 != -- ]]; do shift; done\nshift\nexec "$@"');
+  for (const name of ["systemctl", "journalctl", "bun", "bunx"])
+    stub(name, `echo "${name} $* @ $PWD" >>"$STUB_LOG"`);
 
-  return { origin, work, checkout, stubs, log };
+  return { home, legacyWeb, stubs, unitDir, log, releases: join(home, "releases") };
 }
 
-// One run of the checkout's copy of update.sh. It ends at the stop, after every line this test is about.
-function run(s: ReturnType<typeof setup>, guarded = false) {
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    PATH: `${s.stubs}:${process.env.PATH}`,
-    PIXELSLASH_REPO: s.checkout,
-    STUB_LOG: s.log,
-  };
-  delete childEnv.PIXELSLASH_UPDATE_REEXEC;
-  if (guarded) childEnv.PIXELSLASH_UPDATE_REEXEC = "1";
-  const result = spawnSync("bash", [join(s.checkout, REPO_PATH), "--flag", "value"], {
-    env: childEnv,
+type Setup = ReturnType<typeof setup>;
+
+// A release tarball as release.sh packs it, cut down to what update.sh touches.
+function pack(sha: string, { broken = false } = {}) {
+  const dir = join(root, "pack", sha);
+  mkdirSync(join(dir, "apps/web/deploy/lan"), { recursive: true });
+  for (const unit of [...UNITS, "pixelslash-opencode.service"])
+    copyFileSync(join(LAN, unit), join(dir, "apps/web/deploy/lan", unit));
+  mkdirSync(join(dir, "apps/web/dist/server"), { recursive: true });
+  writeFileSync(join(dir, "apps/web/dist/server/index.js"), `// ${sha}\n`);
+  if (broken) writeFileSync(join(dir, "apps/web/BROKEN"), "");
+  const tarball = join(root, `pixelslash-${sha}.tar.gz`);
+  const tar = spawnSync("tar", ["-czf", tarball, "-C", dir, "."]);
+  expect(tar.status).toBe(0);
+  return tarball;
+}
+
+function deploy(s: Setup, tarball: string) {
+  writeFileSync(s.log, "");
+  const harness = [
+    'source "$1"',
+    "wait_for_port() { [[ $1 != 3000 || ! -e $CURRENT/apps/web/BROKEN ]]; }",
+    'main "$2"',
+  ].join("\n");
+  const result = spawnSync("bash", ["-c", harness, "_", SCRIPT, tarball], {
+    env: {
+      ...process.env,
+      PIXELSLASH_HOME: s.home,
+      PIXELSLASH_APP_PATH: `${s.stubs}:/usr/bin:/bin`,
+      PIXELSLASH_UNIT_DIR: s.unitDir,
+      PIXELSLASH_HELPER_SWITCH: join(root, "no-helper-switch"),
+      PIXELSLASH_D1_RETRY_SLEEP: "0",
+      STUB_LOG: s.log,
+      PATH: `${s.stubs}:${process.env["PATH"]}`,
+    },
     encoding: "utf8",
   });
-  const stopLines = readLog(s.log).filter((line) =>
-    line.startsWith("systemctl stop pixelslash-web "),
-  );
-  return { stderr: result.stderr, stopLines };
+  return {
+    status: result.status,
+    stderr: result.stderr,
+    commands: readFileSync(s.log, "utf8").split("\n").filter(Boolean),
+  };
 }
 
-function readLog(path: string) {
-  try {
-    return readFileSync(path, "utf8").split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
-}
+const current = (s: Setup) => readlinkSync(join(s.releases, "current"));
+const releaseNames = (s: Setup) =>
+  readdirSync(s.releases)
+    .filter((name) => name !== "current")
+    .toSorted();
 
-describe("update.sh self re-exec", () => {
-  test("a commit that changes the script runs the new body once, with the same arguments", () => {
+describe("update.sh", () => {
+  test("installs a release beside the old checkout and switches to it", () => {
     const s = setup();
-    const oldText = readFileSync(join(s.checkout, REPO_PATH), "utf8");
-    commit(s.work, { [REPO_PATH]: withMarker(oldText) }, "change update.sh");
+    const { status, stderr, commands } = deploy(s, pack("aaaaaaa"));
+    const rel = join(s.releases, "aaaaaaa");
 
-    const { stderr, stopLines } = run(s);
-    const newText = readFileSync(join(s.checkout, REPO_PATH), "utf8");
+    expect({ status, stderr }).toEqual({ status: 0, stderr: expect.any(String) });
+    expect(current(s)).toBe(rel);
+    // The state is the old checkout's, linked, and the CT's secrets are copied in, private.
+    expect(readlinkSync(join(rel, "apps/web/.wrangler/state"))).toBe(
+      join(s.legacyWeb, ".wrangler/state"),
+    );
+    expect(readFileSync(join(rel, "apps/web/.wrangler/state/v3/builds"), "utf8")).toBe(
+      "42 builds\n",
+    );
+    expect(readFileSync(join(rel, "apps/web/dist/server/.dev.vars"), "utf8")).toContain(
+      "ct-secret",
+    );
+    expect(statSync(join(rel, "apps/web/dist/server/.dev.vars")).mode & 0o777).toBe(0o600);
+    expect(readdirSync(s.unitDir).toSorted()).toEqual([...UNITS].toSorted());
 
-    expect(newText).not.toBe(oldText);
-    expect(
-      stderr.match(/update\.sh changed \(sha256 ([0-9a-f]{64}) -> ([0-9a-f]{64})\)/)?.slice(1),
-    ).toEqual([sha(oldText), sha(newText)]);
-    expect(stderr.split("NEW BODY").length - 1).toBe(1);
-    expect(stderr).toContain("NEW BODY args: --flag value");
-    expect(stopLines).toEqual(["systemctl stop pixelslash-web REEXEC=1"]);
+    // Install and migrate in the new release, then the sidecar, then the server. Nothing builds.
+    const at = (prefix: string) => commands.findIndex((line) => line.startsWith(prefix));
+    expect(commands).toContain(`bun install --frozen-lockfile --production @ ${rel}`);
+    expect(commands).toContain(
+      `bunx wrangler d1 migrations apply DB --local --env e2e @ ${rel}/apps/web`,
+    );
+    expect(at("bunx wrangler d1 migrations")).toBeLessThan(at("systemctl restart pixelslash-diff"));
+    expect(at("systemctl restart pixelslash-diff")).toBeLessThan(
+      at("systemctl restart pixelslash-stub pixelslash-web"),
+    );
+    expect(commands.filter((line) => /build/.test(line))).toEqual([]);
   });
 
-  test("an unchanged script does not re-exec", () => {
+  test("a release that does not come up goes back to the previous one", () => {
     const s = setup();
-    commit(s.work, { "README.md": "v2\n" }, "docs only");
+    expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
 
-    const { stderr, stopLines } = run(s);
+    const { status, stderr, commands } = deploy(s, pack("bbbbbbb", { broken: true }));
 
-    expect(stderr).not.toContain("update.sh changed");
-    expect(stderr).not.toContain("NEW BODY");
-    expect(stopLines).toEqual(["systemctl stop pixelslash-web REEXEC="]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("going back to aaaaaaa");
+    expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
+    expect(releaseNames(s)).toEqual(["aaaaaaa"]);
+    const restarts = commands.filter((line) => line.startsWith("systemctl restart"));
+    expect(restarts.at(-1)).toMatch(
+      /^systemctl restart pixelslash-diff pixelslash-stub pixelslash-web/,
+    );
+    // The state is not touched by a rollback.
+    expect(readFileSync(join(s.legacyWeb, ".wrangler/state/v3/builds"), "utf8")).toBe(
+      "42 builds\n",
+    );
   });
 
-  test("the guard stops a re-exec even when the script changed", () => {
+  test("keeps the last three releases", () => {
     const s = setup();
-    const oldText = readFileSync(join(s.checkout, REPO_PATH), "utf8");
-    commit(s.work, { [REPO_PATH]: withMarker(oldText) }, "change update.sh");
+    for (const sha of ["aaaaaaa", "bbbbbbb", "ccccccc", "ddddddd", "eeeeeee"])
+      expect(deploy(s, pack(sha)).status).toBe(0);
 
-    const { stderr, stopLines } = run(s, true);
+    expect(releaseNames(s)).toEqual(["ccccccc", "ddddddd", "eeeeeee"]);
+    expect(current(s)).toBe(join(s.releases, "eeeeeee"));
+    expect(existsSync(join(s.legacyWeb, ".wrangler/state/v3/builds"))).toBe(true);
 
-    expect(stderr).not.toContain("update.sh changed");
-    expect(stderr).not.toContain("NEW BODY");
-    expect(stopLines).toEqual(["systemctl stop pixelslash-web REEXEC=1"]);
+    // Going back to a kept release points `current` at it again and copies the secrets in again;
+    // it is not unpacked again.
+    writeFileSync(join(s.legacyWeb, ".dev.vars.e2e"), "IMAGE_SIGNING_SECRET=rotated\n");
+    const back = deploy(s, pack("ddddddd"));
+    expect(back.status).toBe(0);
+    expect(current(s)).toBe(join(s.releases, "ddddddd"));
+    expect(back.commands.some((line) => line.startsWith("bun install"))).toBe(false);
+    expect(readFileSync(join(s.releases, "ddddddd/apps/web/dist/server/.dev.vars"), "utf8")).toBe(
+      "IMAGE_SIGNING_SECRET=rotated\n",
+    );
+
+    // A kept release that fails to go back to is kept: this deploy did not unpack it.
+    writeFileSync(join(s.stubs, "bunx"), "#!/usr/bin/env bash\nexit 1\n");
+    expect(deploy(s, pack("ccccccc")).status).toBe(1);
+    expect(current(s)).toBe(join(s.releases, "ddddddd"));
+    expect(releaseNames(s)).toEqual(["ccccccc", "ddddddd", "eeeeeee"]);
+  });
+
+  test("a D1 locked by an upload is tried again", () => {
+    const s = setup();
+    // wrangler fails on the lock twice, then migrates.
+    writeFileSync(
+      join(s.stubs, "bunx"),
+      [
+        "#!/usr/bin/env bash",
+        'echo "bunx $* @ $PWD" >>"$STUB_LOG"',
+        'n=$(grep -c "^bunx" "$STUB_LOG")',
+        '((n > 2)) || { echo "database is locked: SQLITE_BUSY"; exit 1; }',
+      ].join("\n"),
+    );
+
+    const { status, commands } = deploy(s, pack("aaaaaaa"));
+
+    expect(status).toBe(0);
+    expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
+    expect(commands.filter((line) => line.startsWith("bunx wrangler d1 migrations"))).toHaveLength(
+      3,
+    );
+  });
+
+  test("the wait for a port ends when its unit has exited", () => {
+    const s = setup();
+    // systemctl reports the unit waiting to be restarted; nothing listens on port 1.
+    writeFileSync(join(s.stubs, "systemctl"), "#!/usr/bin/env bash\necho auto-restart\n");
+    const started = Date.now();
+    const result = spawnSync(
+      "bash",
+      ["-c", 'source "$1" && wait_for_port 1 60 pixelslash-web', "_", SCRIPT],
+      { env: { ...process.env, PATH: `${s.stubs}:${process.env["PATH"]}` }, encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(1);
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  test("a release that fails to install is deleted and the old one never stops", () => {
+    const s = setup();
+    expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+    writeFileSync(join(s.stubs, "bun"), "#!/usr/bin/env bash\nexit 1\n");
+
+    const { status, commands } = deploy(s, pack("bbbbbbb"));
+
+    expect(status).toBe(1);
+    expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
+    expect(releaseNames(s)).toEqual(["aaaaaaa"]);
+    expect(commands.filter((line) => line.startsWith("systemctl"))).toEqual([]);
   });
 });

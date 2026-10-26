@@ -9,7 +9,7 @@ Wants=network-online.target
 
 [Service]
 User=pixelslash
-WorkingDirectory=/home/pixelslash/pixelslash/apps/web
+WorkingDirectory=/home/pixelslash/releases/current/apps/web
 Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/diff-sidecar.ts
 Restart=on-failure

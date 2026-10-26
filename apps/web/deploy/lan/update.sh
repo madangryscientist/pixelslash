@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Update the LAN self-host to origin/main: pull, stop, install, migrate, build, restart. Run as root
-# on the CT. See apps/web/README.md, "Run it on the Proxmox server".
+# The CT-side half of a LAN deploy (PS-225): unpack a release, install it beside the one serving,
+# migrate, switch, and roll back if it does not come up. Run as root on the CT by release.sh, which
+# builds the release on the desktop and pushes it in; nothing here builds. See apps/web/README.md,
+# "Run it on the Proxmox server".
 #
-# pixelslash-web is stopped before the install and build. A running workerd holds ~1.5 GB of the
-# CT's 2 GiB cgroup, the vite build then has no room and the CT thrashes page cache for tens of
-# minutes (2026-10-23, ob 1887); with the server stopped the build takes seconds. The cost is a short
-# downtime. If a step fails after the stop, the previous build is put back and started again.
+#   update.sh /root/pixelslash-<sha>.tar.gz
+#
+# Releases sit side by side in /home/pixelslash/releases/<sha>, and the units run from the
+# `current` symlink there. Until the switch nothing the running processes load is touched, so the
+# only downtime is the restart. A release that does not come up on :3000 puts `current` back on the
+# previous one and restarts that. The last 3 releases are kept.
+#
+# The D1 and R2 state stays where it always was, in the old checkout's apps/web/.wrangler/state, and
+# every release links to it; the CT's .dev.vars.e2e (the deployment's own secrets) is next to it
+# and is copied into each release's dist/server/.dev.vars, where serve.ts reads it.
 #
 # The opencode helper (ob 1900) is a switch: the file /etc/pixelslash/opencode-helper holds the
 # model (`provider/model`), and while it exists this script installs opencode, installs and enables
@@ -17,140 +25,232 @@
 # napi-image codec on 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come
 # up is reported and the update goes on, since the Worker then diffs in-process with pngjs, as it
 # did before the sidecar. See apps/web/README.md, "The diff sidecar".
-#
-# One run is enough when a commit changes this file: after the fetch the new file runs once, before
-# anything is stopped (see the self-check in main).
 set -Eeuo pipefail
 
-HELPER_SWITCH=/etc/pixelslash/opencode-helper
-HELPER_KEY=/home/pixelslash/.config/pixelslash/opencode.key
+# The PIXELSLASH_* overrides are for the test, which runs this against temp directories.
+APP_USER=pixelslash
+APP_HOME=${PIXELSLASH_HOME:-/home/pixelslash}
+APP_PATH=${PIXELSLASH_APP_PATH:-$APP_HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin}
+RELEASES=$APP_HOME/releases
+CURRENT=$RELEASES/current
+KEEP_RELEASES=3
+# The checkout the CT served from before PS-225: its apps/web holds the state and the secrets.
+LEGACY=$APP_HOME/pixelslash
+SHARED_WEB=$LEGACY/apps/web
+UNIT_DIR=${PIXELSLASH_UNIT_DIR:-/etc/systemd/system}
+HELPER_SWITCH=${PIXELSLASH_HELPER_SWITCH:-/etc/pixelslash/opencode-helper}
+HELPER_KEY=$APP_HOME/.config/pixelslash/opencode.key
 HELPER_URL=http://127.0.0.1:4180/v1
-OPENCODE_BIN=/home/pixelslash/.opencode/bin/opencode
+OPENCODE_BIN=$APP_HOME/.opencode/bin/opencode
+D1_RETRY_SLEEP=${PIXELSLASH_D1_RETRY_SLEEP:-2}
 
-# Everything is in a function so bash has read the whole script before `git reset` rewrites it.
-main() {
-  # PIXELSLASH_REPO is for the test, which points the script at a temp checkout; prev sits beside it.
-  local repo=${PIXELSLASH_REPO:-/home/pixelslash/pixelslash}
-  local dist=$repo/apps/web/dist
-  local prev=${repo%/*}/dist.prev
-  # This file's sha256 before the reset rewrites it.
-  local self=$0 before=""
-  [[ -n ${PIXELSLASH_UPDATE_REEXEC:-} ]] || before=$(sha256sum "$self" | cut -d' ' -f1)
-  as_app() {
-    runuser -u pixelslash -- env PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin \
-      bash -c "cd $repo && $1"
-  }
+as_app() {
+  runuser -u "$APP_USER" -- env PATH="$APP_PATH" bash -c "$1"
+}
 
-  # opencode, the release the capture image pins (docker/capture/Dockerfile: version and sha256),
-  # from the same npm tarball. Installed once per version; nothing is downloaded when it is there.
-  install_opencode() {
-    local dockerfile=$repo/docker/capture/Dockerfile version sha
-    version=$(sed -n 's/^ARG OPENCODE_VERSION=//p' "$dockerfile")
-    # The ADD whose URL is the opencode tarball: its checksum is on the line before it.
-    sha=$(grep -B1 'cli-linux-x64' "$dockerfile" | sed -n 's/.*--checksum=sha256:\([0-9a-f]*\).*/\1/p')
-    [[ -n $version && -n $sha ]] || { echo "no pinned opencode in $dockerfile" >&2; exit 1; }
-    if [[ -x $OPENCODE_BIN ]] && "$OPENCODE_BIN" --version 2>/dev/null | grep -qx "opencode v$version"; then
-      return
+# `restart` returns once the process is forked, so a unit that dies on start is seen by waiting
+# for its port: up to $2 half-seconds (default 20, 10 s). With a unit as $3 the wait ends as soon
+# as that unit has exited (failed, or waiting to be restarted), so a release that crashes on start
+# is rolled back in a second or two rather than at the timeout.
+wait_for_port() {
+  for _ in $(seq "${2:-20}"); do
+    if (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null; then return 0; fi
+    if [[ -n ${3:-} ]]; then
+      case $(systemctl show -p SubState --value "$3") in failed | auto-restart) return 1 ;; esac
     fi
-    local tmp
-    tmp=$(mktemp -d)
-    curl -fsSL "https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-$version.tgz" -o "$tmp/opencode.tgz"
-    echo "$sha  $tmp/opencode.tgz" | sha256sum -c --quiet
-    tar -xzf "$tmp/opencode.tgz" -C "$tmp" --strip-components=2 package/bin/opencode
-    install -d -o pixelslash -g pixelslash "$(dirname "$OPENCODE_BIN")"
-    install -m 755 -o pixelslash -g pixelslash "$tmp/opencode" "$OPENCODE_BIN"
-    rm -rf "$tmp"
-  }
+    sleep 0.5
+  done
+  return 1
+}
 
-  # With the switch on, every org without a model of its own explains through the helper (the key
-  # column is a placeholder: the real key is the helper's token file). An org that has a model of
-  # its own keeps it. With it off, the rows that point at the helper are removed.
-  point_models() {
-    local sql
-    sql=$(mktemp)
-    if [[ -n $1 ]]; then
-      cat >"$sql" <<SQL
+# opencode, the release the capture image pins ($1/docker/capture/Dockerfile: version and sha256),
+# from the same npm tarball. Installed once per version; nothing is downloaded when it is there.
+install_opencode() {
+  local dockerfile=$1/docker/capture/Dockerfile version sha
+  version=$(sed -n 's/^ARG OPENCODE_VERSION=//p' "$dockerfile")
+  # The ADD whose URL is the opencode tarball: its checksum is on the line before it.
+  sha=$(grep -B1 'cli-linux-x64' "$dockerfile" | sed -n 's/.*--checksum=sha256:\([0-9a-f]*\).*/\1/p')
+  [[ -n $version && -n $sha ]] || { echo "no pinned opencode in $dockerfile" >&2; return 1; }
+  if [[ -x $OPENCODE_BIN ]] && "$OPENCODE_BIN" --version 2>/dev/null | grep -qx "opencode v$version"; then
+    return
+  fi
+  local tmp
+  tmp=$(mktemp -d)
+  curl -fsSL "https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-$version.tgz" -o "$tmp/opencode.tgz"
+  echo "$sha  $tmp/opencode.tgz" | sha256sum -c --quiet
+  tar -xzf "$tmp/opencode.tgz" -C "$tmp" --strip-components=2 package/bin/opencode
+  install -d -o "$APP_USER" -g "$APP_USER" "$(dirname "$OPENCODE_BIN")"
+  install -m 755 -o "$APP_USER" -g "$APP_USER" "$tmp/opencode" "$OPENCODE_BIN"
+  rm -rf "$tmp"
+}
+
+# With the switch on, every org without a model of its own explains through the helper (the key
+# column is a placeholder: the real key is the helper's token file). An org that has a model of
+# its own keeps it. With it off, the rows that point at the helper are removed. $1 is the release.
+point_models() {
+  local sql
+  sql=$(mktemp)
+  if [[ -n $2 ]]; then
+    cat >"$sql" <<SQL
 INSERT INTO org_models (org_id, base_url, model, api_key, auto_pass_noise)
-SELECT id, '$HELPER_URL', '$1', 'opencode-helper', 0 FROM orgs WHERE is_smoke = 0
+SELECT id, '$HELPER_URL', '$2', 'opencode-helper', 0 FROM orgs WHERE is_smoke = 0
 ON CONFLICT (org_id) DO UPDATE SET model = excluded.model WHERE org_models.base_url = excluded.base_url;
 SQL
-    else
-      echo "DELETE FROM org_models WHERE base_url = '$HELPER_URL';" >"$sql"
-    fi
-    chmod 644 "$sql"
-    as_app "cd apps/web && bunx wrangler d1 execute DB --local --env e2e --file=$sql"
-    rm -f "$sql"
-  }
-
-  # `restart` returns once the process is forked, so a unit that dies on start is seen by waiting
-  # for its port: up to $2 half-seconds (default 20, 10 s).
-  wait_for_port() {
-    for _ in $(seq "${2:-20}"); do
-      if (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null; then return 0; fi
-      sleep 0.5
-    done
-    return 1
-  }
-
-  # A deploy checkout: nothing is edited or committed here, so main's tip wins.
-  as_app "git fetch --quiet origin main && git reset --quiet --hard origin/main && git log --oneline -1"
-
-  # A changed script is run once more, before anything is stopped, so the new one decides the rest.
-  # The env var set here makes that run skip this check: no second re-exec.
-  if [[ -n $before ]]; then
-    local after
-    after=$(sha256sum "$self" | cut -d' ' -f1)
-    if [[ $after != "$before" ]]; then
-      echo "update.sh changed (sha256 $before -> $after): running the new script" >&2
-      exec env PIXELSLASH_UPDATE_REEXEC=1 bash "$self" "$@"
-    fi
+  else
+    echo "DELETE FROM org_models WHERE base_url = '$HELPER_URL';" >"$sql"
   fi
+  chmod 644 "$sql"
+  d1 "$1" execute DB --file="$sql"
+  rm -f "$sql"
+}
 
-  # The switch, read before anything is stopped: a bad one fails here, with the LAN still up.
+# `wrangler d1 $2...` on the local D1, in release $1. An upload in flight holds the database's write
+# lock for a moment, and wrangler then fails with SQLITE_BUSY rather than waiting (a deploy to the
+# CT failed on one), so a locked database is tried again, up to 5 times, $D1_RETRY_SLEEP s apart.
+# Any other failure fails at once.
+d1() {
+  local rel=$1 out try
+  shift
+  out=$(mktemp)
+  for try in 1 2 3 4 5; do
+    if as_app "cd $rel/apps/web && bunx wrangler d1 $* --local --env e2e" >"$out" 2>&1; then
+      cat "$out"
+      rm -f "$out"
+      return 0
+    fi
+    cat "$out" >&2
+    grep -q SQLITE_BUSY "$out" && ((try < 5)) || break
+    echo "the D1 database is locked: trying again in $D1_RETRY_SLEEP s" >&2
+    sleep "$D1_RETRY_SLEEP"
+  done
+  rm -f "$out"
+  return 1
+}
+
+# The CT's secrets, copied into release $1, where serve.ts reads them.
+# Without them it would serve with the e2e env's fixed test secrets, so a missing file fails.
+copy_secrets() {
+  as_app "install -m 600 $SHARED_WEB/.dev.vars.e2e $1/apps/web/dist/server/.dev.vars"
+}
+
+# Unpacks $1 (the tarball) into $2 and installs its runtime dependencies there, beside the release
+# that is serving. The release links the shared state.
+unpack_release() {
+  local tarball=$1 rel=$2
+  rm -rf "$rel"
+  as_app "mkdir -p $rel $SHARED_WEB/.wrangler/state"
+  as_app "tar -xzf - -C $rel" <"$tarball"
+  as_app "mkdir -p $rel/apps/web/.wrangler && ln -sfn $SHARED_WEB/.wrangler/state $rel/apps/web/.wrangler/state"
+  as_app "cd $rel && bun install --frozen-lockfile --production"
+}
+
+install_units() {
+  install -m 644 "$1"/apps/web/deploy/lan/pixelslash-stub.service \
+    "$1"/apps/web/deploy/lan/pixelslash-diff.service \
+    "$1"/apps/web/deploy/lan/pixelslash-web.service "$UNIT_DIR"/
+}
+
+# Points `current` at $1 in one rename, so a unit never sees it missing.
+set_current() {
+  as_app "ln -sfn $1 $CURRENT.next && mv -T $CURRENT.next $CURRENT"
+}
+
+# Keeps the newest $KEEP_RELEASES releases (by when they were switched to) and whatever `current`
+# points at; deletes the rest.
+prune_releases() {
+  local serving dir kept=0
+  serving=$(readlink -f "$CURRENT")
+  # shellcheck disable=SC2045 # release names are hex
+  for dir in $(ls -1dt "$RELEASES"/*/); do
+    dir=${dir%/}
+    [[ ${dir##*/} =~ ^[0-9a-f]+$ ]] || continue
+    if [[ $dir == "$serving" ]] || ((kept < KEEP_RELEASES)); then
+      kept=$((kept + 1))
+      continue
+    fi
+    echo "pruning release ${dir##*/}" >&2
+    rm -rf "$dir"
+  done
+}
+
+# Puts `current` back on $1, restarts it and deletes $2, the release this deploy unpacked (empty
+# when it reused a kept one), so a bad release never takes one of the kept places from a good one;
+# exits 1 either way.
+rollback() {
+  trap - ERR HUP INT TERM
+  local prev=$1 failed=$2
+  if [[ -z $prev ]]; then
+    echo "update failed and there is no previous release to go back to" >&2
+    exit 1
+  fi
+  echo "update failed: going back to ${prev##*/}" >&2
+  set_current "$prev"
+  install_units "$prev"
+  # The helper too, when it is installed: it would otherwise run on from the deleted release.
+  local units=(pixelslash-diff pixelslash-stub pixelslash-web)
+  if [[ -f $UNIT_DIR/pixelslash-opencode.service ]]; then
+    [[ ! -f $prev/apps/web/deploy/lan/pixelslash-opencode.service ]] ||
+      install -m 644 "$prev"/apps/web/deploy/lan/pixelslash-opencode.service "$UNIT_DIR"/
+    units+=(pixelslash-opencode)
+  fi
+  systemctl daemon-reload
+  systemctl restart "${units[@]}"
+  [[ -z $failed || $failed == "$prev" ]] || rm -rf "$failed"
+  if ! wait_for_port 3000 60 pixelslash-web; then
+    echo "the previous release did not come up on :3000 either" >&2
+  fi
+  exit 1
+}
+
+main() {
+  local tarball=${1:?usage: update.sh <release.tar.gz>}
+  local name=${tarball##*/}
+  name=${name%.tar.gz}
+  name=${name#pixelslash-}
+  [[ $name =~ ^[0-9a-f]{7,40}$ ]] || { echo "$tarball is not named <sha>.tar.gz" >&2; exit 1; }
+  local rel=$RELEASES/$name prev="" unpacked=""
+  [[ ! -L $CURRENT ]] || prev=$(readlink -f "$CURRENT")
+
+  # The switch, read before anything changes: a bad one fails here, with the LAN still up.
   local helper_model="" had_helper=0
-  [[ -f /etc/systemd/system/pixelslash-opencode.service ]] && had_helper=1
+  [[ -f $UNIT_DIR/pixelslash-opencode.service ]] && had_helper=1
   if [[ -f $HELPER_SWITCH ]]; then
     helper_model=$(tr -d '[:space:]' <"$HELPER_SWITCH")
     [[ $helper_model =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] ||
       { echo "$HELPER_SWITCH must hold one provider/model, e.g. opencode-go/claude-haiku-5-5" >&2; exit 1; }
-    [[ -f $HELPER_KEY && $(stat -c '%a %U' "$HELPER_KEY") == "600 pixelslash" ]] ||
-      { echo "$HELPER_KEY must exist, mode 600, owned by pixelslash" >&2; exit 1; }
-    install_opencode
+    [[ -f $HELPER_KEY && $(stat -c '%a %U' "$HELPER_KEY") == "600 $APP_USER" ]] ||
+      { echo "$HELPER_KEY must exist, mode 600, owned by $APP_USER" >&2; exit 1; }
   fi
 
-  # From here a failure must not leave the LAN down: a failed build can leave dist half written, so
-  # the old one is moved aside and put back, then the server is started on it (the checkout stays at
-  # the new commit).
-  trap rollback ERR HUP INT TERM
-  rollback() {
-    trap - ERR HUP INT TERM
-    echo "update failed: starting the previous build again" >&2
-    if [[ -d $prev ]]; then
-      rm -rf "$dist"
-      mv "$prev" "$dist"
-    fi
-    systemctl start pixelslash-web
-    exit 1
-  }
-
-  systemctl stop pixelslash-web
-  rm -rf "$prev"
-  if [[ -d $dist ]]; then
-    mv "$dist" "$prev"
+  # Everything up to the switch happens beside the serving release, which does not notice; a failure
+  # here deletes a release this deploy unpacked, so it never takes one of the kept places. One still
+  # kept (going back to it, or the current one again to apply a changed helper switch or secrets)
+  # is not unpacked again: `current` is pointed at it and it is restarted. Only a complete release
+  # is kept, since a failed one is deleted.
+  trap '[[ -z $unpacked ]] || rm -rf "$unpacked"; exit 1' ERR HUP INT TERM
+  if [[ -d $rel ]]; then
+    echo "release $name is already unpacked: switching to it" >&2
+  else
+    as_app "mkdir -p $RELEASES"
+    unpacked=$rel
+    unpack_release "$tarball" "$rel"
   fi
-  as_app "bun install --frozen-lockfile"
-  as_app "cd apps/web && bunx wrangler d1 migrations apply DB --local --env e2e"
-  as_app "cd apps/web && CLOUDFLARE_ENV=e2e bun run build"
-  install -m 644 "$repo"/apps/web/deploy/lan/pixelslash-stub.service \
-    "$repo"/apps/web/deploy/lan/pixelslash-diff.service \
-    "$repo"/apps/web/deploy/lan/pixelslash-web.service /etc/systemd/system/
+  copy_secrets "$rel"
+  [[ -z $helper_model ]] || install_opencode "$rel"
+  # Additive only, so the release still serving runs on the migrated schema until the restart.
+  d1 "$rel" migrations apply DB
+
+  # From here a failure puts `current` back on the previous release and restarts it.
+  trap 'rollback "$prev" "$unpacked"' ERR HUP INT TERM
+  install_units "$rel"
   if [[ -n $helper_model ]]; then
-    install -m 644 "$repo"/apps/web/deploy/lan/pixelslash-opencode.service /etc/systemd/system/
+    install -m 644 "$rel"/apps/web/deploy/lan/pixelslash-opencode.service "$UNIT_DIR"/
   elif [[ $had_helper == 1 ]]; then
     systemctl disable --now --quiet pixelslash-opencode || true
-    rm -f /etc/systemd/system/pixelslash-opencode.service
+    rm -f "$UNIT_DIR"/pixelslash-opencode.service
   fi
   systemctl daemon-reload
+  set_current "$rel"
   # The sidecar is up before the server that sends to it. Waited for like the helper, but a sidecar
   # that does not come up costs speed, not a result: it is reported, and the update goes on.
   systemctl enable --quiet pixelslash-diff
@@ -169,23 +269,26 @@ SQL
     if ! wait_for_port 4180; then
       journalctl -u pixelslash-opencode -n 5 --no-pager >&2 || true
       echo "pixelslash-opencode did not come up on :4180" >&2
-      rollback
+      rollback "$prev" "$unpacked"
     fi
   fi
-  if [[ -n $helper_model || $had_helper == 1 ]]; then point_models "$helper_model"; fi
+  if [[ -n $helper_model || $had_helper == 1 ]]; then point_models "$rel" "$helper_model"; fi
   systemctl enable --quiet pixelslash-stub pixelslash-web
   systemctl restart pixelslash-stub pixelslash-web
-  # serve.ts (PS-220) starts Miniflare on :3000, about a second on the desktop and not timed on the
-  # CT, so it gets 30 s. A build it cannot load (no wrangler.json, a module it cannot find) only
-  # shows as a port that never opens. The rollback puts the previous dist back; it cannot help if
-  # serve.ts itself is what is broken, since the unit runs the new serve.ts either way.
-  if ! wait_for_port 3000 60; then
+  # serve.ts (PS-220) starts Miniflare on :3000 in under a second on the CT; it gets 30 s. A
+  # serve.ts that exits ends the wait when the unit does; a release that hangs, at the 30 s.
+  if ! wait_for_port 3000 60 pixelslash-web; then
     journalctl -u pixelslash-web -n 5 --no-pager >&2 || true
     echo "pixelslash-web did not come up on :3000" >&2
-    rollback
+    rollback "$prev" "$unpacked"
   fi
   trap - ERR HUP INT TERM
-  rm -rf "$prev"
+  touch "$rel"
+  prune_releases
+  echo "release $name is serving" >&2
 }
 
-main "$@"
+# Sourced by the test for its functions; run, it deploys.
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi

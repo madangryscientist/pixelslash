@@ -9,7 +9,7 @@ Wants=network-online.target
 
 [Service]
 User=pixelslash
-WorkingDirectory=/home/pixelslash/pixelslash/apps/web
+WorkingDirectory=/home/pixelslash/releases/current/apps/web
 Environment=PATH=/home/pixelslash/.bun/bin:/home/pixelslash/.opencode/bin:/usr/local/bin:/usr/bin:/bin
 Environment=PIXELSLASH_OPENCODE_KEY_FILE=/home/pixelslash/.config/pixelslash/opencode.key
 ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/opencode-helper.ts

@@ -102,29 +102,48 @@ public DNS. Real GitHub sign-in is a later ticket.
 | Dashboard | `http://192.168.0.34:3000` |
 | Stand-in | `http://192.168.0.34:4174` (the browser is sent there to sign in) |
 | Container | CT 135 `pixelslash` on `192.168.0.20`: Debian 13, unprivileged, 2 vCPU, 2 GB, 10 GB on `local-lvm`, starts on boot. The address is static in the CT config, below the router's DHCP pool. |
-| Checkout | `/home/pixelslash/pixelslash`, user `pixelslash`, `origin/main` over a read-only deploy key ("pixelslash CT 135"); the push URL is `no-push-from-this-ct`. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
-| State | D1 and R2 in `apps/web/.wrangler/state` on the CT's disk, kept across restarts and updates. |
-| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/lan/serve.ts`: the production build on Miniflare, no vite), from `deploy/lan/`. `pixelslash-diff` (`bun deploy/lan/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
+| Releases | `/home/pixelslash/releases/<sha>/`, user `pixelslash`, one per deploy, built on the desktop; `releases/current` is the one serving. The last 3 are kept. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
+| Old checkout | `/home/pixelslash/pixelslash`, the git checkout the CT served from and built in before PS-225. Nothing runs from it now; it holds the state and the secrets below. |
+| State | D1 and R2 in the old checkout's `apps/web/.wrangler/state` on the CT's disk; every release's `apps/web/.wrangler/state` links to it, so it is kept across restarts, deploys and rollbacks. |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/lan/serve.ts`: the production build on Miniflare, no vite), from `deploy/lan/`, in `releases/current/apps/web`. `pixelslash-diff` (`bun deploy/lan/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
 
 `deploy/lan/serve.ts` calls Miniflare's API on the build (`dist/server` is the Worker, `dist/client` the
 assets): the D1 and R2 in `.wrangler/state/v3` that `vite preview` kept, the `wrangler.json` vars with
 `.dev.vars` over them, the explain queue. It listens on `0.0.0.0:3000`; `HOST` and `PORT` move it (the
-Rust front door of PS-217 will set `127.0.0.1` and `3001`). It does not migrate or build: `update.sh` does.
+Rust front door of PS-217 will set `127.0.0.1` and `3001`). It does not migrate or build: the deploy does.
 
 The build is the `e2e` environment's with three values replaced. `apps/web/.dev.vars.e2e` on the CT
 (mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://192.168.0.34:4174`, so the
 browser on another machine is sent to the stand-in at the CT's address rather than its own
 `localhost`, a random `IMAGE_SIGNING_SECRET`, and the deployment's `MODEL_KEY_SECRET` (without it
-the CT would seal keys under the `e2e` env's fixed test value). The Cloudflare plugin copies it into
-`dist/server/.dev.vars` at build time and `serve.ts` reads it from there (`vite preview` did too); the `e2e` env in
-`wrangler.jsonc`, and so the tests, are unchanged.
+the CT would seal keys under the `e2e` env's fixed test value). It lives in the old checkout and never
+leaves the CT: the build runs on the desktop, which ships no `.dev.vars`, and the deploy copies the
+CT's file into the release's `dist/server/.dev.vars` (mode 600), where `serve.ts` reads it. The `e2e`
+env in `wrangler.jsonc`, and so the tests, are unchanged.
 
-Update to `origin/main` (pull, stop, install, migrate, build, restart) from the desktop. It is not
-run automatically. **A deploy has a short downtime:** `pixelslash-web` is stopped before the install
-and build, because the running workerd holds most of the CT's 2 GiB and a build beside it thrashes
-the CT for tens of minutes; with it stopped the whole update takes about 12 s and :3000 is down for
-that long. The stub stays up. If a step fails after the stop, the previous build is put back and the
-server is started on it, and the script exits 1.
+**Deploy (PS-225): the CT never builds.** A build beside the running workerd does not fit in the
+CT's 2 GiB, so the build runs on the desktop and the CT gets the result. From a clean checkout of the
+commit (the planner's land worktree, on main after the land):
+
+```bash
+PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
+  apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+```
+
+`release.sh` refuses a sha that is not `HEAD` or a tree that is not clean, runs
+`CLOUDFLARE_ENV=e2e bun run build`, packs the commit's tracked files (without `bench/`) and
+`dist` into one tarball, sends it over ssh to the Proxmox host and in with `pct push`, and runs that
+release's own `deploy/lan/update.sh` in the CT. The host, the CT and the key come only from those
+variables (`PIXELSLASH_LAN_SSH_KEY` is optional); nothing is hard-coded. It is not run automatically.
+
+On the CT, `update.sh` unpacks the release into `releases/<sha>` beside the one serving, installs it
+(`bun install --frozen-lockfile --production`) and runs the D1 migrations (additive only), then
+points `current` at it and restarts the units. **The downtime is that restart only.** A release that
+does not come up on :3000 goes back to the previous one by itself and is deleted; the script's header
+and comments have the details. A sha still kept on the CT (the last 3) is switched to without
+unpacking it again, so deploying the current sha applies a changed opencode switch or
+`.dev.vars.e2e`, and deploying an older one from a clean checkout of it is the rollback by hand.
+wrangler is a runtime dependency of `apps/web` so the production install has it for the migrations.
 
 **workerd's memory (PS-155).** A day of `/workerd-rss.log` samples (every 10 min, 2026-10-23 to 25) shows workerd at 127-140 MB idle
 and stepping to 1.5-1.8 GB (peak 1.82 GB) within one 10-minute sample of an upload burst (the snapshot PUTs and `finalize`),
@@ -133,17 +152,7 @@ does not give the memory back, and with `vite preview` (~0.5 GB) beside it the p
 two OOM kills of 2026-10-25. `pixelslash-web` has run `deploy/lan/serve.ts` since PS-220 instead, which takes about 450 MB
 out of the unit at idle and after a burst (`perf/README.md`, desktop A/B); the caps below are unchanged until the same run is
 made on the CT. `pixelslash-web.service` therefore carries `MemoryHigh=1400M`, `MemoryMax=1700M` and
-`OOMPolicy=stop`; `update.sh` installs the unit, so the cap survives an update.
-
-```bash
-ssh -i ~/.ssh/id_ed25519_mac root@192.168.0.20 \
-  pct exec 135 -- /home/pixelslash/pixelslash/apps/web/deploy/lan/update.sh
-```
-
-One run is enough, even when the commit changes `update.sh` itself: after the fetch the script compares
-its sha256 with the one it started with, and on a change it re-executes the new file once, before
-anything is stopped (`PIXELSLASH_UPDATE_REEXEC=1` keeps it from doing so again). The log says
-`update.sh changed (sha256 <old> -> <new>)`.
+`OOMPolicy=stop`; every deploy installs the release's unit, so the cap survives an update.
 
 Logs: `pct exec 135 -- journalctl -u pixelslash-web -f`. Point a project's upload at it with
 `PIXELSLASH_SERVER=http://192.168.0.34:3000` and a token issued in its Settings on the CT. A token
@@ -187,7 +196,7 @@ server diff: in-process (unreachable): http://127.0.0.1:4181/v1/diff: Unable to 
 ```
 
 The shots go over loopback to a process bound to 127.0.0.1 and nowhere else; nothing is written to
-disk (invariant 4). `update.sh` installs and restarts the unit before `pixelslash-web` starts, and a
+disk (invariant 4). A deploy installs and restarts the unit before `pixelslash-web` starts, and a
 sidecar that does not come up is a warning, not a rollback: the Worker measures in-process. The unit
 is capped at `MemoryHigh=450M` / `MemoryMax=600M` (it idles at ~40 MB and peaked at ~340 MB on
 PS-200's burst); `pixelslash-web`'s cap is unchanged. Logs, one line per diff with its time:
@@ -205,22 +214,23 @@ dir that is removed when the call ends. It is **off** until you turn it on, and 
 personal self-host only: the OpenCode Go plan it uses is for personal use.
 
 ```bash
-# On the CT, as root: the model (provider/model), then the key, then an update.
+# On the CT, as root: the model (provider/model), then the key.
 echo opencode-go/claude-haiku-5-5 > /etc/pixelslash/opencode-helper
 install -d -o pixelslash -g pixelslash /home/pixelslash/.config/pixelslash
 install -m 600 -o pixelslash -g pixelslash /dev/stdin /home/pixelslash/.config/pixelslash/opencode.key
-/home/pixelslash/pixelslash/apps/web/deploy/lan/update.sh
+# Then, on the desktop, deploy (the sha already serving is restarted, not unpacked again).
+apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
 ```
 
-While `/etc/pixelslash/opencode-helper` exists, `update.sh` checks it and the key file (which must
+While `/etc/pixelslash/opencode-helper` exists, a deploy (`update.sh` on the CT) checks it and the key file (which must
 be mode 600), installs the opencode release the capture image pins, enables the unit, and gives
 every non-smoke org without a model a row pointing at `http://127.0.0.1:4180/v1` with a placeholder
 key. The real key is only in the token file; the helper puts it in opencode's environment, so it is
 never in git, the unit, a log line or a reply. An org or project with a model of its own keeps it
-and wins. The rows are written when `update.sh` runs, so an org created afterwards has no explain
-step until the next update. Remove the file and run `update.sh` again to turn it off: the rows that
+and wins. The rows are written when a deploy runs, so an org created afterwards has no explain
+step until the next deploy. Remove the file and deploy again to turn it off: the rows that
 point at the helper are deleted and the unit is stopped and removed. With the file never made,
-`update.sh` does nothing about the helper.
+a deploy does nothing about the helper.
 
 The helper runs one call at a time (the CT has no memory for more; the unit is capped at 500 MB)
 and gives a call 18 s. One call takes about 4 s. The app sends a shot's regions up to six at a

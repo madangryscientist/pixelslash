@@ -136,7 +136,8 @@ server's speed); one corpus, one set of sizes, and a single run per N (plus the 
 
 `deploy/lan/serve.ts` starts the built Worker on Miniflare directly, so there is no vite process
 and no Node-to-workerd hop. This section is what that measured **on the desktop, not on CT 135**:
-a builder cannot deploy a branch to the CT (`update.sh` resets it to `origin/main`), and a 500-shot
+a builder could not deploy a branch to the CT (`update.sh` reset it to `origin/main`; since PS-225
+`release.sh` deploys any clean commit), and a 500-shot
 run adds about 2.6 GB to a disk that had 2.9 GB free after PS-214. The CT run is still owed (below).
 
 **Method.** Same harness, same corpus, same commit (**88ee718**'s product code plus `serve.ts`), one
@@ -203,7 +204,7 @@ PS-214's settled workerd on the CT (850 to 960 MB at 200 and 500 shots against 4
 here), and on the CT's figure `serve.ts` (115) + workerd (960) is ~1.07 GB: a cap lowered by the
 saving would sit under it. Lowering needs the CT's own numbers.
 
-**Owed after the land**: `ssh` to the host, `update.sh`, then `perf/run.sh` on the CT (check
+**Owed after the land**: deploy with `deploy/lan/release.sh` (PS-225), then `perf/run.sh` on the CT (check
 `df -h /` first, the disk note above) and read the settled workerd, the cgroup peak, and whether
 any finalize hits `ECONNRESET` (`journalctl -u pixelslash-web`, and the driver stops on a failed
 request). That is the PS-217 Q10 number and the basis for any lower cap.

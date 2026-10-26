@@ -160,6 +160,18 @@ Implementation lands on a branch, the builder commits with a trailing
    git push origin --delete <branch>   # only after the squash is on main
    ```
 
+4. When the land changes `apps/web` (or what it imports), deploy main to the LAN self-host
+   (CT 135) from the land worktree, clean and at the pushed squash. The build runs here and the
+   CT only installs and switches, so a failed release rolls itself back
+   (`apps/web/README.md`, "Run it on the Proxmox server"):
+
+   ```bash
+   PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
+     apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+   ```
+
+   There is no `git pull` on the CT any more and no `update.sh` to run there by hand.
+
 Scan several worktrees without opening a diff:
 
 ```bash
