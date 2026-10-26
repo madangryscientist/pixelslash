@@ -79,7 +79,7 @@ function statusOf(raw: string | null): BuildStatus | undefined {
   return status;
 }
 
-const buildUrl = (ctx: ReadCtx, projectId: string, buildId: string) =>
+export const buildUrl = (ctx: Pick<ReadCtx, "origin">, projectId: string, buildId: string) =>
   `${ctx.origin}/projects/${projectId}/builds/${buildId}`;
 
 export const snapshotUrl = (ctx: ReadCtx, projectId: string, buildId: string, snapshotId: string) =>

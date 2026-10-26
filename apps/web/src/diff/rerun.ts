@@ -177,7 +177,7 @@ export async function rediffShots(
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await reopenReviews(deps.db, ids);
-    await markErrored(deps.db, build, e, runFields(timer.ended()));
-    return { status: "errored", error: e instanceof Error ? e.message : String(e), unmeasured: 0 };
+    const error = await markErrored(deps.db, build, e, runFields(timer.ended()));
+    return { status: "errored", error, unmeasured: 0 };
   }
 }

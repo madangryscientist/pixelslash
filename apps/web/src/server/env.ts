@@ -3,13 +3,17 @@ import { drizzle } from "drizzle-orm/d1";
 import type { GithubConfig } from "#/auth/github";
 import type { Db } from "#/db/db";
 import type { ExplainQueue } from "#/ai/explain-queue";
+import { retryBusy } from "#/db/busy";
 import { diffLocationOf } from "#/db/orgs";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
 import { type SentryConfig, sentryConfigOf } from "./sentry-config";
 
-/** The one place that touches the Worker's bindings; everything below takes plain values. */
-export const database = (): Db => drizzle(env.DB);
+/**
+ * The one place that touches the Worker's bindings; everything below takes plain values. A locked
+ * database (a deploy migrating the self-host's D1) is waited out, not an error (PS-228).
+ */
+export const database = (): Db => drizzle(retryBusy(env.DB));
 
 export const blobStore = (): BlobStore => r2BlobStore(env.BLOBS);
 

@@ -5,6 +5,7 @@
 #
 #   PIXELSLASH_LAN_SSH=root@<proxmox host> PIXELSLASH_LAN_CT=<ct id> \
 #     [PIXELSLASH_LAN_SSH_KEY=<identity file>] [PIXELSLASH_SENTRY_DSN=<dsn>] \
+#     [PIXELSLASH_DEPLOY_FORCE=1] \
 #     apps/web/deploy/lan/release.sh <sha>
 #
 # The CT never builds (PS-225): the vite build cannot fit in its 2 GiB beside a running workerd (ob
@@ -58,17 +59,17 @@ main() {
   # that update.sh there, and remove both copies whatever it exits with.
   # shellcheck disable=SC2016 # expanded on the host
   local remote='set -euo pipefail
-ct=$1 short=$2 d=$(mktemp -d)
+ct=$1 short=$2 force=$3 d=$(mktemp -d)
 trap "rm -rf $d" EXIT
 cat >"$d/$short.tar.gz"
 tar -xzf "$d/$short.tar.gz" -C "$d" ./apps/web/deploy/lan/update.sh
 pct push "$ct" "$d/$short.tar.gz" "/root/pixelslash-$short.tar.gz"
 pct push "$ct" "$d/apps/web/deploy/lan/update.sh" /root/pixelslash-update.sh --perms 0755
 status=0
-pct exec "$ct" -- /root/pixelslash-update.sh "/root/pixelslash-$short.tar.gz" || status=$?
+pct exec "$ct" -- env "PIXELSLASH_DEPLOY_FORCE=$force" /root/pixelslash-update.sh "/root/pixelslash-$short.tar.gz" || status=$?
 pct exec "$ct" -- rm -f "/root/pixelslash-$short.tar.gz" /root/pixelslash-update.sh
 exit $status'
-  ssh "${ssh_args[@]}" "$ssh_dest" "bash -c $(printf %q "$remote") _ $(printf %q "$ct") $short" \
+  ssh "${ssh_args[@]}" "$ssh_dest" "bash -c $(printf %q "$remote") _ $(printf %q "$ct") $short $(printf %q "${PIXELSLASH_DEPLOY_FORCE:-}")" \
     <"$stage/$short.tar.gz"
 }
 

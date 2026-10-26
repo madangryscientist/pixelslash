@@ -10,9 +10,9 @@ const CONFIG = fileURLToPath(new URL("../../wrangler.jsonc", import.meta.url));
 /**
  * A fresh local D1 (miniflare, through wrangler) with the real migrations applied. Slower than
  * `testDb()`, and only for what in-memory SQLite does not enforce: D1's limits, such as its 100
- * bound parameters per statement. Nothing is persisted; call `dispose` when done.
+ * bound parameters per statement. Nothing is persisted; call `dispose` when done. `d1` is the binding itself, for a test that wraps it.
  */
-export async function d1Db(): Promise<{ db: Db; dispose: () => Promise<void> }> {
+export async function d1Db(): Promise<{ db: Db; d1: D1Database; dispose: () => Promise<void> }> {
   const proxy = await getPlatformProxy<{ DB: D1Database }>({ configPath: CONFIG, persist: false });
   for (const file of readdirSync(MIGRATIONS)
     .filter((f) => f.endsWith(".sql"))
@@ -23,5 +23,5 @@ export async function d1Db(): Promise<{ db: Db; dispose: () => Promise<void> }> 
       if (stmt.trim()) await proxy.env.DB.prepare(stmt).run();
     }
   }
-  return { db: drizzle(proxy.env.DB), dispose: () => proxy.dispose() };
+  return { db: drizzle(proxy.env.DB), d1: proxy.env.DB, dispose: () => proxy.dispose() };
 }

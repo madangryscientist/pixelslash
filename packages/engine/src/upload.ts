@@ -120,14 +120,21 @@ async function finalise(
 /**
  * A finalise runs the diff in the request, so its reply is the outcome. `processing` means a retry
  * met an earlier try's run that has not ended (or was killed): nothing was measured yet. `errored`
- * is said, not failed, as before: the build is on the server and the reason is the server's.
+ * is a failed upload (PS-228): `finalise` has already given up on it, so the server could not
+ * measure the build and a CI step that read exit 0 would pass a build nobody diffed. The reason is
+ * the server's; the build page, when the server names it, goes on the same line so the last line
+ * of stderr stays the `UPLOAD FAILED:` one.
  */
-function checkOutcome(client: Client, id: string, done: unknown): void {
+function checkOutcome(id: string, done: unknown): void {
   if (!isObj(done)) return;
   if (done.status === "processing")
     throw new UploadError(`upload failed: finalize: build ${id} is still processing on the server`);
-  if (done.status === "errored")
-    client.warn(`upload: build ${id} is errored on the server: ${String(done.error)}`);
+  if (done.status === "errored") {
+    const page = typeof done.web_url === "string" && done.web_url ? ` (${done.web_url})` : "";
+    throw new UploadError(
+      `upload failed: build ${id} errored on the server: ${String(done.error)}${page}`,
+    );
+  }
 }
 
 type OpenBuild = {
@@ -268,8 +275,8 @@ export async function uploadSnapshots(
   await runWorkers(worker, stop);
   const sent = timingsToSend(opts.timings, started, log.finish(), timed);
   const done = await finalise(client, id, manifest.snapshots.length, sent);
-  checkOutcome(client, id, done);
   progress.finalised = true;
+  checkOutcome(id, done);
   const outcome = await flakes.finish(manifest.snapshots);
   const timings = timingsToSend(opts.timings, started, log.finish(), timed);
   return {

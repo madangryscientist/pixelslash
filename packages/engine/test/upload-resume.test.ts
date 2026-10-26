@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "vitest";
+import { UploadError } from "../src/errors.ts";
 import { uploadSnapshots } from "../src/upload.ts";
 import { fakeServer } from "./fake-server.ts";
 import { cleanup, entry, gitOpts, repo, snapshotDir } from "./upload-fixtures.ts";
@@ -42,19 +43,31 @@ describe("uploadSnapshots resumes a diff the server stopped at its budget (ob 16
     expect(warnings[0]).toMatch(/40 of 1 shots still to measure/);
   });
 
-  test("stops when a finalise measured nothing more, and says the build is errored", async () => {
+  test("stops when a finalise measured nothing more, and fails the upload (PS-228)", async () => {
     const { run, warnings, finalises } = await upload([errored(7), errored(7)]);
-    await run;
+    const failure = await run.catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(UploadError);
+    expect(failure).toHaveProperty(
+      "message",
+      "upload failed: build b1 errored on the server: diff ceiling: 7 left",
+    );
     expect(finalises()).toBe(2);
-    expect(warnings.at(-1)).toMatch(/build b1 is errored on the server: diff ceiling: 7 left/);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/7 of 1 shots still to measure/);
   });
 
-  test("a reply without a count is not retried", async () => {
-    const { run, warnings, finalises } = await upload([
-      { id: "b1", status: "errored", error: "boom" },
+  test("a reply without a count is not retried, and fails the upload with the server's page", async () => {
+    const { run, finalises } = await upload([
+      {
+        id: "b1",
+        status: "errored",
+        error: "boom",
+        web_url: "https://ps.example/projects/p/builds/b1",
+      },
     ]);
-    await run;
+    await expect(run).rejects.toThrow(
+      "upload failed: build b1 errored on the server: boom (https://ps.example/projects/p/builds/b1)",
+    );
     expect(finalises()).toBe(1);
-    expect(warnings).toEqual(["upload: build b1 is errored on the server: boom"]);
   });
 });

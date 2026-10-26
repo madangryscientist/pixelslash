@@ -189,6 +189,24 @@ unpacking it again, so deploying the current sha applies a changed opencode swit
 `.dev.vars.e2e`, and deploying an older one from a clean checkout of it is the rollback by hand.
 wrangler is a runtime dependency of `apps/web` so the production install has it for the migrations.
 
+**A deploy does not run under a live build (PS-228).** The restart kills the Worker mid-diff and the
+migration can hold the D1 file's write lock, so a build being diffed at that moment ended `errored`
+(a deploy during an upload did exactly that). Before it changes anything, `update.sh` asks the
+serving release's D1 for builds that are `processing` and began within the last 15 minutes. Any
+makes it exit 1 with the build ids and `nothing changed`; run it again once they end. A build
+`processing` for longer is an orphan (the run died with its Worker; 7a698500 was one) and never
+blocks. If the D1 cannot be read the deploy stops too, since not knowing is not a go-ahead. To
+deploy anyway: `PIXELSLASH_DEPLOY_FORCE=1 apps/web/deploy/lan/release.sh …` (`release.sh` carries it
+into the CT). The first release on a CT has no serving D1 to ask and skips the check.
+
+The Worker also rides out a short lock itself: `database()` (`src/server/env.ts`) wraps the D1
+binding in `retryBusy` (`src/db/busy.ts`), which runs a statement again on `SQLITE_BUSY` / `database
+is locked` after 25, 50, 100 and 200 ms (five tries, about 375 ms) before the error stands. A busy
+statement did not run, so a repeat is safe. A lock held longer still ends the build `errored`, and
+the build's `error` names the SQLite cause, not only drizzle's `Failed query`. The CLI treats an
+`errored` build at the end of `upload` as an upload failure (exit 1, `UPLOAD FAILED: build <id>
+errored on the server: <reason> (<build page>)`), so CI no longer passes a build nobody diffed.
+
 **workerd's memory (PS-155).** A day of `/workerd-rss.log` samples (every 10 min, 2026-10-23 to 25) shows workerd at 127-140 MB idle
 and stepping to 1.5-1.8 GB (peak 1.82 GB) within one 10-minute sample of an upload burst (the snapshot PUTs and `finalize`),
 then holding there for hours until the unit restarts, which brings it back to 130 MB. It does not grow without bound, but it

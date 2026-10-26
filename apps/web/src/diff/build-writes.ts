@@ -60,18 +60,32 @@ export async function acceptDefaultBranchBuild(
     .where(and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId)));
 }
 
-/** `timings`: the server timings (ob 1792) the end of the run writes with its error, if it has any. */
+/**
+ * Why a run failed, as the build says it. Drizzle wraps a database error in "Failed query: <sql>",
+ * which hides what the database said; the cause is added, so a locked database reads as one (PS-228).
+ */
+export function reasonOf(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const cause = e.cause instanceof Error ? e.cause.message : "";
+  return cause && !e.message.includes(cause) ? `${e.message}: ${cause}` : e.message;
+}
+
+/**
+ * `timings`: the server timings (ob 1792) the end of the run writes with its error, if it has any.
+ * Returns the reason it stored, for a reply that must say the same.
+ */
 export async function markErrored(
   db: Db,
   build: Build,
   e: unknown,
   timings: Partial<ReturnType<typeof runFields>> = {},
-): Promise<void> {
-  const error = e instanceof Error ? e.message : String(e);
+): Promise<string> {
+  const error = reasonOf(e);
   await db
     .update(builds)
     .set({ ...timings, status: "errored", error })
     .where(eq(builds.id, build.id));
+  return error;
 }
 
 /**

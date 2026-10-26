@@ -20,6 +20,7 @@ import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines
 import {
   API_VERSION,
   type ReadCtx,
+  buildUrl,
   getBuild,
   getSnapshot,
   listBuilds,
@@ -123,6 +124,8 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
     status: result.status,
     error: result.error,
     unmeasured: result.unmeasured,
+    // For a CLI to point at an errored build (PS-228); absent from a server from before it.
+    web_url: buildUrl({ origin: new URL(ctx.request.url).origin }, done.projectId, done.id),
   });
 }
 

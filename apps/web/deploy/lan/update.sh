@@ -20,6 +20,12 @@
 # (never printed); every release then gets SENTRY_RELEASE (its sha) and SENTRY_ENVIRONMENT=lan
 # beside it in dist/server/.dev.vars. With no DSN nothing is added and the server reports nowhere.
 #
+# A deploy under a live build (PS-228): the restart kills the Worker mid-diff, and the migration
+# can hold the database's write lock, so a build that is `processing` errors. update.sh refuses,
+# before it changes anything, while the serving release's D1 has a build that began processing in
+# the last 15 minutes (a build older than that is an orphan, as 7a698500 was, and never blocks).
+# PIXELSLASH_DEPLOY_FORCE=1 on the release.sh command line deploys anyway.
+#
 # The opencode helper (ob 1900) is a switch: the file /etc/pixelslash/opencode-helper holds the
 # model (`provider/model`), and while it exists this script installs opencode, installs and enables
 # pixelslash-opencode, and points every org without a model of its own at the helper. Without the
@@ -48,6 +54,8 @@ HELPER_KEY=$APP_HOME/.config/pixelslash/opencode.key
 HELPER_URL=http://127.0.0.1:4180/v1
 OPENCODE_BIN=$APP_HOME/.opencode/bin/opencode
 D1_RETRY_SLEEP=${PIXELSLASH_D1_RETRY_SLEEP:-2}
+# A build that started processing within this many seconds is live, and a deploy waits for it.
+LIVE_BUILD_SECONDS=900
 
 as_app() {
   runuser -u "$APP_USER" -- env PATH="$APP_PATH" bash -c "$1"
@@ -129,6 +137,31 @@ d1() {
     sleep "$D1_RETRY_SLEEP"
   done
   rm -f "$out"
+  return 1
+}
+
+# Refuse to deploy under a live build (PS-228). Asks the D1 of release $1, the one serving, for the
+# builds that began processing within $LIVE_BUILD_SECONDS; any is a reason to stop, before anything
+# changes. A D1 that cannot be read stops it too: not knowing is not a go-ahead, and FORCE is there.
+refuse_live_build() {
+  local rel=$1 cutoff sql out ids
+  if [[ ${PIXELSLASH_DEPLOY_FORCE:-} == 1 ]]; then
+    echo "PIXELSLASH_DEPLOY_FORCE=1: not checking for a build in flight" >&2
+    return 0
+  fi
+  cutoff=$((($(date +%s) - LIVE_BUILD_SECONDS) * 1000))
+  sql="SELECT id FROM builds WHERE status = 'processing' AND processing_started_at > $cutoff"
+  if ! out=$(d1 "$rel" execute DB --json --command "$(printf %q "$sql")" 2>&1) ||
+    ! grep -q '"results"' <<<"$out"; then
+    echo "$out" >&2
+    echo "refusing to deploy: could not ask the D1 whether a build is in flight (nothing changed)." >&2
+    echo "Set PIXELSLASH_DEPLOY_FORCE=1 to deploy without the check." >&2
+    return 1
+  fi
+  ids=$(grep -Eo '"id": *"[^"]+"' <<<"$out" | sed -E 's/.*: *"([^"]+)"/\1/' | paste -sd, - || true)
+  [[ -z $ids ]] && return 0
+  echo "refusing to deploy: a build is processing (started in the last $((LIVE_BUILD_SECONDS / 60)) min): $ids" >&2
+  echo "A restart now would error it. Wait for it to end, or set PIXELSLASH_DEPLOY_FORCE=1 to deploy anyway (nothing changed)." >&2
   return 1
 }
 
@@ -257,6 +290,9 @@ main() {
     [[ -f $HELPER_KEY && $(stat -c '%a %U' "$HELPER_KEY") == "600 $APP_USER" ]] ||
       { echo "$HELPER_KEY must exist, mode 600, owned by $APP_USER" >&2; exit 1; }
   fi
+
+  # Before anything changes: a deploy under a live build errors that build.
+  [[ -z $prev ]] || refuse_live_build "$prev" || exit 1
 
   # Everything up to the switch happens beside the serving release, which does not notice; a failure
   # here deletes a release this deploy unpacked, so it never takes one of the kept places. One still

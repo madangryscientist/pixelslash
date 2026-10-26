@@ -139,4 +139,27 @@ describe("an upload failure ends on UPLOAD FAILED (PS-223)", () => {
     expect(lines.at(-1)).toMatch(/UPLOAD FAILED: .*500/);
     expect(cap.stdout).not.toMatch(/build:|https?:\/\//);
   });
+
+  test("a build the server errored fails the upload and never exits 0 (PS-228)", async () => {
+    const [cwd, dir, cap] = [await gitRepo(), await uploadDir(), capture()];
+    const errored = async () =>
+      Response.json({
+        id: "build-1",
+        status: "errored",
+        error: "database is locked",
+        unmeasured: 0,
+        web_url: `${SERVER}/projects/p1/builds/build-1`,
+      });
+    const code = await run(["upload", dir, "--server", SERVER], cap.io, {
+      fetch: errored,
+      cwd,
+      env: { PIXELSLASH_TOKEN: "psci_env" },
+    });
+    expect(code).toBe(1);
+    const lines = cap.stderr.trimEnd().split("\n");
+    expect(lines.at(-1)).toBe(
+      `UPLOAD FAILED: build build-1 errored on the server: database is locked (${SERVER}/projects/p1/builds/build-1)`,
+    );
+    expect(cap.stdout).not.toMatch(/build:/);
+  });
 });

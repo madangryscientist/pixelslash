@@ -72,7 +72,8 @@ export type ProcessDeps = {
 
 /**
  * This run stopped before the Worker's limit with shots left. Not a failure to start over from:
- * what was measured is kept, and the next finalise measures only the rest (ob 1645).
+ * what was measured is kept, and the next finalise measures only the rest (ob 1645). Its count
+ * includes shots a changed baseline sends back, which a count of rows with no result would miss.
  */
 export class DiffCeilingError extends Error {
   readonly unmeasured: number;
@@ -410,10 +411,8 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     return { status, error: null, unmeasured: 0 };
   } catch (e) {
     reportBuildFailure(e);
-    await markErrored(deps.db, build, e, runFields(timer.ended()));
-    // The ceiling's count includes shots a changed baseline sends back to be measured again, which
-    // a count of rows with no result would miss.
+    const error = await markErrored(deps.db, build, e, runFields(timer.ended()));
     const unmeasured = e instanceof DiffCeilingError ? e.unmeasured : 0;
-    return { status: "errored", error: e instanceof Error ? e.message : String(e), unmeasured };
+    return { status: "errored", error, unmeasured };
   }
 }

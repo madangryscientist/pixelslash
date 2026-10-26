@@ -1,115 +1,30 @@
 import { spawnSync } from "node:child_process";
 import {
-  chmodSync,
-  copyFileSync,
   existsSync,
-  mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   readlinkSync,
-  realpathSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
+import {
+  UNITS,
+  bunxBody,
+  cleanup,
+  current,
+  deploy,
+  pack,
+  releaseNames,
+  setup,
+  varsOf,
+} from "./update-harness";
 
-// update.sh, the CT-side half of a LAN deploy, run against temp directories. The root-only pieces
-// are stubbed: `runuser` runs its command as this user; `systemctl`, `journalctl`, `bun` and `bunx`
-// only log. `wait_for_port` is replaced after the script is sourced: :3000 never opens while
-// `current` is a release holding a BROKEN file, which stands in for a serve.ts that exits.
 const SCRIPT = fileURLToPath(new URL("./update.sh", import.meta.url));
-const LAN = fileURLToPath(new URL(".", import.meta.url));
-const UNITS = ["pixelslash-stub.service", "pixelslash-diff.service", "pixelslash-web.service"];
 
-let root = "";
-afterEach(() => {
-  if (root) rmSync(root, { recursive: true, force: true });
-  root = "";
-});
-
-function setup() {
-  root = realpathSync(mkdtempSync(join(tmpdir(), "update-sh-")));
-  const home = join(root, "home");
-  const legacyWeb = join(home, "pixelslash/apps/web");
-  const stubs = join(root, "stubs");
-  const unitDir = join(root, "units");
-  const log = join(root, "commands.log");
-
-  // The checkout the CT served from before PS-225: its state and its secrets.
-  mkdirSync(join(legacyWeb, ".wrangler/state/v3"), { recursive: true });
-  writeFileSync(join(legacyWeb, ".wrangler/state/v3/builds"), "42 builds\n");
-  writeFileSync(join(legacyWeb, ".dev.vars.e2e"), "IMAGE_SIGNING_SECRET=ct-secret\n");
-  mkdirSync(unitDir);
-
-  mkdirSync(stubs);
-  const stub = (name: string, body: string) => {
-    writeFileSync(join(stubs, name), `#!/usr/bin/env bash\n${body}\n`);
-    chmodSync(join(stubs, name), 0o755);
-  };
-  stub("runuser", 'while [[ $1 != -- ]]; do shift; done\nshift\nexec "$@"');
-  for (const name of ["systemctl", "journalctl", "bun", "bunx"])
-    stub(name, `echo "${name} $* @ $PWD" >>"$STUB_LOG"`);
-
-  return { home, legacyWeb, stubs, unitDir, log, releases: join(home, "releases") };
-}
-
-type Setup = ReturnType<typeof setup>;
-
-// A release tarball as release.sh packs it, cut down to what update.sh touches.
-function pack(sha: string, { broken = false, sentryDsn = "" } = {}) {
-  const dir = join(root, "pack", sha);
-  mkdirSync(join(dir, "apps/web/deploy/lan"), { recursive: true });
-  for (const unit of [...UNITS, "pixelslash-opencode.service"])
-    copyFileSync(join(LAN, unit), join(dir, "apps/web/deploy/lan", unit));
-  mkdirSync(join(dir, "apps/web/dist/server"), { recursive: true });
-  writeFileSync(join(dir, "apps/web/dist/server/index.js"), `// ${sha}\n`);
-  if (broken) writeFileSync(join(dir, "apps/web/BROKEN"), "");
-  // What release.sh adds when PIXELSLASH_SENTRY_DSN is set.
-  if (sentryDsn) writeFileSync(join(dir, ".sentry-dsn"), `${sentryDsn}\n`, { mode: 0o600 });
-  const tarball = join(root, `pixelslash-${sha}.tar.gz`);
-  const tar = spawnSync("tar", ["-czf", tarball, "-C", dir, "."]);
-  expect(tar.status).toBe(0);
-  return tarball;
-}
-
-function deploy(s: Setup, tarball: string) {
-  writeFileSync(s.log, "");
-  const harness = [
-    'source "$1"',
-    "wait_for_port() { [[ $1 != 3000 || ! -e $CURRENT/apps/web/BROKEN ]]; }",
-    'main "$2"',
-  ].join("\n");
-  const result = spawnSync("bash", ["-c", harness, "_", SCRIPT, tarball], {
-    env: {
-      ...process.env,
-      PIXELSLASH_HOME: s.home,
-      PIXELSLASH_APP_PATH: `${s.stubs}:/usr/bin:/bin`,
-      PIXELSLASH_UNIT_DIR: s.unitDir,
-      PIXELSLASH_HELPER_SWITCH: join(root, "no-helper-switch"),
-      PIXELSLASH_D1_RETRY_SLEEP: "0",
-      STUB_LOG: s.log,
-      PATH: `${s.stubs}:${process.env["PATH"]}`,
-    },
-    encoding: "utf8",
-  });
-  return {
-    status: result.status,
-    stderr: result.stderr,
-    commands: readFileSync(s.log, "utf8").split("\n").filter(Boolean),
-  };
-}
-
-const varsOf = (rel: string) => readFileSync(join(rel, "apps/web/dist/server/.dev.vars"), "utf8");
-const current = (s: Setup) => readlinkSync(join(s.releases, "current"));
-const releaseNames = (s: Setup) =>
-  readdirSync(s.releases)
-    .filter((name) => name !== "current")
-    .toSorted();
+afterEach(cleanup);
 
 describe("update.sh", () => {
   test("installs a release beside the old checkout and switches to it", () => {
@@ -186,7 +101,7 @@ describe("update.sh", () => {
     );
 
     // A kept release that fails to go back to is kept: this deploy did not unpack it.
-    writeFileSync(join(s.stubs, "bunx"), "#!/usr/bin/env bash\nexit 1\n");
+    writeFileSync(join(s.stubs, "bunx"), `#!/usr/bin/env bash\n${bunxBody("exit 1")}\n`);
     expect(deploy(s, pack("ccccccc")).status).toBe(1);
     expect(current(s)).toBe(join(s.releases, "ddddddd"));
     expect(releaseNames(s)).toEqual(["ccccccc", "ddddddd", "eeeeeee"]);
