@@ -1,4 +1,4 @@
-import { Button } from "@hackcove/ui";
+import { Body, Button, ButtonGroup, Overline, Stack } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";
@@ -31,9 +31,9 @@ function useRerun(projectId: string, buildId: string) {
 function RerunError({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <p role="alert" className="mt-2 text-sm text-red-700">
+    <Body as="p" role="alert" tone="danger">
       {error}
-    </p>
+    </Body>
   );
 }
 
@@ -42,7 +42,7 @@ export function RerunErrored({ projectId, buildId }: { projectId: string; buildI
   const hydrated = useHydrated();
   const { busy, error, run } = useRerun(projectId, buildId);
   return (
-    <div className="mt-2">
+    <div className="mt-2 space-y-2">
       <Button
         variant="outline"
         disabled={!hydrated}
@@ -90,23 +90,25 @@ function RerunShotButton({
   const hydrated = useHydrated();
   const { busy, error, run } = useRerun(projectId, buildId);
   return (
-    <section>
-      <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Re-run</h2>
-      <p className="mb-2 text-sm text-slate-600">
+    <Stack as="section" gap="xs">
+      <Overline as="h2">Re-run</Overline>
+      <Body as="p" tone="muted">
         Measure this shot again from the uploaded image. A review stays if the result is the same.
-      </p>
-      <Button
-        variant="outline"
-        disabled={!hydrated}
-        busy={busy}
-        busyLabel="Re-running…"
-        onClick={() => run(snapshot.id)}
-        size="sm"
-        data-testid="rerun-shot"
-      >
-        Re-run this shot
-      </Button>
+      </Body>
+      <ButtonGroup>
+        <Button
+          variant="outline"
+          disabled={!hydrated}
+          busy={busy}
+          busyLabel="Re-running…"
+          onClick={() => run(snapshot.id)}
+          size="sm"
+          data-testid="rerun-shot"
+        >
+          Re-run this shot
+        </Button>
+      </ButtonGroup>
       <RerunError error={error} />
-    </section>
+    </Stack>
   );
 }

@@ -1,4 +1,19 @@
-import { Breadcrumbs, Button, Input, ListLayout, Pill } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Breadcrumbs,
+  Button,
+  ButtonGroup,
+  Caption,
+  Card,
+  Cluster,
+  ClusterGrow,
+  Input,
+  ListLayout,
+  Pill,
+  Stack,
+  TextLink,
+} from "@hackcove/ui";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
@@ -30,7 +45,7 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
   };
   if (flake.status === "resolved") {
     return (
-      <div className="space-y-1">
+      <Stack gap="xs">
         <Button
           variant="outline"
           busy={busy}
@@ -42,11 +57,11 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
           Reopen
         </Button>
         {error && (
-          <p role="alert" className="text-sm text-red-700">
+          <Body as="p" role="alert" tone="danger">
             {error}
-          </p>
+          </Body>
         )}
-      </div>
+      </Stack>
     );
   }
   if (!resolving) {
@@ -57,7 +72,7 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
     );
   }
   return (
-    <form onSubmit={resolve} aria-label="Resolve flake" className="space-y-2 text-sm">
+    <Stack as="form" gap="xs" onSubmit={resolve} aria-label="Resolve flake">
       <Input
         aria-label="Resolution note (optional)"
         placeholder="What fixed it (optional)"
@@ -66,19 +81,19 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
         onChange={(e) => setNote(e.target.value)}
       />
       {error && (
-        <p role="alert" className="text-red-700">
+        <Body as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Body>
       )}
-      <div className="flex gap-2">
+      <ButtonGroup>
         <Button type="submit" busy={busy} busyLabel="Resolving…" size="sm">
           Resolve
         </Button>
         <Button type="button" variant="ghost" onClick={() => setResolving(false)} size="sm">
           Cancel
         </Button>
-      </div>
-    </form>
+      </ButtonGroup>
+    </Stack>
   );
 }
 
@@ -87,49 +102,52 @@ function FlakeItem({ projectId, flake, now }: { projectId: string; flake: FlakeV
   // The policy the latest detection was captured under; a hand mark sent none, so review.
   const policy = latest?.policy ?? "review";
   return (
-    <li
-      id={flakeAnchor(flake.id)}
-      data-testid="flake"
-      data-status={flake.status}
-      className="scroll-mt-6 space-y-3 rounded-xl border border-slate-200 bg-white p-5 target:border-violet-400"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 font-medium">
-            <Pill tone={flake.status === "open" ? "amber" : "slate"}>{flake.status}</Pill>
-            <span data-testid="flake-name" className="truncate">
-              {flake.name}
-            </span>
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {variantOf(flake)} · {flake.evidence.length} detection
-            {flake.evidence.length === 1 ? "" : "s"} · updated{" "}
-            {formatRelative(flake.updatedAt, now)}
-          </p>
-        </div>
-        <StatusControl projectId={projectId} flake={flake} />
-      </div>
-      <FlakeHistory flake={flake} />
-      {latest && (
-        <div className="space-y-1">
-          <FlakeRuns evidence={latest} />
-          <Link
-            to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-            params={{ projectId, buildId: latest.buildId, snapshotId: latest.snapshotId }}
-            className="text-sm text-violet-700 hover:underline"
-          >
-            See the shot
-          </Link>
-        </div>
-      )}
-      <details className="text-sm">
-        <summary className="cursor-pointer text-slate-600">
-          Policy: {policy}. Change it in config
-        </summary>
-        <div className="mt-2">
-          <FlakyPolicyControl policy={policy} />
-        </div>
-      </details>
+    <li id={flakeAnchor(flake.id)} className="scroll-mt-6">
+      <Card as="article" data-testid="flake" data-status={flake.status}>
+        <Stack gap="sm">
+          <Cluster gap="sm" align="start" justify="between" wrap>
+            <ClusterGrow>
+              <Cluster gap="xs">
+                <Pill tone={flake.status === "open" ? "amber" : "slate"}>{flake.status}</Pill>
+                <BodyStrong truncate data-testid="flake-name">
+                  {flake.name}
+                </BodyStrong>
+              </Cluster>
+              <Caption as="p">
+                {variantOf(flake)} · {flake.evidence.length} detection
+                {flake.evidence.length === 1 ? "" : "s"} · updated{" "}
+                {formatRelative(flake.updatedAt, now)}
+              </Caption>
+            </ClusterGrow>
+            <StatusControl projectId={projectId} flake={flake} />
+          </Cluster>
+          <FlakeHistory flake={flake} />
+          {latest && (
+            <Stack gap="xs">
+              <FlakeRuns evidence={latest} />
+              <TextLink
+                render={(props) => (
+                  <Link
+                    to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                    params={{ projectId, buildId: latest.buildId, snapshotId: latest.snapshotId }}
+                    {...props}
+                  />
+                )}
+              >
+                See the shot
+              </TextLink>
+            </Stack>
+          )}
+          <details>
+            <summary className="cursor-pointer">
+              <Body tone="muted">Policy: {policy}. Change it in config</Body>
+            </summary>
+            <div className="mt-2">
+              <FlakyPolicyControl policy={policy} />
+            </div>
+          </details>
+        </Stack>
+      </Card>
     </li>
   );
 }
@@ -148,11 +166,11 @@ function FlakesPage() {
             : `${open} open, ${flakes.length - open} resolved. Open flakes first.`
         }
       >
-        <ul className="flex flex-col gap-4">
+        <Stack as="ul" gap="sm">
           {flakes.map((flake) => (
             <FlakeItem key={flake.id} projectId={project.id} flake={flake} now={now} />
           ))}
-        </ul>
+        </Stack>
       </ListLayout>
     </Page>
   );

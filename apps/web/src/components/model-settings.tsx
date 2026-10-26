@@ -2,14 +2,18 @@ import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import {
   Body,
+  BodyStrong,
   Button,
+  Caption,
   Card,
   Checkbox,
+  Cluster,
   Code,
   Field,
   Input,
   SectionHeading,
   Stack,
+  TextLink,
 } from "@hackcove/ui";
 import type { ModelView, ModelSource } from "#/db/models";
 import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
@@ -54,30 +58,28 @@ export function ModelSettings({
           model, or when a call fails, the shot is reviewed as plain pixels. Nothing is sent until
           this is saved.
         </Body>
-        <form onSubmit={save}>
-          <Stack>
-            <ModelFields
-              fields={fields}
-              setFields={setFields}
-              keySet={!!saved}
-              hydrated={hydrated}
-              owner={project ? "project" : "org"}
-            />
-            <ModelActions
-              fields={fields}
-              saved={saved}
-              busy={busy}
-              hydrated={hydrated}
-              onRemove={remove}
-              label={removeLabel(scope, source)}
-            />
-            {error && (
-              <p role="alert" className="text-sm text-red-700">
-                {error}
-              </p>
-            )}
-          </Stack>
-        </form>
+        <Stack as="form" onSubmit={save}>
+          <ModelFields
+            fields={fields}
+            setFields={setFields}
+            keySet={!!saved}
+            hydrated={hydrated}
+            owner={project ? "project" : "org"}
+          />
+          <ModelActions
+            fields={fields}
+            saved={saved}
+            busy={busy}
+            hydrated={hydrated}
+            onRemove={remove}
+            label={removeLabel(scope, source)}
+          />
+          {error && (
+            <Body as="p" role="alert" tone="danger">
+              {error}
+            </Body>
+          )}
+        </Stack>
       </Stack>
     </Card>
   );
@@ -140,14 +142,12 @@ function ModelInUse({
   orgSettingsHref: string | undefined;
 }) {
   const orgLink = orgSettingsHref ? (
-    <a href={orgSettingsHref} className="underline">
-      org settings
-    </a>
+    <TextLink href={orgSettingsHref}>org settings</TextLink>
   ) : (
     "org settings"
   );
   return (
-    <p className="mb-3 text-sm font-medium" data-testid="model-in-use" data-source={source.source}>
+    <BodyStrong as="p" data-testid="model-in-use" data-source={source.source}>
       {source.source === "org" && (
         <>
           Using the org&apos;s model ({source.model.model}). Set a model below to override it for
@@ -158,7 +158,7 @@ function ModelInUse({
       {source.source === "none" && (
         <>No model. Set one below, or once for every project in its {orgLink}.</>
       )}
-    </p>
+    </BodyStrong>
   );
 }
 
@@ -200,12 +200,12 @@ function ModelFields({
           data-testid="model-name"
         />
       </Field>
-      <span className="block text-xs text-slate-500">
+      <Caption as="p">
         OpenCode Go works for a personal self-host (
         <Code>https://opencode.ai/inference/go/openai/v1</Code>, a Go model that takes images). A
         deployed service should use OpenCode Zen or the provider's own API, because Go is licensed
         for coding-agent traffic.
-      </span>
+      </Caption>
       <Field
         label="API key"
         htmlFor="model-key-input"
@@ -230,10 +230,12 @@ function ModelFields({
         data-testid="model-auto-pass"
         label={
           <span>
-            <span className="font-medium">Auto-pass noise</span>
-            <span className="block text-slate-600">
-              Accept a shot when the model labels every changed region noise. Off, noise is only
-              labelled and a person still decides.
+            <BodyStrong>Auto-pass noise</BodyStrong>
+            <span className="block">
+              <Body tone="muted">
+                Accept a shot when the model labels every changed region noise. Off, noise is only
+                labelled and a person still decides.
+              </Body>
             </span>
           </span>
         }
@@ -260,7 +262,7 @@ function ModelActions({
   const missing =
     !fields.baseUrl.trim() || !fields.model.trim() || (!saved && !fields.apiKey.trim());
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <Cluster gap="sm" wrap>
       <Button
         type="submit"
         disabled={!hydrated}
@@ -285,11 +287,9 @@ function ModelActions({
           >
             {label}
           </Button>
-          <span className="text-xs text-slate-500" data-testid="model-key-set">
-            Key set for {saved.baseUrl}
-          </span>
+          <Caption data-testid="model-key-set">Key set for {saved.baseUrl}</Caption>
         </>
       )}
-    </div>
+    </Cluster>
   );
 }

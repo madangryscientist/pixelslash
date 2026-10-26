@@ -1,12 +1,18 @@
+import { Checkbox, Cluster, Legend, type LegendItem, Stack } from "@hackcove/ui";
 import { useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
-import { REGION_COLOURS, RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
+import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
 import { useHydrated } from "#/components/ui";
 import type { DiffRegion, DiffResult } from "#/db/schema";
 
-const KINDS = ["change", "noise", "shift"] as const;
+/** The swatch tone nearest each kind's box colour in REGION_COLOURS. */
+const KINDS = [
+  { kind: "change", tone: "danger" },
+  { kind: "noise", tone: "warn" },
+  { kind: "shift", tone: "info" },
+] as const;
 
-function Stack({
+function ShotStack({
   name,
   shown,
   diffUrl,
@@ -57,34 +63,21 @@ function Controls({
   onShowDiff: (show: boolean) => void;
 }) {
   const hydrated = useHydrated();
+  const items: LegendItem[] = KINDS.flatMap(({ kind, tone }) => {
+    const n = regions.filter((region) => region.kind === kind).length;
+    return n === 0 ? [] : [{ label: kind, tone, detail: n }];
+  });
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={showDiff}
-          disabled={!hydrated || !diffUrl}
-          onChange={(e) => onShowDiff(e.target.checked)}
-        />
-        Diff image
-      </label>
-      <ul className="flex flex-wrap gap-3 text-slate-600">
-        {KINDS.map((kind) => {
-          const n = regions.filter((region) => region.kind === kind).length;
-          if (n === 0) return null;
-          return (
-            <li key={kind} className="flex items-center gap-1">
-              <span
-                aria-hidden
-                className="inline-block size-3 rounded-sm"
-                style={{ background: REGION_COLOURS[kind] }}
-              />
-              {kind} ({n})
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <Cluster gap="sm" wrap>
+      <Checkbox
+        label="Diff image"
+        size="sm"
+        checked={showDiff}
+        disabled={!hydrated || !diffUrl}
+        onChange={(e) => onShowDiff(e.target.checked)}
+      />
+      <Legend items={items} />
+    </Cluster>
   );
 }
 
@@ -113,10 +106,10 @@ export function SnapshotOverlay({
   // Boxes belong to the comparison, so they are drawn only when there was one.
   const boxes = result && branchUrl && highlight ? { result, regions } : null;
   return (
-    <div>
+    <Stack gap="xs">
       <Viewport width={result?.branchWidth ?? null} scale={scale} crop={crop}>
         <div className="border border-slate-200">
-          <Stack
+          <ShotStack
             name={name}
             shown={branchUrl ?? mainUrl}
             diffUrl={diffUrl}
@@ -126,6 +119,6 @@ export function SnapshotOverlay({
         </div>
       </Viewport>
       <Controls regions={regions} diffUrl={diffUrl} showDiff={showDiff} onShowDiff={setShowDiff} />
-    </div>
+    </Stack>
   );
 }

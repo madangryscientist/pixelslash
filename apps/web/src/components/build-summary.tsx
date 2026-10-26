@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button } from "@hackcove/ui";
+import { Body, Button, Caption, Cluster, Divider, Overline, Pill, Stack } from "@hackcove/ui";
 import { useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { tabCounts } from "#/lib/build-tabs";
@@ -56,28 +56,34 @@ function Sentences({
   const label = shotLabeller(snapshots.map((shot) => shot.name));
   const byId = new Map(snapshots.map((shot) => [shot.id, shot]));
   return (
-    <p data-testid="summary-text">
+    <Stack gap="xs" data-testid="summary-text">
       {build.aiSummary?.sentences.map((sentence, i) => (
-        <span key={i} className="mb-1 block" data-testid="summary-sentence">
+        <Body as="p" key={i} data-testid="summary-sentence">
           {sentence.text}{" "}
           {sentence.shots.flatMap((id, _, ids) => {
             const shot = byId.get(id);
             if (!shot) return [];
             return [
-              <Link
+              <Pill
                 key={id}
-                to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-                params={{ projectId, buildId: build.id, snapshotId: id }}
-                className="mr-1 rounded border border-slate-200 px-1 text-xs text-violet-700 hover:underline"
+                tone="violet"
                 data-testid="summary-shot-link"
+                render={(props) => (
+                  <Link
+                    to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                    params={{ projectId, buildId: build.id, snapshotId: id }}
+                    {...props}
+                  />
+                )}
               >
                 {linkText(shot, label(shot.name), oneStory(ids, byId))}
-              </Link>,
+              </Pill>,
+              " ",
             ];
-          })}{" "}
-        </span>
+          })}
+        </Body>
       ))}
-    </p>
+    </Stack>
   );
 }
 
@@ -109,11 +115,11 @@ function Footer({
       .finally(() => setBusy(false));
   };
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+    <Cluster gap="sm" wrap>
       {summary && (
-        <span data-testid="summary-model">
+        <Caption data-testid="summary-model">
           {summary.model} · {formatDateTime(new Date(summary.at))}
-        </span>
+        </Caption>
       )}
       {canRegenerate && (
         <Button
@@ -127,11 +133,11 @@ function Footer({
         </Button>
       )}
       {error && (
-        <span role="alert" className="text-red-700">
+        <Caption role="alert" tone="danger">
           {error}
-        </span>
+        </Caption>
       )}
-    </div>
+    </Cluster>
   );
 }
 
@@ -159,21 +165,21 @@ function SummaryBody({
   if (!describable) return null;
   if (modelConfigured && tooManyChanges(changed))
     return (
-      <p className="text-slate-600" data-testid="summary-too-many">
+      <Body as="p" tone="muted" data-testid="summary-too-many">
         {noSummaryReason(changed)}
-      </p>
+      </Body>
     );
   // Written once every shot is explained (ob 1875); a big build gets none.
   if (pending)
     return (
-      <p className="text-slate-600" data-testid="summary-pending">
+      <Body as="p" tone="muted" data-testid="summary-pending">
         explaining…
-      </p>
+      </Body>
     );
   return (
-    <p className="text-slate-600" data-testid="summary-skip">
+    <Body as="p" tone="muted" data-testid="summary-skip">
       skip: no judge.
-    </p>
+    </Body>
   );
 }
 
@@ -205,13 +211,9 @@ export function BuildSummary({
   const describable = snapshots.some((shot) => DESCRIBED.has(shot.diffStatus ?? ""));
   const changed = snapshots.filter((shot) => shot.diffStatus === "changed").length;
   return (
-    <section
-      className="mt-4 border-t border-slate-200 pt-4 text-sm text-slate-700"
-      data-testid="build-summary"
-    >
-      <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-        AI summary
-      </h2>
+    <Stack as="section" gap="xs" data-testid="build-summary">
+      <Divider />
+      <Overline as="h2">AI summary</Overline>
       <SummaryBody
         projectId={projectId}
         build={build}
@@ -221,16 +223,16 @@ export function BuildSummary({
         describable={describable}
         pending={pending}
       />
-      <p className="mt-1 text-slate-600" data-testid="summary-counts">
+      <Body as="p" tone="muted" data-testid="summary-counts">
         {describable ? "" : "Nothing changed. "}
         {measuredCounts(snapshots).join(" · ")}.
-      </p>
+      </Body>
       <Footer
         projectId={projectId}
         build={build}
         // While the queue writes it, a Regenerate would summarise notes not all in yet.
         canRegenerate={modelConfigured && describable && !tooManyChanges(changed) && !pending}
       />
-    </section>
+    </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { Button, SegmentedControl } from "@hackcove/ui";
+import { Button, Cluster, ClusterGrow, SegmentedControl } from "@hackcove/ui";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionLegend } from "#/components/composition";
 import type { Scale } from "#/components/snapshot-frame";
@@ -72,8 +72,8 @@ function CompositionToggle({
   return (
     <>
       <Button
-        variant={on ? "primary" : "outline"}
-        aria-pressed={on}
+        variant="outline"
+        pressed={on}
         disabled={!hydrated || !side}
         title={
           side ? "Draw the composition findings on Branch" : "Findings are drawn side by side only"
@@ -116,11 +116,11 @@ export function ViewerControls({
 }) {
   const hydrated = useHydrated();
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
+    <Cluster gap="xs" wrap>
       <Segmented label="View mode" options={MODES} value={mode} onChange={onMode} />
       <Button
-        variant={highlight ? "primary" : "outline"}
-        aria-pressed={highlight}
+        variant="outline"
+        pressed={highlight}
         disabled={!hydrated || !measured}
         title={measured ? "Draw the measured regions" : "Nothing was measured, so nothing to draw"}
         onClick={() => onHighlight(!highlight)}
@@ -136,7 +136,7 @@ export function ViewerControls({
           onChange={onShowFindings}
         />
       )}
-      <span className="flex-1" />
+      <ClusterGrow />
       <Segmented
         label="Scale"
         options={SCALES}
@@ -144,6 +144,6 @@ export function ViewerControls({
         onChange={onScale}
         disabled={crop ? {} : { zoom: "No measured change to zoom to" }}
       />
-    </div>
+    </Cluster>
   );
 }

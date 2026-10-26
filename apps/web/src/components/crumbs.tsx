@@ -1,4 +1,4 @@
-import { crumbLinkClass } from "@hackcove/ui";
+import { Caption, crumbLinkClass } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
@@ -28,7 +28,7 @@ export function projectCrumb(project: { id: string; name: string }): ReactNode {
 export function buildCrumbLabel(build: { branch: string; commitSha: string }): ReactNode {
   return (
     <>
-      {build.branch} <span className="font-mono text-xs">{build.commitSha.slice(0, 7)}</span>
+      {build.branch} <Caption mono>{build.commitSha.slice(0, 7)}</Caption>
     </>
   );
 }

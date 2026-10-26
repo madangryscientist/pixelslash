@@ -1,4 +1,13 @@
-import { KeyValue, KeyValueList } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Caption,
+  KeyValue,
+  KeyValueList,
+  Overline,
+  Stack,
+  TextLink,
+} from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
@@ -17,14 +26,6 @@ const OPTION_KEYS: (keyof DiffOptions)[] = [
   "noiseAmplitude",
   "maxShift",
 ];
-
-function Heading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-      {children}
-    </h2>
-  );
-}
 
 function sizeLine(result: NonNullable<SnapshotView["diffResult"]>, main: string, branch: string) {
   if (result.settledBy) return `${IDENTICAL_NOTE}; both shots are ${main}.`;
@@ -49,9 +50,9 @@ function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
     line = sizeLine(result, main, branch);
   }
   return (
-    <p data-testid="sizes" className="mt-2 text-sm text-slate-600">
+    <Body as="p" data-testid="sizes" tone="muted">
       {line}
-    </p>
+    </Body>
   );
 }
 
@@ -75,13 +76,15 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
   const result = snapshot.diffResult;
   if (!result) {
     return (
-      <section>
-        <Heading>Measured</Heading>
-        <p className="text-sm font-medium">Not measured</p>
+      <Stack as="section" gap="xs">
+        <Overline as="h2" tone="muted">
+          Measured
+        </Overline>
+        <BodyStrong as="p">Not measured</BodyStrong>
         {snapshot.diffError && (
-          <p data-testid="diff-error" className="mt-1 text-sm text-red-700">
+          <Body as="p" data-testid="diff-error" tone="danger">
             {snapshot.diffError}
-          </p>
+          </Body>
         )}
         {snapshot.measuredBy && (
           <KeyValueList>
@@ -89,22 +92,26 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
           </KeyValueList>
         )}
         <SizeLine snapshot={snapshot} />
-      </section>
+      </Stack>
     );
   }
   if (result.settledBy) {
     return (
-      <section>
-        <Heading>Measured</Heading>
-        <p className="text-sm font-medium">Not measured: identical bytes</p>
+      <Stack as="section" gap="xs">
+        <Overline as="h2" tone="muted">
+          Measured
+        </Overline>
+        <BodyStrong as="p">Not measured: identical bytes</BodyStrong>
         <SizeLine snapshot={snapshot} />
-      </section>
+      </Stack>
     );
   }
   const boxes = result.regions.filter((region) => region.kind === "change").length;
   return (
-    <section>
-      <Heading>Measured</Heading>
+    <Stack as="section" gap="xs">
+      <Overline as="h2" tone="muted">
+        Measured
+      </Overline>
       <KeyValueList>
         <KeyValue label="Changed px">{formatNumber(result.changedPixels)}</KeyValue>
         <KeyValue label="Changed regions">{boxes}</KeyValue>
@@ -113,32 +120,32 @@ function Measured({ snapshot }: { snapshot: SnapshotView }) {
         <KeyValue label="Specks dropped">
           {result.specks.count} ({formatNumber(result.specks.pixels)} px)
         </KeyValue>
-        <KeyValue label="Compared at">
-          {result.width}×{result.height}
-        </KeyValue>
+        <KeyValue label="Compared at">{`${result.width}×${result.height}`}</KeyValue>
         <Provenance snapshot={snapshot} />
       </KeyValueList>
       <SizeLine snapshot={snapshot} />
-    </section>
+    </Stack>
   );
 }
 
 /** Where the shot was taken. The colour scheme is the capture's media query, not a theme. */
 function Environment({ snapshot }: { snapshot: SnapshotView }) {
   return (
-    <section>
-      <Heading>Captured in</Heading>
+    <Stack as="section" gap="xs">
+      <Overline as="h2" tone="muted">
+        Captured in
+      </Overline>
       <KeyValueList>
         <KeyValue label="Platform">{snapshot.platform}</KeyValue>
         <KeyValue label="Browser">{snapshot.browser}</KeyValue>
         <KeyValue label="Viewport">{snapshot.viewport}</KeyValue>
         <KeyValue label="Colour scheme">
-          <span data-testid="color-scheme" className="font-mono text-xs">
+          <Caption data-testid="color-scheme" mono>
             prefers-color-scheme: {snapshot.theme}
-          </span>
+          </Caption>
         </KeyValue>
       </KeyValueList>
-    </section>
+    </Stack>
   );
 }
 
@@ -182,9 +189,9 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
               <span data-testid={`option-${key}`}>{used[key] ?? "engine default"}</span>
             </KeyValue>
             {source && (
-              <p data-testid={`source-${key}`} className="text-xs text-slate-500">
+              <Caption as="p" data-testid={`source-${key}`} tone="muted">
                 {source}
-              </p>
+              </Caption>
             )}
           </div>
         );
@@ -192,18 +199,24 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
     </KeyValueList>
   );
   return (
-    <section>
-      <Heading>Diff options</Heading>
+    <Stack as="section" gap="xs">
+      <Overline as="h2" tone="muted">
+        Diff options
+      </Overline>
       {allDefault ? (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-slate-600">All engine defaults</summary>
-          <div className="mt-2">{list}</div>
+        <details>
+          <summary className="cursor-pointer">
+            <Body tone="muted">All engine defaults</Body>
+          </summary>
+          {list}
         </details>
       ) : (
         list
       )}
-      <p className="mt-2 text-sm text-slate-600">{ignoreLine(snapshot)}</p>
-    </section>
+      <Body as="p" tone="muted">
+        {ignoreLine(snapshot)}
+      </Body>
+    </Stack>
   );
 }
 
@@ -217,28 +230,35 @@ const approvedNow = (snapshot: SnapshotView) =>
  */
 function Carried({ projectId, snapshot }: { projectId: string; snapshot: SnapshotView }) {
   // A carried change that was accepted since reads as approved earlier instead (ob 1722).
-  if (!snapshot.carriedFrom || approvedNow(snapshot)) return null;
+  const { carriedFrom, carriedFromBuild } = snapshot;
+  if (!carriedFrom || approvedNow(snapshot)) return null;
   return (
-    <section data-testid="carried">
-      <Heading>Carried change</Heading>
-      <p className="text-sm text-slate-700">
+    <Stack as="section" gap="xs" data-testid="carried">
+      <Overline as="h2" tone="muted">
+        Carried change
+      </Overline>
+      <Body as="p">
         No change since the branch's last build, whose change against the accepted baseline is still
         open. Accepting or rejecting here decides it on both builds.
-      </p>
-      {snapshot.carriedFromBuild && (
-        <Link
-          to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-          params={{
-            projectId,
-            buildId: snapshot.carriedFromBuild,
-            snapshotId: snapshot.carriedFrom,
-          }}
-          className="mt-1 inline-block text-sm text-violet-700 underline"
+      </Body>
+      {carriedFromBuild && (
+        <TextLink
+          render={(p) => (
+            <Link
+              to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+              params={{
+                projectId,
+                buildId: carriedFromBuild,
+                snapshotId: carriedFrom,
+              }}
+              {...p}
+            />
+          )}
         >
           See the change
-        </Link>
+        </TextLink>
       )}
-    </section>
+    </Stack>
   );
 }
 
@@ -250,24 +270,29 @@ function ApprovedEarlier({ projectId, snapshot }: { projectId: string; snapshot:
   const approved = snapshot.approvedEarlier;
   if (!approved || !approvedNow(snapshot)) return null;
   return (
-    <section data-testid="approved-earlier">
-      <Heading>Approved earlier</Heading>
-      <p className="text-sm text-slate-700">
-        Approved on build{" "}
-        <span className="font-mono text-xs">{approved.commitSha.slice(0, 7)}</span>
+    <Stack as="section" gap="xs" data-testid="approved-earlier">
+      <Overline as="h2" tone="muted">
+        Approved earlier
+      </Overline>
+      <Body as="p">
+        Approved on build <Caption mono>{approved.commitSha.slice(0, 7)}</Caption>
         {approved.reviewedBy && <> by {approved.reviewedBy}</>}
         {approved.reviewedAt && <>, {formatDateTime(approved.reviewedAt)}</>}. No change since, but
         this shot still differs from {approved.defaultBranch}.
-      </p>
-      <Link
-        to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-        params={{ projectId, buildId: approved.buildId, snapshotId: approved.snapshotId }}
-        className="mt-1 inline-block text-sm text-violet-700 underline"
+      </Body>
+      <TextLink
         data-testid="approved-earlier-link"
+        render={(p) => (
+          <Link
+            to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+            params={{ projectId, buildId: approved.buildId, snapshotId: approved.snapshotId }}
+            {...p}
+          />
+        )}
       >
         See the change against {approved.defaultBranch}
-      </Link>
-    </section>
+      </TextLink>
+    </Stack>
   );
 }
 
@@ -291,11 +316,11 @@ export function SidePanel({
   children?: ReactNode;
 }) {
   return (
-    <div className="space-y-6">
+    <Stack gap="md">
       {!reviewable && (
-        <p className="text-sm text-slate-600">
+        <Body as="p" tone="muted">
           This build is {status}; a new build is needed to review it.
-        </p>
+        </Body>
       )}
       {children}
       <Carried projectId={projectId} snapshot={snapshot} />
@@ -305,6 +330,6 @@ export function SidePanel({
       <Environment snapshot={snapshot} />
       <Options snapshot={snapshot} options={options} />
       {after}
-    </div>
+    </Stack>
   );
 }

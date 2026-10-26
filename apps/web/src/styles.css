@@ -10,19 +10,9 @@
  */
 
 /*
- * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.2.7 does not remap.
- * Without these a divider would be a light-theme colour on a dark surface. They sit here, not in a
- * fork of the theme: delete a rule when the theme ships it. The theme already ships the text-red,
- * border-amber and violet-hover rules with the same values, so they are not repeated.
- */
-.dark .divide-slate-100 > :not(:last-child) {
-  border-color: #282839; /* what border-slate-100 maps to */
-}
-
-/*
- * The organizations page's own colours: what the snapshot mix bar paints, the amber that marks
- * work waiting, and the grey of a button that cannot be pressed. Light is the hackcove palette
- * (Tailwind amber/blue/slate/emerald), dark is Catppuccin Mocha (peach, blue, surface, green).
+ * What the snapshot mix bar paints: hackcove's StackedBar takes text tones, which have one grey,
+ * and the bar needs two (not measured, and the unchanged track). Light is the hackcove palette
+ * (Tailwind amber/blue/slate), dark is Catppuccin Mocha (peach, blue, surface).
  */
 :root {
   --ps-changed: #f59e0b;
@@ -30,11 +20,6 @@
   --ps-removed: #ef4444;
   --ps-unmeasured: #cbd5e1;
   --ps-same: #e2e8f0;
-  --ps-ok: #059669;
-  --ps-warn: #b45309;
-  --ps-warn-soft: #fffbeb;
-  --ps-brand-soft: #f5f3ff;
-  --ps-brand-ink: #1e1e2e;
 }
 .dark {
   --ps-changed: #fab387;
@@ -42,8 +27,4 @@
   --ps-removed: #f38ba8;
   --ps-unmeasured: #585b70;
   --ps-same: #313244;
-  --ps-ok: #a6e3a1;
-  --ps-warn: #f9e2af;
-  --ps-warn-soft: #2d2a22;
-  --ps-brand-soft: #2a2540;
 }

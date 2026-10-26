@@ -1,10 +1,21 @@
-import { Breadcrumbs, Code, ListLayout } from "@hackcove/ui";
+import {
+  Body,
+  Breadcrumbs,
+  Callout,
+  Cluster,
+  Code,
+  ListLayout,
+  MetaList,
+  SectionHeading,
+  Stack,
+  TextLink,
+} from "@hackcove/ui";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { MainGroups } from "#/components/branch-main-groups";
 import {
   type BranchMode,
   ChangeSummary,
-  MainGroups,
   MainSummaryBox,
   ModeTabs,
 } from "#/components/branch-review";
@@ -32,6 +43,46 @@ export const Route = createFileRoute("/projects/$projectId/branches/$branch")({
 
 const short = (sha: string) => sha.slice(0, 7);
 
+type Loaded = ReturnType<typeof Route.useLoaderData>;
+
+/** The newest build on the branch, and where the branch left main. */
+function BranchMeta({
+  project,
+  build,
+  buildCount,
+}: Pick<Loaded, "project" | "build" | "buildCount">) {
+  return (
+    <Cluster gap="xs" wrap data-testid="branch-meta">
+      <Body tone="muted">newest build</Body>
+      <TextLink
+        mono
+        data-testid="branch-head"
+        render={(props) => (
+          <Link
+            to="/projects/$projectId/builds/$buildId"
+            params={{ projectId: project.id, buildId: build.id }}
+            {...props}
+          />
+        )}
+      >
+        {short(build.commitSha)}
+      </TextLink>
+      {build.prNumber !== null && <Body>PR #{build.prNumber}</Body>}
+      <StatusBadge status={build.status} />
+      <MetaList>
+        {formatDateTime(build.createdAt)}
+        {`${buildCount} build${buildCount === 1 ? "" : "s"} on this branch`}
+        {build.mergeBaseSha && (
+          <>
+            merge-base with <Code>{project.defaultBranch}</Code>:{" "}
+            <Code>{short(build.mergeBaseSha)}</Code>
+          </>
+        )}
+      </MetaList>
+    </Cluster>
+  );
+}
+
 function BranchPage() {
   const data = Route.useLoaderData();
   const { project, org, build, snapshots, againstMain, thumbs, previous, buildCount } = data;
@@ -55,35 +106,13 @@ function BranchPage() {
         breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), build.branch]} />}
         title={`${project.name} · ${build.branch}`}
       >
-        <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="branch-meta">
-          <span className="text-slate-500">newest build</span>
-          <Link
-            to="/projects/$projectId/builds/$buildId"
-            params={{ projectId: project.id, buildId: build.id }}
-            className="font-mono text-violet-700 hover:underline"
-            data-testid="branch-head"
-          >
-            {short(build.commitSha)}
-          </Link>
-          {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
-          <StatusBadge status={build.status} />
-          <span className="text-slate-500">{formatDateTime(build.createdAt)}</span>
-          <span className="text-slate-500">
-            {buildCount} build{buildCount === 1 ? "" : "s"} on this branch
-          </span>
-          {build.mergeBaseSha && (
-            <span className="text-slate-500">
-              · merge-base with <Code>{project.defaultBranch}</Code>:{" "}
-              <Code>{short(build.mergeBaseSha)}</Code>
-            </span>
-          )}
-        </div>
+        <BranchMeta project={project} build={build} buildCount={buildCount} />
         <MainSummaryBox summary={summary} status={build.status} />
         <ModeTabs projectId={project.id} branch={build.branch} active={mode} />
         {error && (
-          <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+          <Callout tone="danger" role="alert">
             {error}
-          </p>
+          </Callout>
         )}
         {mode === "main" ? (
           <AgainstMain
@@ -124,11 +153,11 @@ function AgainstMain({
   onReview,
 }: Parameters<typeof MainGroups>[0] & { defaultBranch: string; summary: MainSummary }) {
   return (
-    <section data-testid="mode-body-main">
-      <p className="mb-4 text-sm text-slate-600">
+    <Stack as="section" data-testid="mode-body-main">
+      <Body as="p" tone="muted">
         Everything this branch changes, measured from the accepted shot at the merge-base. This is
         the final review before merging.
-      </p>
+      </Body>
       <ChangeSummary
         title="What this branch changes"
         detail={`${summary.changed} shot${summary.changed === 1 ? "" : "s"} · ${
@@ -145,12 +174,12 @@ function AgainstMain({
         reviewable={reviewable}
         onReview={onReview}
       />
-      <p className="text-sm text-slate-500">
+      <Body as="p" tone="muted">
         Older builds made before against-main measuring show &ldquo;not measured against main&rdquo;
         and are not counted. &ldquo;Ready to merge&rdquo; only reads the review states above; it is
         not an approval of its own.
-      </p>
-    </section>
+      </Body>
+    </Stack>
   );
 }
 
@@ -175,12 +204,12 @@ function SinceLastBuild({
   const counts = tabCounts(snapshots);
   const lines = sinceLastBuildLines(snapshots);
   return (
-    <section data-testid="mode-body-since">
-      <p className="mb-4 text-sm text-slate-600">
+    <Stack as="section" data-testid="mode-body-since">
+      <Body as="p" tone="muted">
         {previous
           ? `What build ${head} changed compared with build ${previous} on this branch. The same view as the build page.`
           : `Build ${head} is the branch's first build, so it is compared with the accepted shots it started from. The same view as the build page.`}
-      </p>
+      </Body>
       <ChangeSummary
         title={`What build ${head} changes`}
         detail={`${lines.length} shot${lines.length === 1 ? "" : "s"}${previous ? ` since build ${previous}` : ""}`}
@@ -188,25 +217,23 @@ function SinceLastBuild({
         empty="Nothing changed since the last build."
       />
       {BUILD_TABS.filter((tab) => counts[tab.id] > 0).map((tab) => (
-        <div key={tab.id} data-testid={`since-${tab.id}`}>
+        <Stack key={tab.id} gap="xs" data-testid={`since-${tab.id}`}>
           {/* The removed and not-measured lists head themselves, by group. */}
           {(tab.id === "changed" || tab.id === "new" || tab.id === "unchanged") && (
-            <h2 className="mb-2 text-lg font-semibold">
-              {tab.label} <span className="text-slate-500">({counts[tab.id]})</span>
-            </h2>
+            <SectionHeading>
+              {tab.label} <Body tone="muted">({counts[tab.id]})</Body>
+            </SectionHeading>
           )}
-          <div className="mb-8">
-            <TabBody
-              projectId={projectId}
-              buildId={buildId}
-              tab={tab.id}
-              snapshots={snapshots}
-              thumbs={thumbs}
-              baseline={baseline}
-            />
-          </div>
-        </div>
+          <TabBody
+            projectId={projectId}
+            buildId={buildId}
+            tab={tab.id}
+            snapshots={snapshots}
+            thumbs={thumbs}
+            baseline={baseline}
+          />
+        </Stack>
       ))}
-    </section>
+    </Stack>
   );
 }

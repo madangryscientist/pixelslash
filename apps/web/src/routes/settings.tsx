@@ -5,7 +5,9 @@ import {
   Breadcrumbs,
   Button,
   Callout,
+  Caption,
   Card,
+  Cluster,
   CopyLine,
   Input,
   ListLayout,
@@ -63,6 +65,7 @@ function AccountSettings() {
               <Body as="p">Check a token from your machine with:</Body>
               <CopyLine
                 text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
+                disabled={!hydrated}
                 data-testid="token-usage"
               />
             </Stack>
@@ -100,46 +103,48 @@ function IssueForm({ onIssued }: { onIssued: (token: string) => void }) {
       .finally(() => setBusy(false));
   };
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-      <Input
-        aria-label="Token name, e.g. laptop"
-        placeholder="Token name, e.g. laptop"
-        value={name}
-        disabled={!hydrated}
-        onChange={(e) => setName(e.target.value)}
-        width="lg"
-      />
-      <Select
-        aria-label="Expires"
-        value={days}
-        disabled={!hydrated}
-        onChange={(e) => setDays(e.target.value)}
-        width="auto"
-      >
-        {TOKEN_EXPIRY_DAYS.map((d) => (
-          <option key={d} value={String(d)}>
-            {d === 365 ? "Expires in 1 year" : `Expires in ${d} days`}
-          </option>
-        ))}
-        <option value="never">Never expires</option>
-      </Select>
-      <Button
-        type="submit"
-        disabled={!hydrated}
-        disabledReason={empty ? emptyReason : undefined}
-        busy={busy}
-        busyLabel="Issuing…"
-      >
-        Issue token
-      </Button>
+    <Stack as="form" gap="xs" onSubmit={submit}>
+      <Cluster gap="sm" wrap>
+        <Input
+          aria-label="Token name, e.g. laptop"
+          placeholder="Token name, e.g. laptop"
+          value={name}
+          disabled={!hydrated}
+          onChange={(e) => setName(e.target.value)}
+          width="lg"
+        />
+        <Select
+          aria-label="Expires"
+          value={days}
+          disabled={!hydrated}
+          onChange={(e) => setDays(e.target.value)}
+          width="auto"
+        >
+          {TOKEN_EXPIRY_DAYS.map((d) => (
+            <option key={d} value={String(d)}>
+              {d === 365 ? "Expires in 1 year" : `Expires in ${d} days`}
+            </option>
+          ))}
+          <option value="never">Never expires</option>
+        </Select>
+        <Button
+          type="submit"
+          disabled={!hydrated}
+          disabledReason={empty ? emptyReason : undefined}
+          busy={busy}
+          busyLabel="Issuing…"
+        >
+          Issue token
+        </Button>
+      </Cluster>
       {error ? (
-        <p role="alert" className="w-full text-sm text-red-700">
+        <Body as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Body>
       ) : (
-        empty && hydrated && <p className="w-full text-xs text-slate-400">{emptyReason}</p>
+        empty && hydrated && <Caption as="p">{emptyReason}</Caption>
       )}
-    </form>
+    </Stack>
   );
 }
 
@@ -166,9 +171,9 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
   };
   if (tokens.length === 0) {
     return (
-      <p data-testid="no-tokens" className="text-sm text-slate-400">
+      <Body as="p" tone="muted" data-testid="no-tokens">
         No tokens yet. Issue one above to use the CLI or MCP server as yourself.
-      </p>
+      </Body>
     );
   }
   return (

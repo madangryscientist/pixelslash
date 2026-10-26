@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { Body, Caption, Stack, SubsectionHeading } from "@hackcove/ui";
 import {
   GAP_COLOUR,
   MAX_FINDINGS,
@@ -145,8 +146,10 @@ function Row({ finding, children }: { finding: Finding; children: ReactNode }) {
 function GapItem({ gap, index, library }: { gap: Gap; index: number; library: string }) {
   return (
     <Row finding={{ kind: "gap", index }}>
-      <code className="text-xs break-words">{gap.selector}</code>
-      <p className="text-sm break-words">{gapReason(gap, library)}</p>
+      <Caption as="code" mono>
+        {gap.selector}
+      </Caption>
+      <Body as="p">{gapReason(gap, library)}</Body>
     </Row>
   );
 }
@@ -154,8 +157,10 @@ function GapItem({ gap, index, library }: { gap: Gap; index: number; library: st
 function SpecialItem({ special, index }: { special: SpecialCase; index: number }) {
   return (
     <Row finding={{ kind: "special", index }}>
-      <code className="text-xs break-words">{special.selector}</code>
-      <p className="text-sm break-words">{special.reason}</p>
+      <Caption as="code" mono>
+        {special.selector}
+      </Caption>
+      <Body as="p">{special.reason}</Body>
     </Row>
   );
 }
@@ -168,18 +173,20 @@ export function CompositionPanel({ composition }: { composition: Composition | n
   if (!composition) return null;
   const { library, gaps, special, omitted } = composition;
   return (
-    <section aria-label="Composition" className="space-y-4">
+    <Stack as="section" gap="sm" aria-label="Composition">
       {omitted ? (
-        <p className="text-sm text-slate-500">
+        <Body as="p" tone="muted">
           {omitted} more past the cap of {MAX_FINDINGS} a shot were not kept.
-        </p>
+        </Body>
       ) : null}
       <div>
-        <h2 className="text-sm font-semibold">
+        <SubsectionHeading as="h2" size="sm">
           {library} gaps on Branch ({gaps.length})
-        </h2>
+        </SubsectionHeading>
         {gaps.length === 0 ? (
-          <p className="text-sm text-slate-500">Everything styled here comes from {library}.</p>
+          <Body as="p" tone="muted">
+            Everything styled here comes from {library}.
+          </Body>
         ) : (
           <ul aria-label={`${library} gaps`} className="divide-y divide-slate-200">
             {gaps.map((gap, i) => (
@@ -190,9 +197,13 @@ export function CompositionPanel({ composition }: { composition: Composition | n
         )}
       </div>
       <div>
-        <h2 className="text-sm font-semibold">Special cases on Branch ({special.length})</h2>
+        <SubsectionHeading as="h2" size="sm">
+          Special cases on Branch ({special.length})
+        </SubsectionHeading>
         {special.length === 0 ? (
-          <p className="text-sm text-slate-500">Nothing on this shot is declared custom.</p>
+          <Body as="p" tone="muted">
+            Nothing on this shot is declared custom.
+          </Body>
         ) : (
           <ul aria-label="Special cases" className="divide-y divide-slate-200">
             {special.map((s, i) => (
@@ -201,6 +212,6 @@ export function CompositionPanel({ composition }: { composition: Composition | n
           </ul>
         )}
       </div>
-    </section>
+    </Stack>
   );
 }

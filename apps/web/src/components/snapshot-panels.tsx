@@ -1,5 +1,18 @@
 import { type ReactNode } from "react";
-import { Button, Container, Dialog, Kbd, KeyValue, KeyValueList, Pill } from "@hackcove/ui";
+import {
+  Body,
+  Button,
+  ButtonGroup,
+  Cluster,
+  ClusterGrow,
+  Container,
+  Dialog,
+  Kbd,
+  KeyValue,
+  KeyValueList,
+  Pill,
+  SubsectionHeading,
+} from "@hackcove/ui";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { formatDateTime } from "#/lib/format";
@@ -14,9 +27,6 @@ const SHORTCUTS: [string, string][] = [
   ["?", "Show these shortcuts"],
   ["Esc", "Close this list"],
 ];
-
-const barButton =
-  "inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50";
 
 type Review = { index: number | null; total: number };
 
@@ -42,9 +52,9 @@ function ShotTitle({
   const title = label.component ? `${label.component} · ${label.story}` : label.story;
   return (
     <>
-      <h1 className="min-w-0 truncate text-base font-semibold" title={snapshot.name}>
+      <SubsectionHeading as="h1" size="base" title={snapshot.name}>
         {title}
-      </h1>
+      </SubsectionHeading>
       {variantChips(label).map((chip) => (
         <Pill key={chip} tone="slate">
           {chip}
@@ -52,9 +62,7 @@ function ShotTitle({
       ))}
       <StatusBadge status={build.status} />
       <ReviewChip state={snapshot.reviewState} by={snapshot.reviewedBy} />
-      {snapshot.reviewedAt && (
-        <span className="text-sm text-slate-500">{formatDateTime(snapshot.reviewedAt)}</span>
-      )}
+      {snapshot.reviewedAt && <Body tone="muted">{formatDateTime(snapshot.reviewedAt)}</Body>}
     </>
   );
 }
@@ -70,8 +78,6 @@ type BarActions = {
   onHelp: () => void;
 };
 
-const outline = `${barButton} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
-
 /** Walk, decide, and the key list: each button shows the key that does the same. */
 function Actions({
   actions,
@@ -85,69 +91,71 @@ function Actions({
   const hydrated = useHydrated();
   const { onPrevious, onNext } = actions;
   return (
-    <div className="flex items-center gap-1.5">
-      <button
-        type="button"
+    <ButtonGroup>
+      <Button
+        variant="outline"
+        size="sm"
         aria-label="Previous shot"
         aria-keyshortcuts="k"
         disabled={!hydrated || !onPrevious}
         onClick={() => onPrevious?.()}
-        className={outline}
       >
         ‹ <Kbd aria-hidden="true">k</Kbd>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
         aria-label="Next shot"
         aria-keyshortcuts="j"
         disabled={!hydrated || !onNext}
         onClick={() => onNext?.()}
-        className={outline}
       >
         › <Kbd aria-hidden="true">j</Kbd>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
         aria-expanded={actions.flagOpen}
+        pressed={actions.flagOpen}
         disabled={!hydrated}
         title="Missed change or false positive: tell PixelSlash the diff got this shot wrong"
         onClick={actions.onFlag}
-        className={`${outline} ${actions.flagOpen ? "border-violet-500! text-violet-700!" : ""}`}
       >
         Flag detection
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        tone="danger"
         aria-keyshortcuts="r"
         disabled={!hydrated || !canDecide}
         title={why}
         onClick={actions.onReject}
-        className={`${barButton} border border-red-300 bg-white text-red-700 hover:bg-red-50`}
       >
         Reject <Kbd aria-hidden="true">r</Kbd>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        size="sm"
+        tone="positive"
         aria-keyshortcuts="a"
         disabled={!hydrated || !canDecide}
         title={why}
         onClick={actions.onAccept}
-        className={`${barButton} border border-transparent bg-emerald-700 text-white hover:bg-emerald-800`}
       >
         Accept <Kbd aria-hidden="true">a</Kbd>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
         data-testid="keyboard-hint"
         aria-label="Keyboard shortcuts"
         aria-keyshortcuts="?"
         disabled={!hydrated}
         onClick={actions.onHelp}
-        className={`${barButton} text-slate-500 hover:text-slate-700`}
       >
         ?
-      </button>
-    </div>
+      </Button>
+    </ButtonGroup>
   );
 }
 
@@ -183,17 +191,17 @@ export function ViewerBar({
     <div className="sticky top-14 z-10 border-b border-slate-200 bg-white">
       <Container>
         {breadcrumbs}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Cluster gap="sm" wrap>
           <ShotTitle build={build} snapshot={snapshot} label={label} />
-          <span className="flex-1" />
-          <span data-testid="review-position" className="text-sm text-slate-600 tabular-nums">
+          <ClusterGrow />
+          <Body data-testid="review-position" tone="muted" numeric>
             {reviewText(review)}
-          </span>
-          <span data-testid="position" className="text-sm text-slate-500 tabular-nums">
+          </Body>
+          <Body data-testid="position" tone="muted" numeric>
             {position} of {total}
-          </span>
+          </Body>
           <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
-        </div>
+        </Cluster>
       </Container>
     </div>
   );

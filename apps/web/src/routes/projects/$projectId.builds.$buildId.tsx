@@ -1,4 +1,4 @@
-import { Breadcrumbs, ListLayout } from "@hackcove/ui";
+import { Body, BodyStrong, Breadcrumbs, Callout, ListLayout, Stack } from "@hackcove/ui";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { BuildHeader } from "#/components/build-header";
@@ -30,17 +30,19 @@ type Loaded = ReturnType<typeof Route.useLoaderData>;
 function BuildError({ project, build }: Pick<Loaded, "project" | "build">) {
   if (!build.error) return null;
   return (
-    <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">
-      {build.error}
-      {project.diffLocation === "ci" && build.status === "errored" && (
-        <span data-testid="rerun-ci" className="mt-1 block font-medium">
-          This project diffs in CI, so the server cannot measure it again: re-run the CI job.
-        </span>
-      )}
-      {project.diffLocation === "server" && build.status === "errored" && (
-        <RerunErrored projectId={project.id} buildId={build.id} />
-      )}
-    </div>
+    <Callout tone="danger" role="alert">
+      <Stack gap="xs">
+        <span>{build.error}</span>
+        {project.diffLocation === "ci" && build.status === "errored" && (
+          <BodyStrong as="p" tone="danger" data-testid="rerun-ci">
+            This project diffs in CI, so the server cannot measure it again: re-run the CI job.
+          </BodyStrong>
+        )}
+        {project.diffLocation === "server" && build.status === "errored" && (
+          <RerunErrored projectId={project.id} buildId={build.id} />
+        )}
+      </Stack>
+    </Callout>
   );
 }
 
@@ -58,6 +60,16 @@ function useAcceptAll(projectId: string, buildId: string) {
     }
   };
   return { error, acceptAll };
+}
+
+/** What a decision does to the build, under the shots. */
+function RejectionNote() {
+  return (
+    <Body as="p" tone="muted">
+      A rejection keeps the build failed until a new build arrives. New and removed shots are listed
+      for review and never block a build.
+    </Body>
+  );
 }
 
 function BuildPage() {
@@ -113,12 +125,14 @@ function BuildPage() {
         <BuildTimings build={build} />
         <BuildError project={project} build={build} />
         {error && (
-          <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm">
+          <Callout tone="danger" role="alert">
             {error}
-          </p>
+          </Callout>
         )}
         {snapshots.length === 0 ? (
-          <p className="text-slate-600">This build holds no snapshots yet.</p>
+          <Body as="p" tone="muted">
+            This build holds no snapshots yet.
+          </Body>
         ) : (
           <>
             <BuildTabs projectId={project.id} buildId={build.id} active={active} counts={counts} />
@@ -133,10 +147,7 @@ function BuildPage() {
             />
           </>
         )}
-        <p className="text-sm text-slate-500">
-          A rejection keeps the build failed until a new build arrives. New and removed shots are
-          listed for review and never block a build.
-        </p>
+        <RejectionNote />
         <BuildOverrideChanges changes={thresholdChanges} />
       </ListLayout>
     </Page>

@@ -1,4 +1,16 @@
-import { Button, CodeBlock, CopyButton, Field, Input } from "@hackcove/ui";
+import {
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  Cluster,
+  CodeBlock,
+  CopyButton,
+  Field,
+  Input,
+  Overline,
+  Stack,
+} from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";
@@ -110,15 +122,15 @@ function OptionField({
 
 function Snippet({ o, hydrated }: { o: ShownOverride; hydrated: boolean }) {
   return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>
+    <Stack gap="xs">
+      <Cluster justify="between" gap="sm">
+        <Caption>
           By @{o.by}, {formatDateTime(o.at)}. Copy as config:
-        </span>
+        </Caption>
         <CopyButton text={o.snippet} disabled={!hydrated} />
-      </div>
+      </Cluster>
       <CodeBlock data-testid="override-snippet">{o.snippet}</CodeBlock>
-    </div>
+    </Stack>
   );
 }
 
@@ -151,7 +163,7 @@ function ScopePicker({ scope, onChange }: { scope: Scope; onChange: (scope: Scop
     <fieldset className="space-y-1">
       <legend className="sr-only">Applies to</legend>
       {(["test", "variant"] as const).map((option) => (
-        <label key={option} className="flex items-center gap-2">
+        <label key={option} className="flex items-center gap-2 text-sm">
           <input
             type="radio"
             name="override-scope"
@@ -178,7 +190,7 @@ function Actions({
   onClear: (() => void) | null;
 }) {
   return (
-    <div className="flex gap-2">
+    <ButtonGroup>
       <Button
         type="submit"
         disabled={waiting}
@@ -203,7 +215,7 @@ function Actions({
           Clear
         </Button>
       )}
-    </div>
+    </ButtonGroup>
   );
 }
 
@@ -226,12 +238,11 @@ function OverrideForm({
   const set = (key: Key, value: string) =>
     setDrafts((d) => ({ ...d, [scope]: { ...d[scope], [key]: value } }));
   return (
-    <section data-testid="diff-override">
-      <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-        Set thresholds
-      </h2>
-      <form
-        className="space-y-2 text-sm"
+    <Stack as="section" gap="xs" data-testid="diff-override">
+      <Overline as="h2">Set thresholds</Overline>
+      <Stack
+        as="form"
+        gap="xs"
         onSubmit={(e) => {
           e.preventDefault();
           save(scope, optionsOf(draft));
@@ -247,23 +258,23 @@ function OverrideForm({
             onChange={(value) => set(key, value)}
           />
         ))}
-        <p className="text-xs text-slate-500">
+        <Caption as="p">
           Saving re-diffs this build now, and every later build reads it. Leave a field empty for
           the config's value.
-        </p>
+        </Caption>
         <Actions waiting={!hydrated} busy={busy} onClear={held ? () => save(scope, {}) : null} />
-      </form>
+      </Stack>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
+        <Body as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Body>
       )}
       {note && (
-        <p data-testid="override-note" className="mt-2 text-sm text-slate-600">
+        <Body as="p" tone="muted" data-testid="override-note">
           {note}
-        </p>
+        </Body>
       )}
       {held && <Snippet o={held} hydrated={hydrated} />}
-    </section>
+    </Stack>
   );
 }

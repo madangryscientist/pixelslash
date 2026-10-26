@@ -1,4 +1,20 @@
-import { Button, Input, Pill, Section, buttonClass } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Button,
+  ButtonGroup,
+  ButtonLink,
+  Caption,
+  Card,
+  Cluster,
+  Input,
+  ListRow,
+  Overline,
+  Pill,
+  Section,
+  Stack,
+  TextLink,
+} from "@hackcove/ui";
 import { Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import type { ProjectFlag, SnapshotFlag } from "#/db/flags";
@@ -72,27 +88,31 @@ type FlagDraft = ReturnType<typeof useFlagDraft>;
 function FlagList({ flags }: { flags: SnapshotFlag[] }) {
   if (flags.length === 0) return null;
   return (
-    <section>
-      <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+    <Stack as="section" gap="xs">
+      <Overline as="h2" tone="muted">
         Detection flags
-      </h2>
-      <ul className="space-y-2 text-sm">
+      </Overline>
+      <Stack as="ul" gap="xs">
         {flags.map((flag) => (
           <li key={flag.id} data-testid="detection-flag" data-kind={flag.kind}>
-            <Pill tone={flag.kind === "missed" ? "amber" : "blue"}>{FLAG_LABELS[flag.kind]}</Pill>
-            <span className="ml-2 text-slate-500">by {flag.mine ? "you" : flag.by}</span>
-            {flag.note && <p className="mt-1 text-slate-700">{flag.note}</p>}
-            {flag.rect && <p className="mt-0.5 text-xs text-slate-500">{rectText(flag.rect)}</p>}
+            <Pill tone={flag.kind === "missed" ? "amber" : "blue"}>{FLAG_LABELS[flag.kind]}</Pill>{" "}
+            <Body tone="muted">by {flag.mine ? "you" : flag.by}</Body>
+            {flag.note && <Body as="p">{flag.note}</Body>}
+            {flag.rect && (
+              <Caption as="p" tone="muted">
+                {rectText(flag.rect)}
+              </Caption>
+            )}
           </li>
         ))}
-      </ul>
-    </section>
+      </Stack>
+    </Stack>
   );
 }
 
 function KindPicker({ kind, onKind }: { kind: FlagKind | null; onKind: (kind: FlagKind) => void }) {
   return (
-    <>
+    <Stack gap="xs">
       {KINDS.map((option) => (
         <label key={option} className="flex items-start gap-2">
           <input
@@ -103,13 +123,13 @@ function KindPicker({ kind, onKind }: { kind: FlagKind | null; onKind: (kind: Fl
             onChange={() => onKind(option)}
             className="mt-1"
           />
-          <span>
-            {FLAG_LABELS[option]}
-            <span className="block text-xs text-slate-500">{KIND_HINTS[option]}</span>
+          <span className="grid">
+            <Body>{FLAG_LABELS[option]}</Body>
+            <Caption tone="muted">{KIND_HINTS[option]}</Caption>
           </span>
         </label>
       ))}
-    </>
+    </Stack>
   );
 }
 
@@ -122,11 +142,11 @@ function drawLabel(draft: FlagDraft): string {
 function AreaPicker({ draft }: { draft: FlagDraft }) {
   const { canDraw } = draft;
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <Cluster gap="xs" wrap>
       <Button
         type="button"
-        variant={draft.drawing ? "primary" : "outline"}
-        aria-pressed={draft.drawing}
+        variant="outline"
+        pressed={draft.drawing}
         disabled={!canDraw}
         title={canDraw ? "Drag a box on either shot" : "Nothing was measured to draw on"}
         onClick={() => draft.setDrawing(!draft.drawing)}
@@ -136,15 +156,15 @@ function AreaPicker({ draft }: { draft: FlagDraft }) {
       </Button>
       {draft.rect && (
         <>
-          <span data-testid="flag-rect" className="text-xs text-slate-500">
+          <Caption data-testid="flag-rect" tone="muted">
             {rectText(draft.rect)}
-          </span>
+          </Caption>
           <Button type="button" variant="ghost" onClick={() => draft.setRect(null)} size="sm">
             Clear
           </Button>
         </>
       )}
-    </div>
+    </Cluster>
   );
 }
 
@@ -186,54 +206,54 @@ function FlagForm({
   };
 
   return (
-    <form
-      onSubmit={save}
-      aria-label="Flag detection"
-      className="space-y-3 rounded-lg border border-violet-200 bg-violet-50/40 p-3 text-sm"
-    >
-      <fieldset className="space-y-1.5">
-        <legend className="mb-1 font-medium">{mine ? "Edit your flag" : "Flag detection"}</legend>
-        <KindPicker kind={kind} onKind={setKind} />
-      </fieldset>
-      <Input
-        aria-label="Note (optional)"
-        placeholder="Note (optional)"
-        value={note}
-        maxLength={200}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <AreaPicker draft={draft} />
-      {error && (
-        <p role="alert" className="text-red-700">
-          {error}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="submit"
-          disabledReason={kind ? undefined : "Pick missed change or false positive"}
-          busy={busy}
-          busyLabel="Saving…"
-          size="sm"
-        >
-          {mine ? "Save flag" : "Flag"}
-        </Button>
-        {mine && (
+    <Card size="sm">
+      <Stack as="form" gap="sm" onSubmit={save} aria-label="Flag detection">
+        <fieldset>
+          <legend>
+            <BodyStrong>{mine ? "Edit your flag" : "Flag detection"}</BodyStrong>
+          </legend>
+          <KindPicker kind={kind} onKind={setKind} />
+        </fieldset>
+        <Input
+          aria-label="Note (optional)"
+          placeholder="Note (optional)"
+          value={note}
+          maxLength={200}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <AreaPicker draft={draft} />
+        {error && (
+          <Body as="p" role="alert" tone="danger">
+            {error}
+          </Body>
+        )}
+        <ButtonGroup>
           <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            onClick={() => run(() => withdrawShotFlag({ data: ids }))}
+            type="submit"
+            disabledReason={kind ? undefined : "Pick missed change or false positive"}
+            busy={busy}
+            busyLabel="Saving…"
             size="sm"
           >
-            Withdraw
+            {mine ? "Save flag" : "Flag"}
           </Button>
-        )}
-        <Button type="button" variant="ghost" onClick={draft.close} size="sm">
-          Cancel
-        </Button>
-      </div>
-    </form>
+          {mine && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => run(() => withdrawShotFlag({ data: ids }))}
+              size="sm"
+            >
+              Withdraw
+            </Button>
+          )}
+          <Button type="button" variant="ghost" onClick={draft.close} size="sm">
+            Cancel
+          </Button>
+        </ButtonGroup>
+      </Stack>
+    </Card>
   );
 }
 
@@ -267,36 +287,45 @@ export function ProjectFlags({ projectId, flags }: { projectId: string; flags: P
     <Section
       title={
         <>
-          Detection flags <span className="font-normal text-slate-500">{flags.length}</span>
+          Detection flags <Body tone="muted">{flags.length}</Body>
         </>
       }
       actions={
-        <a href={`/projects/${projectId}/flags.json`} download className={buttonClass("outline")}>
+        <ButtonLink variant="outline" href={`/projects/${projectId}/flags.json`} download>
           Export JSON
-        </a>
+        </ButtonLink>
       }
     >
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-        {flags.map((flag) => (
-          <li
+      <Card flush>
+        {flags.map((flag, i) => (
+          <ListRow
             key={flag.id}
+            static
+            divided={i > 0}
             data-testid="project-flag"
-            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-3 text-sm"
+            leading={
+              <Pill tone={flag.kind === "missed" ? "amber" : "blue"}>{FLAG_LABELS[flag.kind]}</Pill>
+            }
           >
-            <Pill tone={flag.kind === "missed" ? "amber" : "blue"}>{FLAG_LABELS[flag.kind]}</Pill>
-            <Link
-              to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-              params={{ projectId, buildId: flag.build.id, snapshotId: flag.snapshot.id }}
-              className="font-medium text-violet-700 hover:underline"
-            >
-              {flag.snapshot.name}
-            </Link>
-            <span className="text-slate-500">on {flag.build.branch}</span>
-            <span className="text-slate-400">by {flag.by}</span>
-            {flag.note && <span className="basis-full text-slate-700">{flag.note}</span>}
-          </li>
+            <Cluster gap="xs" align="baseline" wrap>
+              <TextLink
+                render={(p) => (
+                  <Link
+                    to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                    params={{ projectId, buildId: flag.build.id, snapshotId: flag.snapshot.id }}
+                    {...p}
+                  />
+                )}
+              >
+                {flag.snapshot.name}
+              </TextLink>
+              <Body tone="muted">on {flag.build.branch}</Body>
+              <Caption tone="muted">by {flag.by}</Caption>
+            </Cluster>
+            {flag.note && <Body as="p">{flag.note}</Body>}
+          </ListRow>
         ))}
-      </ul>
+      </Card>
     </Section>
   );
 }

@@ -1,6 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo, useState } from "react";
-import { Button, type LinkRenderProps, Tabs } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Button,
+  Card,
+  Cluster,
+  type LinkRenderProps,
+  ListRow,
+  MetaList,
+  Section,
+  Stack,
+  Tabs,
+} from "@hackcove/ui";
 import { aiFiltered } from "#/components/ai-notes";
 import { ShotCard, measured } from "#/components/shot-card";
 import { ReviewChip } from "#/components/ui";
@@ -57,28 +69,41 @@ function ShotRows({
   baseline: boolean;
 }) {
   return (
-    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-      {rows.map((shot) => (
-        <li key={shot.id} data-testid="snapshot-row">
-          <Link
-            to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-            params={{ projectId, buildId, snapshotId: shot.id }}
-            className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-slate-50"
-          >
-            <span className="font-medium">{shot.name}</span>
-            <span className="text-sm text-slate-500">
-              {shot.platform} · {shot.browser} · {shot.viewport} · {shot.theme}
-            </span>
-            <span className="text-sm text-slate-600">{measured(shot, baseline)}</span>
-            {!baseline && shot.reviewState !== "pending" && (
-              <span className="ml-auto">
-                <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
-              </span>
-            )}
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <Card flush>
+      <ul>
+        {rows.map((shot, index) => (
+          <li key={shot.id} data-testid="snapshot-row">
+            <ListRow
+              divided={index > 0}
+              trailing={
+                !baseline &&
+                shot.reviewState !== "pending" && (
+                  <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
+                )
+              }
+              render={(props) => (
+                <Link
+                  to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                  params={{ projectId, buildId, snapshotId: shot.id }}
+                  {...props}
+                />
+              )}
+            >
+              <Cluster gap="sm" wrap>
+                <BodyStrong>{shot.name}</BodyStrong>
+                <MetaList>
+                  {shot.platform}
+                  {shot.browser}
+                  {shot.viewport}
+                  {shot.theme}
+                </MetaList>
+                <Body tone="muted">{measured(shot, baseline)}</Body>
+              </Cluster>
+            </ListRow>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -95,14 +120,19 @@ function GroupSection({
 }) {
   if (count === 0) return null;
   return (
-    <section data-testid={`group-${group}`} className="mb-8">
-      {heading && (
-        <h2 className="mb-2 text-lg font-semibold">
-          {GROUP_LABEL[group]} <span className="text-slate-500">({count})</span>
-        </h2>
-      )}
+    <Section
+      data-testid={`group-${group}`}
+      gap="xs"
+      title={
+        heading && (
+          <>
+            {GROUP_LABEL[group]} <Body tone="muted">({count})</Body>
+          </>
+        )
+      }
+    >
       {children}
-    </section>
+    </Section>
   );
 }
 
@@ -154,9 +184,9 @@ export function TabBody({
 
   if (groups.every((group) => inGroup(group).length === 0)) {
     return (
-      <p className="text-slate-600" data-testid="tab-empty">
+      <Body as="p" tone="muted" data-testid="tab-empty">
         Nothing in {definition?.label ?? "this tab"}.
-      </p>
+      </Body>
     );
   }
   if (tab === "changed" || tab === "new") {
@@ -183,7 +213,7 @@ export function TabBody({
     );
   }
   return (
-    <>
+    <Stack gap="lg">
       {groups.map((group) => (
         <GroupSection key={group} group={group} count={inGroup(group).length} heading>
           <ShotRows
@@ -194,7 +224,7 @@ export function TabBody({
           />
         </GroupSection>
       ))}
-    </>
+    </Stack>
   );
 }
 
@@ -233,22 +263,27 @@ function CardGroups({
   );
   const filtered = rows.filter(aiFiltered);
   return (
-    <>
+    <Stack gap="lg">
       <GroupSection group={group} count={rows.length - filtered.length} heading={false}>
         {cards(rows.filter((shot) => !aiFiltered(shot)))}
       </GroupSection>
       {filtered.length > 0 && (
-        <section data-testid="group-ai-filtered" className="mb-8">
-          <h2 className="mb-1 text-lg font-semibold">
-            AI-filtered <span className="text-slate-500">({filtered.length})</span>
-          </h2>
-          <p className="mb-3 text-sm text-slate-600">
+        <Section
+          data-testid="group-ai-filtered"
+          gap="xs"
+          title={
+            <>
+              AI-filtered <Body tone="muted">({filtered.length})</Body>
+            </>
+          }
+        >
+          <Body as="p" tone="muted">
             Accepted without a person: the project&apos;s model labelled every changed region noise.
             Open one to reject it.
-          </p>
+          </Body>
           {cards(filtered)}
-        </section>
+        </Section>
       )}
-    </>
+    </Stack>
   );
 }

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Pill } from "@hackcove/ui";
+import { Body, BodyStrong, Caption, Card, Cluster, ClusterGrow, Pill, Stack } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import type { Composition } from "#/components/composition";
@@ -147,9 +147,34 @@ export function findingsLine({ library, gaps, special }: Composition): string {
 function GapsLine({ composition }: { composition: Composition | null | undefined }) {
   if (!composition) return null;
   return (
-    <p className="mt-1 text-sm text-slate-600" data-testid="shot-gaps">
+    <Body as="p" tone="muted" data-testid="shot-gaps">
       {findingsLine(composition)}
-    </p>
+    </Body>
+  );
+}
+
+/** The judge's sentence (ob 1745) and the AI's labels, above the measured line, which always follows them. */
+function ShotNotes({ shot }: { shot: SnapshotView }) {
+  return (
+    <>
+      {shot.changeNote && (
+        <Body as="p" data-testid="shot-change-note">
+          <Body tone="muted">Judge (local model): </Body>
+          {shot.changeNote}.
+        </Body>
+      )}
+      {shot.aiReview && (
+        <Body as="p" data-testid="shot-ai-labels">
+          <Body tone="muted">AI: </Body>
+          {labelSummary(shot.aiReview.regions)}
+        </Body>
+      )}
+      {!shot.aiReview && shot.aiPending && (
+        <Body as="p" tone="muted" data-testid="shot-ai-pending">
+          AI: explaining…
+        </Body>
+      )}
+    </>
   );
 }
 
@@ -172,55 +197,50 @@ export function ShotCard({
   const line = measured(shot, baseline);
   return (
     <li data-testid="snapshot-row" className="relative">
-      <Link
-        to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-        params={{ projectId, buildId, snapshotId: shot.id }}
-        className="block h-full rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-400"
+      <Card
+        size="sm"
+        render={(props) => (
+          <Link
+            to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+            params={{ projectId, buildId, snapshotId: shot.id }}
+            {...props}
+          />
+        )}
       >
-        <ShotThumb shot={shot} src={src} />
-        <div className="mt-3 flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            {label.component && (
-              <p className="truncate text-xs text-slate-500" data-testid="shot-component">
-                {label.component}
-              </p>
+        <Stack gap="xs">
+          <ShotThumb shot={shot} src={src} />
+          <Cluster gap="xs" align="start" justify="between">
+            <ClusterGrow>
+              {/* Stacked: a truncated run is inline-block, so two would share a line. */}
+              <Stack gap="xs">
+                {label.component && (
+                  <Caption as="p" truncate data-testid="shot-component">
+                    {label.component}
+                  </Caption>
+                )}
+                <BodyStrong as="p" truncate title={shot.name} data-testid="shot-story">
+                  {label.story}
+                </BodyStrong>
+              </Stack>
+            </ClusterGrow>
+            {!baseline && (holdsChange(shot) || shot.reviewState !== "pending") && (
+              <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
             )}
-            <p className="truncate font-medium" title={shot.name} data-testid="shot-story">
-              {label.story}
-            </p>
-          </div>
-          {!baseline && (holdsChange(shot) || shot.reviewState !== "pending") && (
-            <ReviewChip state={shot.reviewState} by={shot.reviewedBy} />
-          )}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {shotChips(shot, label).map((chip) => (
-            <Pill key={chip} tone="slate">
-              {chip}
-            </Pill>
-          ))}
-        </div>
-        {/* The judge's sentence (ob 1745) above the measured line, which always follows it. */}
-        {shot.changeNote && (
-          <p className="mt-2 text-sm text-slate-800" data-testid="shot-change-note">
-            <span className="text-slate-500">Judge (local model): </span>
-            {shot.changeNote}.
-          </p>
-        )}
-        {shot.aiReview && (
-          <p className="mt-2 text-sm text-slate-800" data-testid="shot-ai-labels">
-            <span className="text-slate-500">AI: </span>
-            {labelSummary(shot.aiReview.regions)}
-          </p>
-        )}
-        {!shot.aiReview && shot.aiPending && (
-          <p className="mt-2 text-sm text-slate-500" data-testid="shot-ai-pending">
-            AI: explaining…
-          </p>
-        )}
-        <p className="mt-2 text-sm text-slate-600">{line}</p>
-        <GapsLine composition={shot.composition} />
-      </Link>
+          </Cluster>
+          <Cluster gap="xs" wrap>
+            {shotChips(shot, label).map((chip) => (
+              <Pill key={chip} tone="slate">
+                {chip}
+              </Pill>
+            ))}
+          </Cluster>
+          <ShotNotes shot={shot} />
+          <Body as="p" tone="muted">
+            {line}
+          </Body>
+          <GapsLine composition={shot.composition} />
+        </Stack>
+      </Card>
       {/* Beside the card's link, not in it: a link inside a link is not HTML. */}
       {shot.flakeId && (
         <span className="absolute top-4 left-4">

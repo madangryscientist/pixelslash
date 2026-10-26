@@ -1,3 +1,4 @@
+import { Body, BodyStrong, Caption, Stack, type TextTone } from "@hackcove/ui";
 import type { BuildSummary } from "#/db/build-list";
 import type { BuildCounts } from "#/db/review";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
@@ -37,7 +38,7 @@ export function MixBar({ counts }: { counts: BuildCounts }) {
   const slices = slicesOf(counts);
   const total = totalOf(counts);
   return (
-    <div data-testid="snapshot-mix">
+    <Stack gap="xs" data-testid="snapshot-mix">
       <div
         role="img"
         aria-label={slices.map((s) => `${s.count} ${s.label}`).join(", ") || "no shots"}
@@ -51,21 +52,22 @@ export function MixBar({ counts }: { counts: BuildCounts }) {
           />
         ))}
       </div>
-      <p className="mt-1.25 text-xs text-slate-400">
+      <Caption as="p">
         {slices.length === 0
           ? "no shots"
           : slices.map((s) => `${formatNumber(s.count)} ${s.label}`).join(" · ")}
-      </p>
-    </div>
+      </Caption>
+    </Stack>
   );
 }
 
-/** The stripe down a row's left edge: amber when work is waiting, the verdict otherwise. */
-export function stripeOf(build: MixBuild): string {
-  if (build.counts.toReview > 0) return "var(--ps-changed)";
-  if (build.status === "failed" || build.status === "errored") return "var(--ps-removed)";
-  if (build.status === "passed") return "var(--ps-ok)";
-  return "var(--ps-unmeasured)";
+/** The stripe down a row's leading edge: amber when work is waiting, the verdict otherwise. */
+export function stripeToneOf(build: MixBuild | null): TextTone {
+  if (!build) return "muted";
+  if (build.counts.toReview > 0) return "warn";
+  if (build.status === "failed" || build.status === "errored") return "danger";
+  if (build.status === "passed") return "positive";
+  return "muted";
 }
 
 /** A build in one of these statuses was never diffed, so "nothing to review" would claim a result. */
@@ -74,17 +76,17 @@ const UNMEASURED = new Set<MixBuild["status"]>(["uploading", "processing", "erro
 function ToReviewCount({ build, defaultBranch }: { build: MixBuild; defaultBranch: string }) {
   if (build.counts.toReview > 0) {
     return (
-      <span data-testid="to-review" className="font-bold text-(--ps-warn)">
+      <BodyStrong tone="warn" data-testid="to-review">
         {build.counts.toReview} to review
-      </span>
+      </BodyStrong>
     );
   }
   return (
-    <span data-testid="to-review" className="text-sm text-slate-400">
+    <Body tone="muted" data-testid="to-review">
       {build.branch === defaultBranch && build.status === "passed"
         ? "auto-accepted"
         : "nothing to review"}
-    </span>
+    </Body>
   );
 }
 
@@ -96,22 +98,22 @@ export function ToReview({
   build: MixBuild | null;
   defaultBranch: string;
 }) {
-  if (!build) return <span className="text-slate-400">—</span>;
+  if (!build) return <Body tone="muted">—</Body>;
   if (UNMEASURED.has(build.status)) {
     return (
-      <span data-testid="to-review" className="text-sm text-slate-400">
+      <Body tone="muted" data-testid="to-review">
         not measured
-      </span>
+      </Body>
     );
   }
   return (
-    <span className="flex flex-col">
+    <>
       <ToReviewCount build={build} defaultBranch={defaultBranch} />
       {build.counts.skippedFlaky > 0 && (
-        <span data-testid="skipped-flaky-count" className="text-xs text-amber-700">
+        <Caption as="p" tone="warn" data-testid="skipped-flaky-count">
           {build.counts.skippedFlaky} skipped: flaky
-        </span>
+        </Caption>
       )}
-    </span>
+    </>
   );
 }

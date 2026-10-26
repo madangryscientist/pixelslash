@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { CenteredLayout, buttonClass } from "@hackcove/ui";
+import { ButtonLink, CenteredLayout } from "@hackcove/ui";
 import { Page } from "#/components/ui";
 import { getViewer } from "#/server/fns";
 
@@ -14,9 +14,7 @@ function SignIn() {
   return (
     <Page>
       <CenteredLayout title="PixelSlash" subtitle="Visual review for every build.">
-        <a href="/auth/github" className={buttonClass()}>
-          Sign in with GitHub
-        </a>
+        <ButtonLink href="/auth/github">Sign in with GitHub</ButtonLink>
       </CenteredLayout>
     </Page>
   );

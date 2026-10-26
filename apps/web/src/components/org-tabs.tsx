@@ -1,7 +1,6 @@
-import { Button, type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
+import { Avatar, Button, type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { OrgOverview } from "#/db/orgs";
-import { Avatar } from "./avatar";
 import { plural } from "./org-projects";
 
 /** The header's two buttons; the page owns the dialogs they open. */
@@ -27,7 +26,7 @@ export function OrgHeader({
         <span className="flex items-center gap-3">
           <span className="flex" aria-hidden="true">
             {org.members.slice(0, 4).map((member) => (
-              <Avatar key={member.userId} login={member.login} ring />
+              <Avatar key={member.userId} name={member.login} ring />
             ))}
           </span>
           <span data-testid="org-people">

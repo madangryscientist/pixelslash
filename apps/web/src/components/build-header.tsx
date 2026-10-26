@@ -1,6 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
-import { Button, buttonClass } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Button,
+  ButtonLink,
+  Card,
+  Cluster,
+  ClusterGrow,
+  Code,
+  MetaList,
+  ProgressBar,
+  Stack,
+  TextLink,
+} from "@hackcove/ui";
 import { StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { firstToReview } from "#/lib/build-tabs";
@@ -13,23 +26,13 @@ function toReviewText(baseline: boolean, toReview: number): string {
 }
 
 function Progress({ reviewed, total }: { reviewed: number; total: number }) {
-  const percent = total === 0 ? 0 : Math.round((reviewed / total) * 100);
   return (
-    <div className="min-w-48 flex-1" data-testid="review-progress">
-      <p className="mb-1 text-sm text-slate-600">
+    <Stack gap="xs" data-testid="review-progress">
+      <Body as="p" tone="muted">
         {total === 0 ? "No changed shots to review" : `${reviewed} of ${total} reviewed`}
-      </p>
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={reviewed}
-        aria-label="Changed shots reviewed"
-        className="h-2 overflow-hidden rounded-full border border-slate-200 bg-slate-100"
-      >
-        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} />
-      </div>
-    </div>
+      </Body>
+      <ProgressBar value={reviewed} max={total} label="Changed shots reviewed" tone="positive" />
+    </Stack>
   );
 }
 
@@ -64,28 +67,75 @@ function AcceptAll({
 function SkippedFlaky({ projectId, count }: { projectId: string; count: number }) {
   if (count === 0) return null;
   return (
-    <Link
-      to="/projects/$projectId/flakes"
-      params={{ projectId }}
-      className="text-amber-700 hover:underline"
+    <TextLink
+      tone="warn"
       data-testid="skipped-flaky-count"
+      render={(props) => (
+        <Link to="/projects/$projectId/flakes" params={{ projectId }} {...props} />
+      )}
     >
       {count} skipped: flaky
-    </Link>
+    </TextLink>
   );
 }
 
 /** Every branch but the default one has a branch page: the whole branch against main (ob 1723). */
 function BranchLink({ projectId, branch }: { projectId: string; branch: string }) {
   return (
-    <Link
-      to="/projects/$projectId/branches/$branch"
-      params={{ projectId, branch }}
-      className="text-violet-700 hover:underline"
+    <TextLink
       data-testid="branch-link"
+      render={(props) => (
+        <Link
+          to="/projects/$projectId/branches/$branch"
+          params={{ projectId, branch }}
+          {...props}
+        />
+      )}
     >
       Review the whole branch
-    </Link>
+    </TextLink>
+  );
+}
+
+/** Open the next shot to review, or accept every one at once. */
+function ReviewActions({
+  projectId,
+  buildId,
+  next,
+  toReview,
+  reviewable,
+  onAccept,
+}: {
+  projectId: string;
+  buildId: string;
+  next: SnapshotView | undefined;
+  toReview: number;
+  reviewable: boolean;
+  onAccept: () => Promise<void>;
+}) {
+  return (
+    <Cluster gap="xs">
+      {next ? (
+        <ButtonLink
+          size="sm"
+          data-testid="review-next"
+          render={(props) => (
+            <Link
+              to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+              params={{ projectId, buildId, snapshotId: next.id }}
+              {...props}
+            />
+          )}
+        >
+          Review next
+        </ButtonLink>
+      ) : (
+        <Button disabled size="sm" data-testid="review-next">
+          Review next
+        </Button>
+      )}
+      <AcceptAll toReview={toReview} reviewable={reviewable} onAccept={onAccept} />
+    </Cluster>
   );
 }
 
@@ -119,57 +169,50 @@ export function BuildHeader({
   const approvedEarlier = snapshots.filter((shot) => shot.approvedEarlier).length;
   const next = firstToReview(snapshots);
   return (
-    <header className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="font-medium" data-testid="build-branch">
-          {build.branch}
-        </span>
-        {build.branch !== defaultBranch && (
-          <BranchLink projectId={projectId} branch={build.branch} />
-        )}
-        <span className="font-mono text-slate-700">{build.commitSha.slice(0, 7)}</span>
-        {build.prNumber !== null && <span>PR #{build.prNumber}</span>}
-        <StatusBadge status={build.status} />
-        <span className="text-slate-500">{formatDateTime(build.createdAt)}</span>
-        <span className="font-medium text-slate-700" data-testid="to-review">
-          {toReviewText(baseline, toReview)}
-        </span>
-        <SkippedFlaky projectId={projectId} count={skipped} />
-        {approvedEarlier > 0 && (
-          <span className="text-slate-600" data-testid="approved-earlier-count">
-            {approvedEarlier} approved earlier on this branch
-          </span>
-        )}
-      </div>
-      {baseline ? (
-        <p className="mt-4 text-sm text-slate-700" data-testid="build-baseline">
-          This build is the baseline. It is the first build that can be a baseline for this project,
-          so its {snapshots.length} shot{snapshots.length === 1 ? "" : "s"} have nothing to be
-          compared with and need no review. Later builds are compared against it.
-        </p>
-      ) : (
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <Progress reviewed={changed.length - toReview} total={changed.length} />
-          <div className="flex items-center gap-2">
-            {next ? (
-              <Link
-                to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-                params={{ projectId, buildId: build.id, snapshotId: next.id }}
-                className={`${buttonClass()} px-3 py-1.5`}
-                data-testid="review-next"
-              >
-                Review next
-              </Link>
-            ) : (
-              <Button disabled size="sm" data-testid="review-next">
-                Review next
-              </Button>
+    <Card as="section">
+      <Stack>
+        <Cluster gap="sm" wrap>
+          <MetaList>
+            <BodyStrong data-testid="build-branch">{build.branch}</BodyStrong>
+            {build.branch !== defaultBranch && (
+              <BranchLink projectId={projectId} branch={build.branch} />
             )}
-            <AcceptAll toReview={toReview} reviewable={reviewable} onAccept={onAccept} />
-          </div>
-        </div>
-      )}
-      {children}
-    </header>
+            <Code>{build.commitSha.slice(0, 7)}</Code>
+            {build.prNumber !== null && `PR #${build.prNumber}`}
+            {formatDateTime(build.createdAt)}
+          </MetaList>
+          <StatusBadge status={build.status} />
+          <BodyStrong data-testid="to-review">{toReviewText(baseline, toReview)}</BodyStrong>
+          <SkippedFlaky projectId={projectId} count={skipped} />
+          {approvedEarlier > 0 && (
+            <Body tone="muted" data-testid="approved-earlier-count">
+              {approvedEarlier} approved earlier on this branch
+            </Body>
+          )}
+        </Cluster>
+        {baseline ? (
+          <Body as="p" data-testid="build-baseline">
+            This build is the baseline. It is the first build that can be a baseline for this
+            project, so its {snapshots.length} shot{snapshots.length === 1 ? "" : "s"} have nothing
+            to be compared with and need no review. Later builds are compared against it.
+          </Body>
+        ) : (
+          <Cluster gap="sm" align="end" wrap>
+            <ClusterGrow>
+              <Progress reviewed={changed.length - toReview} total={changed.length} />
+            </ClusterGrow>
+            <ReviewActions
+              projectId={projectId}
+              buildId={build.id}
+              next={next}
+              toReview={toReview}
+              reviewable={reviewable}
+              onAccept={onAccept}
+            />
+          </Cluster>
+        )}
+        {children}
+      </Stack>
+    </Card>
   );
 }

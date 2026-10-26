@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Card, FieldDialog, SidebarLayout, Stack } from "@hackcove/ui";
+import { Body, Button, Card, EmptyState, FieldDialog, SidebarLayout, Stack } from "@hackcove/ui";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ModelSettings } from "#/components/model-settings";
@@ -180,20 +180,19 @@ function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
   return (
     <Stack width="narrow">
       <Card as="div" dashed="filled" data-testid="no-orgs">
-        <Stack>
-          <Stack gap="xs">
-            <h1 className="text-[17px] font-semibold">No organizations yet</h1>
-            <p className="text-slate-600">
-              An organization owns your projects and the people who review them. Create one to add
-              projects.
-            </p>
-          </Stack>
-          <ButtonGroup>
+        <EmptyState
+          title="No organizations yet"
+          actions={
             <Button disabled={!hydrated} onClick={onNew}>
               + New organization
             </Button>
-          </ButtonGroup>
-        </Stack>
+          }
+        >
+          <Body as="p" tone="muted">
+            An organization owns your projects and the people who review them. Create one to add
+            projects.
+          </Body>
+        </EmptyState>
       </Card>
     </Stack>
   );
@@ -222,10 +221,10 @@ function ProjectsPanel({
     );
   }
   return (
-    <>
+    <Stack gap="md">
       <WaitingStrip org={org} />
       <ProjectTable org={org} now={now} />
-    </>
+    </Stack>
   );
 }
 

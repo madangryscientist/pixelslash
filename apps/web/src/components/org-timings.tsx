@@ -1,5 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import {
+  Body,
+  BodyStrong,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -44,12 +47,15 @@ function Cell({
       }
     >
       <span data-testid={`timings-${step}`}>
-        {formatDuration(stats.p50)} <span className="text-slate-400">/</span>{" "}
+        {formatDuration(stats.p50)} <Body tone="muted">/</Body>{" "}
         {formatDuration(stats.tail === "max" ? stats.max : stats.p95)}
         {stats.tail === "max" && (
-          <span data-testid={`timings-${step}-tail`} className="ml-1 text-slate-500">
-            max
-          </span>
+          <>
+            {" "}
+            <Body tone="muted" data-testid={`timings-${step}-tail`}>
+              max
+            </Body>
+          </>
         )}
       </span>
     </TableCell>
@@ -95,33 +101,37 @@ function Row({ project }: { project: ProjectTimings }) {
 
 export function TimingsPanel({ projects }: { projects: ProjectTimings[] }) {
   if (projects.length === 0)
-    return <p className="text-slate-600">No timings for this organization.</p>;
+    return (
+      <Body as="p" tone="muted">
+        No timings for this organization.
+      </Body>
+    );
   const explained = (
-    <p className="mb-3 text-sm text-slate-600">
+    <Body as="p" tone="muted">
       Median / 95th percentile of each server step, over builds that finished in the last 30 days.
       With under {P95_MIN_BUILDS} builds the second figure is the slowest, and says max. A step a
       build did not run is left out, and so is a build that took more than one run. A step's own
       build count shows when it differs from Builds. Before diff is the time from opening the build
       to the diff starting, uploads included. {TOTAL_EXPLAINED} A build without a start and an end
       in order has no Total.
-    </p>
+    </Body>
   );
   if (projects.every((project) => project.builds === 0))
     return (
-      <section aria-label="Timings">
+      <Stack as="section" gap="sm" aria-label="Timings">
         {explained}
-        <ul>
+        <Stack as="ul" gap="xs">
           {projects.map((project) => (
-            <li key={project.projectId} data-testid="timings-empty" className="text-slate-600">
-              {projects.length > 1 && <span className="font-semibold">{project.name}: </span>}
+            <Body as="li" key={project.projectId} tone="muted" data-testid="timings-empty">
+              {projects.length > 1 && <BodyStrong>{project.name}: </BodyStrong>}
               {emptyReason(project)}
-            </li>
+            </Body>
           ))}
-        </ul>
-      </section>
+        </Stack>
+      </Stack>
     );
   return (
-    <section aria-label="Timings">
+    <Stack as="section" gap="sm" aria-label="Timings">
       {explained}
       <Table caption="Timings per project">
         <TableHead>
@@ -139,6 +149,6 @@ export function TimingsPanel({ projects }: { projects: ProjectTimings[] }) {
           ))}
         </TableBody>
       </Table>
-    </section>
+    </Stack>
   );
 }

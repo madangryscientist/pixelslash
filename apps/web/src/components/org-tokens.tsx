@@ -4,7 +4,9 @@ import {
   Body,
   Button,
   Callout,
+  Caption,
   Card,
+  Cluster,
   Code,
   CopyLine,
   Input,
@@ -92,30 +94,32 @@ function IssueForm({ orgId, onIssued }: { orgId: string; onIssued: (token: strin
       .finally(() => setBusy(false));
   };
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-      <Input
-        aria-label="Org token name, e.g. monorepo CI"
-        placeholder="Token name, e.g. monorepo CI"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        width="lg"
-      />
-      <Button
-        type="submit"
-        disabledReason={empty ? emptyReason : undefined}
-        busy={busy}
-        busyLabel="Issuing…"
-      >
-        Issue org token
-      </Button>
+    <Stack as="form" gap="xs" onSubmit={submit}>
+      <Cluster gap="sm" wrap>
+        <Input
+          aria-label="Org token name, e.g. monorepo CI"
+          placeholder="Token name, e.g. monorepo CI"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          width="lg"
+        />
+        <Button
+          type="submit"
+          disabledReason={empty ? emptyReason : undefined}
+          busy={busy}
+          busyLabel="Issuing…"
+        >
+          Issue org token
+        </Button>
+      </Cluster>
       {error ? (
-        <p role="alert" className="w-full text-sm text-red-700">
+        <Body as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Body>
       ) : (
-        empty && <p className="w-full text-xs text-slate-400">{emptyReason}</p>
+        empty && <Caption as="p">{emptyReason}</Caption>
       )}
-    </form>
+    </Stack>
   );
 }
 
@@ -134,9 +138,9 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
   };
   if (tokens.length === 0) {
     return (
-      <p data-testid="no-org-tokens" className="text-sm text-slate-400">
+      <Body as="p" tone="muted" data-testid="no-org-tokens">
         No org tokens yet. Issue one above to use a single secret across a monorepo's CI.
-      </p>
+      </Body>
     );
   }
   return (

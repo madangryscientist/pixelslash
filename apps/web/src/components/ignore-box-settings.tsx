@@ -1,10 +1,13 @@
 import {
   Body,
   Button,
+  Caption,
   Card,
   CopyButton,
+  Empty,
   SectionHeading,
   Stack,
+  SubsectionHeading,
   Table,
   TableBody,
   TableCell,
@@ -67,9 +70,9 @@ function ClearBox({
         Clear
       </Button>
       {error && (
-        <p role="alert" className="text-xs text-red-700">
+        <Caption as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Caption>
       )}
     </>
   );
@@ -86,11 +89,7 @@ function TestCell({ box }: { box: Box }) {
 /** Every box ever drawn, newest first: who drew it, and who cleared it. */
 function BoxTrail({ trail }: { trail: Box[] }) {
   if (trail.length === 0)
-    return (
-      <p data-testid="no-ignore-trail" className="text-sm text-slate-400">
-        No boxes were drawn in the review screen.
-      </p>
-    );
+    return <Empty data-testid="no-ignore-trail">No boxes were drawn in the review screen.</Empty>;
   return (
     <Table variant="plain" caption="Ignore boxes drawn in review" data-testid="ignore-trail">
       <TableHead>
@@ -142,9 +141,7 @@ export function IgnoreBoxSettings({
           </Body>
         </Stack>
         {boxes.length === 0 ? (
-          <p data-testid="no-ignore-boxes" className="text-sm text-slate-400">
-            None. Draw one from a shot&apos;s screen.
-          </p>
+          <Empty data-testid="no-ignore-boxes">None. Draw one from a shot&apos;s screen.</Empty>
         ) : (
           <Table variant="plain" caption="Ignore boxes">
             <TableHead>
@@ -172,7 +169,7 @@ export function IgnoreBoxSettings({
             </TableBody>
           </Table>
         )}
-        <h3 className="text-sm font-semibold text-slate-700">Trail</h3>
+        <SubsectionHeading>Trail</SubsectionHeading>
         <BoxTrail trail={trail} />
       </Stack>
     </Card>

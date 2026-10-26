@@ -1,4 +1,4 @@
-import { AppShell, Button, Input, Pill } from "@hackcove/ui";
+import { AppShell, Body, Button, Caption, Cluster, Input, Pill, Stack } from "@hackcove/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
 import { AppBrand, AppControls } from "./shell";
@@ -93,31 +93,33 @@ export function InlineForm({
       .finally(() => setBusy(false));
   };
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-      <Input
-        aria-label={label}
-        placeholder={label}
-        value={value}
-        disabled={!hydrated}
-        onChange={(e) => setValue(e.target.value)}
-        width="lg"
-      />
-      <Button
-        type="submit"
-        disabled={!hydrated}
-        disabledReason={empty ? emptyReason : undefined}
-        busy={busy}
-        busyLabel={busyLabel}
-      >
-        {button}
-      </Button>
+    <Stack as="form" gap="xs" onSubmit={submit}>
+      <Cluster gap="sm">
+        <Input
+          aria-label={label}
+          placeholder={label}
+          value={value}
+          disabled={!hydrated}
+          onChange={(e) => setValue(e.target.value)}
+          width="lg"
+        />
+        <Button
+          type="submit"
+          disabled={!hydrated}
+          disabledReason={empty ? emptyReason : undefined}
+          busy={busy}
+          busyLabel={busyLabel}
+        >
+          {button}
+        </Button>
+      </Cluster>
       {error ? (
-        <p role="alert" className="w-full text-sm text-red-700">
+        <Body as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Body>
       ) : (
-        empty && hydrated && <p className="w-full text-xs text-slate-400">{emptyReason}</p>
+        empty && hydrated && <Caption as="p">{emptyReason}</Caption>
       )}
-    </form>
+    </Stack>
   );
 }

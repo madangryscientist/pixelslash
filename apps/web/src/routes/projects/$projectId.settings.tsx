@@ -2,12 +2,14 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Body,
+  BodyStrong,
   Breadcrumbs,
   Button,
   ButtonGroup,
   Callout,
   Card,
   CopyLine,
+  Empty,
   ListLayout,
   Pill,
   SectionHeading,
@@ -150,7 +152,7 @@ function DiffLocationForm({
         <fieldset className="space-y-2">
           <legend className="sr-only">Diff location</legend>
           {LOCATIONS.map((l) => (
-            <label key={l.value} className="flex items-start gap-2 text-sm">
+            <label key={l.value} className="flex items-start gap-2">
               <input
                 type="radio"
                 name="diff-location"
@@ -160,8 +162,10 @@ function DiffLocationForm({
                 className="mt-1"
               />
               <span>
-                <span className="font-medium">{l.label}</span>
-                <span className="block text-slate-600">{l.detail}</span>
+                <BodyStrong>{l.label}</BodyStrong>
+                <span className="block">
+                  <Body tone="muted">{l.detail}</Body>
+                </span>
               </span>
             </label>
           ))}
@@ -200,9 +204,7 @@ function TokenTable({ tokens, hydrated }: { tokens: Token[]; hydrated: boolean }
   };
   if (tokens.length === 0) {
     return (
-      <p data-testid="no-tokens" className="text-sm text-slate-400">
-        No tokens yet. Issue one above, then upload with it.
-      </p>
+      <Empty data-testid="no-tokens">No tokens yet. Issue one above, then upload with it.</Empty>
     );
   }
   return (

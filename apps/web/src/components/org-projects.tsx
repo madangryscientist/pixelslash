@@ -1,14 +1,23 @@
 import { Link } from "@tanstack/react-router";
 import {
+  Body,
+  ButtonLink,
+  Callout,
+  Caption,
+  Cluster,
+  ClusterGrow,
+  IconButton,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeaderCell,
   TableRow,
+  TextLink,
   rowLinkClass,
 } from "@hackcove/ui";
-import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
+import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { StatusBadge } from "#/components/ui";
 import type { LatestBuild, OrgOverview, ProjectOverview } from "#/db/orgs";
 import { formatNumber, formatRelative } from "#/lib/format";
@@ -23,31 +32,37 @@ function BuildCell({ project }: { project: ProjectOverview }) {
   const { latest } = project;
   if (!latest) {
     return (
-      <div className="flex flex-col gap-0.75">
-        <span className="text-sm text-slate-400">no builds</span>
-        <Link
-          to="/projects/$projectId/settings"
-          params={{ projectId: project.id }}
-          className="relative z-10 w-fit text-xs text-violet-600 hover:underline"
-        >
-          Set up uploads →
-        </Link>
-      </div>
+      <Stack gap="xs">
+        <Body tone="muted">no builds</Body>
+        {/* Gap: nothing in hackcove lifts a link above a stretched rowLinkClass link. */}
+        <span className="relative z-10">
+          <TextLink
+            size="xs"
+            render={(props) => (
+              <Link
+                to="/projects/$projectId/settings"
+                params={{ projectId: project.id }}
+                {...props}
+              />
+            )}
+          >
+            Set up uploads →
+          </TextLink>
+        </span>
+      </Stack>
     );
   }
   return (
-    <div className="flex min-w-0 flex-col gap-0.75">
-      <div className="flex items-center gap-2 whitespace-nowrap">
+    <Stack gap="xs">
+      <Cluster gap="sm">
         <StatusBadge status={latest.status} />
-        <span className="min-w-0 truncate text-sm">{latest.branch}</span>
-        <span className="font-mono text-[12.5px] text-slate-400">
-          {latest.commitSha.slice(0, 7)}
-        </span>
-      </div>
-      {latest.prNumber !== null && (
-        <span className="text-xs text-slate-400">PR #{latest.prNumber}</span>
-      )}
-    </div>
+        <ClusterGrow>
+          <Body truncate>{latest.branch}</Body>
+        </ClusterGrow>
+        <Caption mono>{latest.commitSha.slice(0, 7)}</Caption>
+      </Cluster>
+      {latest.prNumber !== null && <Caption>PR #{latest.prNumber}</Caption>}
+    </Stack>
   );
 }
 
@@ -67,13 +82,8 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
   const { latest } = project;
   const shots = latest ? latest.total - latest.counts.removed : 0;
   return (
-    <TableRow data-testid="project-row">
+    <TableRow data-testid="project-row" stripe={stripeToneOf(latest)}>
       <TableCell secondary={latest ? plural(shots, "shot") : "no builds yet"}>
-        <span
-          aria-hidden="true"
-          style={latest ? { background: stripeOf(latest) } : undefined}
-          className={`absolute inset-y-0 left-0 w-1 ${latest ? "" : "bg-slate-200"}`}
-        />
         <Link to="/projects/$projectId" params={{ projectId: project.id }} className={rowLinkClass}>
           {project.name}
         </Link>
@@ -82,7 +92,7 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
         <BuildCell project={project} />
       </TableCell>
       <TableCell>
-        {latest ? <MixBar counts={latest.counts} /> : <span className="text-slate-400">—</span>}
+        {latest ? <MixBar counts={latest.counts} /> : <Body tone="muted">—</Body>}
       </TableCell>
       <TableCell>
         <ToReview build={latest} defaultBranch={project.defaultBranch} />
@@ -91,22 +101,26 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
         <Updated project={project} now={now} />
       </TableCell>
       <TableCell align="end">
-        <Link
-          to="/projects/$projectId/settings"
-          params={{ projectId: project.id }}
-          aria-label={`${project.name} settings`}
-          title="Settings"
-          className="relative z-10 grid h-8 w-8 place-items-center rounded-lg ml-auto text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-violet-600"
+        <IconButton
+          variant="ghost"
+          label={`${project.name} settings`}
+          render={(props) => (
+            <Link
+              to="/projects/$projectId/settings"
+              params={{ projectId: project.id }}
+              {...props}
+            />
+          )}
         >
           <svg
             viewBox="0 0 24 24"
             aria-hidden="true"
-            className="h-4 w-4 fill-none stroke-current stroke-2"
+            className="size-4 fill-none stroke-current stroke-2"
           >
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
           </svg>
-        </Link>
+        </IconButton>
       </TableCell>
     </TableRow>
   );
@@ -121,34 +135,45 @@ export function WaitingStrip({ org }: { org: OrgOverview }) {
   const [next] = waiting;
   if (!next) return null;
   return (
-    <div
+    <Callout
       data-testid="waiting-strip"
-      className="mb-4 flex flex-wrap items-center gap-3 rounded-[10px] border border-(--ps-changed)/35 bg-(--ps-warn-soft) px-4 py-3"
-    >
-      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-(--ps-changed)" />
-      <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-        {waiting.map((project, index) => (
-          <li key={project.id} className="flex items-center gap-2">
-            {index > 0 && <span className="text-slate-400">·</span>}
+      tone="warn"
+      actions={
+        <ButtonLink
+          variant="outline"
+          size="sm"
+          render={(props) => (
             <Link
               to="/projects/$projectId/builds/$buildId"
-              params={{ projectId: project.id, buildId: project.latest.id }}
-              className="font-semibold text-slate-900 hover:underline"
+              params={{ projectId: next.id, buildId: next.latest.id }}
+              {...props}
+            />
+          )}
+        >
+          Review next
+        </ButtonLink>
+      }
+    >
+      <Cluster gap="sm" wrap>
+        {waiting.map((project, index) => (
+          <Cluster key={project.id} gap="sm">
+            {index > 0 && <Body tone="muted">·</Body>}
+            <TextLink
+              render={(props) => (
+                <Link
+                  to="/projects/$projectId/builds/$buildId"
+                  params={{ projectId: project.id, buildId: project.latest.id }}
+                  {...props}
+                />
+              )}
             >
               {project.name} · {project.latest.branch}
-            </Link>
-            <span className="text-slate-600">{project.latest.counts.toReview} to review</span>
-          </li>
+            </TextLink>
+            <Body tone="muted">{project.latest.counts.toReview} to review</Body>
+          </Cluster>
         ))}
-      </ul>
-      <Link
-        to="/projects/$projectId/builds/$buildId"
-        params={{ projectId: next.id, buildId: next.latest.id }}
-        className="inline-flex h-8.5 items-center rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-semibold text-slate-900 hover:bg-slate-50"
-      >
-        Review next
-      </Link>
-    </div>
+      </Cluster>
+    </Callout>
   );
 }
 

@@ -1,12 +1,17 @@
 import {
   Body,
   Button,
+  Caption,
   Card,
+  Cluster,
   Code,
   CodeBlock,
   CopyButton,
+  Empty,
+  Overline,
   SectionHeading,
   Stack,
+  SubsectionHeading,
   Table,
   TableBody,
   TableCell,
@@ -57,9 +62,9 @@ function optionsText(options: DiffOptions | null): string {
 function OverrideChanges({ changes }: { changes: Change[] }) {
   if (changes.length === 0)
     return (
-      <p data-testid="no-override-changes" className="text-sm text-slate-400">
+      <Empty data-testid="no-override-changes">
         No thresholds were changed in the review screen.
-      </p>
+      </Empty>
     );
   return (
     <Table variant="plain" caption="Thresholds changed in review" data-testid="override-changes">
@@ -93,12 +98,10 @@ function OverrideChanges({ changes }: { changes: Change[] }) {
 export function BuildOverrideChanges({ changes }: { changes: Change[] }) {
   if (changes.length === 0) return null;
   return (
-    <section className="mt-6" data-testid="build-override-changes">
-      <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
-        Thresholds changed in review
-      </h2>
+    <Stack as="section" gap="xs" data-testid="build-override-changes">
+      <Overline as="h2">Thresholds changed in review</Overline>
       <OverrideChanges changes={changes} />
-    </section>
+    </Stack>
   );
 }
 
@@ -136,9 +139,9 @@ function ClearButton({
         Clear
       </Button>
       {error && (
-        <p role="alert" className="text-xs text-red-700">
+        <Caption as="p" role="alert" tone="danger">
           {error}
-        </p>
+        </Caption>
       )}
     </>
   );
@@ -147,18 +150,18 @@ function ClearButton({
 /** The overrides and ignore boxes as the config a route would carry, to copy. */
 function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: boolean }) {
   return (
-    <details className="mt-4 text-sm" data-testid="override-export">
+    <details className="space-y-2 text-sm" data-testid="override-export">
       <summary className="cursor-pointer text-violet-700">Export as config</summary>
-      <p className="mt-2 text-slate-600">
+      <Body as="p" tone="muted">
         Merge each route&apos;s <Code>diff</Code>, <Code>ignore</Code> and <Code>variants</Code>{" "}
         into the route of that name in <Code>pixelslash.config.json</Code>, then clear the overrides
         and ignore boxes here: the builds measure the same. A key the config already sets on that
         variant beats a route&apos;s; move it to the variant. Ignore boxes are in image px, the
         config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise divide by it.
-      </p>
-      <div className="mt-2 flex justify-end">
+      </Body>
+      <Cluster justify="end">
         <CopyButton text={exported} disabled={!hydrated} />
-      </div>
+      </Cluster>
       <CodeBlock data-testid="override-export-json">{exported}</CodeBlock>
     </details>
   );
@@ -188,9 +191,7 @@ export function OverrideSettings({
           </Body>
         </Stack>
         {overrides.list.length === 0 ? (
-          <p data-testid="no-overrides" className="text-sm text-slate-400">
-            None. Set one from a shot&apos;s screen.
-          </p>
+          <Empty data-testid="no-overrides">None. Set one from a shot&apos;s screen.</Empty>
         ) : (
           <Table variant="plain" caption="Diff thresholds set in review">
             <TableHead>
@@ -223,7 +224,7 @@ export function OverrideSettings({
         {(overrides.list.length > 0 || overrides.boxes.length > 0) && (
           <ExportAsConfig exported={overrides.exported} hydrated={hydrated} />
         )}
-        <h3 className="text-sm font-semibold text-slate-700">Changes</h3>
+        <SubsectionHeading>Changes</SubsectionHeading>
         <OverrideChanges changes={overrides.changes} />
       </Stack>
     </Card>

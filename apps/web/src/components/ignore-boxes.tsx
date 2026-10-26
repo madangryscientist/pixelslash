@@ -1,4 +1,16 @@
-import { Button, CodeBlock, CopyButton } from "@hackcove/ui";
+import {
+  Body,
+  Button,
+  ButtonGroup,
+  Callout,
+  Caption,
+  Card,
+  Cluster,
+  CodeBlock,
+  CopyButton,
+  Overline,
+  Stack,
+} from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import type { IgnoreSource } from "#/components/snapshot-frame";
@@ -97,19 +109,32 @@ function useBoxes(ids: Ids, draft: IgnoreDraft) {
   };
 }
 
+function DrawButton({ draft, hydrated }: { draft: IgnoreDraft; hydrated: boolean }) {
+  return (
+    <ButtonGroup>
+      <Button
+        variant="outline"
+        pressed={draft.drawing}
+        disabled={!hydrated}
+        onClick={() => draft.setDrawing(!draft.drawing)}
+        size="sm"
+        data-testid="ignore-draw"
+      >
+        {draft.drawing ? "Drag over the shot…" : "Draw ignore box"}
+      </Button>
+    </ButtonGroup>
+  );
+}
+
 /** The changed regions that touch an ignored area's edge, measured against the areas used. */
 export function EdgeWarning({ result }: { result: DiffResult | null }) {
   const touching = result ? edgeTouches(result.regions, result.ignored) : [];
   if (touching.length === 0) return null;
   return (
-    <p
-      role="status"
-      data-testid="ignore-edge-warning"
-      className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
-    >
+    <Callout tone="warn" role="status" data-testid="ignore-edge-warning">
       {touching.length === 1 ? "A change touches" : `${touching.length} changes touch`} an ignored
       area's edge: {EDGE_WARNING}.
-    </p>
+    </Callout>
   );
 }
 
@@ -127,41 +152,43 @@ function PendingBox({
   onCancel: () => void;
 }) {
   return (
-    <div data-testid="ignore-pending" className="space-y-1.5">
-      <p className="text-xs text-slate-600">
+    <Stack gap="xs" data-testid="ignore-pending">
+      <Caption as="p" numeric>
         {rect.width}×{rect.height} px at {rect.x},{rect.y}
-      </p>
-      <Button
-        disabled={waiting}
-        busy={busy}
-        busyLabel="Saving…"
-        onClick={() => onSave("test")}
-        size="sm"
-        data-testid="ignore-save-test"
-      >
-        Ignore for this test
-      </Button>
-      <Button
-        variant="outline"
-        disabled={waiting}
-        busy={busy}
-        busyLabel="Saving…"
-        onClick={() => onSave("variant")}
-        size="sm"
-        data-testid="ignore-save-variant"
-      >
-        This test, this variant
-      </Button>
-      <Button
-        variant="ghost"
-        disabled={waiting}
-        disabledReason={busy ? "Saving" : undefined}
-        onClick={onCancel}
-        size="sm"
-      >
-        Cancel
-      </Button>
-    </div>
+      </Caption>
+      <ButtonGroup>
+        <Button
+          disabled={waiting}
+          busy={busy}
+          busyLabel="Saving…"
+          onClick={() => onSave("test")}
+          size="sm"
+          data-testid="ignore-save-test"
+        >
+          Ignore for this test
+        </Button>
+        <Button
+          variant="outline"
+          disabled={waiting}
+          busy={busy}
+          busyLabel="Saving…"
+          onClick={() => onSave("variant")}
+          size="sm"
+          data-testid="ignore-save-variant"
+        >
+          This test, this variant
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={waiting}
+          disabledReason={busy ? "Saving" : undefined}
+          onClick={onCancel}
+          size="sm"
+        >
+          Cancel
+        </Button>
+      </ButtonGroup>
+    </Stack>
   );
 }
 
@@ -177,31 +204,35 @@ function BoxRow({
   onClear: () => void;
 }) {
   return (
-    <li data-testid="ignore-box-row" className="rounded-lg border border-slate-200 p-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm">
-          <span className="mr-1 rounded bg-sky-800 px-1 text-[10px] text-white">UI</span>
-          {box.variant ? "This variant" : "This test"} · {box.rect.width}×{box.rect.height}
-        </span>
-        <Button
-          variant="outline"
-          disabled={!hydrated}
-          busy={busy}
-          busyLabel="Clearing…"
-          onClick={onClear}
-          size="sm"
-          data-testid="ignore-clear"
-        >
-          Clear
-        </Button>
-      </div>
-      <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-        <span>
-          By @{box.by}, {formatDateTime(box.at)}. Copy as config:
-        </span>
-        <CopyButton text={box.snippet} disabled={!hydrated} />
-      </div>
-      <CodeBlock data-testid="ignore-snippet">{box.snippet}</CodeBlock>
+    <li>
+      <Card as="div" size="sm" data-testid="ignore-box-row">
+        <Stack gap="xs">
+          <Cluster justify="between" gap="sm">
+            <Body>
+              <span className="mr-1 rounded bg-sky-800 px-1 text-[10px] text-white">UI</span>
+              {box.variant ? "This variant" : "This test"} · {box.rect.width}×{box.rect.height}
+            </Body>
+            <Button
+              variant="outline"
+              disabled={!hydrated}
+              busy={busy}
+              busyLabel="Clearing…"
+              onClick={onClear}
+              size="sm"
+              data-testid="ignore-clear"
+            >
+              Clear
+            </Button>
+          </Cluster>
+          <Cluster justify="between" gap="sm">
+            <Caption>
+              By @{box.by}, {formatDateTime(box.at)}. Copy as config:
+            </Caption>
+            <CopyButton text={box.snippet} disabled={!hydrated} />
+          </Cluster>
+          <CodeBlock data-testid="ignore-snippet">{box.snippet}</CodeBlock>
+        </Stack>
+      </Card>
     </li>
   );
 }
@@ -229,15 +260,15 @@ export function IgnoreBoxes({
   if (project.diffLocation !== "server" || snapshot.diffStatus === "removed") return null;
   const uploaded = snapshot.ignore.length;
   return (
-    <section data-testid="ignore-boxes" className="space-y-2">
-      <h2 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Ignore areas</h2>
+    <Stack as="section" gap="xs" data-testid="ignore-boxes">
+      <Overline as="h2">Ignore areas</Overline>
       {uploaded > 0 && (
-        <p className="text-xs text-slate-600">
+        <Caption as="p">
           {uploaded} from the {uploadedIgnore}, hatched on the shot.
-        </p>
+        </Caption>
       )}
       {ignoreBoxes.length > 0 && (
-        <ul className="space-y-2">
+        <Stack as="ul" gap="xs">
           {ignoreBoxes.map((box) => (
             <BoxRow
               key={box.id}
@@ -247,7 +278,7 @@ export function IgnoreBoxes({
               onClear={() => boxes.clear(box.id)}
             />
           ))}
-        </ul>
+        </Stack>
       )}
       {draft.rect ? (
         <PendingBox
@@ -258,30 +289,21 @@ export function IgnoreBoxes({
           onCancel={draft.reset}
         />
       ) : (
-        <Button
-          variant={draft.drawing ? "primary" : "outline"}
-          aria-pressed={draft.drawing}
-          disabled={!hydrated}
-          onClick={() => draft.setDrawing(!draft.drawing)}
-          size="sm"
-          data-testid="ignore-draw"
-        >
-          {draft.drawing ? "Drag over the shot…" : "Draw ignore box"}
-        </Button>
+        <DrawButton draft={draft} hydrated={hydrated} />
       )}
-      <p className="text-xs text-slate-500">
+      <Caption as="p">
         In image px. Saving re-diffs this build now, and every later build reads it.
-      </p>
+      </Caption>
       {boxes.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <Body as="p" role="alert" tone="danger">
           {boxes.error}
-        </p>
+        </Body>
       )}
       {boxes.note && (
-        <p data-testid="ignore-note" className="text-sm text-slate-600">
+        <Body as="p" tone="muted" data-testid="ignore-note">
           {boxes.note}
-        </p>
+        </Body>
       )}
-    </section>
+    </Stack>
   );
 }

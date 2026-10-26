@@ -1,4 +1,4 @@
-import { Breadcrumbs, Container, FullBleedLayout } from "@hackcove/ui";
+import { Breadcrumbs, Callout, FullBleedLayout, Stack } from "@hackcove/ui";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
@@ -72,13 +72,9 @@ function useWalk(projectId: string, buildId: string) {
 function DecisionError({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <div className="border-b border-red-200 bg-red-50">
-      <Container>
-        <p role="alert" className="py-2 text-sm text-red-700">
-          {error}
-        </p>
-      </Container>
-    </div>
+    <Callout tone="danger" banner role="alert">
+      {error}
+    </Callout>
   );
 }
 
@@ -192,25 +188,27 @@ function SnapshotPage() {
           }}
         />
         <DecisionError error={error} />
-        <div className="min-w-0 space-y-3 p-4">
-          <EdgeWarning result={snapshot.diffResult} />
-          <CompositionFocus>
-            <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
-              <SnapshotViewer
-                name={snapshot.name}
-                mainUrl={images.main}
-                branchUrl={images.branch}
-                diffUrl={images.diff}
-                result={snapshot.diffResult}
-                removed={snapshot.diffStatus === "removed"}
-                composition={snapshot.composition}
-                marks={flag.marks}
-                onDraw={flag.onDraw ?? ignore.onDraw}
-                ignored={ignored}
-              />
-            </RegionNotesProvider>
-            <CompositionPanel composition={snapshot.composition} />
-          </CompositionFocus>
+        <div className="p-4">
+          <Stack gap="sm">
+            <EdgeWarning result={snapshot.diffResult} />
+            <CompositionFocus>
+              <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
+                <SnapshotViewer
+                  name={snapshot.name}
+                  mainUrl={images.main}
+                  branchUrl={images.branch}
+                  diffUrl={images.diff}
+                  result={snapshot.diffResult}
+                  removed={snapshot.diffStatus === "removed"}
+                  composition={snapshot.composition}
+                  marks={flag.marks}
+                  onDraw={flag.onDraw ?? ignore.onDraw}
+                  ignored={ignored}
+                />
+              </RegionNotesProvider>
+              <CompositionPanel composition={snapshot.composition} />
+            </CompositionFocus>
+          </Stack>
         </div>
       </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}

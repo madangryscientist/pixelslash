@@ -1,4 +1,5 @@
 import { type ReactNode, createContext, useContext } from "react";
+import { Body, BodyStrong, Caption, Overline, Stack } from "@hackcove/ui";
 import type { SnapshotView } from "#/db/review";
 import type { AiRegionNote, DiffRegion } from "#/db/schema";
 
@@ -52,54 +53,54 @@ export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
   if (!review) {
     if (snapshot.diffStatus !== "changed") return null;
     return (
-      <section data-testid="ai-explanation">
-        <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+      <Stack as="section" gap="xs" data-testid="ai-explanation">
+        <Overline as="h2" tone="muted">
           AI explanation
-        </h2>
+        </Overline>
         {snapshot.aiPending ? (
-          <p className="text-sm text-slate-600" data-testid="ai-pending">
+          <Body as="p" tone="muted" data-testid="ai-pending">
             explaining…
-          </p>
+          </Body>
         ) : (
           <>
-            <p className="text-sm text-slate-600" data-testid="ai-skip">
+            <Body as="p" tone="muted" data-testid="ai-skip">
               skip: no judge. Review the pixels.
-            </p>
+            </Body>
             {snapshot.aiError && (
-              <p className="mt-1 text-xs text-slate-500" data-testid="ai-error">
+              <Caption as="p" tone="muted" data-testid="ai-error">
                 {snapshot.aiError}
-              </p>
+              </Caption>
             )}
           </>
         )}
-      </section>
+      </Stack>
     );
   }
   return (
-    <section data-testid="ai-explanation">
-      <h2 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+    <Stack as="section" gap="xs" data-testid="ai-explanation">
+      <Overline as="h2" tone="muted">
         AI explanation
-      </h2>
+      </Overline>
       {aiFiltered(snapshot) && (
-        <p className="mb-2 text-sm font-medium" data-testid="ai-auto-passed">
+        <BodyStrong as="p" data-testid="ai-auto-passed">
           Auto-passed: every changed region was labelled noise.
-        </p>
+        </BodyStrong>
       )}
-      <ul className="space-y-2 text-sm">
+      <Stack as="ul" gap="xs">
         {review.regions.map((note) => (
           <li key={`${note.x},${note.y},${note.w},${note.h}`} data-testid="ai-region-note">
-            <span className="font-medium" data-testid="ai-label">
-              {note.label}
-            </span>
-            <span className="text-slate-500">
+            <BodyStrong data-testid="ai-label">{note.label}</BodyStrong>
+            <Body tone="muted">
               {" "}
               at {note.x},{note.y} ({note.w}×{note.h})
-            </span>
-            <p className="text-slate-800">{note.explanation}</p>
+            </Body>
+            <Body as="p">{note.explanation}</Body>
           </li>
         ))}
-      </ul>
-      <p className="mt-2 text-xs text-slate-500">{review.model}</p>
-    </section>
+      </Stack>
+      <Caption as="p" tone="muted">
+        {review.model}
+      </Caption>
+    </Stack>
   );
 }

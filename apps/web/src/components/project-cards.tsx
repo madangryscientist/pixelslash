@@ -1,6 +1,6 @@
 import { Body, Card, Code, CopyLine, SectionHeading, Stack } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
-import { InlineForm } from "#/components/ui";
+import { InlineForm, useHydrated } from "#/components/ui";
 import { saveDefaultBranch } from "#/server/fns";
 
 /** The project settings' default-branch card. */
@@ -34,6 +34,7 @@ export function DefaultBranch({ projectId, branch }: { projectId: string; branch
 
 /** The project settings' upload-command card. */
 export function UploadCommand({ serverUrl }: { serverUrl: string }) {
+  const hydrated = useHydrated();
   return (
     <Card>
       <Stack>
@@ -45,6 +46,7 @@ export function UploadCommand({ serverUrl }: { serverUrl: string }) {
         </Stack>
         <CopyLine
           text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}
+          disabled={!hydrated}
           data-testid="upload-command"
         />
       </Stack>
