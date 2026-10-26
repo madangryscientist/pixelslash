@@ -6,6 +6,7 @@ import type { ExplainQueue } from "#/ai/explain-queue";
 import { diffLocationOf } from "#/db/orgs";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
+import { type SentryConfig, sentryConfigOf } from "./sentry-config";
 
 /** The one place that touches the Worker's bindings; everything below takes plain values. */
 export const database = (): Db => drizzle(env.DB);
@@ -35,6 +36,12 @@ export const modelKeySecret = (): string | undefined => env.MODEL_KEY_SECRET || 
  * here in-process, in the same module (PS-210).
  */
 export const diffSidecarUrl = (): string | undefined => env.DIFF_SIDECAR_URL || undefined;
+
+/**
+ * Where this deployment reports its errors (PS-227): null without a DSN, which is the whole
+ * feature switched off. The same config goes to the browser, so both report as one release.
+ */
+export const sentryConfig = (): SentryConfig | null => sentryConfigOf(env);
 
 /** The oldest CLI the API takes (`x.y.z`, ob 1729); empty takes any. Set in `vars`. */
 export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || undefined;

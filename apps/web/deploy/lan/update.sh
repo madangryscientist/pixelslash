@@ -15,6 +15,11 @@
 # every release links to it; the CT's .dev.vars.e2e (the deployment's own secrets) is next to it
 # and is copied into each release's dist/server/.dev.vars, where serve.ts reads it.
 #
+# Error reporting (PS-227) is on while the CT's .dev.vars.e2e holds a SENTRY_DSN. A release.sh run
+# with PIXELSLASH_SENTRY_DSN set carries it in the tarball as `.sentry-dsn`, and it is saved there
+# (never printed); every release then gets SENTRY_RELEASE (its sha) and SENTRY_ENVIRONMENT=lan
+# beside it in dist/server/.dev.vars. With no DSN nothing is added and the server reports nowhere.
+#
 # The opencode helper (ob 1900) is a switch: the file /etc/pixelslash/opencode-helper holds the
 # model (`provider/model`), and while it exists this script installs opencode, installs and enables
 # pixelslash-opencode, and points every org without a model of its own at the helper. Without the
@@ -133,6 +138,37 @@ copy_secrets() {
   as_app "install -m 600 $SHARED_WEB/.dev.vars.e2e $1/apps/web/dist/server/.dev.vars"
 }
 
+# Sets KEY=value in file $1; the value is read from stdin, so it is on no command line and in no
+# log. The file keeps its owner and mode 600.
+upsert_var() {
+  local file=$1 key=$2 value tmp
+  IFS= read -r value
+  tmp=$(mktemp "$file.XXXXXX")
+  { grep -v "^$key=" "$file" || true; } >"$tmp"
+  printf '%s=%s\n' "$key" "$value" >>"$tmp"
+  chown --reference="$file" "$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$file"
+}
+
+# A DSN release.sh carried in release $1 is saved with the CT's secrets, where every later release
+# finds it, and the carried copy is removed.
+take_sentry_dsn() {
+  local carried=$1/.sentry-dsn
+  [[ -f $carried ]] || return 0
+  upsert_var "$SHARED_WEB/.dev.vars.e2e" SENTRY_DSN <"$carried"
+  rm -f "$carried"
+}
+
+# Names release $1 (sha $2) to Sentry, in the secrets copied into it: the deployed commit and `lan`.
+# Only when a DSN is set, so a deployment without one is left exactly as it was.
+stamp_sentry() {
+  local vars=$1/apps/web/dist/server/.dev.vars
+  grep -q '^SENTRY_DSN=.' "$vars" || return 0
+  upsert_var "$vars" SENTRY_RELEASE <<<"$2"
+  upsert_var "$vars" SENTRY_ENVIRONMENT <<<"lan"
+}
+
 # Unpacks $1 (the tarball) into $2 and installs its runtime dependencies there, beside the release
 # that is serving. The release links the shared state.
 unpack_release() {
@@ -235,7 +271,9 @@ main() {
     unpacked=$rel
     unpack_release "$tarball" "$rel"
   fi
+  take_sentry_dsn "$rel"
   copy_secrets "$rel"
+  stamp_sentry "$rel" "$name"
   [[ -z $helper_model ]] || install_opencode "$rel"
   # Additive only, so the release still serving runs on the migrated schema until the restart.
   d1 "$rel" migrations apply DB

@@ -1,6 +1,15 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { SERVER, SERVER_PORT, SIDECAR, SIDECAR_PORT, STUB, STUB_PORT } from "./e2e/ports";
+import {
+  SENTRY_INGEST,
+  SENTRY_PORT,
+  SERVER,
+  SERVER_PORT,
+  SIDECAR,
+  SIDECAR_PORT,
+  STUB,
+  STUB_PORT,
+} from "./e2e/ports";
 
 // The web server starts before `globalSetup` scopes TMPDIR, so it gets its own under .wrangler/e2e,
 // which the next run clears: miniflare and wrangler leave nothing in /tmp.
@@ -33,6 +42,12 @@ export default defineConfig({
       url: `${STUB}/health`,
       reuseExistingServer: false,
     },
+    {
+      command: "bun e2e/sentry-ingest.ts",
+      env: { PIXELSLASH_E2E_SENTRY_PORT: String(SENTRY_PORT) },
+      url: `${SENTRY_INGEST}/health`,
+      reuseExistingServer: false,
+    },
     ...(sidecar
       ? [
           {
@@ -57,6 +72,8 @@ export default defineConfig({
         TMPDIR: SERVER_TMP,
         // `vite.config.ts` points the worker at this port instead of the one in `wrangler.jsonc`.
         PIXELSLASH_E2E_STUB_PORT: String(STUB_PORT),
+        // And at this error sink, with the DSN the Worker and the browser report to (PS-227).
+        PIXELSLASH_E2E_SENTRY_PORT: String(SENTRY_PORT),
         // And at this sidecar, or at none (`vite.config.ts`).
         PIXELSLASH_E2E_SIDECAR: sidecar ? SIDECAR : "",
       },

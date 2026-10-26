@@ -300,9 +300,17 @@ run; never mix numbers from different runs into one percentage.
    region notes). It never sends a whole shot, and no other server-side call
    carries pixels. Tokens (Figma, CI upload) come from env or a token file,
    never git; a project's model key is entered in its settings and stored by
-   the server. *Amended 2026-10-19: was "Local only"; the hosted review app
-   needs uploads. Amended 2026-10-23: the project's own model (ob 1473, 1668);
-   a project without one uses its org's (ob 1789).*
+   the server. One more sink, and only when its DSN is set: **errors, never
+   shots, go to the Sentry project the DSN names** (`SENTRY_DSN` on the
+   server and in the browser, `PIXELSLASH_SENTRY_DSN` for the CLI). An error
+   report is a message, a stack, the release and the environment; every
+   report passes `scrubEvent` (`packages/engine/src/sentry-scrub.ts`), which
+   drops request bodies, cookies, query strings, auth headers, tokens and
+   image or blob data, and nothing attaches a PNG. With no DSN there is no
+   SDK init and no outbound request. *Amended 2026-10-19: was "Local only";
+   the hosted review app needs uploads. Amended 2026-10-23: the project's own
+   model (ob 1473, 1668); a project without one uses its org's (ob 1789).
+   Amended 2026-10-26: the error sink (PS-227).*
 5. **The local pair mode does not start a dev server.** `--live` / `--local`
    URLs must already be up; a down URL fails. *Amended 2026-10-19: the pinned
    capture image may start the app from a command named in its config.*

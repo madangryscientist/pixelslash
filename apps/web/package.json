@@ -23,6 +23,8 @@
     "@hackcove/theme-catppuccin-mocha": "0.2.7",
     "@hackcove/ui": "0.4.1",
     "@pixelslash/engine": "workspace:*",
+    "@sentry/cloudflare": "11.9.0",
+    "@sentry/react": "11.9.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-router": "1.170.45",
     "@tanstack/react-start": "1.169.3",

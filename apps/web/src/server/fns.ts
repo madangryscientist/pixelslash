@@ -28,7 +28,7 @@ import { BadRequest, parseRect } from "#/api/validate";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
-import { database, defaultDiffLocation, imageSigningSecret } from "./env";
+import { database, defaultDiffLocation, imageSigningSecret, sentryConfig } from "./env";
 import { signFlakeOrNull } from "./flake-images";
 import { field, noteInput, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
@@ -63,10 +63,14 @@ async function imageUrls(
   };
 }
 
-/** What every page's shell needs: who is signed in, and the theme the cookie asks for. */
+/**
+ * What every page's shell needs: who is signed in, the theme the cookie asks for, and where the
+ * browser reports its errors (null with no DSN, so the browser then never loads the reporter).
+ */
 export const getShell = createServerFn().handler(async () => ({
   viewer: await getViewerSummary(),
   theme: parseTheme(getCookie(THEME_COOKIE)),
+  sentry: sentryConfig(),
 }));
 
 async function getViewerSummary() {

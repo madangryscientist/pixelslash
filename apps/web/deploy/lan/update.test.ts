@@ -61,7 +61,7 @@ function setup() {
 type Setup = ReturnType<typeof setup>;
 
 // A release tarball as release.sh packs it, cut down to what update.sh touches.
-function pack(sha: string, { broken = false } = {}) {
+function pack(sha: string, { broken = false, sentryDsn = "" } = {}) {
   const dir = join(root, "pack", sha);
   mkdirSync(join(dir, "apps/web/deploy/lan"), { recursive: true });
   for (const unit of [...UNITS, "pixelslash-opencode.service"])
@@ -69,6 +69,8 @@ function pack(sha: string, { broken = false } = {}) {
   mkdirSync(join(dir, "apps/web/dist/server"), { recursive: true });
   writeFileSync(join(dir, "apps/web/dist/server/index.js"), `// ${sha}\n`);
   if (broken) writeFileSync(join(dir, "apps/web/BROKEN"), "");
+  // What release.sh adds when PIXELSLASH_SENTRY_DSN is set.
+  if (sentryDsn) writeFileSync(join(dir, ".sentry-dsn"), `${sentryDsn}\n`, { mode: 0o600 });
   const tarball = join(root, `pixelslash-${sha}.tar.gz`);
   const tar = spawnSync("tar", ["-czf", tarball, "-C", dir, "."]);
   expect(tar.status).toBe(0);
@@ -102,6 +104,7 @@ function deploy(s: Setup, tarball: string) {
   };
 }
 
+const varsOf = (rel: string) => readFileSync(join(rel, "apps/web/dist/server/.dev.vars"), "utf8");
 const current = (s: Setup) => readlinkSync(join(s.releases, "current"));
 const releaseNames = (s: Setup) =>
   readdirSync(s.releases)
@@ -237,5 +240,63 @@ describe("update.sh", () => {
     expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
     expect(releaseNames(s)).toEqual(["aaaaaaa"]);
     expect(commands.filter((line) => line.startsWith("systemctl"))).toEqual([]);
+  });
+
+  describe("error reporting (PS-227)", () => {
+    const DSN = "https://publickey@o1.ingest.example/42";
+
+    test("with no DSN the secrets are copied as they are", () => {
+      const s = setup();
+      expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+      expect(varsOf(join(s.releases, "aaaaaaa"))).toBe("IMAGE_SIGNING_SECRET=ct-secret\n");
+    });
+
+    test("a DSN the CT holds gets the release's sha and the lan environment", () => {
+      const s = setup();
+      writeFileSync(
+        join(s.legacyWeb, ".dev.vars.e2e"),
+        `IMAGE_SIGNING_SECRET=ct-secret\nSENTRY_DSN=${DSN}\n`,
+      );
+      const { status, stderr, commands } = deploy(s, pack("abc1234"));
+      const rel = join(s.releases, "abc1234");
+
+      expect(status).toBe(0);
+      expect(varsOf(rel).split("\n").toSorted()).toEqual(
+        [
+          "",
+          "IMAGE_SIGNING_SECRET=ct-secret",
+          `SENTRY_DSN=${DSN}`,
+          "SENTRY_ENVIRONMENT=lan",
+          "SENTRY_RELEASE=abc1234",
+        ].toSorted(),
+      );
+      expect(statSync(join(rel, "apps/web/dist/server/.dev.vars")).mode & 0o777).toBe(0o600);
+      // The shared secrets file is not stamped with a release: that is each release's own.
+      expect(readFileSync(join(s.legacyWeb, ".dev.vars.e2e"), "utf8")).not.toContain(
+        "SENTRY_RELEASE",
+      );
+      expect([stderr, ...commands].join("\n")).not.toContain(DSN);
+    });
+
+    test("a DSN carried in the tarball is saved for the next release, and printed nowhere", () => {
+      const s = setup();
+      const { status, stderr, commands } = deploy(s, pack("aaaaaaa", { sentryDsn: DSN }));
+
+      expect(status).toBe(0);
+      expect(readFileSync(join(s.legacyWeb, ".dev.vars.e2e"), "utf8")).toContain(
+        `SENTRY_DSN=${DSN}`,
+      );
+      expect(statSync(join(s.legacyWeb, ".dev.vars.e2e")).mode & 0o777).toBe(0o600);
+      expect(varsOf(join(s.releases, "aaaaaaa"))).toContain("SENTRY_RELEASE=aaaaaaa");
+      expect(existsSync(join(s.releases, "aaaaaaa/.sentry-dsn"))).toBe(false);
+      expect([stderr, ...commands].join("\n")).not.toContain(DSN);
+
+      // The next release carries none, and reports as itself.
+      expect(deploy(s, pack("bbbbbbb")).status).toBe(0);
+      const next = varsOf(join(s.releases, "bbbbbbb"));
+      expect(next).toContain(`SENTRY_DSN=${DSN}`);
+      expect(next).toContain("SENTRY_RELEASE=bbbbbbb");
+      expect(next).not.toContain("SENTRY_RELEASE=aaaaaaa");
+    });
   });
 });

@@ -1,7 +1,23 @@
 import { ErrorPage, NotFound } from "@hackcove/ui";
-import { createRouter as createTanStackRouter, Link } from "@tanstack/react-router";
+import {
+  createRouter as createTanStackRouter,
+  type ErrorComponentProps,
+  Link,
+} from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Page } from "#/components/ui";
+import { reportBrowserError } from "#/lib/sentry-browser";
 import { routeTree } from "./routeTree.gen";
+
+/** The page a route's error lands on: also reported to Sentry, when this deployment has a DSN (PS-227). */
+function RouteError({ error, reset }: ErrorComponentProps) {
+  useEffect(() => reportBrowserError(error), [error]);
+  return (
+    <Page>
+      <ErrorPage onRetry={reset} renderHome={(props) => <Link to="/" {...props} />} />
+    </Page>
+  );
+}
 
 export function getRouter() {
   const router = createTanStackRouter({
@@ -14,11 +30,7 @@ export function getRouter() {
         <NotFound renderHome={(props) => <Link to="/" {...props} />} />
       </Page>
     ),
-    defaultErrorComponent: ({ reset }) => (
-      <Page>
-        <ErrorPage onRetry={reset} renderHome={(props) => <Link to="/" {...props} />} />
-      </Page>
-    ),
+    defaultErrorComponent: RouteError,
   });
 
   return router;

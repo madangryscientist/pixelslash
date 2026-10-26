@@ -7,7 +7,8 @@
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@pixelslash/engine": "workspace:*"
+    "@pixelslash/engine": "workspace:*",
+    "@sentry/bun": "11.9.0"
   },
   "devDependencies": {
     "@types/bun": "1.4.3",

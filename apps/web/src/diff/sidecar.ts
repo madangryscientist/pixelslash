@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import type { DiffIgnore, DiffOptions, PixelDiff } from "@pixelslash/engine/diff";
 import { release } from "@pixelslash/engine/release";
 import { warn } from "#/lib/log";
+import { reportError } from "#/server/sentry";
 import { SIDECAR_PATH, decodeResponse, encodeRequest } from "./sidecar-wire";
 
 /**
@@ -104,6 +105,9 @@ export function logFallbackOnce(
   if (logged.has(kind)) return;
   logged.add(kind);
   warn(`server diff: in-process (${kind}): ${message}`);
+  // Unset and refused are a deployment's choice; a sidecar that is down or errors is a fault (PS-227).
+  if (kind === "unreachable" || kind === "error")
+    reportError(new Error(`diff sidecar ${kind}: ${message}`), { area: "diff-sidecar", kind });
 }
 
 /** For tests: forget what was logged. */

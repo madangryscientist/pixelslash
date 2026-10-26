@@ -1,12 +1,13 @@
 import { appShellRootClassFor } from "@hackcove/ui";
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
+import { startBrowserSentry } from "#/lib/sentry-browser";
 import { THEME_SCRIPT } from "#/lib/theme";
 import { getShell } from "#/server/fns";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
-  // The viewer for the header and the theme cookie for the <html> class, both from the server.
+  // The viewer for the header, the theme cookie for the <html> class and the browser's error sink (PS-227), all from the server.
   loader: () => getShell(),
   head: () => ({
     meta: [
@@ -22,7 +23,9 @@ export const Route = createRootRoute({
 });
 
 function RootDocument({ children }: { children: ReactNode }) {
-  const { theme } = Route.useLoaderData();
+  const { theme, sentry } = Route.useLoaderData();
+  // After hydration, and only with a DSN: the reporter is a chunk a deployment without one never loads.
+  useEffect(() => startBrowserSentry(sentry), [sentry]);
   return (
     // The class legitimately differs from the server's markup when the script resolved the system theme.
     <html

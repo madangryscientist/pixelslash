@@ -36,7 +36,15 @@ import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { CHECK_USAGE, runCheck } from "./check.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
-import { INTERNAL_EXIT, crashLines, inState, newState, type Stage } from "./failure.ts";
+import {
+  INTERNAL_EXIT,
+  crashLines,
+  inState,
+  newState,
+  type RunState,
+  type Stage,
+} from "./failure.ts";
+import { reportToSentry } from "./sentry.ts";
 import { DEV_USAGE, runDev } from "./dev.ts";
 import type { KeyInput } from "./dev-loop.ts";
 import { FLAKE_USAGE, FLAKES_USAGE, runFlake, runFlakes } from "./flake.ts";
@@ -181,6 +189,7 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
     return guarded(() => command.run(argv.slice(1), io, deps), io, command.usage, {
       name: argv[0] ?? "",
       stage: command.stage,
+      env: deps.env ?? process.env,
     });
   return guarded(
     async () => {
@@ -198,20 +207,36 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
     },
     io,
     USAGE,
-    { name: "compare", stage: "compare" },
+    { name: "compare", stage: "compare", env: deps.env ?? process.env },
   );
+}
+
+/** Only the `UPLOAD FAILED` runs of the known errors are Sentry's: a refused argument or a page that would not settle is the user's. */
+async function reportUploadFailure(
+  e: Error,
+  command: { name: string; env: Record<string, string | undefined> },
+  state: RunState,
+): Promise<void> {
+  if (!e.message.includes("UPLOAD FAILED:")) return;
+  await reportToSentry(command.env, e, {
+    kind: "upload",
+    command: command.name,
+    stage: state.stage,
+  });
 }
 
 /**
  * Map the known errors to exit codes: usage 2, capture, Figma or upload 1, a remote command the
  * server refused or could not answer 3. Anything else is a bug (PS-223): one `FAILED` line, what
  * reached the server, the stack, and exit 7, so a runner can tell a crash from a verdict.
+ * A crash and an `UPLOAD FAILED` run are also reported to Sentry when `PIXELSLASH_SENTRY_DSN` is
+ * set (PS-227); a new-violations exit, a usage error and a capture or Figma failure are not.
  */
 async function guarded(
   work: () => Promise<number>,
   io: Io,
   usage: string,
-  command: { name: string; stage: Stage | undefined },
+  command: { name: string; stage: Stage | undefined; env: Record<string, string | undefined> },
 ): Promise<number> {
   const state = newState(command.stage);
   try {
@@ -223,13 +248,20 @@ async function guarded(
     }
     if (e instanceof RemoteError) {
       io.stderr.write(`${e.message}\n`);
+      await reportUploadFailure(e, command, state);
       return REMOTE_EXIT;
     }
     if (e instanceof CaptureError || e instanceof FigmaError || e instanceof UploadError) {
       io.stderr.write(`${e.message}\n`);
+      await reportUploadFailure(e, command, state);
       return 1;
     }
     io.stderr.write(`${crashLines(command.name, e, state).join("\n")}\n`);
+    await reportToSentry(command.env, e, {
+      kind: "crash",
+      command: command.name,
+      stage: state.stage,
+    });
     return INTERNAL_EXIT;
   }
 }

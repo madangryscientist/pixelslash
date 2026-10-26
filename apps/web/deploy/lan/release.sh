@@ -4,12 +4,18 @@
 # apps/web/README.md, "Run it on the Proxmox server".
 #
 #   PIXELSLASH_LAN_SSH=root@<proxmox host> PIXELSLASH_LAN_CT=<ct id> \
-#     [PIXELSLASH_LAN_SSH_KEY=<identity file>] apps/web/deploy/lan/release.sh <sha>
+#     [PIXELSLASH_LAN_SSH_KEY=<identity file>] [PIXELSLASH_SENTRY_DSN=<dsn>] \
+#     apps/web/deploy/lan/release.sh <sha>
 #
 # The CT never builds (PS-225): the vite build cannot fit in its 2 GiB beside a running workerd (ob
 # 1887), so it used to stop the server for the build. Here the build runs on this machine, the
 # release (the commit's tracked files and the built dist) goes over ssh to the Proxmox host and in
 # with `pct push`, and the release's own update.sh unpacks, installs and switches it on the CT.
+#
+# PIXELSLASH_SENTRY_DSN (PS-227) turns on error reporting: the DSN goes into the tarball as a
+# private file, over the same ssh stream, and update.sh saves it with the CT's secrets. It is read
+# from the environment and never printed or put on a command line. Without it the CT keeps the DSN
+# it already has in .dev.vars.e2e.
 set -Eeuo pipefail
 
 main() {
@@ -42,6 +48,9 @@ main() {
   cp -a apps/web/dist "$stage/$short/apps/web/dist"
   # This machine's .dev.vars must never reach the CT: it carries its own, which update.sh puts here.
   rm -f "$stage/$short/apps/web/dist/server/.dev.vars"
+  if [[ -n ${PIXELSLASH_SENTRY_DSN:-} ]]; then
+    (umask 077 && printf '%s\n' "$PIXELSLASH_SENTRY_DSN" >"$stage/$short/.sentry-dsn")
+  fi
   tar -czf "$stage/$short.tar.gz" -C "$stage/$short" .
   echo "release $short: $(du -h "$stage/$short.tar.gz" | cut -f1)" >&2
 

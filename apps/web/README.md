@@ -16,6 +16,50 @@ in `.dev.vars.example`). Never in git.
 
 The `e2e` env in `wrangler.jsonc` carries fixed test values for these; they are not secrets.
 
+## Error reporting to Sentry (PS-227)
+
+Optional, and off until a DSN is set. With no `SENTRY_DSN` the Worker is not wrapped, the browser is
+never told a DSN (so the reporter's chunk is never fetched) and no request goes out for it.
+
+| Var | Where | Meaning |
+| --- | --- | --- |
+| `SENTRY_DSN` | `.dev.vars` / `wrangler secret put` / the CT's `.dev.vars.e2e` | The Sentry DSN. Server and browser both use it (a DSN is public by design: it can only send events). |
+| `SENTRY_RELEASE` | `wrangler.jsonc` vars; `update.sh` | The deployed sha. `update.sh` stamps it on the CT; `e2e` is `e2e`. |
+| `SENTRY_ENVIRONMENT` | `wrangler.jsonc` vars; `update.sh` | `lan` on the CT, `e2e` under the e2e runs, `dev` otherwise. |
+
+**What is reported.** On the server (`@sentry/cloudflare`): an error the Worker lets out, an `/api/v1`
+failure that becomes a 5xx (failed uploads and finalizes), a failed shot or build diff, and a diff
+sidecar failure (`src/diff/sidecar.ts`; the sidecar is a Bun process, but only the Worker talks to
+it, so the Worker reports its failures). In the browser (`@sentry/react`): an uncaught error and an
+error that reaches a route's error component. Server-function errors are turned into a response by
+TanStack Start before the Worker's wrapper sees them, so they are not reported on the server: one
+that breaks a page reaches the browser's error component and is reported there. Tracing is off
+(`tracesSampleRate` 0), there is no session replay, no profiling and no breadcrumbs.
+
+**Why `@sentry/cloudflare`.** It is the SDK for the runtime (workerd, here under Miniflare), and
+Sentry's TanStack Start docs use it with `withSentry` on Workers. `@sentry/tanstackstart-react` is
+in beta and its server setup does not run on Cloudflare. All three SDKs are 11.9.0, MIT.
+
+**Privacy.** Every event passes `scrubEvent` (`packages/engine/src/sentry-scrub.ts`, shared with the
+CLI): bodies, cookies, query strings, auth headers, tokens and image data are dropped, and the user
+and breadcrumbs are removed. `src/server/sentry.test.ts` and `e2e/sentry.spec.ts` assert it against a
+local fake ingest.
+
+**Deploy.** The CT keeps the DSN in `apps/web/.dev.vars.e2e` as `SENTRY_DSN=…`. `release.sh` can
+also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a mode 600
+`.sentry-dsn` (never on a command line, never printed), and `update.sh` saves it into the CT's
+`.dev.vars.e2e` and deletes the carried file. `update.sh` then stamps the release's own
+`SENTRY_RELEASE=<sha>` and `SENTRY_ENVIRONMENT=lan` into its `.dev.vars` (only when a DSN is set).
+
+**To switch it on (one time):**
+
+1. Create a project in sentry.io (platform: Cloudflare Workers or JavaScript) and copy its DSN.
+2. `ob secret set pixelslash-sentry-dsn` and paste it.
+3. Deploy with it: `PIXELSLASH_SENTRY_DSN="$(ob secret get pixelslash-sentry-dsn)" apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"`
+   (the same command as the deploy above). Or put `SENTRY_DSN=<dsn>` in the CT's
+   `apps/web/.dev.vars.e2e` and deploy the current sha again.
+4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see the README's "Error reporting".
+
 ## Run it locally as a project's server
 
 A local server is a real PixelSlash server: a CLI pointed at it uploads, the server diffs, and the

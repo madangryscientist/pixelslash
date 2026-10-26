@@ -10,6 +10,7 @@ import {
 import { type Db, NotFoundError } from "#/db/db";
 import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process";
 import type { DiffLocation } from "#/db/schema";
+import { reportError } from "#/server/sentry";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { authorize } from "./authorize";
 import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
@@ -267,6 +268,8 @@ function errorOf(e: unknown): ApiError {
     return { status: 409, code: "conflict", message: e.message };
   if (e instanceof TooLarge)
     return { status: 413, code: "too_large", message: `PNG over ${MAX_PNG_BYTES} bytes` };
+  // Not one of the refusals above: a failed upload or finalise, which is the server's fault (PS-227).
+  reportError(e, { area: "api" });
   throw e;
 }
 

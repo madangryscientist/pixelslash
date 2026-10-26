@@ -406,6 +406,24 @@ A shot the diff cannot decode is not a usage error either: `check` and `dev` use
 
 The client sends `User-Agent: pixelslash/<version>`.
 
+### Error reporting (opt-in)
+
+`pixelslash` reports its own crashes to Sentry **only when `PIXELSLASH_SENTRY_DSN` is set** in the
+environment. Unset (the default) the Sentry SDK is never loaded and nothing goes over the network
+for it. Set, it reports two things: a crash (the exit **7** path above) and an `UPLOAD FAILED`
+path. It never reports exit 1 (new violations), a usage error or any other result of a page: those
+are verdicts, not bugs.
+
+| Variable | Meaning |
+| --- | --- |
+| `PIXELSLASH_SENTRY_DSN` | The Sentry DSN to report to. Unset: no reporting. |
+| `PIXELSLASH_SENTRY_ENVIRONMENT` | The environment tag. Default `cli`; `ci` is a good value in CI. |
+
+The release is the CLI's own version. A report is the error's message, its stack, the release and
+the environment: request and response bodies, cookies, tokens (upload, Figma, model keys), URL
+query strings and any image or blob data are removed before it leaves the machine, and no shot is
+ever attached.
+
 ## Your coding agent: `pixelslash mcp`
 
 `pixelslash mcp` is a stdio [MCP](https://modelcontextprotocol.io) server, so the coding agent you already run can read PixelSlash (which builds have changes, what changed in a shot, which shots are flaky, what reviewers flagged) and drive feature mode in the worktree it was started in ([below](#feature-mode-from-your-agent)). Add it to Claude Code with:

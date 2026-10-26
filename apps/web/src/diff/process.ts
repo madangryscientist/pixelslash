@@ -36,6 +36,7 @@ import {
 } from "./build-writes";
 import { withOverrides } from "./with-overrides";
 import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
+import { reportError } from "#/server/sentry";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
@@ -287,6 +288,7 @@ async function diffOrRecord(
     return null;
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
+    reportError(e, { area: "diff", step: "shot" });
     await storeSnapshot(deps.db, shot.id, {
       diffStatus: null,
       diffResult: null,
@@ -355,6 +357,11 @@ async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<Process
   return { status: current.status, error: current.error, unmeasured: 0 };
 }
 
+/** The ceiling is the budget working as designed, not a failure: the next finalise resumes. */
+function reportBuildFailure(e: unknown): void {
+  if (!(e instanceof DiffCeilingError)) reportError(e, { area: "diff", step: "build" });
+}
+
 /**
  * Diff the shots of a finalised build that have no result and move it to its verdict. It takes `processing` (just
  * finalised), `errored` (a retry after a failure such as a transient R2 miss) and a `processing`
@@ -402,6 +409,7 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     await queueExplain(deps, build);
     return { status, error: null, unmeasured: 0 };
   } catch (e) {
+    reportBuildFailure(e);
     await markErrored(deps.db, build, e, runFields(timer.ended()));
     // The ceiling's count includes shots a changed baseline sends back to be measured again, which
     // a count of rows with no result would miss.

@@ -44,6 +44,11 @@
     "MIN_CLI_VERSION": "",
     // Where a new project diffs (ob 1727): `ci` here; unset or anything else is `server`, the self-host default.
     "DEFAULT_DIFF_LOCATION": "ci",
+    // Error reporting (PS-227), off while SENTRY_DSN is empty. Set the DSN with `wrangler secret put SENTRY_DSN`;
+    // the release is the deployed commit and the environment names the deployment (`dev` here, `e2e`, `lan`).
+    "SENTRY_DSN": "",
+    "SENTRY_RELEASE": "",
+    "SENTRY_ENVIRONMENT": "dev",
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
@@ -81,6 +86,11 @@
         // Playwright run points it at its own sidecar's port (vite.config.ts). Cloudflare's vars
         // above never set it: there the server diff stays in-process (diff.wasm, as everywhere).
         "DIFF_SIDECAR_URL": "http://127.0.0.1:4181",
+        // Off here; the Playwright run points it at its own ingest stub (vite.config.ts), and the
+        // LAN self-host's `.dev.vars` sets the real DSN, release and `lan`.
+        "SENTRY_DSN": "",
+        "SENTRY_RELEASE": "e2e",
+        "SENTRY_ENVIRONMENT": "e2e",
       },
     },
   },
