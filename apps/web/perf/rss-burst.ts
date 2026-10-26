@@ -6,7 +6,13 @@
  * It replays what the CLI sends (`packages/engine/src/upload.ts`): a main build (open, PUT every
  * shot four at a time, finalise), then a branch build of changed shots that the server diffs in
  * its finalise, finalised again until nothing is left unmeasured. `perf/rss-sampler.py` runs on
- * the CT over ssh and prints the resident memory of workerd, `vite preview` and the diff sidecar.
+ * the CT over ssh and prints the resident memory of workerd, `vite preview` (or, since PS-220,
+ * `deploy/lan/serve.ts`) and the diff sidecar.
+ *
+ * `--local 1` (PS-220) runs the sampler on this machine instead, against two `systemd-run --user`
+ * units (`--web-unit`, `--diff-unit`; their cgroups sit under `--cg`), and restarts them with
+ * `systemctl --user`. That is how the desktop A/B of `vite preview` against `serve.ts` is taken:
+ * `--server` and `PIXELSLASH_TOKEN` name a local review app, `--org` a local org. perf/README.md.
  */
 import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -26,6 +32,11 @@ const SETTLE_S = [10, 60, 180];
 const OUT = opt("out", "");
 const SSH = opt("ssh", "ssh -i ~/.ssh/id_ed25519_mac root@192.168.0.20");
 const CT = opt("ct", "135");
+/** PS-220: sample two local `systemd-run --user` units, not the CT's. */
+const LOCAL = opt("local", "0") === "1";
+const WEB_UNIT = opt("web-unit", "pixelslash-web.service");
+const DIFF_UNIT = opt("diff-unit", "pixelslash-diff.service");
+const CG = opt("cg", "/sys/fs/cgroup/system.slice/");
 /** The org the run's throwaway project goes in (a personal token that belongs to several needs one). */
 const ORG = opt("org", "pixelslash");
 /** Restart pixelslash-web and pixelslash-diff first, so the run starts from a cold unit. */
@@ -43,7 +54,7 @@ type Mark = { mark: string; t: number; hwm: Record<string, number> };
 const samples: Sample[] = [];
 const marks: Mark[] = [];
 
-const CLASSES = ["workerd", "vite", "sidecar"] as const;
+const CLASSES = ["workerd", "vite", "host", "sidecar"] as const;
 
 // ---- the sampler on the CT -----------------------------------------------------------------
 
@@ -51,12 +62,19 @@ const code = readFileSync(new URL("./rss-sampler.py", import.meta.url), "utf8");
 const b64 = Buffer.from(code).toString("base64");
 const [sshBin = "ssh", ...sshArgs] = SSH.replace("~", homedir()).split(" ");
 const sampler = Bun.spawn(
-  [
-    sshBin,
-    ...sshArgs,
-    `pct exec ${CT} -- python3 -u -c "import base64;exec(base64.b64decode('${b64}'))"`,
-  ],
-  { stdin: "pipe", stdout: "pipe", stderr: "inherit" },
+  LOCAL
+    ? ["python3", "-u", "-c", code]
+    : [
+        sshBin,
+        ...sshArgs,
+        `pct exec ${CT} -- python3 -u -c "import base64;exec(base64.b64decode('${b64}'))"`,
+      ],
+  {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "inherit",
+    env: { ...process.env, CG, WEB_UNIT, DIFF_UNIT },
+  },
 );
 /** One line of the sampler's output: a sample, or the answer to a `mark`. */
 function take(line: string): void {
@@ -99,6 +117,10 @@ async function mark(name: string): Promise<void> {
 }
 
 async function ct(command: string): Promise<string> {
+  if (LOCAL) {
+    const run = Bun.spawn(["bash", "-c", command], { stdout: "pipe", stderr: "pipe" });
+    return await new Response(run.stdout).text();
+  }
   const run = Bun.spawn(
     [sshBin, ...sshArgs, `pct exec ${CT} -- bash -c ${JSON.stringify(command)}`],
     { stdout: "pipe", stderr: "pipe" },
@@ -218,7 +240,11 @@ const peakOf = (key: string, from: number, to: number) =>
 const lastOf = (key: string, at: number) => samples.filter((s) => s.t <= at).at(-1)?.[key] ?? 0;
 
 if (RESTART) {
-  await ct("systemctl restart pixelslash-diff pixelslash-web");
+  await ct(
+    LOCAL
+      ? `systemctl --user restart ${DIFF_UNIT} ${WEB_UNIT}`
+      : "systemctl restart pixelslash-diff pixelslash-web",
+  );
   await Bun.sleep(2000);
 }
 await waitUp();

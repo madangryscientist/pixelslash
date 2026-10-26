@@ -83,9 +83,9 @@ SQL
   }
 
   # `restart` returns once the process is forked, so a unit that dies on start is seen by waiting
-  # for its port: up to 10 s.
+  # for its port: up to $2 half-seconds (default 20, 10 s).
   wait_for_port() {
-    for _ in $(seq 20); do
+    for _ in $(seq "${2:-20}"); do
       if (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null; then return 0; fi
       sleep 0.5
     done
@@ -175,6 +175,15 @@ SQL
   if [[ -n $helper_model || $had_helper == 1 ]]; then point_models "$helper_model"; fi
   systemctl enable --quiet pixelslash-stub pixelslash-web
   systemctl restart pixelslash-stub pixelslash-web
+  # serve.ts (PS-220) starts Miniflare on :3000, about a second on the desktop and not timed on the
+  # CT, so it gets 30 s. A build it cannot load (no wrangler.json, a module it cannot find) only
+  # shows as a port that never opens. The rollback puts the previous dist back; it cannot help if
+  # serve.ts itself is what is broken, since the unit runs the new serve.ts either way.
+  if ! wait_for_port 3000 60; then
+    journalctl -u pixelslash-web -n 5 --no-pager >&2 || true
+    echo "pixelslash-web did not come up on :3000" >&2
+    rollback
+  fi
   trap - ERR HUP INT TERM
   rm -rf "$prev"
 }

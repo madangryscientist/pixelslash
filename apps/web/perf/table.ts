@@ -32,16 +32,16 @@ const runs = readdirSync(dir)
 const mb = (n: number | undefined) => `${Math.round(n ?? 0)}`;
 const out: string[] = [];
 out.push(
-  "| shots | phase | s | workerd | vite | sidecar | web unit (cgroup) | anon / file | swap | `high` events | note |",
-  "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+  "| shots | phase | s | workerd | vite | serve.ts | sidecar | web unit (cgroup) | anon / file | swap | `high` events | note |",
+  "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
 );
 for (const run of runs) {
   out.push(
-    `| ${run.shots} | idle (cold start) | | ${mb(run.idle["workerd"])} | ${mb(run.idle["vite"])} | ${mb(run.idle["sidecar"])} | | | | | | |`,
+    `| ${run.shots} | idle (cold start) | | ${mb(run.idle["workerd"])} | ${mb(run.idle["vite"])} | ${mb(run.idle["host"])} | ${mb(run.idle["sidecar"])} | | | | | | |`,
   );
   for (const p of run.phases)
     out.push(
-      `| ${run.shots} | ${p.phase} | ${p.seconds.toFixed(0)} | ${mb(p.hwmMB["workerd"])} | ${mb(p.hwmMB["vite"])} | ${mb(p.hwmMB["sidecar"])} | ${mb(p.webUnitPeakMB)} | ${p.webUnitAnonPeakMB === undefined ? "" : `${mb(p.webUnitAnonPeakMB)} / ${mb(p.webUnitFilePeakMB)}`} | ${mb(p.webUnitSwapPeakMB)} | ${p.webHighEvents} | ${p.note ?? ""} |`,
+      `| ${run.shots} | ${p.phase} | ${p.seconds.toFixed(0)} | ${mb(p.hwmMB["workerd"])} | ${mb(p.hwmMB["vite"])} | ${mb(p.hwmMB["host"])} | ${mb(p.hwmMB["sidecar"])} | ${mb(p.webUnitPeakMB)} | ${p.webUnitAnonPeakMB === undefined ? "" : `${mb(p.webUnitAnonPeakMB)} / ${mb(p.webUnitFilePeakMB)}`} | ${mb(p.webUnitSwapPeakMB)} | ${p.webHighEvents} | ${p.note ?? ""} |`,
     );
 }
 out.push(

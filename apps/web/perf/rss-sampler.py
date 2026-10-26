@@ -5,6 +5,10 @@ each unit's cgroup memory (current, swap, anon, file) and the unit's `high` even
 stdin `mark NAME` prints a mark line with every class's VmHWM (the peak since the last mark) and then
 resets VmHWM (clear_refs 5), so the next mark is the peak of the phase in between.
 Needs root (clear_refs) and cgroup v2. Read-only apart from the HWM reset.
+
+PS-220: `CG`, `WEB_UNIT` and `DIFF_UNIT` point it at other cgroups, so the same run can sample two
+`systemd-run --user` units on a desktop (perf/rss-burst.ts --local). Processes of the web unit are
+workerd, `vite` (vite preview), `host` (deploy/lan/serve.ts, PS-220) or `other` (bunx).
 """
 
 import json
@@ -14,8 +18,11 @@ import sys
 import time
 
 INTERVAL = float(os.environ.get("INTERVAL", "0.25"))
-CG = "/sys/fs/cgroup/system.slice/"
-UNITS = {"web": "pixelslash-web.service", "diff": "pixelslash-diff.service"}
+CG = os.environ.get("CG", "/sys/fs/cgroup/system.slice/")
+UNITS = {
+    "web": os.environ.get("WEB_UNIT", "pixelslash-web.service"),
+    "diff": os.environ.get("DIFF_UNIT", "pixelslash-diff.service"),
+}
 
 
 def read(path):
@@ -42,6 +49,8 @@ def klass(unit, pid):
         return "workerd"
     if "vite" in cmd:
         return "vite"
+    if "serve.ts" in cmd:
+        return "host"
     return "other"  # bunx and anything else in the unit
 
 
@@ -71,7 +80,7 @@ def mb(n):
 
 
 def sample():
-    rss = {"workerd": 0, "vite": 0, "other": 0, "sidecar": 0}
+    rss = {"workerd": 0, "vite": 0, "host": 0, "other": 0, "sidecar": 0}
     for cls, pid in pids():
         rss[cls] += kb(pid, "VmRSS")
     row = {"t": round(time.time(), 3)}
@@ -91,7 +100,7 @@ def sample():
 
 
 def mark(name):
-    hwm = {"workerd": 0, "vite": 0, "other": 0, "sidecar": 0}
+    hwm = {"workerd": 0, "vite": 0, "host": 0, "other": 0, "sidecar": 0}
     for cls, pid in pids():
         hwm[cls] += kb(pid, "VmHWM")
         try:

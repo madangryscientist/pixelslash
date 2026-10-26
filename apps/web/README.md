@@ -41,7 +41,8 @@ CLOUDFLARE_ENV=e2e bun run dev -- --host 127.0.0.1 --strictPort
 
 This is the dev server, so changes to the app reload without a rebuild. The server diff runs under
 it as it does in a build; to serve the production build instead, `CLOUDFLARE_ENV=e2e bun run build`
-then `bunx vite preview --host 127.0.0.1 --port 3000 --strictPort`.
+then `HOST=127.0.0.1 bun deploy/lan/serve.ts` (the LAN self-host's server, below; `PORT` moves it off :3000).
+`bunx vite preview --host 127.0.0.1 --port 3000 --strictPort` still serves the same build.
 
 `bunx nx test:e2e web` (and `bun run test:e2e:dev`) does not use :3000 or :4174: `e2e/ports.ts` picks two
 free ports per run, so two runs from two worktrees can go at once. Set `PIXELSLASH_E2E_PORT` and
@@ -103,14 +104,19 @@ public DNS. Real GitHub sign-in is a later ticket.
 | Container | CT 135 `pixelslash` on `192.168.0.20`: Debian 13, unprivileged, 2 vCPU, 2 GB, 10 GB on `local-lvm`, starts on boot. The address is static in the CT config, below the router's DHCP pool. |
 | Checkout | `/home/pixelslash/pixelslash`, user `pixelslash`, `origin/main` over a read-only deploy key ("pixelslash CT 135"); the push URL is `no-push-from-this-ct`. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
 | State | D1 and R2 in `apps/web/.wrangler/state` on the CT's disk, kept across restarts and updates. |
-| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`vite preview` of the production build), from `deploy/lan/`. `pixelslash-diff` (`bun deploy/lan/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/lan/serve.ts`: the production build on Miniflare, no vite), from `deploy/lan/`. `pixelslash-diff` (`bun deploy/lan/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
+
+`deploy/lan/serve.ts` calls Miniflare's API on the build (`dist/server` is the Worker, `dist/client` the
+assets): the D1 and R2 in `.wrangler/state/v3` that `vite preview` kept, the `wrangler.json` vars with
+`.dev.vars` over them, the explain queue. It listens on `0.0.0.0:3000`; `HOST` and `PORT` move it (the
+Rust front door of PS-217 will set `127.0.0.1` and `3001`). It does not migrate or build: `update.sh` does.
 
 The build is the `e2e` environment's with three values replaced. `apps/web/.dev.vars.e2e` on the CT
 (mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://192.168.0.34:4174`, so the
 browser on another machine is sent to the stand-in at the CT's address rather than its own
 `localhost`, a random `IMAGE_SIGNING_SECRET`, and the deployment's `MODEL_KEY_SECRET` (without it
 the CT would seal keys under the `e2e` env's fixed test value). The Cloudflare plugin copies it into
-`dist/server/.dev.vars` at build time and `vite preview` reads it from there; the `e2e` env in
+`dist/server/.dev.vars` at build time and `serve.ts` reads it from there (`vite preview` did too); the `e2e` env in
 `wrangler.jsonc`, and so the tests, are unchanged.
 
 Update to `origin/main` (pull, stop, install, migrate, build, restart) from the desktop. It is not
@@ -123,8 +129,10 @@ server is started on it, and the script exits 1.
 **workerd's memory (PS-155).** A day of `/workerd-rss.log` samples (every 10 min, 2026-10-23 to 25) shows workerd at 127-140 MB idle
 and stepping to 1.5-1.8 GB (peak 1.82 GB) within one 10-minute sample of an upload burst (the snapshot PUTs and `finalize`),
 then holding there for hours until the unit restarts, which brings it back to 130 MB. It does not grow without bound, but it
-does not give the memory back, and with `vite preview` (~0.5 GB) beside it the peak is more than the CT's 2 GiB: that was the
-two OOM kills of 2026-10-25. `pixelslash-web.service` therefore carries `MemoryHigh=1400M`, `MemoryMax=1700M` and
+does not give the memory back, and with `vite preview` (~0.5 GB) beside it the peak was more than the CT's 2 GiB: that was the
+two OOM kills of 2026-10-25. `pixelslash-web` has run `deploy/lan/serve.ts` since PS-220 instead, which takes about 450 MB
+out of the unit at idle and after a burst (`perf/README.md`, desktop A/B); the caps below are unchanged until the same run is
+made on the CT. `pixelslash-web.service` therefore carries `MemoryHigh=1400M`, `MemoryMax=1700M` and
 `OOMPolicy=stop`; `update.sh` installs the unit, so the cap survives an update.
 
 ```bash
@@ -234,3 +242,8 @@ miniflare's undici pool had kept: `read ECONNRESET`, so a 500 `fetch failed` in 
 retry from the CLI for a request that never ran. Miniflare sets `reset: false` on every request it
 sends, so a `Connection: close` header cannot ask for this; the plugin sets `reset: true` on that
 pool. Preview only; the Cloudflare deploy does not run it.
+`deploy/lan/serve.ts` (the LAN unit since PS-220) has no such hop: workerd listens on the port, and
+a client reaches it directly, so there is no pool socket to reset and the plugin is not on its path
+(it stays for `vite preview` on the desktop). A client whose keep-alive socket workerd closes right
+after a long answer can still see a reset; the CLI retries a network error after 1 s and 2 s, and a
+finalize is resumable. Whether the CT's workerd does that is checked by the CT run in `perf/README.md`.

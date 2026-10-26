@@ -15,6 +15,8 @@ perf/run.sh                     # 50, 200 and 500 shots, each from freshly resta
 SHOTS="200" perf/run.sh out-dir # one size, into out-dir
 bun perf/rss-burst.ts --shots 200 --out run.json   # one run, all flags in the file header
 bun perf/table.ts perf/results/<run>               # the tables below
+bun perf/rss-burst.ts --local 1 --server http://127.0.0.1:3301 --cg <app.slice cgroup> \
+  --web-unit <unit>.service --diff-unit <unit>.service --shots 200 --out run.json   # a desktop run (PS-220, below)
 ```
 
 Needs: ssh to the Proxmox host (`~/.ssh/id_ed25519_mac`, `pct exec 135`), a personal token in
@@ -129,3 +131,79 @@ the sidecar's ~420 MB per diff of a 1280x9500 page (one diff in flight today, so
 What this does not show: the upload and diff are both on the one 2 vCPU, 2 GiB CT, so `memory.high`
 throttling stretches the PUT times at 200 and 500 shots (they are not a clean measure of the
 server's speed); one corpus, one set of sizes, and a single run per N (plus the repeat at 200).
+
+## PS-220: `serve.ts` in place of `vite preview` (desktop A/B)
+
+`deploy/lan/serve.ts` starts the built Worker on Miniflare directly, so there is no vite process
+and no Node-to-workerd hop. This section is what that measured **on the desktop, not on CT 135**:
+a builder cannot deploy a branch to the CT (`update.sh` resets it to `origin/main`), and a 500-shot
+run adds about 2.6 GB to a disk that had 2.9 GB free after PS-214. The CT run is still owed (below).
+
+**Method.** Same harness, same corpus, same commit (**88ee718**'s product code plus `serve.ts`), one
+arm after the other on a fresh `.wrangler/state` and fresh units: `rss-burst.ts --local 1` drives
+the server as `systemd-run --user` units (`ps220-web`, `ps220-diff` with the sidecar's 450M/600M
+caps, `ps220-stub`) and the sampler reads their cgroups. The arms differ in one thing:
+`bun deploy/lan/serve.ts` against `bunx vite preview` of the same `CLOUDFLARE_ENV=e2e` build.
+`rss-sampler.py` classes the Bun process that runs Miniflare as `serve.ts`. The desktop was
+busy (load ~8 on 12 cores) and the web units had **no** `MemoryHigh`, so nothing was swapped or
+throttled; the cgroup column counts page cache the CT's cap would have reclaimed, so read the
+**anon** column and the process columns, not the cgroup peak.
+Data: `results/2026-10-26-88ee718-ps220/{serve,vite}/{50,200,500}.json`.
+
+Peak `VmHWM` by process (MB), idle and after each burst has settled (+180 s):
+
+| shots | arm | idle workerd / host / sidecar | settled workerd | settled vite or `serve.ts` | settled workerd + host | settled anon |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 50 | `serve.ts` | 137 / 114 / 27 | 290 | 106 | **396** | 285 |
+| 50 | `vite preview` | 156 / 565 / 27 | 350 | 477 | 827 | 688 |
+| 200 | `serve.ts` | 137 / 111 / 31 | 411 | 103 | **514** | 402 |
+| 200 | `vite preview` | 155 / 563 / 27 | 518 | 428 | 946 | 808 |
+| 500 | `serve.ts` | 135 / 114 / 27 | 588 | 106 | **694** | 580 |
+| 500 | `vite preview` | 156 / 555 / 27 | 692 | 473 | 1165 | 1023 |
+
+- **Idle**: workerd + the host is 251 MB under `serve.ts` (workerd 137, the Bun process 114) against
+  721 MB under vite (156 + 565). PS-214 measured 141 + 558 on the CT. The Bun process that runs
+  Miniflare is not free: it is the ~115 MB.
+- **After a burst** the resident set is 430 to 470 MB lower at every size, and the cgroup's anon
+  bytes 400 to 440 MB lower (peak anon at 500 shots 643 against 1083). workerd itself is 60 to
+  105 MB smaller under `serve.ts` in this run; that part is within what one run per arm can say,
+  and is confounded: the plugin's Miniflare is 5.20261012.0-beta (workerd 1.20261012.1) and
+  `serve.ts` runs the `miniflare` the app depends on, 5.20261019.0-beta (workerd 1.20261019.1, the
+  one `wrangler` in `apps/web` already uses). The ~450 MB is the vite and Node process, not workerd.
+- **The sidecar is unchanged** (27 idle, 411 to 425 at its peak): it is the same process.
+- `GET /` probes never failed on the `serve.ts` arm (0 of 16, 82 and 183); the slowest answer was
+  0.2, 2.4 and 9.9 s, against 0.2, 0.3 and 3.8 s under vite. The slow ones are the 500-shot PUTs
+  and finalize with a busy desktop and no cap; the CT run is where this matters.
+
+**ECONNRESET (ob 1876).** None on `serve.ts`: the CLI-shaped driver sent 1, 2 and 4 finalizes
+back to back (4 hand-offs in all, the next one sent the moment the last answered) straight to workerd's own socket
+with Bun's `fetch`, and no request failed. It is a weak result, because the desktop does not
+reproduce 1876 under `vite preview` either: with `freshConnectionPerRequest` switched off the same
+200 and 500 runs (`results/.../vite-no-fresh-connection/`) also had no reset. What `serve.ts`
+changes is structural: Miniflare's undici `Pool` is not on the path (workerd listens on the port
+itself), so the pooled socket 1876 had to reset does not exist. What is left is the other end
+of the connection: a client whose keep-alive socket workerd closes 50 ms after a long answer.
+Bun's `fetch` does reset on that (a stand-in server that closes 40 ms after answering, then a
+second request 5 ms later: 20 of 40 failed), and workerd on the desktop keeps an idle socket
+15 s, so whether the CT's workerd closes early is for the CT run to show. If it does, the
+real consequence is bounded: `upload-client.ts` retries a network error at 1 s and 2 s and the
+finalize is resumable ("until measured"), so the CLI pays a second, not a failure.
+
+**State survives the switch.** A build seeded under `vite preview` (org, project, a main and a
+branch build with a changed shot, its PNGs in R2) was read back through `serve.ts` on the same
+`.wrangler/state/v3`: the build, its `changes` verdict, and the signed baseline, branch and
+diff image URLs all answered, and no second D1 database file or new R2 object appeared. The
+database file is named from the D1 id, which `serve.ts` takes from `dist/server/wrangler.json`
+as the plugin does.
+
+**Verdict.** `serve.ts` takes about 450 MB out of the web unit at idle and after any burst, and
+does not change what the PUT phases hold in workerd (same shape: 375 to 640 MB peak at 50 to 500
+shots). **`MemoryHigh` / `MemoryMax` stay at 1400M / 1700M.** The desktop did not reproduce
+PS-214's settled workerd on the CT (850 to 960 MB at 200 and 500 shots against 410 and 590
+here), and on the CT's figure `serve.ts` (115) + workerd (960) is ~1.07 GB: a cap lowered by the
+saving would sit under it. Lowering needs the CT's own numbers.
+
+**Owed after the land**: `ssh` to the host, `update.sh`, then `perf/run.sh` on the CT (check
+`df -h /` first, the disk note above) and read the settled workerd, the cgroup peak, and whether
+any finalize hits `ECONNRESET` (`journalctl -u pixelslash-web`, and the driver stops on a failed
+request). That is the PS-217 Q10 number and the basis for any lower cap.
