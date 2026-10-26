@@ -162,13 +162,15 @@ describe("figma file", () => {
       const pages = await servePages();
       const dir = await tmp();
       const live = pages.url("live.html");
-      await expect(
-        run(
-          ["--live", live, "--local", live, "--file", FILE_KEY, "--out", join(dir, "out")],
-          capture().io,
-          { spawn: judgeBoom, fetch: figmaFetch(), env: { FIGMA_TOKEN } },
-        ),
-      ).rejects.toThrow("judge exploded");
+      const cap = capture();
+      const code = await run(
+        ["--live", live, "--local", live, "--file", FILE_KEY, "--out", join(dir, "out")],
+        cap.io,
+        { spawn: judgeBoom, fetch: figmaFetch(), env: { FIGMA_TOKEN } },
+      );
+      expect(code).toBe(7);
+      expect(cap.stderr).toContain("pixelslash: FAILED compare:");
+      expect(cap.stderr).toContain("judge exploded");
       expect(leftovers()).toEqual([]);
     }, 30_000);
 

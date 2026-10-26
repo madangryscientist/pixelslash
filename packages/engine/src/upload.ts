@@ -37,7 +37,27 @@ export type UploadOptions = {
   timings?: Timings | undefined;
 };
 
+/** How far an upload got, filled in as it goes (PS-223), so a failure can say what reached the server. */
+export type UploadProgress = {
+  /** A build was opened on the server. */
+  opened: boolean;
+  /** Shots the server has answered for. */
+  sent: number;
+  total: number;
+  /** The finalise was answered: the build is complete. */
+  finalised: boolean;
+};
+
+export const newUploadProgress = (): UploadProgress => ({
+  opened: false,
+  sent: 0,
+  total: 0,
+  finalised: false,
+});
+
 export type UploadDeps = {
+  /** Filled in by `uploadSnapshots` as it goes. */
+  progress?: UploadProgress;
   fetch?: FetchLike;
   env?: NodeJS.ProcessEnv;
   /** Where the git checkout and the config are looked for. Default: the process's. */
@@ -188,6 +208,8 @@ export async function uploadSnapshots(
   const fetcher = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const started = performance.now();
   const manifest = await readManifest(opts.dir);
+  const progress = deps.progress ?? newUploadProgress();
+  progress.total = manifest.snapshots.length;
   const warn = deps.warn ?? (() => {});
   const ctx = await gitContext({ ...opts.git, env, warn });
   const log = requestLog();
@@ -200,6 +222,7 @@ export async function uploadSnapshots(
     onRequest: (step, ms) => log.record(step, ms),
   };
   const { id, diffLocation } = await openBuild(client, ctx, opts.projectId);
+  progress.opened = true;
   // A server from before ob 1727 has no baselines endpoint and diffs every build itself.
   const picked = diffLocation
     ? await fetchBaselines(client, { path: `/api/v1/builds/${id}/baselines` }, manifest.snapshots)
@@ -214,8 +237,9 @@ export async function uploadSnapshots(
   await clearFlakeOutput(opts.dir);
   const timed: ShotTiming[] = [];
   const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
+  const stop = { on: false };
   const worker = async () => {
-    for (let next = queue.shift(); next; next = queue.shift()) {
+    for (let next = queue.shift(); next && !stop.on; next = queue.shift()) {
       const { e, pick } = next;
       const file = pngPath(opts.dir, e);
       const png = Buffer.from(await Bun.file(file).arrayBuffer());
@@ -238,11 +262,14 @@ export async function uploadSnapshots(
         path: `/api/v1/builds/${id}/snapshots`,
         body: snapshotForm(e, png, { results: ci ? results : [], flake, note }),
       });
+      progress.sent++;
     }
   };
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  await runWorkers(worker, stop);
   const sent = timingsToSend(opts.timings, started, log.finish(), timed);
-  checkOutcome(client, id, await finalise(client, id, manifest.snapshots.length, sent));
+  const done = await finalise(client, id, manifest.snapshots.length, sent);
+  checkOutcome(client, id, done);
+  progress.finalised = true;
   const outcome = await flakes.finish(manifest.snapshots);
   const timings = timingsToSend(opts.timings, started, log.finish(), timed);
   return {
@@ -252,6 +279,22 @@ export async function uploadSnapshots(
     timings,
     ...outcome,
   };
+}
+
+/**
+ * Run `CONCURRENCY` workers to the end. One failure stops the rest pulling more and is thrown once
+ * they have all settled, so the progress a crash reports (PS-223) is final, not still moving.
+ */
+async function runWorkers(worker: () => Promise<void>, stop: { on: boolean }): Promise<void> {
+  const settled = await Promise.allSettled(
+    Array.from({ length: CONCURRENCY }, () =>
+      worker().catch((e) => {
+        stop.on = true;
+        throw e;
+      }),
+    ),
+  );
+  for (const r of settled) if (r.status === "rejected") throw r.reason;
 }
 
 /** The judge's sentence for a changed shot; a model that fails is said and the shot goes without. */

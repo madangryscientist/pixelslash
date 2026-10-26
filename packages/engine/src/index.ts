@@ -8,6 +8,8 @@ export {
 export { changeLines } from "./compare-report.ts";
 export {
   compareSnapshots,
+  notComparedLines,
+  notComparedSummary,
   type SnapshotCompareDeps,
   type SnapshotCompareOptions,
   type SnapshotCompareResult,
@@ -93,7 +95,13 @@ export {
   type CheckResult,
   type CheckShot,
 } from "./check.ts";
-export { uploadSnapshots, type UploadDeps, type UploadResult } from "./upload.ts";
+export {
+  uploadSnapshots,
+  type UploadDeps,
+  newUploadProgress,
+  type UploadProgress,
+  type UploadResult,
+} from "./upload.ts";
 export type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 export type { FlakeRecord } from "./flake.ts";
 export {

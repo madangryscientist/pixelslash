@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { shotsOf } from "./check-rows.ts";
-import { compareSnapshots } from "./compare-snapshots.ts";
+import { assertCompared, compareSnapshots } from "./compare-snapshots.ts";
 import { pngSize } from "./dev-refs.ts";
 import {
   type DevAgainst,
@@ -91,6 +91,7 @@ export async function runIteration(opts: DevRunOptions): Promise<DevIteration> {
   const side = await sideOf(opts, dir, manifest.snapshots);
   const report = join(dir, "report");
   const result = await compareSnapshots({ mainDir: side.dir, branchDir: shots, out: report });
+  assertCompared(result);
   const rows = shotsOf(result, manifest.snapshots, { branch: shots, main: side.dir, report });
   const variantOf = new Map(manifest.snapshots.map((e) => [join(shots, e.file), e.variant.name]));
   const devShots: DevShot[] = [];

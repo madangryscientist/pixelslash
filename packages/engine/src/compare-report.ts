@@ -17,6 +17,8 @@ export type CompareRow = {
   regions: Region[];
   /** Set when the shot was captured again and the captures disagreed (`check`, ob 1732). */
   flaky?: { runs: number; differed: number } | undefined;
+  /** Set when the diff threw on this shot (PS-223): it was not measured, and is neither changed nor unchanged. */
+  error?: string | undefined;
 };
 
 type Rows = {
@@ -24,6 +26,7 @@ type Rows = {
   unchanged: CompareRow[];
   added: CompareRow[];
   removed: CompareRow[];
+  failed?: CompareRow[] | undefined;
 };
 
 /** One name in a group: what the CLI prints and the report shows, and the entry's anchor on the page. */
@@ -44,7 +47,13 @@ export function rowLabel(r: CompareRow): string {
 function anchorsOf(input: Rows): Map<CompareRow, string> {
   const taken = new Set<string>();
   const anchors = new Map<CompareRow, string>();
-  for (const r of [...input.changed, ...input.added, ...input.removed, ...input.unchanged]) {
+  for (const r of [
+    ...input.changed,
+    ...input.added,
+    ...input.removed,
+    ...(input.failed ?? []),
+    ...input.unchanged,
+  ]) {
     const base = `shot-${r.key.replace(/[^a-zA-Z0-9_-]+/g, "-")}`;
     let id = base;
     for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
@@ -123,13 +132,15 @@ export function renderCompareIndex(input: {
   added: CompareRow[];
   removed: CompareRow[];
   mismatched: CompareRow[];
+  failed?: CompareRow[] | undefined;
   title?: string | undefined;
   note?: string | undefined;
   flakes?: string | undefined;
 }): string {
   const { changed, unchanged, added, removed, mismatched } = input;
+  const failed = input.failed ?? [];
   const title = esc(input.title ?? "PixelSlash compare");
-  const counts = `${changed.length} changed · ${unchanged.length} unchanged · ${added.length} new · ${removed.length} removed`;
+  const counts = `${changed.length} changed · ${unchanged.length} unchanged · ${added.length} new · ${removed.length} removed${failed.length > 0 ? ` · ${failed.length} not compared` : ""}`;
   const warning =
     mismatched.length === 0
       ? ""
@@ -148,6 +159,12 @@ export function renderCompareIndex(input: {
     compareList("Changed", changed, anchors, px),
     compareList("New on Branch", added, anchors, () => ""),
     compareList("Removed from Branch", removed, anchors, () => ""),
+    compareList(
+      "Not compared",
+      failed,
+      anchors,
+      (r) => ` — <span class="warn">${esc(r.error ?? "")}</span>`,
+    ),
     compareList("Unchanged", unchanged, anchors, () => ""),
   ].join("\n  ");
   return `<!doctype html>

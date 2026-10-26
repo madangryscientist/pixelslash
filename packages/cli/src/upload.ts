@@ -8,6 +8,7 @@ import {
   type SnapshotEntry,
   UploadError,
   type Timings,
+  type UploadProgress,
   type UploadResult,
   UsageError,
   findConfigIfAny,
@@ -24,12 +25,14 @@ import {
 } from "@pixelslash/engine";
 import { RemoteError } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
+import { ESCALATE, enterStage, uploadLine, uploadProgress } from "./failure.ts";
 import { connect, namesProject, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout 30m] [--interval 15s]]\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.";
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout 30m] [--interval 15s]]\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.\nA failed upload ends on `UPLOAD FAILED: <reason>` and prints no build link. " +
+  ESCALATE;
 
 /** The flags `upload` and `capture --upload` share. */
 export const UPLOAD_FLAGS = [
@@ -172,6 +175,17 @@ function printFlakes(result: UploadResult, io: Io): void {
 }
 
 /**
+ * A refused or failed upload ends on `UPLOAD FAILED: <reason>`, after what reached the server
+ * (PS-223): the last lines a runner sees are never a link. The exit code is the error's own.
+ */
+function failedUpload(e: unknown, progress: UploadProgress): unknown {
+  if (!(e instanceof UploadError || e instanceof RemoteError)) return e;
+  const reason = e.message.replace(/^upload failed: /, "");
+  const message = `${uploadLine(progress)}\nUPLOAD FAILED: ${reason}`;
+  return e instanceof RemoteError ? new RemoteError(message) : new UploadError(message);
+}
+
+/**
  * Send `dir` to the server the flags, env or config name, and record the build in `dir` for
  * `status`. Returns the exit code (0): a flaky shot is said and sent, and what it does to the
  * build is the server's call. With `wait`, the build is then followed as `status --wait` does. `deps.recapture` is
@@ -189,10 +203,13 @@ export async function uploadDir(
   const cwd = deps.cwd ?? process.cwd();
   const warn = (m: string) => io.stderr.write(`${m}\n`);
   const retries = flakeRetries(flags["flake-retries"]);
-  const target = await resolveTarget(flags, deps, cwd);
-  const own = await chooseRecapture(flags, deps, warn);
+  const progress = uploadProgress();
+  enterStage("upload");
+  let own: OwnRecapture | undefined;
   let id: string;
   try {
+    const target = await resolveTarget(flags, deps, cwd);
+    own = await chooseRecapture(flags, deps, warn);
     const result = await uploadSnapshots(
       {
         dir: resolve(dir),
@@ -208,7 +225,7 @@ export async function uploadDir(
           pr: prNumber(flags.pr),
         },
       },
-      { ...deps, warn, ...(own && { recapture: own.recapture }) },
+      { ...deps, warn, progress, ...(own && { recapture: own.recapture }) },
     );
     const { commitSha, branch } = result.git;
     io.stdout.write(`pixelslash: uploaded ${result.snapshots} snapshots\n`);
@@ -221,6 +238,8 @@ export async function uploadDir(
       commit: commitSha,
     });
     id = result.buildId;
+  } catch (e) {
+    throw failedUpload(e, progress);
   } finally {
     await own?.close();
   }

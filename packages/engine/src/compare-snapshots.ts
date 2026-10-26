@@ -3,7 +3,7 @@ import { join, resolve, sep } from "node:path";
 import { diffPngs } from "./diff.ts";
 import { UsageError } from "./errors.ts";
 import type { Fingerprint } from "./fingerprint.ts";
-import { renderCompareIndex, type CompareRow } from "./compare-report.ts";
+import { renderCompareIndex, rowLabel, type CompareRow } from "./compare-report.ts";
 import { withTimings } from "./report-timings.ts";
 import { renderPixelReport } from "./report.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
@@ -28,6 +28,8 @@ export type SnapshotCompareResult = {
   removed: CompareRow[];
   /** Matched snapshots whose two sides were rendered by different environments. */
   mismatched: CompareRow[];
+  /** Matched snapshots the diff threw on (PS-223): not measured, so in none of the other lists. */
+  failed: CompareRow[];
   /** The diff of each matched shot, and the run's total (ob 1791); `check` adds its capture and upload. */
   timings: Timings;
 };
@@ -112,9 +114,8 @@ async function diffMatch(
       branch: branch.ignore,
     });
   } catch (e) {
-    throw new UsageError(
-      `${branch.name}: cannot diff ${main.file} against ${branch.file}: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    row.error = e instanceof Error ? e.message : String(e);
+    return { row, changed: false, diffMs: 0 };
   }
   const diffMs = elapsed(started);
   row.changedPixels = diff.changedPixels;
@@ -143,6 +144,23 @@ async function diffMatch(
   );
   row.report = `${dir}/report.html`;
   return { row, changed: true, diffMs };
+}
+
+/** `not compared: home (chromium 1280x720): <why>`: a shot the diff threw on, for the CLI to print. */
+export function notComparedLines(input: { failed: CompareRow[] }): string[] {
+  return input.failed.map((r) => `not compared: ${rowLabel(r)}: ${r.error}`);
+}
+
+/** One line naming every shot the diff threw on, for the greppable `FAILED` line. */
+export function notComparedSummary(input: { failed: CompareRow[] }): string {
+  const n = input.failed.length;
+  return `${n} shot${n === 1 ? "" : "s"} not compared: ${input.failed.map(rowLabel).join(", ")}`;
+}
+
+/** For a caller that has no `not compared` state of its own (`check`, `dev`): a shot the diff threw on fails it. */
+export function assertCompared(input: { failed: CompareRow[] }): void {
+  if (input.failed.length > 0)
+    throw new Error([notComparedSummary(input), ...notComparedLines(input)].join("\n"));
 }
 
 function refuseOverlap(out: string, dirs: string[]): void {
@@ -179,6 +197,7 @@ export async function compareSnapshots(
     added: [],
     removed: [],
     mismatched: [],
+    failed: [],
     timings: { totalMs: 0, shots: [] },
   };
   const shots: ShotTiming[] = [];
@@ -192,6 +211,10 @@ export async function compareSnapshots(
     }
     const paths = { main: opts.mainDir, branch: opts.branchDir, out, varied };
     const { row, changed, diffMs } = await diffMatch(paths, before, e, dirFor(e, taken));
+    if (row.error !== undefined) {
+      result.failed.push(row);
+      continue;
+    }
     shots.push({ name: identity(e), diffMs });
     if (row.mismatch.length > 0) {
       result.mismatched.push(row);

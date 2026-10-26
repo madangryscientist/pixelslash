@@ -36,6 +36,7 @@ import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { CHECK_USAGE, runCheck } from "./check.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
+import { INTERNAL_EXIT, crashLines, inState, newState, type Stage } from "./failure.ts";
 import { DEV_USAGE, runDev } from "./dev.ts";
 import type { KeyInput } from "./dev-loop.ts";
 import { FLAKE_USAGE, FLAKES_USAGE, runFlake, runFlakes } from "./flake.ts";
@@ -136,13 +137,18 @@ async function relay(
 
 const COMMANDS: Record<
   string,
-  { usage: string; run: (argv: string[], io: Io, deps: CliDeps) => Promise<number> }
+  {
+    usage: string;
+    /** The stage a crash is put down to until the command says it has moved on. */
+    stage?: Stage;
+    run: (argv: string[], io: Io, deps: CliDeps) => Promise<number>;
+  }
 > = {
   init: { usage: INIT_USAGE, run: runInit },
-  capture: { usage: CAPTURE_USAGE, run: runCapture },
-  compare: { usage: COMPARE_USAGE, run: (argv, io) => runCompare(argv, io) },
+  capture: { usage: CAPTURE_USAGE, stage: "capture", run: runCapture },
+  compare: { usage: COMPARE_USAGE, stage: "compare", run: (argv, io) => runCompare(argv, io) },
   import: { usage: IMPORT_USAGE, run: (argv, io) => runImport(argv, io) },
-  upload: { usage: UPLOAD_USAGE, run: runUpload },
+  upload: { usage: UPLOAD_USAGE, stage: "upload", run: runUpload },
   check: { usage: CHECK_USAGE, run: runCheck },
   dev: { usage: DEV_USAGE, run: runDev },
   "install-browser": {
@@ -171,7 +177,11 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
     return 0;
   }
   const command = COMMANDS[argv[0] ?? ""];
-  if (command) return guarded(() => command.run(argv.slice(1), io, deps), io, command.usage);
+  if (command)
+    return guarded(() => command.run(argv.slice(1), io, deps), io, command.usage, {
+      name: argv[0] ?? "",
+      stage: command.stage,
+    });
   return guarded(
     async () => {
       const cli = parseArgs(argv);
@@ -188,16 +198,24 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
     },
     io,
     USAGE,
+    { name: "compare", stage: "compare" },
   );
 }
 
 /**
  * Map the known errors to exit codes: usage 2, capture, Figma or upload 1, a remote command the
- * server refused or could not answer 3. Anything else is a bug and throws.
+ * server refused or could not answer 3. Anything else is a bug (PS-223): one `FAILED` line, what
+ * reached the server, the stack, and exit 7, so a runner can tell a crash from a verdict.
  */
-async function guarded(work: () => Promise<number>, io: Io, usage: string): Promise<number> {
+async function guarded(
+  work: () => Promise<number>,
+  io: Io,
+  usage: string,
+  command: { name: string; stage: Stage | undefined },
+): Promise<number> {
+  const state = newState(command.stage);
   try {
-    return await work();
+    return await inState(state, work);
   } catch (e) {
     if (e instanceof UsageError) {
       io.stderr.write(`${e.message}\n${usage}\n`);
@@ -211,6 +229,7 @@ async function guarded(work: () => Promise<number>, io: Io, usage: string): Prom
       io.stderr.write(`${e.message}\n`);
       return 1;
     }
-    throw e;
+    io.stderr.write(`${crashLines(command.name, e, state).join("\n")}\n`);
+    return INTERNAL_EXIT;
   }
 }

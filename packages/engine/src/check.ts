@@ -4,7 +4,11 @@ import { type BaselinesReply, baselinePng, fetchBaselines } from "./baselines-cl
 import { type BaselinePick, type PickedShot, measureShot } from "./ci-diff.ts";
 import { type CheckShot, addRemoved, shotsOf } from "./check-rows.ts";
 import { renderCompareIndex } from "./compare-report.ts";
-import { type SnapshotCompareResult, compareSnapshots } from "./compare-snapshots.ts";
+import {
+  type SnapshotCompareResult,
+  assertCompared,
+  compareSnapshots,
+} from "./compare-snapshots.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import type { Fingerprint } from "./fingerprint.ts";
@@ -252,6 +256,7 @@ export async function checkAgainstServer(
     { mainDir: dirs.main, branchDir: dirs.branch, out: dirs.report },
     { warn: client.warn },
   );
+  assertCompared(result);
   addRemoved(result, removed, manifest.snapshots, opts.only);
   const outcome = await flakeRows(result, manifest.snapshots, shooting, {
     dir: dirs.branch,
