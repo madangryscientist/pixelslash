@@ -10,9 +10,14 @@ export function isObj(v: unknown): v is Obj {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** Tries per request, and the wait before each retry: bounded, never a loop. */
-const TRIES = 3;
-const RETRY_DELAYS_MS = [1000, 2000];
+/**
+ * The wait before each retry: bounded, never a loop. The schedule adds up to 30 s, which outlasts
+ * a LAN deploy (pixelslash-web is down for about 13 s, PS-224); a build left open by a shorter one
+ * is orphaned.
+ */
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
+/** Tries per request: the first, then one after each wait. */
+const TRIES = RETRY_DELAYS_MS.length + 1;
 
 export type Client = {
   fetch: FetchLike;

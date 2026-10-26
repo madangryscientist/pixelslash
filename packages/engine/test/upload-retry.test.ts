@@ -12,7 +12,10 @@ const PROXY_500 = () =>
     { status: 500, headers: { "content-type": "text/html" } },
   );
 
-async function upload(fetch: (url: string, init?: RequestInit) => Promise<Response>) {
+async function upload(
+  fetch: (url: string, init?: RequestInit) => Promise<Response>,
+  onSleep: (ms: number) => void = () => {},
+) {
   const { dir: cwd } = await repo(1, 1);
   const dir = await snapshotDir([entry("home")]);
   const warnings: string[] = [];
@@ -24,6 +27,7 @@ async function upload(fetch: (url: string, init?: RequestInit) => Promise<Respon
       warn: (m) => warnings.push(m),
       sleep: async (ms) => {
         waits.push(ms);
+        onSleep(ms);
       },
     },
   );
@@ -39,7 +43,7 @@ describe("uploadSnapshots retries what the API never answered", () => {
     const { run, warnings, waits } = await upload(server.fetch);
     await expect(run).resolves.toMatchObject({ buildId: "b1", snapshots: 1 });
     expect(warnings).toEqual([
-      "upload: open build: POST /api/v1/builds -> 500 TypeError: fetch failed; trying again (2/3)",
+      "upload: open build: POST /api/v1/builds -> 500 TypeError: fetch failed; trying again (2/6)",
     ]);
     expect(waits).toEqual([1000]);
     expect(server.calls.map((c) => c.method)).toEqual(["POST", "POST", "PUT", "POST"]);
@@ -57,15 +61,39 @@ describe("uploadSnapshots retries what the API never answered", () => {
     );
   });
 
-  test("a finalise the API never answered stops after 3 tries, naming the step and the answer", async () => {
+  test("a finalise the API never answered stops after 6 tries, naming the step and the answer", async () => {
     const server = fakeServer((c) => (c.url.endsWith("/finalize") ? PROXY_500() : undefined));
     const { run, warnings, waits } = await upload(server.fetch);
     await expect(run).rejects.toThrow(
-      "upload failed: finalize: POST /api/v1/builds/b1/finalize -> 500 TypeError: fetch failed (after 3 tries)",
+      "upload failed: finalize: POST /api/v1/builds/b1/finalize -> 500 TypeError: fetch failed (after 6 tries)",
     );
-    expect(waits).toEqual([1000, 2000]);
-    expect(warnings).toHaveLength(2);
-    expect(server.calls.filter((c) => c.url.endsWith("/finalize"))).toHaveLength(3);
+    expect(waits).toEqual([1000, 2000, 4000, 8000, 15000]);
+    expect(warnings).toHaveLength(5);
+    expect(server.calls.filter((c) => c.url.endsWith("/finalize"))).toHaveLength(6);
+  });
+
+  // A deploy stops pixelslash-web for about 13 s (PS-224); the clock below is the fake sleeps'.
+  test("a server that refuses connections for 13 s is waited out, and the upload completes", async () => {
+    const server = fakeServer();
+    let clock = 0;
+    const { run } = await upload(
+      async (url, init) => {
+        if (clock < 13_000) throw new Error("connect ECONNREFUSED 192.168.0.135:3000");
+        return server.fetch(url, init);
+      },
+      (ms) => (clock += ms),
+    );
+    await expect(run).resolves.toMatchObject({ buildId: "b1", snapshots: 1 });
+  });
+
+  test("a server that stays refused past the window still fails loudly, naming the step", async () => {
+    const { run, waits } = await upload(async () => {
+      throw new Error("connect ECONNREFUSED 192.168.0.135:3000");
+    });
+    await expect(run).rejects.toThrow(
+      /^upload failed: open build: POST https:\/\/ps\.example\/api\/v1\/builds: connect ECONNREFUSED .* \(after 6 tries\)$/,
+    );
+    expect(waits.reduce((a, b) => a + b, 0)).toBe(30_000);
   });
 
   test("a connection that fails is tried again", async () => {

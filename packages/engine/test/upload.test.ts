@@ -262,6 +262,7 @@ describe("uploadSnapshots", () => {
           fetch: async () => {
             throw new Error("connection refused");
           },
+          sleep: async () => {},
         },
       ),
     ).rejects.toThrow(UploadError);

@@ -245,5 +245,5 @@ pool. Preview only; the Cloudflare deploy does not run it.
 `deploy/lan/serve.ts` (the LAN unit since PS-220) has no such hop: workerd listens on the port, and
 a client reaches it directly, so there is no pool socket to reset and the plugin is not on its path
 (it stays for `vite preview` on the desktop). A client whose keep-alive socket workerd closes right
-after a long answer can still see a reset; the CLI retries a network error after 1 s and 2 s, and a
+after a long answer can still see a reset; the CLI retries a network error for 30 s (1, 2, 4, 8 and 15 s), and a
 finalize is resumable. Whether the CT's workerd does that is checked by the CT run in `perf/README.md`.

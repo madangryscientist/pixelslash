@@ -186,8 +186,8 @@ of the connection: a client whose keep-alive socket workerd closes 50 ms after a
 Bun's `fetch` does reset on that (a stand-in server that closes 40 ms after answering, then a
 second request 5 ms later: 20 of 40 failed), and workerd on the desktop keeps an idle socket
 15 s, so whether the CT's workerd closes early is for the CT run to show. If it does, the
-real consequence is bounded: `upload-client.ts` retries a network error at 1 s and 2 s and the
-finalize is resumable ("until measured"), so the CLI pays a second, not a failure.
+real consequence is bounded: `upload-client.ts` retries a network error at 1, 2, 4, 8 and 15 s
+and the finalize is resumable ("until measured"), so the CLI pays a second, not a failure.
 
 **State survives the switch.** A build seeded under `vite preview` (org, project, a main and a
 branch build with a changed shot, its PNGs in R2) was read back through `serve.ts` on the same

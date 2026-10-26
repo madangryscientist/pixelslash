@@ -495,7 +495,7 @@ No mTLS and no signing: both hops are loopback or in-account, and the secret is 
 
 | Failure | What happens |
 | --- | --- |
-| The web app is down during a PUT | 502 to the CLI, staged parts deleted. The CLI retries it (`upload-client.ts`: 3 tries, 1 s then 2 s, on 502/503/504), and a resend replaces the row; after the third it fails the upload, as today. |
+| The web app is down during a PUT | 502 to the CLI, staged parts deleted. The CLI retries it (`upload-client.ts`: 6 tries, 1, 2, 4, 8 then 15 s, on 502/503/504), and a resend replaces the row; after the sixth it fails the upload, as today. |
 | Row write fails after the parts are stored | Parts deleted; the CLI gets the web app's error, or 502. |
 | Diff done, result write fails (5xx, timeout) | Retried with backoff (3 tries, ~1 s, 4 s, 16 s). If it still fails the result is dropped and logged. Nothing is lost: the overlay key is deterministic, so the next run overwrites it, and finalize's plan sees no standing result and re-issues the job. |
 | Diff done, result is stale (409) | Dropped. The newer upload has its own job. |
