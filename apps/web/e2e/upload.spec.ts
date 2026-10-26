@@ -41,7 +41,7 @@ async function provision(page: Page, org: string, project: string, signIn: boole
     "ci",
     page.getByRole("button", { name: "Issue token" }),
   );
-  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
+  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
   expect(token).toMatch(/^psci_/);
   return token;
 }

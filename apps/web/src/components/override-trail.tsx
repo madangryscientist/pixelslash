@@ -4,6 +4,7 @@ import {
   Card,
   Code,
   CodeBlock,
+  CopyButton,
   SectionHeading,
   Stack,
   Table,
@@ -15,7 +16,6 @@ import {
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { CopyButton } from "#/components/copy-button";
 import type { DiffOptions } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
 import { clearDiffOverride } from "#/server/overrides";
@@ -157,7 +157,7 @@ function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: bo
         config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise divide by it.
       </p>
       <div className="mt-2 flex justify-end">
-        <CopyButton text={exported} hydrated={hydrated} />
+        <CopyButton text={exported} disabled={!hydrated} />
       </div>
       <CodeBlock data-testid="override-export-json">{exported}</CodeBlock>
     </details>
@@ -198,9 +198,7 @@ export function OverrideSettings({
                 <TableHeaderCell>Test</TableHeaderCell>
                 <TableHeaderCell>Options</TableHeaderCell>
                 <TableHeaderCell>Set</TableHeaderCell>
-                <TableHeaderCell align="end">
-                  <span className="sr-only">Actions</span>
-                </TableHeaderCell>
+                <TableHeaderCell align="end" srLabel="Actions" />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -214,7 +212,7 @@ export function OverrideSettings({
                     @{o.by}, {formatDateTime(o.at)}
                   </TableCell>
                   <TableCell align="end">
-                    <CopyButton text={o.snippet} hydrated={hydrated} />
+                    <CopyButton text={o.snippet} disabled={!hydrated} />
                     <ClearButton projectId={projectId} o={o} hydrated={hydrated} />
                   </TableCell>
                 </TableRow>

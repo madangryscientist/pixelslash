@@ -2,6 +2,7 @@ import {
   Body,
   Button,
   Card,
+  CopyButton,
   SectionHeading,
   Stack,
   Table,
@@ -13,7 +14,6 @@ import {
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { CopyButton } from "#/components/copy-button";
 import { type Variant, variantLabel } from "#/components/override-trail";
 import type { IgnoreRect } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
@@ -152,9 +152,7 @@ export function IgnoreBoxSettings({
                 <TableHeaderCell>Test</TableHeaderCell>
                 <TableHeaderCell>Box</TableHeaderCell>
                 <TableHeaderCell>Drawn</TableHeaderCell>
-                <TableHeaderCell align="end">
-                  <span className="sr-only">Actions</span>
-                </TableHeaderCell>
+                <TableHeaderCell align="end" srLabel="Actions" />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -166,7 +164,7 @@ export function IgnoreBoxSettings({
                     @{b.by}, {formatDateTime(b.at)}
                   </TableCell>
                   <TableCell align="end">
-                    <CopyButton text={b.snippet} hydrated={hydrated} />
+                    <CopyButton text={b.snippet} disabled={!hydrated} />
                     <ClearBox projectId={projectId} boxId={b.id} hydrated={hydrated} />
                   </TableCell>
                 </TableRow>

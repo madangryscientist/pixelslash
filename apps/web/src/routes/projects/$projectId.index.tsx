@@ -1,8 +1,11 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   Breadcrumbs,
+  buttonClass,
   Card,
+  CopyLine,
   ListLayout,
+  rowLinkClass,
   Stack,
   Table,
   TableBody,
@@ -10,15 +13,12 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
-  buttonClass,
-  rowLinkClass,
 } from "@hackcove/ui";
 import { MixBar, ToReview, stripeOf } from "#/components/build-mix";
-import { CopyLine } from "#/components/copy-button";
 import { orgCrumb } from "#/components/crumbs";
 import { ProjectFlags } from "#/components/detection-flag";
 import { Step } from "#/components/org-empty";
-import { Page, StatusBadge, useHydrated } from "#/components/ui";
+import { Page, StatusBadge } from "#/components/ui";
 import type { BuildSummary } from "#/db/build-list";
 import { formatRelative } from "#/lib/format";
 import { getProjectPage } from "#/server/fns";
@@ -30,7 +30,6 @@ export const Route = createFileRoute("/projects/$projectId/")({
 
 function ProjectPage() {
   const { project, org, builds, flags, now, serverUrl } = Route.useLoaderData();
-  const hydrated = useHydrated();
   return (
     <Page>
       <ListLayout
@@ -61,7 +60,7 @@ function ProjectPage() {
         }
       >
         {builds.length === 0 ? (
-          <EmptyProject projectId={project.id} serverUrl={serverUrl} hydrated={hydrated} />
+          <EmptyProject projectId={project.id} serverUrl={serverUrl} />
         ) : (
           <Table caption="Builds">
             <TableHead>
@@ -156,15 +155,7 @@ function BuildRow({
 }
 
 /** A project with no builds: where the token comes from and the exact command that uploads. */
-function EmptyProject({
-  projectId,
-  serverUrl,
-  hydrated,
-}: {
-  projectId: string;
-  serverUrl: string;
-  hydrated: boolean;
-}) {
+function EmptyProject({ projectId, serverUrl }: { projectId: string; serverUrl: string }) {
   const command = `PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`;
   return (
     <Card as="div" dashed="filled" data-testid="empty-project">
@@ -193,7 +184,7 @@ function EmptyProject({
           <Step n={2} />
           <Stack gap="xs">
             <span>Upload a snapshot dir with it:</span>
-            <CopyLine text={command} hydrated={hydrated} testId="upload-command" />
+            <CopyLine text={command} data-testid="upload-command" />
           </Stack>
         </li>
       </ol>

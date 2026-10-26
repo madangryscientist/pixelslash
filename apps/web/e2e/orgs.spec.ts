@@ -12,8 +12,10 @@ test("an empty org says what a project is, and a pending invite can be withdrawn
   await createOrg(page, "Fresh Co");
   const empty = page.getByTestId("empty-org");
   await expect(empty).toContainText("No projects yet");
-  await expect(page.getByTestId("upload-command")).toContainText("pixelslash upload");
-  await expect(page.getByTestId("upload-command")).toContainText("--server http");
+  await expect(page.getByTestId("upload-command").locator("code")).toContainText(
+    "pixelslash upload",
+  );
+  await expect(page.getByTestId("upload-command").locator("code")).toContainText("--server http");
 
   // A disabled button is grey, says why, and is a real disabled control.
   await page.getByRole("button", { name: "+ New project" }).first().click();

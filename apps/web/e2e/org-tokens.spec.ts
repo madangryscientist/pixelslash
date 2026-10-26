@@ -19,7 +19,7 @@ test("mint an org token in the org settings, see it is live, revoke it", async (
 
   await page.getByLabel("Org token name, e.g. monorepo CI").fill("monorepo CI");
   await page.getByRole("button", { name: "Issue org token" }).click();
-  const token = (await page.getByTestId("issued-org-token").textContent()) ?? "";
+  const token = (await page.getByTestId("issued-org-token").locator("code").textContent()) ?? "";
   expect(token).toMatch(/^psorg_/);
   const row = page.getByTestId("org-token-row").filter({ hasText: "monorepo CI" });
   await expect(row).toContainText(token.slice(0, 8));

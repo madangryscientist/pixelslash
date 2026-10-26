@@ -6,6 +6,7 @@ import {
   Button,
   Callout,
   Card,
+  CopyLine,
   Input,
   ListLayout,
   Pill,
@@ -19,7 +20,6 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@hackcove/ui";
-import { CopyLine } from "#/components/copy-button";
 import { Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
 import { TOKEN_EXPIRY_DAYS } from "#/lib/token-expiry";
@@ -54,7 +54,7 @@ function AccountSettings() {
                 role="status"
                 title="Copy this token now. It will not be shown again."
               >
-                <CopyLine text={issued} hydrated={hydrated} testId="issued-token" />
+                <CopyLine text={issued} data-testid="issued-token" />
               </Callout>
             )}
             <IssueForm onIssued={setIssued} />
@@ -63,8 +63,7 @@ function AccountSettings() {
               <Body as="p">Check a token from your machine with:</Body>
               <CopyLine
                 text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
-                hydrated={hydrated}
-                testId="token-usage"
+                data-testid="token-usage"
               />
             </Stack>
           </Stack>
@@ -182,9 +181,7 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
           <TableHeaderCell>Last used</TableHeaderCell>
           <TableHeaderCell>Expires</TableHeaderCell>
           <TableHeaderCell>Status</TableHeaderCell>
-          <TableHeaderCell align="end">
-            <span className="sr-only">Actions</span>
-          </TableHeaderCell>
+          <TableHeaderCell align="end" srLabel="Actions" />
         </TableRow>
       </TableHead>
       <TableBody>

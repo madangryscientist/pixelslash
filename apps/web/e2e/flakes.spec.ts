@@ -60,8 +60,12 @@ test("a flaky shot under each policy: badge, summary line, config line, resolve 
 
   // The policy control offers the other policy and copies its line; nothing changes on the server.
   const control = panel.getByTestId("flaky-policy-control");
-  await expect(control.getByTestId("flaky-route-line")).toHaveText('"flaky": "review"');
-  await expect(control.getByTestId("flaky-story-tag")).toHaveText("pixelslash-flaky-review");
+  await expect(control.getByTestId("flaky-route-line").locator("code")).toHaveText(
+    '"flaky": "review"',
+  );
+  await expect(control.getByTestId("flaky-story-tag").locator("code")).toHaveText(
+    "pixelslash-flaky-review",
+  );
   await expect(control).toContainText("takes effect from the next build");
   await control.getByRole("button", { name: "copy" }).first().click();
   await expect(control.getByRole("button", { name: "copied" })).toBeVisible();

@@ -9,33 +9,8 @@
  * theme file, so it is repeated here.
  */
 
-@theme {
-  --font-sans:
-    Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
-  --font-mono:
-    ui-monospace, "JetBrains Mono", "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono",
-    monospace;
-}
-
 /*
- * The page behind the cards. The components' own slate/white is the light theme; the Mocha theme
- * file remaps it under `.dark` on <html> and paints mantle there (#181825), but that does not reach
- * the app root: without the dark rule below, every dark shot changes (checked by pixel diff). So
- * the canvas is set here: slate-50 in light, Mocha mantle in dark, so a card (white / base) lifts
- * off it in both.
- */
-.app-canvas {
-  background-color: #f8fafc;
-  color: #0f172a;
-}
-.dark .app-canvas {
-  background-color: #181825;
-  color: #cdd6f4;
-}
-
-/*
- * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.2.5 does not remap.
+ * Utilities the design system uses that @hackcove/theme-catppuccin-mocha 0.2.7 does not remap.
  * Without these a divider would be a light-theme colour on a dark surface. They sit here, not in a
  * fork of the theme: delete a rule when the theme ships it. The theme already ships the text-red,
  * border-amber and violet-hover rules with the same values, so they are not repeated.

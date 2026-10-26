@@ -162,9 +162,7 @@ export function ProjectTable({ org, now }: { org: OrgOverview; now: Date }) {
           <TableHeaderCell>Snapshots</TableHeaderCell>
           <TableHeaderCell>To review</TableHeaderCell>
           <TableHeaderCell>Updated</TableHeaderCell>
-          <TableHeaderCell align="end">
-            <span className="sr-only">Settings</span>
-          </TableHeaderCell>
+          <TableHeaderCell align="end" srLabel="Settings" />
         </TableRow>
       </TableHead>
       <TableBody>

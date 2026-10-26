@@ -30,8 +30,8 @@ function Cell({
 }) {
   if (!stats)
     return (
-      <TableCell tone="muted">
-        <span data-testid={`timings-${step}`}>—</span>
+      <TableCell tone="muted" data-testid={`timings-${step}`}>
+        —
       </TableCell>
     );
   return (
@@ -77,12 +77,12 @@ function Row({ project }: { project: ProjectTimings }) {
           {project.name}
         </Link>
       </TableCell>
-      <TableCell tone="muted">
-        <span data-testid="timings-builds">{project.builds}</span>
+      <TableCell tone="muted" data-testid="timings-builds">
+        {project.builds}
       </TableCell>
       {project.builds === 0 ? (
-        <TableCell tone="muted" colSpan={STEPS.length}>
-          <span data-testid="timings-empty">{emptyReason(project)}</span>
+        <TableCell tone="muted" colSpan={STEPS.length} data-testid="timings-empty">
+          {emptyReason(project)}
         </TableCell>
       ) : (
         STEPS.map((step) => (

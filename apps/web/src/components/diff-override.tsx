@@ -1,7 +1,6 @@
-import { Button, CodeBlock, Field, Input } from "@hackcove/ui";
+import { Button, CodeBlock, CopyButton, Field, Input } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { CopyButton } from "#/components/copy-button";
 import { useHydrated } from "#/components/ui";
 import type { DiffOptions } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
@@ -116,7 +115,7 @@ function Snippet({ o, hydrated }: { o: ShownOverride; hydrated: boolean }) {
         <span>
           By @{o.by}, {formatDateTime(o.at)}. Copy as config:
         </span>
-        <CopyButton text={o.snippet} hydrated={hydrated} />
+        <CopyButton text={o.snippet} disabled={!hydrated} />
       </div>
       <CodeBlock data-testid="override-snippet">{o.snippet}</CodeBlock>
     </div>

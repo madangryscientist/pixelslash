@@ -31,7 +31,7 @@ export async function provision(page: Page, org = "Flake Co", project = "flaky")
     "ci",
     page.getByRole("button", { name: "Issue token" }),
   );
-  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
+  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
   const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1] ?? "";
   expect(projectId).not.toBe("");
   return { token, projectId };

@@ -17,7 +17,7 @@ test("issue a personal token in settings, see it once, use it, revoke it", async
   await page.getByLabel("Token name, e.g. laptop").fill("laptop");
   await page.getByLabel("Expires").selectOption("30");
   await page.getByRole("button", { name: "Issue token" }).click();
-  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
+  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
   expect(token).toMatch(/^psu_/);
   const row = page.getByRole("row", { name: /laptop/ });
   await expect(row).toContainText(token.slice(0, 8));

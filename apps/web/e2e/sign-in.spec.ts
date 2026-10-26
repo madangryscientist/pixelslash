@@ -26,7 +26,7 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
   await page.getByRole("link", { name: "storefront", exact: true }).click();
   const empty = page.getByTestId("empty-project");
   await expect(empty).toContainText("No builds yet");
-  await expect(empty.getByTestId("upload-command")).toContainText(
+  await expect(empty.getByTestId("upload-command").locator("code")).toContainText(
     `pixelslash upload DIR --server ${new URL(page.url()).origin}`,
   );
   await page.goBack();
@@ -41,7 +41,7 @@ test("sign in with GitHub, create a project and issue a CI token", async ({ page
 
   await page.getByLabel("Token name, e.g. github-actions").fill("github-actions");
   await page.getByRole("button", { name: "Issue token" }).click();
-  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
+  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
   expect(token).toMatch(/^psci_/);
   const row = page.getByRole("row", { name: /github-actions/ });
   await expect(row).toContainText(token.slice(0, 9));

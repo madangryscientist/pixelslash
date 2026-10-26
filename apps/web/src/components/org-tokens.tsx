@@ -6,9 +6,10 @@ import {
   Callout,
   Card,
   Code,
+  CopyLine,
   Input,
-  Stack,
   Pill,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -18,7 +19,6 @@ import {
 } from "@hackcove/ui";
 import { formatDateTime } from "#/lib/format";
 import { issueOrgTokenFn, revokeOrgTokenFn } from "#/server/org-token-fns";
-import { CopyLine } from "./copy-button";
 
 export type OrgToken = {
   id: string;
@@ -60,7 +60,7 @@ export function OrgTokensPanel({
             role="status"
             title="Copy this token now. It will not be shown again."
           >
-            <CopyLine text={issued} hydrated={hydrated} testId="issued-org-token" />
+            <CopyLine text={issued} data-testid="issued-org-token" />
           </Callout>
         )}
         <IssueForm orgId={orgId} onIssued={setIssued} />
@@ -148,9 +148,7 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
           <TableHeaderCell>Created</TableHeaderCell>
           <TableHeaderCell>Last used</TableHeaderCell>
           <TableHeaderCell>Status</TableHeaderCell>
-          <TableHeaderCell align="end">
-            <span className="sr-only">Actions</span>
-          </TableHeaderCell>
+          <TableHeaderCell align="end" srLabel="Actions" />
         </TableRow>
       </TableHead>
       <TableBody>

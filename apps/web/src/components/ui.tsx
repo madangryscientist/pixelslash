@@ -18,11 +18,9 @@ export function StatusBadge({ status }: { status: string }) {
     uploading: "slate",
   };
   return (
-    <span data-testid="build-status">
-      <Pill dot tone={tone[status] ?? "slate"}>
-        {status}
-      </Pill>
-    </span>
+    <Pill dot tone={tone[status] ?? "slate"} data-testid="build-status">
+      {status}
+    </Pill>
   );
 }
 
@@ -30,9 +28,9 @@ export function StatusBadge({ status }: { status: string }) {
 export function ReviewChip({ state, by }: { state: string; by?: string | null }) {
   const tone: Record<string, Tone> = { pending: "slate", accepted: "emerald", rejected: "red" };
   return (
-    <span data-testid="review-state">
-      <Pill tone={tone[state] ?? "slate"}>{by ? `${state} by ${by}` : state}</Pill>
-    </span>
+    <Pill tone={tone[state] ?? "slate"} data-testid="review-state">
+      {by ? `${state} by ${by}` : state}
+    </Pill>
   );
 }
 
@@ -45,11 +43,14 @@ export function ReviewChip({ state, by }: { state: string; by?: string | null })
 export function Page({ bleed = false, children }: { bleed?: boolean; children: ReactNode }) {
   const hydrated = useHydrated();
   return (
-    <div className="app-canvas" data-hydrated={hydrated}>
-      <AppShell brand={<AppBrand />} controls={<AppControls />} bleed={bleed}>
-        {children}
-      </AppShell>
-    </div>
+    <AppShell
+      brand={<AppBrand />}
+      controls={<AppControls />}
+      bleed={bleed}
+      data-hydrated={hydrated}
+    >
+      {children}
+    </AppShell>
   );
 }
 

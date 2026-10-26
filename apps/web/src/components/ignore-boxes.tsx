@@ -1,7 +1,6 @@
-import { Button, CodeBlock } from "@hackcove/ui";
+import { Button, CodeBlock, CopyButton } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { CopyButton } from "#/components/copy-button";
 import type { IgnoreSource } from "#/components/snapshot-frame";
 import { useHydrated } from "#/components/ui";
 import type { DiffResult, IgnoreRect } from "#/db/schema";
@@ -200,7 +199,7 @@ function BoxRow({
         <span>
           By @{box.by}, {formatDateTime(box.at)}. Copy as config:
         </span>
-        <CopyButton text={box.snippet} hydrated={hydrated} />
+        <CopyButton text={box.snippet} disabled={!hydrated} />
       </div>
       <CodeBlock data-testid="ignore-snippet">{box.snippet}</CodeBlock>
     </li>

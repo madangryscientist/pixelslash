@@ -141,7 +141,7 @@ async function provision(
     "ci",
     page.getByRole("button", { name: "Issue token" }),
   );
-  const token = (await page.getByTestId("issued-token").textContent()) ?? "";
+  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
   await page.goto(`/orgs?org=${orgId}`);
   await page.getByRole("link", { name: "shop", exact: true }).click();
   const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1];

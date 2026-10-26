@@ -1,7 +1,6 @@
-import { Button, Input, Pill } from "@hackcove/ui";
+import { Button, CopyLine, Input, Pill } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { CopyLine } from "#/components/copy-button";
 import { useFlagWrite } from "#/components/detection-flag";
 import { useHydrated } from "#/components/ui";
 import type { FlakyPolicy } from "#/db/schema";
@@ -52,7 +51,6 @@ const other = (policy: FlakyPolicy): FlakyPolicy => (policy === "skip" ? "review
  * stored here; the next build's upload carries the new policy.
  */
 export function FlakyPolicyControl({ policy }: { policy: FlakyPolicy }) {
-  const hydrated = useHydrated();
   const [target, setTarget] = useState<FlakyPolicy>(other(policy));
   return (
     <div data-testid="flaky-policy-control" className="space-y-2 text-sm">
@@ -73,9 +71,9 @@ export function FlakyPolicyControl({ policy }: { policy: FlakyPolicy }) {
         ))}
       </fieldset>
       <p className="text-xs text-slate-500">A route in your capture config:</p>
-      <CopyLine text={`"flaky": "${target}"`} hydrated={hydrated} testId="flaky-route-line" />
+      <CopyLine text={`"flaky": "${target}"`} data-testid="flaky-route-line" />
       <p className="text-xs text-slate-500">Or a story's tag:</p>
-      <CopyLine text={`pixelslash-flaky-${target}`} hydrated={hydrated} testId="flaky-story-tag" />
+      <CopyLine text={`pixelslash-flaky-${target}`} data-testid="flaky-story-tag" />
       <p className="text-xs text-slate-500">
         It takes effect from the next build. Nothing changes on the server.
       </p>

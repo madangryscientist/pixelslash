@@ -1,5 +1,4 @@
-import { Button, Card, Stack } from "@hackcove/ui";
-import { CopyLine } from "./copy-button";
+import { Button, Card, CopyLine, Stack } from "@hackcove/ui";
 
 /** An org with no projects: what a project is, and the two steps to a first build. */
 export function EmptyOrg({
@@ -34,7 +33,7 @@ export function EmptyOrg({
           <Step n={2} />
           <Stack gap="xs">
             <span>Upload a build:</span>
-            <CopyLine text={command} hydrated={hydrated} testId="upload-command" />
+            <CopyLine text={command} data-testid="upload-command" />
           </Stack>
         </li>
       </ol>

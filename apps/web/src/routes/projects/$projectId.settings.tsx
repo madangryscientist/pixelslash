@@ -7,6 +7,7 @@ import {
   ButtonGroup,
   Callout,
   Card,
+  CopyLine,
   ListLayout,
   Pill,
   SectionHeading,
@@ -18,7 +19,6 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@hackcove/ui";
-import { CopyLine } from "#/components/copy-button";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { ModelSettings } from "#/components/model-settings";
@@ -65,7 +65,7 @@ function ProjectSettings() {
                 role="status"
                 title="Copy this token now. It will not be shown again."
               >
-                <CopyLine text={issued} hydrated={hydrated} testId="issued-token" />
+                <CopyLine text={issued} data-testid="issued-token" />
               </Callout>
             )}
             <InlineForm
@@ -94,7 +94,7 @@ function ProjectSettings() {
           orgSettingsHref={`/orgs?org=${org.id}&tab=model`}
           hydrated={hydrated}
         />
-        <UploadCommand serverUrl={serverUrl} hydrated={hydrated} />
+        <UploadCommand serverUrl={serverUrl} />
       </ListLayout>
     </Page>
   );
@@ -214,9 +214,7 @@ function TokenTable({ tokens, hydrated }: { tokens: Token[]; hydrated: boolean }
           <TableHeaderCell>Created</TableHeaderCell>
           <TableHeaderCell>Last used</TableHeaderCell>
           <TableHeaderCell>Status</TableHeaderCell>
-          <TableHeaderCell align="end">
-            <span className="sr-only">Actions</span>
-          </TableHeaderCell>
+          <TableHeaderCell align="end" srLabel="Actions" />
         </TableRow>
       </TableHead>
       <TableBody>
