@@ -43,14 +43,14 @@ to listen there, GitHub only puts a one-time `code` in that URL.
 2. Open `$TMPDIR/register-app.html`, press the button, check the name (it must be unique on GitHub;
    rename it if taken) and create the App. The browser lands on `http://localhost:8787/?code=…`,
    which does not load. Copy the `code`; it works once and for an hour.
-3. Trade the code for the App's id and private key. The key goes straight into ob, never onto the
+3. Trade the code for the App's id and private key. The key goes straight into a file or your secret store, never onto the
    screen, and only the id is printed:
 
    ```bash
    code=<the code>
    reply=$(curl -fsS -X POST -H 'accept: application/vnd.github+json' \
      "https://api.github.com/app-manifests/$code/conversions")
-   jq -r .pem <<<"$reply" | ob secret set pixelslash-github-app-key
+   (umask 077; jq -r .pem <<<"$reply" > github-app-key.pem)   # or pipe it into your secret store; never in git
    jq -r .id <<<"$reply"        # the App id
    unset reply
    ```
@@ -80,10 +80,10 @@ base64'd onto one line for the trip. A var left unset keeps what the CT has.
 
 ```bash
 PIXELSLASH_GITHUB_APP_ID=<the App id> \
-PIXELSLASH_GITHUB_APP_KEY="$(ob secret get pixelslash-github-app-key)" \
+PIXELSLASH_GITHUB_APP_KEY="$(cat github-app-key.pem)" \
 PIXELSLASH_PUBLIC_URL=http://<the CT's address>:3000 \
-PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
-  apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+PIXELSLASH_LAN_SSH=root@$SSH_HOST PIXELSLASH_LAN_CT=$CT PIXELSLASH_LAN_SSH_KEY=~/.ssh/<key> \
+  apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"
 ```
 
 **Cloudflare.** `wrangler secret put GITHUB_APP_PRIVATE_KEY` (paste the PEM), and set

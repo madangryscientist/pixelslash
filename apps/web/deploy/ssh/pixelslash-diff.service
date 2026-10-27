@@ -11,7 +11,7 @@ Wants=network-online.target
 User=pixelslash
 WorkingDirectory=/home/pixelslash/releases/current/apps/web
 Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/diff-sidecar.ts
+ExecStart=/home/pixelslash/.bun/bin/bun deploy/ssh/diff-sidecar.ts
 Restart=on-failure
 RestartSec=2
 # The CT has 2 GiB and pixelslash-web may hold 1.7 GB of it (PS-155). The sidecar idles at ~40 MB,

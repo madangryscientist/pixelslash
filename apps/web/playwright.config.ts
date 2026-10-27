@@ -51,7 +51,7 @@ export default defineConfig({
     ...(sidecar
       ? [
           {
-            command: "bun deploy/lan/diff-sidecar.ts",
+            command: "bun deploy/ssh/diff-sidecar.ts",
             env: { PIXELSLASH_DIFF_SIDECAR_PORT: String(SIDECAR_PORT) },
             url: `${SIDECAR}/health`,
             reuseExistingServer: false,

@@ -8,7 +8,7 @@ import { SIDECAR_PATH, decodeResponse, encodeRequest } from "./sidecar-wire";
 /**
  * The self-host's diff sidecar client (PS-203). workerd cannot load a native addon, so a self-host
  * runs the engine's diff with the napi-image codec in a Bun process on loopback
- * (`deploy/lan/diff-sidecar.ts`) and the Worker sends it each shot's two PNGs. This file has no
+ * (`deploy/ssh/diff-sidecar.ts`) and the Worker sends it each shot's two PNGs. This file has no
  * codec and no native import: what Cloudflare bundles is a `fetch`. Cloudflare never sets
  * `DIFF_SIDECAR_URL`, so there it is never called.
  */

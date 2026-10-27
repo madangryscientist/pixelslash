@@ -43,7 +43,7 @@ function pick(name: string, free: number): number {
 
 export const SERVER_PORT = pick(SERVER_PORT_VAR, serverFree);
 export const STUB_PORT = pick(STUB_PORT_VAR, stubFree);
-/** The diff sidecar's (PS-203); `deploy/lan/diff-sidecar.ts` reads the same var. */
+/** The diff sidecar's (PS-203); `deploy/ssh/diff-sidecar.ts` reads the same var. */
 export const SIDECAR_PORT = pick(SIDECAR_PORT_VAR, sidecarFree);
 /** The Sentry ingest stand-in's (PS-227): `e2e/sentry-ingest.ts`, which the Worker and the browser report to. */
 export const SENTRY_PORT = pick(SENTRY_PORT_VAR, sentryFree);

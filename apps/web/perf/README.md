@@ -1,6 +1,6 @@
 # Server memory during an upload burst (PS-214)
 
-How much memory the LAN self-host (CT 135: `pixelslash-web.service` = `vite preview` in front of
+How much memory the LAN self-host (a Proxmox CT, `$CT`: `pixelslash-web.service` = `vite preview` in front of
 workerd, and `pixelslash-diff.service` = the Bun diff sidecar) uses while a CI run uploads 50, 200
 and 500 shots, split by phase and by process. On demand only: it is not in the gate.
 
@@ -19,14 +19,14 @@ bun perf/rss-burst.ts --local 1 --server http://127.0.0.1:3301 --cg <app.slice c
   --web-unit <unit>.service --diff-unit <unit>.service --shots 200 --out run.json   # a desktop run (PS-220, below)
 ```
 
-Needs: ssh to the Proxmox host (`~/.ssh/id_ed25519_mac`, `pct exec 135`), a personal token in
-`~/.config/pixelslash/credentials.json` (or `PIXELSLASH_TOKEN`), and a quiet desktop and CT: nothing
-else gating on the desktop, nobody using the LAN server. Each run restarts both units first.
+Needs: ssh to the Proxmox host (`$SSH_HOST`, `pct exec $CT`), a personal token in
+`~/.config/pixelslash/credentials.json` (or `PIXELSLASH_TOKEN`), and a quiet development machine and
+CT: nothing else gating on the machine, nobody using the server. Each run restarts both units first.
 
 **It leaves data on the CT.** There is no delete API, so each run keeps a throwaway project
 (`ps-214-rss-<N>-<id>` in the `pixelslash` org) with its N shots on each side in R2 and D1. The 50, 200, 200 (rerun)
 and 500 runs added about 2.6 GB; the CT's root disk was 2.9 GB free after them (9.8 GB, 70 % used).
-Check `pct exec 135 -- df -h /` before a run, and do not run 500 again until that is cleaned up.
+Check `pct exec $CT -- df -h /` before a run, and do not run 500 again until that is cleaned up.
 
 ## Method
 
@@ -134,8 +134,8 @@ server's speed); one corpus, one set of sizes, and a single run per N (plus the 
 
 ## PS-220: `serve.ts` in place of `vite preview` (desktop A/B)
 
-`deploy/lan/serve.ts` starts the built Worker on Miniflare directly, so there is no vite process
-and no Node-to-workerd hop. This section is what that measured **on the desktop, not on CT 135**:
+`deploy/ssh/serve.ts` starts the built Worker on Miniflare directly, so there is no vite process
+and no Node-to-workerd hop. This section is what that measured **on a development machine, not on the CT**:
 a builder could not deploy a branch to the CT (`update.sh` reset it to `origin/main`; since PS-225
 `release.sh` deploys any clean commit), and a 500-shot
 run adds about 2.6 GB to a disk that had 2.9 GB free after PS-214. The CT run is still owed (below).
@@ -144,7 +144,7 @@ run adds about 2.6 GB to a disk that had 2.9 GB free after PS-214. The CT run is
 arm after the other on a fresh `.wrangler/state` and fresh units: `rss-burst.ts --local 1` drives
 the server as `systemd-run --user` units (`ps220-web`, `ps220-diff` with the sidecar's 450M/600M
 caps, `ps220-stub`) and the sampler reads their cgroups. The arms differ in one thing:
-`bun deploy/lan/serve.ts` against `bunx vite preview` of the same `CLOUDFLARE_ENV=e2e` build.
+`bun deploy/ssh/serve.ts` against `bunx vite preview` of the same `CLOUDFLARE_ENV=e2e` build.
 `rss-sampler.py` classes the Bun process that runs Miniflare as `serve.ts`. The desktop was
 busy (load ~8 on 12 cores) and the web units had **no** `MemoryHigh`, so nothing was swapped or
 throttled; the cgroup column counts page cache the CT's cap would have reclaimed, so read the
@@ -204,7 +204,7 @@ PS-214's settled workerd on the CT (850 to 960 MB at 200 and 500 shots against 4
 here), and on the CT's figure `serve.ts` (115) + workerd (960) is ~1.07 GB: a cap lowered by the
 saving would sit under it. Lowering needs the CT's own numbers.
 
-**Owed after the land**: deploy with `deploy/lan/release.sh` (PS-225), then `perf/run.sh` on the CT (check
+**Owed after the land**: deploy with `deploy/ssh/release.sh` (PS-225), then `perf/run.sh` on the CT (check
 `df -h /` first, the disk note above) and read the settled workerd, the cgroup peak, and whether
 any finalize hits `ECONNRESET` (`journalctl -u pixelslash-web`, and the driver stops on a failed
 request). That is the PS-217 Q10 number and the basis for any lower cap.

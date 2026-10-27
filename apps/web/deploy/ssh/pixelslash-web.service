@@ -1,5 +1,5 @@
 # apps/web's production build on Miniflare, on :3000, with nothing in front of workerd
-# (deploy/lan/serve.ts, PS-220; it replaced `vite preview`). D1 and R2 are miniflare's, in
+# (deploy/ssh/serve.ts, PS-220; it replaced `vite preview`). D1 and R2 are miniflare's, in
 # apps/web/.wrangler/state, which every release links to the old checkout's (PS-225). It runs from
 # the release `current` points at, which update.sh switches. See apps/web/README.md, "Run it on the
 # Proxmox server".
@@ -13,7 +13,7 @@ Wants=network-online.target pixelslash-stub.service pixelslash-diff.service
 User=pixelslash
 WorkingDirectory=/home/pixelslash/releases/current/apps/web
 Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/serve.ts
+ExecStart=/home/pixelslash/.bun/bin/bun deploy/ssh/serve.ts
 Restart=on-failure
 RestartSec=2
 # workerd steps from ~135 MB to 1.5-1.8 GB on an upload burst and keeps it until a restart (ob 1887,

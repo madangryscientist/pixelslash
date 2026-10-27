@@ -99,9 +99,9 @@ export function pack(
   }: { broken?: boolean; sentryDsn?: string; carried?: Record<string, string> } = {},
 ) {
   const dir = join(root, "pack", sha);
-  mkdirSync(join(dir, "apps/web/deploy/lan"), { recursive: true });
+  mkdirSync(join(dir, "apps/web/deploy/ssh"), { recursive: true });
   for (const unit of [...UNITS, "pixelslash-opencode.service"])
-    copyFileSync(join(LAN, unit), join(dir, "apps/web/deploy/lan", unit));
+    copyFileSync(join(LAN, unit), join(dir, "apps/web/deploy/ssh", unit));
   mkdirSync(join(dir, "apps/web/dist/server"), { recursive: true });
   writeFileSync(join(dir, "apps/web/dist/server/index.js"), `// ${sha}\n`);
   if (broken) writeFileSync(join(dir, "apps/web/BROKEN"), "");

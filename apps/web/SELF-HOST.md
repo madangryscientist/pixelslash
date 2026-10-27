@@ -247,7 +247,7 @@ not `HEAD`):
 ```bash
 PIXELSLASH_LAN_SSH=root@<proxmox host> PIXELSLASH_LAN_CT=<container id> \
   PIXELSLASH_LAN_SSH_KEY=~/.ssh/<key> \
-  apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+  apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"
 ```
 
 `PIXELSLASH_LAN_SSH_KEY` is optional. The script builds here with `CLOUDFLARE_ENV=e2e bun run build`, sends the
@@ -261,7 +261,7 @@ Then do steps 8 and 9 above with `--server http://<box>:3000`. A token works onl
 
 `release.sh` uses `pct push` and `pct exec`, so it needs a Proxmox host. On any other machine, do by hand what
 the `remote` block in the script does: build, pack the tarball the way the script does, copy it over, and run
-`apps/web/deploy/lan/update.sh <sha>.tar.gz` as root there (the file must be named `<sha>.tar.gz`, or
+`apps/web/deploy/ssh/update.sh <sha>.tar.gz` as root there (the file must be named `<sha>.tar.gz`, or
 `pixelslash-<sha>.tar.gz`).
 
 ### More
