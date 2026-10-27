@@ -73,16 +73,26 @@ bun run format:check              # oxfmt --check  (`bun run format` fixes)
 bun run test                      # nx run-many -t test  (Vitest under the Bun runtime, and xunit for engines/dotnet)
 ```
 
-**The gate needs the .NET SDK** since `engines/dotnet` (ob 1910): `bun run test` builds and tests
-`PixelSlash.Diff.Tests` with `dotnet`. The version is pinned twice, in `.tool-versions` (mise
-activates it in this directory, with no `mise trust` needed) and in `global.json` (what `dotnet`
-itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
-"dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
-network once. The SDK is for the gate and the bench only: it is not in the capture image or on
-the self-host. The `@nx/dotnet` plugin in `nx.json` reads the .NET projects when Nx builds its
-graph, so without an SDK **every** `nx` command fails ("Failed to register MSBuild"), not only the
-dotnet ones. `NX_DOTNET_DISABLE=true` turns the plugin off: the TS projects then run as before and
-the two dotnet projects are not in the graph.
+**The .NET SDK is optional** (`engines/dotnet`, ob 1910; opt-in for contributors, PS-251). The root
+scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `scripts/nx.ts`, which runs
+`dotnet --version` first. Two paths:
+
+- **With a working `dotnet`** (this desktop): nothing changes. `bun run test` builds and tests
+  `PixelSlash.Diff.Tests` with xunit. The version is pinned twice, in `.tool-versions` (mise
+  activates it in this directory, with no `mise trust` needed) and in `global.json` (what `dotnet`
+  itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
+  "dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
+  network once.
+- **Without one** (a container, an outside contributor): the wrapper sets `NX_DOTNET_DISABLE=true`
+  and prints `dotnet SDK not found: skipping engines/dotnet`; the TS projects run as before and the
+  two dotnet projects are not in the graph. A `dotnet` that cannot run (no SDK matching
+  `global.json`) counts as missing. Setting `NX_DOTNET_DISABLE` yourself skips the check and the line.
+
+The reason for the wrapper: the `@nx/dotnet` plugin in `nx.json` reads the .NET projects when Nx
+builds its graph, so without an SDK **every** `nx` command fails ("Failed to register MSBuild"), not
+only the dotnet ones. A bare `bunx nx ...` skips the wrapper, so on a machine without an SDK set
+`NX_DOTNET_DISABLE=true` yourself. The SDK is for the gate and the bench only: it is not in the
+capture image or on the self-host. A change to `engines/dotnet` needs the SDK to be checked.
 
 One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
 `.nx/`; add `--skip-nx-cache` to force a rerun. There is no Nx Cloud and no

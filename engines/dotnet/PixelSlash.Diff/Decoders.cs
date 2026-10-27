@@ -1,10 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using SkiaSharp;
-#if DECODER_CANDIDATES
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-#endif
 
 namespace PixelSlash.Diff;
 
@@ -17,15 +13,14 @@ namespace PixelSlash.Diff;
 /// The default is `skia`: of the permissive decoders, the fastest that comes from NuGet, so a fresh
 /// checkout runs it with no build step. `spng-zlibng` and `wuffs` measured faster still (bench/PERF.md),
 /// but they and `spng` are native libraries built from upstream by `native/build.sh`, which needs gcc
-/// and the network. `imagesharp` is compiled in only with `-p:DecoderCandidates=true` (its licence is
-/// not permissive). A decoder whose library is not there is a usage error, never a silent fallback.
+/// and the network. A decoder whose library is not there is a usage error, never a silent fallback.
 /// </summary>
 public static unsafe class Decoders
 {
     public const string Default = "skia";
 
     /// <summary>Every name, in the order the bench lists them.</summary>
-    public static readonly string[] Names = ["stb", "spng", "spng-zlibng", "wuffs", "skia", "imagesharp"];
+    public static readonly string[] Names = ["stb", "spng", "spng-zlibng", "wuffs", "skia"];
 
     static double Ms(long from, long to) => (to - from) * 1000.0 / Stopwatch.Frequency;
 
@@ -37,11 +32,6 @@ public static unsafe class Decoders
         "spng-zlibng" => Native.Spng("libspng-zlibng.so").Missing,
         "wuffs" => Native.Wuffs.Missing,
         "skia" => null,
-#if DECODER_CANDIDATES
-        "imagesharp" => null,
-#else
-        "imagesharp" => $"{name} is compiled in only with -p:DecoderCandidates=true",
-#endif
         _ => $"unknown decoder {name} (one of {string.Join(", ", Names)})",
     };
 
@@ -58,9 +48,6 @@ public static unsafe class Decoders
             "spng-zlibng" => Native.Spng("libspng-zlibng.so").Decode(file),
             "wuffs" => Native.Wuffs.Decode(file),
             "skia" => Skia(file),
-#if DECODER_CANDIDATES
-            "imagesharp" => ImageSharp(file),
-#endif
             _ => throw new ArgumentException(Unavailable(name) ?? $"no decoder {name}"),
         } ?? throw new InvalidDataException($"{name} cannot decode {path}");
         var end = Stopwatch.GetTimestamp();
@@ -79,16 +66,6 @@ public static unsafe class Decoders
             if (codec.GetPixels(info, (IntPtr)to) != SKCodecResult.Success) return null;
         return new Raster(pixels, info.Width, info.Height);
     }
-
-#if DECODER_CANDIDATES
-    static Raster ImageSharp(byte[] file)
-    {
-        using var image = Image.Load<Rgba32>(file);
-        var pixels = new byte[image.Width * image.Height * 4];
-        image.CopyPixelDataTo(pixels);
-        return new Raster(pixels, image.Width, image.Height);
-    }
-#endif
 
     /// <summary>The native libraries in native/out/, loaded on first use and resolved by name.</summary>
     static class Native

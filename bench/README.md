@@ -445,7 +445,7 @@ PS-210, the overlay encoders in PS-211. Their numbers stay in `PERF.md`.
 ```bash
 bun run bench:decoders -- --env dedicated            # every candidate below, written to bench/results/decoders-<yyyy-mm>.md
 engines/dotnet/native/build.sh                        # once: libspng (zlib and zlib-ng) and Wuffs, into native/out/
-<csharp> [--decoder stb|spng|spng-zlibng|wuffs|skia|imagesharp] diff a.png b.png --json [--decode parallel|sequential]
+<csharp> [--decoder stb|spng|spng-zlibng|wuffs|skia] diff a.png b.png --json [--decode parallel|sequential]
 bun bench/src/impl/ts-diff.ts [--engine wasm] [--no-tiles] diff a.png b.png --json
 ```
 
@@ -461,7 +461,6 @@ every PNG in both corpora and `fixtures/ds` with each one that is present.
 | C# | `stb` | Unlicense or MIT | C# | NuGet; the only one that splits its decode into phases |
 | C# | `spng`, `spng-zlibng` | BSD-2 (libspng), zlib (zlib, zlib-ng) | C# | `native/build.sh` |
 | C# | `wuffs` | Apache-2.0 | C# | `native/build.sh` |
-| C# | `imagesharp` | Six Labors Split (paid for commercial use) | C# | `-p:DecoderCandidates=true` only; measured, never shipped |
 
 `native/build.sh` fetches each library's source at a pinned sha256 into
 `~/.cache/pixelslash-native`, builds it with the system `gcc` and writes `native/out/*.so`
@@ -469,12 +468,12 @@ every PNG in both corpora and `fixtures/ds` with each one that is present.
 and the C# default still runs: that is why the default is `skia`, the fastest permissive decoder
 that comes from NuGet, and not `spng-zlibng` or `wuffs`, which measured faster (`bench/PERF.md`).
 
-`bench:decoders` builds the C# engine with `-p:DecoderCandidates=true`, then runs
+`bench:decoders` builds the C# engine, then runs
 `bench:perf --impl` over every C# decoder in one interleaved run (its flags,
 such as `--env dedicated`, `--runs` or `--only`, go through). The TS impl's `bun build --compile`
 start-up row went in PS-210: a compiled binary does not carry `diff.wasm`, which the engine reads
 from disk. Peak RSS is what each process reports as `peak_rss_bytes` (its own `VmHWM`), because the
-kernel's rusage for a child carries the parent's high-water mark through fork and exec. The table's "Could not build" lists ImageSharp 3.2 and 4.x (they need a licence key).
+kernel's rusage for a child carries the parent's high-water mark through fork and exec.
 
 ## The regression guard
 
