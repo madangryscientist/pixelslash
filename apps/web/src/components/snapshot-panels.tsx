@@ -52,7 +52,7 @@ function ShotTitle({
   const title = label.component ? `${label.component} · ${label.story}` : label.story;
   return (
     <>
-      <SubsectionHeading as="h1" size="base" title={snapshot.name}>
+      <SubsectionHeading as="h1" size="base" truncate title={snapshot.name}>
         {title}
       </SubsectionHeading>
       {variantChips(label).map((chip) => (

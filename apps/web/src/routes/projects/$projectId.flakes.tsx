@@ -103,8 +103,8 @@ function FlakeItem({ projectId, flake, now }: { projectId: string; flake: FlakeV
   // The policy the latest detection was captured under; a hand mark sent none, so review.
   const policy = latest?.policy ?? "review";
   return (
-    <li id={flakeAnchor(flake.id)} className="scroll-mt-6">
-      <Card as="article" data-testid="flake" data-status={flake.status}>
+    <li>
+      <Card as="article" id={flakeAnchor(flake.id)} data-testid="flake" data-status={flake.status}>
         <Stack gap="sm">
           <Cluster gap="sm" align="start" justify="between" wrap>
             <ClusterGrow>

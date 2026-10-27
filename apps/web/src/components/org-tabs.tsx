@@ -1,4 +1,4 @@
-import { Avatar, Button, type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
+import { Avatar, Button, Cluster, type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { OrgOverview } from "#/db/orgs";
 import { plural } from "./org-projects";
@@ -23,7 +23,8 @@ export function OrgHeader({
     <PageHeader
       title={org.name}
       subtitle={
-        <span className="flex items-center gap-3">
+        <Cluster as="span" gap="sm">
+          {/* Gap: Cluster has no zero gap, and the ringed avatars overlap by a negative margin. */}
           <span className="flex" aria-hidden="true">
             {org.members.slice(0, 4).map((member) => (
               <Avatar key={member.userId} name={member.login} ring />
@@ -34,7 +35,7 @@ export function OrgHeader({
             {" · "}
             {pending} {pending === 1 ? "invite" : "invites"} pending
           </span>
-        </span>
+        </Cluster>
       }
       actions={
         <>

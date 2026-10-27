@@ -31,13 +31,13 @@ export function OrgRail({
               leading={<Avatar name={org.name} size="sm" />}
               trailing={
                 org.waiting > 0 ? (
-                  <span
+                  <Pill
+                    tone="amber"
+                    round
                     title={`${org.waiting} ${org.waiting === 1 ? "project has" : "projects have"} shots to review`}
                   >
-                    <Pill tone="amber" round>
-                      {org.waiting}
-                    </Pill>
-                  </span>
+                    {org.waiting}
+                  </Pill>
                 ) : (
                   <Caption>0</Caption>
                 )

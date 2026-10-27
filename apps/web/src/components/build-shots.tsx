@@ -5,6 +5,7 @@ import {
   BodyStrong,
   Button,
   Card,
+  CardGrid,
   Cluster,
   type LinkRenderProps,
   ListRow,
@@ -247,7 +248,7 @@ function CardGroups({
   baseline: boolean;
 }) {
   const cards = (shots: SnapshotView[]) => (
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">
+    <CardGrid as="ul" columns="auto" minWidth="md">
       {shots.map((shot) => (
         <ShotCard
           key={shot.id}
@@ -259,7 +260,7 @@ function CardGroups({
           baseline={baseline}
         />
       ))}
-    </ul>
+    </CardGrid>
   );
   const filtered = rows.filter(aiFiltered);
   return (
