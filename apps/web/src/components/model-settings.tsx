@@ -228,17 +228,8 @@ function ModelFields({
         disabled={!hydrated}
         onChange={(e) => set({ autoPassNoise: e.target.checked })}
         data-testid="model-auto-pass"
-        label={
-          <span>
-            <BodyStrong>Auto-pass noise</BodyStrong>
-            <span className="block">
-              <Body tone="muted">
-                Accept a shot when the model labels every changed region noise. Off, noise is only
-                labelled and a person still decides.
-              </Body>
-            </span>
-          </span>
-        }
+        label={<BodyStrong>Auto-pass noise</BodyStrong>}
+        description="Accept a shot when the model labels every changed region noise. Off, noise is only labelled and a person still decides."
       />
     </>
   );

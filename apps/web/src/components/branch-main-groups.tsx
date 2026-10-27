@@ -106,10 +106,8 @@ function MainRow({
       divided={divided}
       data-testid="main-row"
       data-group={shot.mainGroup}
-      leading={
-        // Gap: ListRow's leading slot has no width, and the thumbnail fills its box.
-        <div className="w-32">{shown && <ShotThumb shot={thumb} src={src} />}</div>
-      }
+      leadingWidth="thumbnail"
+      leading={shown ? <ShotThumb shot={thumb} src={src} /> : null}
       actions={<MainRowActions shot={shot} reviewable={reviewable} onReview={onReview} />}
     >
       <Stack gap="xs">

@@ -196,7 +196,7 @@ export function ShotCard({
 }) {
   const line = measured(shot, baseline);
   return (
-    <li data-testid="snapshot-row" className="relative">
+    <div data-testid="snapshot-row" className="relative">
       <Card
         size="sm"
         render={(props) => (
@@ -247,6 +247,6 @@ export function ShotCard({
           <FlakyBadge projectId={projectId} flakeId={shot.flakeId} skipped={skippedFlaky(shot)} />
         </span>
       )}
-    </li>
+    </div>
   );
 }

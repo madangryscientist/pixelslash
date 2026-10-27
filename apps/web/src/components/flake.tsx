@@ -9,6 +9,8 @@ import {
   Input,
   Overline,
   Pill,
+  Radio,
+  RadioGroup,
   Stack,
 } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
@@ -72,22 +74,18 @@ export function FlakyPolicyControl({ policy }: { policy: FlakyPolicy }) {
   const hydrated = useHydrated();
   return (
     <Stack gap="xs" data-testid="flaky-policy-control">
-      <fieldset className="flex flex-wrap items-center gap-3">
-        <legend className="sr-only">Policy to switch to</legend>
-        <Body tone="muted">Set the policy to</Body>
+      <RadioGroup
+        name="flaky-target"
+        label="Set the policy to"
+        value={target}
+        onChange={(value) => {
+          if (value === "skip" || value === "review") setTarget(value);
+        }}
+      >
         {(["skip", "review"] as const).map((option) => (
-          <label key={option} className="flex items-center gap-1 text-sm">
-            <input
-              type="radio"
-              name="flaky-target"
-              value={option}
-              checked={target === option}
-              onChange={() => setTarget(option)}
-            />
-            {option}
-          </label>
+          <Radio key={option} value={option} label={option} />
         ))}
-      </fieldset>
+      </RadioGroup>
       <Caption as="p">A route in your capture config:</Caption>
       <CopyLine text={`"flaky": "${target}"`} disabled={!hydrated} data-testid="flaky-route-line" />
       <Caption as="p">Or a story's tag:</Caption>

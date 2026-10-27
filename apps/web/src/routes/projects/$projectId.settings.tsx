@@ -2,7 +2,6 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Body,
-  BodyStrong,
   Breadcrumbs,
   Button,
   ButtonGroup,
@@ -12,6 +11,8 @@ import {
   Empty,
   ListLayout,
   Pill,
+  Radio,
+  RadioGroup,
   SectionHeading,
   Stack,
   Table,
@@ -150,27 +151,19 @@ function DiffLocationForm({
             is never diffed on the server instead.
           </Body>
         </Stack>
-        <fieldset className="space-y-2">
-          <legend className="sr-only">Diff location</legend>
+        <RadioGroup
+          name="diff-location"
+          label="Compare shots in"
+          value={chosen}
+          onChange={(value) => {
+            const location = LOCATIONS.find((l) => l.value === value);
+            if (location) setChosen(location.value);
+          }}
+        >
           {LOCATIONS.map((l) => (
-            <label key={l.value} className="flex items-start gap-2">
-              <input
-                type="radio"
-                name="diff-location"
-                value={l.value}
-                checked={chosen === l.value}
-                onChange={() => setChosen(l.value)}
-                className="mt-1"
-              />
-              <span>
-                <BodyStrong>{l.label}</BodyStrong>
-                <span className="block">
-                  <Body tone="muted">{l.detail}</Body>
-                </span>
-              </span>
-            </label>
+            <Radio key={l.value} value={l.value} label={l.label} description={l.detail} />
           ))}
-        </fieldset>
+        </RadioGroup>
         {chosen !== saved && (
           <Callout tone="warn" role="status" title="Builds will not be comparable">
             Builds before and after a switch were measured in different places and may not be

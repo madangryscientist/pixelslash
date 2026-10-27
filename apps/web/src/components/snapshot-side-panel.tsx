@@ -2,6 +2,7 @@ import {
   Body,
   BodyStrong,
   Caption,
+  Disclosure,
   KeyValue,
   KeyValueList,
   Overline,
@@ -190,12 +191,15 @@ function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffO
         Diff options
       </Overline>
       {allDefault ? (
-        <details>
-          <summary className="cursor-pointer">
-            <Body tone="muted">All engine defaults</Body>
-          </summary>
+        <Disclosure
+          summary={
+            <Body as="span" tone="muted">
+              All engine defaults
+            </Body>
+          }
+        >
           {list}
-        </details>
+        </Disclosure>
       ) : (
         list
       )}
