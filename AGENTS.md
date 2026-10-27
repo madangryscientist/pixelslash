@@ -147,24 +147,33 @@ bun run pixelslash -- --live-png <main.png> --local-png <branch.png> --out /tmp/
 ## Landing: through a pull request
 
 Decided by Jacobus 2026-10-27: pixelslash and hackcove merge through PRs, so the PixelSlash
-GitHub check (PS-23) can be seen working on a real PR. Implementation still lands on a branch,
-the builder still commits with a trailing `State:` line, and the planner still gates and
-squash-merges with `ob-land`. Only the last step changed: the squash goes through a PR instead
-of a direct push to `main`.
+GitHub check (PS-23) can be seen working on a real PR. **The builder opens the PR and hands it
+back; the planner gates and merges it.** Tickets dispatched before this rule (up to PS-233 and
+PS-23) land the old way, a squash pushed straight to `main`.
 
 1. Builder commits on its own branch, ending the message with one of
    `State: landable` / `State: needs-human` / `State: blocked` / `State: partial`.
-2. The builder never pushes and never merges.
-3. On `State: landable`, the planner gates the squash in a land worktree (as before), then
-   opens the PR from that worktree and merges it. Landing is what touches the remote, and it
-   is the only step that does:
+2. On `landable` or `needs-human`, the builder rebases on `origin/main`, pushes its branch and
+   opens the PR, then hands off (`ob spinoff handoff`) with the PR URL in the note:
 
    ```bash
-   git push -u origin land/<branch>
-   gh pr create --base main --head land/<branch> --title "<squash subject>" --body-file <msg>
+   git fetch origin && git rebase origin/main
+   git push -u origin <branch>
+   gh pr create --base main --head <branch> --title "<type>(ps N): <title>" --body-file <msg>
+   ```
+
+   The PR body is the commit body: what changed, how it was gated, the `State:` line. The
+   builder never merges, never pushes to `main`, and never opens a PR for `blocked`/`partial`.
+3. The planner gates the PR's head in a land worktree (as before), and only on a green gate
+   merges it. Merging is the planner's step and only the planner's:
+
+   ```bash
    gh pr checks <pr> --watch            # once PS-234 has installed the App: wait for PixelSlash
    gh pr merge <pr> --squash --delete-branch --subject "<squash subject>" --body-file <msg>
    ```
+
+   If `main` moved and the PR no longer rebases cleanly, the planner sends it back to the
+   builder to rebase; it does not resolve the builder's conflicts itself.
 
    The repo is private on GitHub's free plan, so branch protection and required checks are not
    available: nothing on GitHub stops a merge. The planner does. Do not merge a PR whose
