@@ -87,7 +87,10 @@ export async function runIteration(opts: DevRunOptions): Promise<DevIteration> {
   const timed = timedSession(opts.session);
   const shots = join(dir, "shots");
   // One shot at a time: `oursMs` is the run less the summed settle, which needs the shots apart.
-  const { manifest } = await captureInto(timed.session, shots, 1);
+  // The session outlives the run: its unmatched selectors are this run's summary, failed or not (PS-241).
+  const { manifest } = await captureInto(timed.session, shots, 1).finally(() =>
+    opts.session.flush(),
+  );
   const side = await sideOf(opts, dir, manifest.snapshots);
   const report = join(dir, "report");
   const result = await compareSnapshots({ mainDir: side.dir, branchDir: shots, out: report });

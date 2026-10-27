@@ -40,6 +40,7 @@ import { joinOrigin } from "./routes.ts";
 import { captureInto } from "./capture-into.ts";
 import { signIn, type Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
+import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
 import { elapsed, type CaptureSteps, type SettleSteps, type ShotTiming } from "./timings.ts";
 import { awaitStory, storybookRoutes } from "./storybook.ts";
 
@@ -111,18 +112,17 @@ const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"]
 /**
  * Resolve ignore areas on the live page to image-px boxes: every match of every selector, every
  * `[data-pixelslash-ignore]` element, and the fixed rectangles. Nothing is painted. A selector that
- * matches nothing warns, like a mask does.
+ * matches nothing is tallied for the run, like a mask's.
  */
 async function resolveIgnoreBoxes(
   page: Page,
   areas: Ignore[],
-  shot: Pick<Shot, "route" | "stabilise" | "warn">,
+  shot: Pick<Shot, "stabilise" | "unmatched">,
   image: { width: number; height: number },
 ): Promise<IgnoreRect[]> {
   const selectors = areas.filter((a) => typeof a === "string");
-  const boxes = await measureIgnore(page, selectors, true, (selector) =>
-    shot.warn(`warning: ignore "${selector}" matched nothing on ${shot.route.path}`),
-  );
+  const misses = shot.unmatched.checked("ignore", selectors);
+  const boxes = await measureIgnore(page, selectors, true, misses);
   boxes.push(...areas.filter((a) => typeof a !== "string"));
   return toImageRects(boxes, shot.stabilise.deviceScaleFactor, image);
 }
@@ -175,6 +175,7 @@ type Shot = {
   /** The library a composition-only project is measured against; undefined for any other project. */
   library: CompositionLibrary | undefined;
   warn: (m: string) => void;
+  unmatched: UnmatchedTally;
 };
 
 /**
@@ -224,9 +225,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
     const page = await context.newPage();
     const opened = await open(page, url, route, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");
-    const locators = await maskLocators(page, selectors, (selector) =>
-      shot.warn(`warning: mask "${selector}" matched nothing on ${route.path}`),
-    );
+    const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
     const shooting = performance.now();
     const png = await page.screenshot({
       fullPage: true,
@@ -286,6 +285,8 @@ export type CaptureSession = {
   /** How long the browser took to launch (PS-195). */
   browserLaunchMs: number;
   shoot: (route: Route, variant: Variant) => Promise<Shoot>;
+  /** Print the selectors that matched nothing since the last flush (PS-241); `close` does too. */
+  flush: () => void;
   close: () => Promise<void>;
 };
 
@@ -296,6 +297,7 @@ export async function openCaptureSession(
 ): Promise<CaptureSession> {
   const warn = deps.warn ?? (() => {});
   const warnMedia = mediaWarner(warn);
+  const unmatched = unmatchedTally(warn);
   const image = imageId(deps.env ?? process.env);
   if (image === BARE)
     warn(
@@ -307,6 +309,7 @@ export async function openCaptureSession(
   let stopApp: StopApp | undefined;
   let browser: Browser | undefined;
   const close = async () => {
+    unmatched.flush();
     await browser?.close();
     await stopApp?.();
   };
@@ -343,10 +346,12 @@ export async function openCaptureSession(
           session,
           library,
           warn,
+          unmatched,
         });
         warnMedia(route, variant, taken.media);
         return taken;
       },
+      flush: () => unmatched.flush(),
       close,
     };
   } catch (e) {
