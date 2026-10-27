@@ -29,12 +29,34 @@ for r in rows:
         ["git", "rev-parse", "--verify", r["ps"]["commit"] + "^{commit}"],
         cwd=HERE, capture_output=True, text=True, check=True,
     ).stdout.strip()
+# A public comparison: every cell that says a rival lacks or only partly has something, or that the docs
+# were silent, names why and links the page it was read from. The build stops on one that does not.
+LINKS = DATA["links"]
+for r in rows:
+    for k in COMPETITORS:
+        if r["t"][k] == "y":
+            continue
+        cell = f"{k}:{r['k']}"
+        for what, table in (("note", DATA["notes"]), ("link", LINKS)):
+            if not table.get(cell, "").strip():
+                raise SystemExit(f"{cell} is {r['t'][k]!r} and has no {what}")
+        if not LINKS[cell].startswith("https://"):
+            raise SystemExit(f"{cell}: the link must be an https URL, got {LINKS[cell]!r}")
 behind = [r for r in rows if r["behind"]]
+for r in behind:
+    if not r.get("gap"):
+        raise SystemExit(f"{r['k']} is behind and has no gap sentence for the 'What is actually missing' card")
 level = len(rows) - len(behind)
+# "Nothing we have is unique" is prose below. A row only we have (we say y, every rival says n) would make
+# it false, so the build stops until the text is changed because a landing changed it.
+unique = [r for r in rows if r["ps"]["v"] == "y" and all(SCORE[r["t"][k]] == 0 and r["t"][k] != "?" for k in COMPETITORS)]
+if unique:
+    raise SystemExit("rows only we have: " + ", ".join(r["k"] for r in unique) + "; rewrite the 'Nothing we have is unique' section")
 
 payload = json.dumps({
     "rows": rows,
     "notes": DATA["notes"],
+    "links": LINKS,
     "src": {t["key"]: t.get("src", "") for t in TOOLS},
     "names": {t["key"]: t["name"] for t in TOOLS},
     "competitors": COMPETITORS,
@@ -80,6 +102,8 @@ html = f"""<!doctype html>
   td.row small {{ display: block; font: 10px/1.3 var(--font-mono, monospace); color: var(--dim); }}
   td.row small a.sha {{ font: 9.5px/1 var(--font-mono, monospace); color: var(--dim); opacity: .75; }}
   td.c {{ text-align: center; font-size: 12px; }}
+  td.c a {{ color: inherit; text-decoration: none; }} td.c a:hover {{ text-decoration: underline; }}
+  .foot a {{ color: inherit; }}
   tr.grp td {{ border-top: 1px solid var(--line); padding-top: 12px; font: 9.5px/1 var(--font-sans, sans-serif);
               letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }}
   .v-y {{ color: var(--yes); }} .v-p {{ color: var(--part); }} .v-n {{ color: var(--no); }} .v-? {{ color: var(--unk); }}
@@ -102,7 +126,7 @@ html = f"""<!doctype html>
   <div class="stat"><b>{len(rows)}</b><span>capabilities</span></div>
   <div class="stat"><b>{level}</b><span>level or ahead</span></div>
   <div class="stat"><b>{len(behind)}</b><span>behind</span></div>
-  <div class="stat"><b>0</b><span>nobody else has</span></div>
+  <div class="stat"><b>{len(unique)}</b><span>nobody else has</span></div>
 </div>
 
 <div class="bar">
@@ -113,14 +137,14 @@ html = f"""<!doctype html>
   <label class="toggle"><input type="checkbox" id="onlyDiff" checked> only where we're behind</label>
 </div>
 
-<table><colgroup><col class="c0"><col span="{len(TOOLS) - 1}"></colgroup>
+<table><colgroup><col class="c0"><col span="{len(TOOLS)}"></colgroup>
 <thead><tr><th></th>{HEAD_HTML}</tr></thead><tbody id="tb"></tbody></table>
 
 <h2>Nothing we have is unique</h2>
 <p class="lede">Every capability in the table exists somewhere else. Two are rare rather than unique: a
 local-only mode where nothing is uploaded (one other tool, and it is archived), and an AI judgement
-against design-system rasters (the others have AI that compares builds, not one that reads a design
-system). The diff's own accuracy is the other claim, and it is measured, not asserted: 35/37 real
+against design-system rasters (Applitools checks a build against a Figma design and Percy's AI reviews
+changes against a PR summary; no docs page we read describes checking a design-system ruleset). The diff's own accuracy is the other claim, and it is measured, not asserted: 35/37 real
 changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
 (<code>bench/results/2026-10-20.md</code>).</p>
 
@@ -131,21 +155,22 @@ changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
 <ul>
   <li><b>Lost Pixel is gone.</b> The repository was archived on 22 April 2026; the README says it is joining
     Figma and sunsetting the product. Its column is a historical comparison, not a live competitor.</li>
-  <li><b>Argos is the closest thing to us</b>: MIT-licensed, free hobby tier, deterministic diff, merge-base
-    baselines, and the only one whose docs argue against AI. Its weakness is capture: it runs in your CI, so
-    the renderer is whatever your runner has, and it has no diff-time ignore region.</li>
+  <li><b>Argos is the closest thing to us</b>: MIT-licensed, a free hobby tier, merge-base
+    baselines, and a diff its docs call deterministic, with no AI step. Its weakness is capture: it runs in
+    your CI, so the renderer is whatever your runner has, and its ignore is per change fingerprint, not a
+    region you draw.</li>
   <li><b>Chromatic</b> is the benchmark for the review loop (modes, diff inspector, checks, flake filter) and
-    the one with the tightened free tier: 5,000 snapshots on Chrome only.</li>
-  <li><b>Percy</b> (BrowserStack) sells cross-browser cloud rendering and Intelli Ignore; sensitivity is set at
-    project or region level, not per snapshot.</li>
-  <li><b>Applitools</b> has the deepest match-level surface (layout, content, strict, exact), accessibility
-    checks, self-hosting via Private Cloud, and no free tier: the price is the opening for a cheap, honest diff.</li>
+    the one whose free plan is 5,000 snapshots a month.</li>
+  <li><b>Percy</b> (BrowserStack) sells cross-browser cloud rendering and Intelli Ignore; sensitivity is set per
+    project, per snapshot or per region, and its AI review is paid-plan only.</li>
+  <li><b>Applitools</b> has the deepest match-level surface (a level per checkpoint or region, in place of a numeric threshold), accessibility
+    checks, on-premises deployment sold as an add-on, and no free tier: the price is the opening for a cheap, honest diff.</li>
 </ul>
 
 <div class="foot">
   Our column: README.md, packages/engine/src, packages/cli/src, apps/web/src at <b>{DATA["ours_commit"]}</b>,
   audited {DATA["audited"]}; each of our cells names the land that made it true.<br>
-  Theirs: {" · ".join(t.get("src", "") for t in TOOLS if t["key"] != "ps")} (all fetched {DATA["updated"]}).<br>
+  Theirs: the public docs of each tool, fetched {DATA["updated"]}; every cell that is not a yes links the page it was read from, and its note says what that page says. Starting points: {" · ".join(f'<a href="{t["src"]}">{t["name"]}</a>' for t in TOOLS if t["key"] != "ps")}.<br>
   A "partial" is a documented subset, not a guess: read the note on the cell. Regenerate with
   <code>python3 docs/capabilities/build.py</code> after editing <code>data.json</code>.
 </div>
@@ -161,7 +186,7 @@ D.rows.forEach(r => {{
     lastGroup = r.g;
     const g = document.createElement('tr');
     g.className = 'grp';
-    g.innerHTML = '<td colspan="{len(TOOLS)}">' + r.g + '</td>';
+    g.innerHTML = '<td colspan="{len(TOOLS) + 1}">' + r.g + '</td>';
     tb.appendChild(g);
   }}
   const tr = document.createElement('tr');
@@ -172,8 +197,11 @@ D.rows.forEach(r => {{
     '<td class="c psc v-' + r.ps.v + '" title="' + r.ps.note.replace(/"/g, '') + '">' + GLYPH[r.ps.v] + '</td>' +
     D.competitors.map(k => {{
       const v = r.t[k];
-      const note = D.notes[k + ':' + r.k] || (k + ': ' + v);
-      return '<td class="c v-' + v + '" title="' + note.replace(/"/g, '') + '">' + GLYPH[v] + '</td>';
+      const cell = k + ':' + r.k;
+      const note = D.notes[cell] || (k + ': ' + v);
+      const url = D.links[cell];
+      const mark = url ? '<a href="' + url + '" rel="noopener">' + GLYPH[v] + '</a>' : GLYPH[v];
+      return '<td class="c v-' + v + '" title="' + note.replace(/"/g, '') + '">' + mark + '</td>';
     }}).join('');
   tb.appendChild(tr);
 }});
@@ -193,13 +221,7 @@ function apply() {{
 onlyDiff.onchange = apply;
 apply();
 
-const BEHIND = [
-  ['Review UI', 'the accept/reject loop on a page — build list, side-by-side, overlay, slider, j/k/a/r', 'ob 1421'],
-  ['PR gate', 'a GitHub check that blocks on unreviewed changes', 'ob 1471'],
-  ['A Playwright helper', 'so teams using their own tests can call us', 'ob 1498'],
-  ['Self-hosting shipped', 'the seams exist; no Docker image or guide yet', 'map: Hosting'],
-  ['Flake signal, accessibility, retention, pricing', 'deliberately unbuilt until there is a product to sell', 'ob 1426']
-];
+const BEHIND = D.rows.filter(r => r.behind).map(r => [r.label, r.gap, r.plan]);
 document.getElementById('cards').innerHTML = BEHIND.map(([t, d, ref]) =>
   '<div class="card"><b>' + t + '</b><span>' + d + '</span> <em>' + ref + '</em></div>').join('');
 </script>
