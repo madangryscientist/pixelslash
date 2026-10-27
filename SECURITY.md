@@ -4,7 +4,7 @@
 
 Report it privately, not in a public issue: use GitHub's private vulnerability reporting, **Security
 > Report a vulnerability** on [the repository](https://github.com/madangryscientist/pixelslash/security/advisories/new).
-Only the maintainers can read the report. Say what you found, the version or commit, and the steps
+If you cannot use GitHub, email hello@hack-cove.com. Only the maintainers can read the report. Say what you found, the version or commit, and the steps
 to reproduce it; a proof of concept helps.
 
 This is a one-maintainer project, so these are targets, not guarantees: an acknowledgement within

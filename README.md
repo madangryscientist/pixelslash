@@ -73,6 +73,9 @@ code.
 
 ## The review app
 
+The hosted app is at [app.pixelslash.dev](https://app.pixelslash.dev); the project site is
+[pixelslash.dev](https://pixelslash.dev).
+
 `apps/web` is the review server: TanStack Start on Cloudflare Workers, D1 for data, R2 for the
 shots, GitHub sign-in. CI uploads a build with the CLI, and people review it there. The
 [self-host guide](apps/web/SELF-HOST.md) takes you from an empty Cloudflare account (or a box on
