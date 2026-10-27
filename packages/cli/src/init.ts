@@ -218,7 +218,7 @@ export function configSource(a: Answers): string {
     a.project ? `project: ${q(a.project)}` : `// project: "<project name>"`,
   ];
   return [
-    "// Written by `pixelslash init`. Every option is in the PixelSlash README.",
+    "// Written by `pixelslash init`. Every option is in the PixelSlash CLI reference (docs/cli.md).",
     "// No token goes in here: `pixelslash login`, or PIXELSLASH_TOKEN in CI.",
     "export default {",
     ...(a.storybook

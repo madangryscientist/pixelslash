@@ -201,7 +201,7 @@ async function withBuild(
   return run(build, owner);
 }
 
-/** Every endpoint the API has. The README's API table is checked against this list. */
+/** Every endpoint the API has. The API table in docs/cli.md is checked against this list. */
 export const ENDPOINTS: readonly Endpoint[] = [
   { method: "GET", path: "/api/v1/me", upload: true, run: (ctx) => me(ctx) },
   { method: "POST", path: "/api/v1/builds", upload: true, run: (ctx) => startBuild(ctx) },
@@ -318,7 +318,7 @@ function belowMinimum(request: Request, min: string | undefined): boolean {
  * `authorize` turns the token into an actor: a CI token reaches its one project, an org (`psorg_`)
  * token every project of its org, a personal (`psu_`) token every project of its user's orgs. A project, build or shot the actor cannot reach
  * is a 404, never a 403, and nothing an upload writes leaves that project's org. The endpoints and
- * their replies are in `ENDPOINTS` and the README's "API" section.
+ * their replies are in `ENDPOINTS` and the "API" section of docs/cli.md.
  */
 export async function handleApi(request: Request, deps: ApiDeps): Promise<Response> {
   const path = new URL(request.url).pathname.split("/").filter(Boolean);

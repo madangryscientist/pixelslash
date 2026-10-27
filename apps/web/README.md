@@ -70,7 +70,7 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
 3. Deploy with it: `PIXELSLASH_SENTRY_DSN=<dsn> apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"`
    (the same command as the deploy above). Or put `SENTRY_DSN=<dsn>` in the CT's
    `apps/web/.dev.vars.e2e` and deploy the current sha again.
-4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see the README's "Error reporting".
+4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see "Error reporting" in [`docs/cli.md`](../../docs/cli.md).
 
 ## GitHub check runs (PS-23)
 

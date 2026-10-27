@@ -16,7 +16,7 @@ The first version of the package: a single bundle (`dist/index.js`) with
 
 - The `pixelslash` bin: the compare run (URL pair, PNG pair, routes), `init`, `capture`, `compare`,
   `import`, `upload`, `check`, `dev`, `login`, `logout`, `whoami`, `builds`, `build`, `status`,
-  `flakes`, `flake`, `project`, `mcp`, `install-browser` and `--version`. The README has each
+  `flakes`, `flake`, `project`, `mcp`, `install-browser` and `--version`. `docs/cli.md` has each
   command's flags.
 - `playwright` as a peer dependency; `pixelslash install-browser` installs its
   `chromium-headless-shell` once.

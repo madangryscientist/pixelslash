@@ -3,7 +3,7 @@
  * light and dark, from a local e2e build (ob 1706). It reuses the organizations-page dogfood's
  * `start` and `setup` (dogfood-orgs.config.ts, dogfood-orgs.setup.ts), so the sign-in and the
  * fixed seed are the same. `bun run dogfood:upload` (apps/web) captures this and uploads it; see
- * the README's "Reviewing the review app with itself".
+ * `docs/cli.md`'s "Reviewing the review app with itself".
  */
 import orgs from "./dogfood-orgs.config";
 

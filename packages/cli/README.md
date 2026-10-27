@@ -5,7 +5,8 @@ have), pixel-diff them, and write a `report.html`. Optionally judge each shot ag
 system with a local vision model, or upload the shots to a PixelSlash server for review.
 
 This is the CLI of [PixelSlash](https://github.com/madangryscientist/pixelslash). The full
-reference for every command and flag is that repository's README.
+reference for every command and flag is that repository's
+[`docs/cli.md`](https://github.com/madangryscientist/pixelslash/blob/main/docs/cli.md).
 
 ## Install
 

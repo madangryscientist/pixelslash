@@ -1,0 +1,36 @@
+name: Bug report
+description: Something PixelSlash does is wrong, or a run failed
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. A security problem does not go here: use
+        [private reporting](https://github.com/madangryscientist/pixelslash/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pixelslash --version`, or the commit if you run from source.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran, and the Bun and OS versions.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+      description: The output and the exit code. For a diff problem, attach a screenshot of `report.html` and, if you can share them, the two PNGs.
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: The review app or the capture image, if the run used one; a minimal page that shows it.

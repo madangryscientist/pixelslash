@@ -136,7 +136,7 @@ bun /path/to/pixelslash/packages/cli/src/index.ts capture --upload \
 ```
 
 or `… upload <snapshot-dir> --server … --token-path …` for a directory you already have. `PIXELSLASH_SERVER`
-and `PIXELSLASH_TOKEN` replace the two flags in CI. The README's "Uploading to a server" has the rest. A build
+and `PIXELSLASH_TOKEN` replace the two flags in CI. `docs/cli.md`, "Uploading to a server", has the rest. A build
 on the project's default branch (`main`) is accepted as the baseline; a build on any other branch is diffed
 against it and waits for review.
 

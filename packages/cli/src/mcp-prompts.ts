@@ -8,7 +8,7 @@ import { buildToSpec } from "./mcp-dev.ts";
 
 /**
  * The local fix loop as MCP prompts (ob 1735): what an agent does with the local tools, in order.
- * The README's "Using PixelSlash from your agent" says the same.
+ * `docs/cli.md`'s "Using PixelSlash from your agent" says the same.
  */
 
 type LoopPrompt = {

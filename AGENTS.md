@@ -3,7 +3,7 @@
 A standalone Bun CLI for visual review: capture Main and Branch (Playwright, or
 existing PNGs), pixel-diff them, write `report.html`, and optionally judge each
 shot against a design system with a local vision model. The destination is a
-Chromatic competitor that is not tied to Storybook. `README.md` is the CLI's
+Chromatic competitor that is not tied to Storybook. `docs/cli.md` is the CLI's
 contract.
 
 Extracted from omnibus on 2026-10-19 (ob 1418). History before that commit is
@@ -244,5 +244,5 @@ run; never mix numbers from different runs into one percentage.
    additive only: a new endpoint, or a new field on a reply. Nothing is
    renamed, retyped or removed, and an error `code` keeps its meaning. A
    breaking change is `/api/v2`. Every endpoint is in `ENDPOINTS`
-   (`apps/web/src/api/handler.ts`) and in the README's "API" table; a test
+   (`apps/web/src/api/handler.ts`) and in the "API" table of `docs/cli.md`; a test
    fails when the two differ.
