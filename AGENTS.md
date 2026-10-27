@@ -144,21 +144,33 @@ bunx playwright install chromium-headless-shell   # once per machine
 bun run pixelslash -- --live-png <main.png> --local-png <branch.png> --out /tmp/ps-check
 ```
 
-## Landing: no PRs
+## Landing: through a pull request
 
-Implementation lands on a branch, the builder commits with a trailing
-`State:` line, and the planner gates and squash-merges with `ob-land`.
+Decided by Jacobus 2026-10-27: pixelslash and hackcove merge through PRs, so the PixelSlash
+GitHub check (PS-23) can be seen working on a real PR. Implementation still lands on a branch,
+the builder still commits with a trailing `State:` line, and the planner still gates and
+squash-merges with `ob-land`. Only the last step changed: the squash goes through a PR instead
+of a direct push to `main`.
 
 1. Builder commits on its own branch, ending the message with one of
-   `State: ready` / `State: needs-human` / `State: blocked` / `State: partial`.
+   `State: landable` / `State: needs-human` / `State: blocked` / `State: partial`.
 2. The builder never pushes and never merges.
-3. On `State: ready`, the planner loads `ob-land` and lands it. Landing is what
-   touches the remote, and it is the only step that does:
+3. On `State: landable`, the planner gates the squash in a land worktree (as before), then
+   opens the PR from that worktree and merges it. Landing is what touches the remote, and it
+   is the only step that does:
 
    ```bash
-   git push origin main
-   git push origin --delete <branch>   # only after the squash is on main
+   git push -u origin land/<branch>
+   gh pr create --base main --head land/<branch> --title "<squash subject>" --body-file <msg>
+   gh pr checks <pr> --watch            # once PS-234 has installed the App: wait for PixelSlash
+   gh pr merge <pr> --squash --delete-branch --subject "<squash subject>" --body-file <msg>
    ```
+
+   The repo is private on GitHub's free plan, so branch protection and required checks are not
+   available: nothing on GitHub stops a merge. The planner does. Do not merge a PR whose
+   PixelSlash check is failing or pending, unless the PR changes nothing a shot can see and
+   says so. No commit, PR title or PR body carries a `Co-Authored-By` or any AI attribution
+   line.
 
 4. When the land changes `apps/web` (or what it imports), deploy main to the LAN self-host
    (CT 135) from the land worktree, clean and at the pushed squash. The build runs here and the
