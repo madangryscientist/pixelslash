@@ -4,6 +4,12 @@ What has to be true before `madangryscientist/pixelslash` can go public, and in 
 This is an investigation: nothing here changed code, history, visibility or npm. Every finding
 names the file or the command it came from. Read against `main` at `b01a193` on 2026-10-27.
 
+**Decided by Jacobus, 2026-10-27** (recorded on PS-243): **fully open**, covering the engine, the
+CLI, the hosted web app and the bench, with no open-core split. **Fresh history**, with no omnibus
+pre-extraction commits, no secrets and nothing LAN-specific. The planner turns §10 into build
+tickets and runs §11 last, so §10 and §11 are the executable plan. §1 to §9 are the evidence
+behind it.
+
 The short answer: **nothing is fatal, and no live secret is in any commit.** Five things block a
 public flip. A licence has to be chosen. History has to be replaced with a fresh root. The LAN and
 ob coupling has to come out of the tracked tree. Attribution for pixelmatch and pngjs has to be added. One
@@ -18,6 +24,8 @@ unfair matrix row has to be fixed. Everything else is hygiene that can follow th
 - [7. The hosted app, once the code is public](#7-the-hosted-app-once-the-code-is-public)
 - [8. Decisions only Jacobus can make](#8-decisions-only-jacobus-can-make)
 - [9. Ordered checklist](#9-ordered-checklist)
+- [10. The plan: tickets in dependency order](#10-the-plan-tickets-in-dependency-order)
+- [11. Go-public runbook](#11-go-public-runbook)
 - [Appendix A: the full dependency licence table](#appendix-a-the-full-dependency-licence-table)
 
 ---
@@ -194,7 +202,8 @@ note in `AGENTS.md` says that history belongs to omnibus.
 | Risk | a missed pattern stays public forever; every sha changes anyway, so `ours_commit`, the matrix `commit` cells and `bench/results` shas all point at nothing | old shas in docs point at nothing (the same as with a cleaned history) |
 | Effort | 1 to 2 days, plus a second scan and a review | under an hour |
 
-**Recommendation: a fresh squashed root in a new public repo.** Both options change every sha,
+**Decided: fresh history.** The method, and why it goes into a new repo rather than a force-push
+over this one, is in §11. Both options change every sha,
 so the cleaned history loses its main advantage: links from the matrix, the bench results and
 `ob` tickets break either way. The squash removes every IP, trailer, private email and omnibus
 commit at once, with no list of patterns to get right. Keep the private repo as it is, as the
@@ -455,21 +464,23 @@ leaves without `--upload`) is a security property we accept reports against.
 
 ## 8. Decisions only Jacobus can make
 
-Each has a recommendation. None of them was acted on.
+Each has a recommendation. None of them was acted on. **D2, D3 and D7 are decided** (fully open,
+web app included, fresh history). For the rest, the recommendation in **bold** is firm and meant
+to be adopted as written; §10 assumes it.
 
 | # | Decision | Recommendation | Why |
 | --- | --- | --- | --- |
-| D1 | **Licence**: MIT or Apache-2.0 | **Apache-2.0** | patent grant, trademark clause, contribution terms without a CLA (§1) |
-| D2 | **Open-core or fully open** | **Fully open code, a paid hosted service** (the Plausible/Sentry-before-FSL shape) | Every gap against the field is in the matrix and nothing is unique (AGENTS.md matrix rules). A closed core would hold back exactly what makes it worth trying. The hosted app's value is running it: D1, R2, the GitHub App, the model key, no ops |
-| D3 | **Is the web app (`apps/web`) public too?** | **Yes**, with the LAN deploy moved out (§3) | It is half the product and the `/api/v1` contract. The CLI's `--upload` is pointless to outsiders without a server they can run |
-| D4 | **Name and trademark** | Keep **PixelSlash**. Run a USPTO/EUIPO search (memory "pixelslash.dev": not yet checked) before launch. Register the word mark only if the hosted app charges | Apache-2.0 §6 already keeps the name out of the licence |
+| D1 | **Licence**: MIT or Apache-2.0 | **Apache-2.0, adopt it.** Copyright line: `Copyright 2026 Jacobus Langner and the PixelSlash contributors` | permissive, plus a patent grant, a trademark clause and contribution terms without a CLA (§1). Every dependency is compatible |
+| D2 | **Open-core or fully open** | **Decided: fully open** (engine, CLI, web app, bench). A paid hosted service stays possible | Every gap against the field is in the matrix and nothing is unique (AGENTS.md matrix rules). A closed core would hold back exactly what makes it worth trying. The hosted app's value is running it: D1, R2, the GitHub App, the model key, no ops |
+| D3 | **Is the web app (`apps/web`) public too?** | **Decided: yes**, with the LAN deploy generalised (§3) | It is half the product and the `/api/v1` contract. The CLI's `--upload` is pointless to outsiders without a server they can run |
+| D4 | **Name and trademark** | **Keep PixelSlash. File nothing now.** Before the flip, spend 15 minutes on a knockout search (USPTO, EUIPO TMview, WIPO Global Brand Database, classes 9 and 42). A live conflict there is the only reason to rename before launch. File the word mark when the hosted app first charges. Add one line to the README: "PixelSlash is a name of Jacobus Langner; the Apache-2.0 licence does not grant it" | Apache-2.0 §6 already keeps the name out of the licence |
 | D5 | **pixelslash.dev** | **Register it now** (RDAP still answers 404 today, so it is unregistered) | It is the docs, hosted-app and `security@` address. Cheap, and someone else can take it the day the repo is public |
-| D6 | **Where the repo lives**: `madangryscientist/pixelslash` or an org | **A new GitHub org** (`pixelslash` is a taken user name, so something like `pixelslash-dev`) with a **new public repo** from a squashed root (D7). The current repo stays private as the archive | an org lets him add maintainers later; a new repo leaves the private history untouched |
-| D7 | **History**: cleaned or fresh root | **Fresh squashed root** (§2) | removes IPs, trailers, email and omnibus commits in one step; both options break shas anyway |
+| D6 | **Where the repo lives** | **Keep the name `madangryscientist/pixelslash`, as a new repo.** Rename this one to `pixelslash-archive` (it stays private) and create a fresh `pixelslash` under the same account from the new root (§11). Move it to an org only when a second maintainer arrives: a transfer keeps redirects | the same URL means the GitHub App manifest, `build.py` and the docs keep their links. A new repo, rather than a force-push, is the only way to keep the old PRs' refs private (§11) |
+| D7 | **History**: cleaned or fresh root | **Decided: fresh history.** Method: a squashed root (§2, §11) | removes IPs, trailers, email and omnibus commits in one step; both options break shas anyway |
 | D8 | **Commit identity** in the public repo | his `users.noreply.github.com` address, not Gmail | the Gmail address is on every commit today |
 | D9 | **axe-core (PS-238)** | **Yes, unmodified** | MPL-2.0 file-level copyleft; `lightningcss` is already MPL (§1) |
 | D10 | **The Sentry CLI's FSL licence**: accept | **Accept** | build tool, not shipped, PixelSlash does not compete with Sentry (§1) |
-| D11 | **The pricing research and positioning docs** (`docs/research/competitor-pricing.md`, `docs/visual-compare-map.md`) | public if D2 is "fully open"; **move** if the hosted app's pricing is still undecided | strategy docs are a gift to competitors only if there is something to protect |
+| D11 | **The pricing research and positioning docs** (`docs/research/competitor-pricing.md`, `docs/visual-compare-map.md`) | **Move them to the private repo.** D2 opens the code, not the pricing strategy | the code is the product. Pricing notes about named rivals help nobody outside and invite argument |
 | D12 | **Agent-written contributions**: does the "no AI attribution" rule bind outside contributors? | No. It is his rule for his agents; say nothing in CONTRIBUTING | policing it for outsiders creates friction for no gain |
 | D13 | **When**: before or after the hosted app is on pixelslash.dev | After D5 and the blockers; the hosted app can follow | the CLI alone is useful and is the first thing people try |
 
@@ -484,7 +495,7 @@ planner to file with `ob add … --project pixelslash`; none were filed by this 
 
 | # | Item | Effort | Ticket? |
 | --- | --- | --- | --- |
-| B1 | Jacobus decides D1, D2, D3, D6, D7 (§8) | S | no, decisions |
+| B1 | Decisions: D2, D3, D7 **decided** 2026-10-27; adopt §8's firm recommendations for D1, D4, D6 | S | no, decisions |
 | B2 | Register `pixelslash.dev` (D5), and the `pixelslash` npm org | S | no, his step |
 | B3 | Strip the LAN and ob coupling from the tree: move `.opencode/` out; split `AGENTS.md` into public `CONTRIBUTING.md` and private agent notes; required flags instead of LAN defaults in `apps/web/perf/rss-burst.ts`, `bench/src/argos.ts`, `ops/argos-bench/run-pairs.sh`; rewrite the Proxmox/CT/IP prose in `apps/web/README.md`, `bench/README.md`, `bench/PERF.md`, `docs/*`; strip hosts from `apps/web/perf/results/*`; repoint `github-app/manifest.json` and `build.py` at the public URL; replace the real-looking Figma `FILE_KEY` fixture; drop the MAC from `ops/argos-bench/runbook.md`; reword `ob secret` and "Jacobus's desktop" prose; move this report itself (it names the LAN hosts) to the private repo. Re-run §2's sweep until the tree is clean | M | **yes**: "Make the tree public-safe: LAN, ob and personal coupling out" |
 | B4 | `LICENSE` (+ `NOTICE` crediting pixelmatch, pngjs, the two papers and the Argos calibration cases; a comment in `yiq.ts`, `lib.rs`, `Diff.cs`); `license` fields in every `package.json` and both `Cargo.toml` | S | **yes**: "Licence the repo" (after D1) |
@@ -519,8 +530,562 @@ planner to file with `ob add … --project pixelslash`; none were filed by this 
 | N5 | Gradually swap `ob N`/`PS-N` refs in new code comments for public issue links | n/a | no, a convention in CONTRIBUTING |
 | N6 | Ship the LGPL notice for libvips with any image of the web app that contains sharp | S | with N2 |
 
-**Tickets for the planner to file** (none filed here): B3, B4, B5, B6+B7 (with S3, N1), B8, S1,
-S4, S5, S6, S7, S8, S9, N2, N3.
+**Tickets for the planner to file** (none filed here): §10 turns these rows into ticket-sized
+briefs, in the order they can land.
+
+---
+
+## 10. The plan: tickets in dependency order
+
+These are the §9 rows, cut to one ticket each and put in the order they can land. Each brief is
+written to paste into `ob add "<title>" --project pixelslash --body "<brief>"`; raise its three
+`####` headings to `##` when pasting (they are `####` here only to keep this page's outline). The
+recommendations in §8 are assumed adopted: Apache-2.0, the name kept, the same account with a
+new repo, a fresh root.
+
+```
+T1 tree public-safe ──┐
+T2 docs and agents ───┼──> T8 README + community ──┐
+T3 licence ───────────┘                            │
+T4 matrix ─────────────────────────────────────────┤
+T5 hosted-app hardening ──> T9 self-host guide ────┤
+T6 gate without .NET ─────> T7 CI ─────────────────┼──> T12 go public ──> T13 publish
+T10 npm package (built, not published) ────────────┤
+T11 capture image on GHCR (workflow only) ─────────┘
+```
+
+T1 to T6 are independent and can run in parallel. T12 runs only when every other ticket has
+landed. T13 runs after the flip, because npm provenance needs a public source repo.
+
+### T1. Make the tree public-safe: LAN, ob and personal coupling out of code and data
+
+#### What to build
+- Remove the home-network defaults from code. A missing value now fails with a message naming
+  the env var:
+  - `bench/src/argos.ts:15-17`: `ARGOS_BENCH_HOST` and `ARGOS_BENCH_KEY`. Line 67's hint names
+    VM 101 and `root@192.168.0.20`.
+  - `ops/argos-bench/run-pairs.sh:13-14`: the same two variables.
+  - `apps/web/perf/rss-burst.ts:28,33,34`: the `--server`, `--ssh` and `--ct` defaults.
+  - `ops/argos-bench/provision-vm.sh`: the VM id, bridge and Proxmox host as required arguments.
+- Remove or reword the host data:
+  - Drop the MAC address from `ops/argos-bench/runbook.md:21,144`.
+  - In `apps/web/perf/results/*/*.json`, replace the hosts and IPs with role names (`server`,
+    `client`).
+  - Replace the address in `packages/engine/test/upload-retry.test.ts:81` with `example.test`.
+- Replace `FILE_KEY` in `packages/cli/test/support.ts:183` with an obviously made-up key of the
+  same shape. Keep the tests passing.
+- Move `.opencode/` out of the repo: its plugins re-export `/home/jacobus/...` by absolute path.
+  Where it goes is T2's call; in this ticket, delete it from the tree and note the move in the
+  commit.
+- Set `docs/capabilities/build.py:13` (`REPO`) and `apps/web/github-app/manifest.json:3` from a
+  single constant for the repo URL. The URL itself stays `madangryscientist/pixelslash` (D6), so
+  only the duplication goes.
+
+#### Acceptance
+- From the worktree, this prints nothing outside `docs/open-source-readiness.md`:
+
+  ```bash
+  git grep -nE '192\.168\.|CT 135|VM 101|id_ed25519_mac|debian@|root@192|/home/jacobus|([0-9a-f]{2}:){5}[0-9a-f]{2}'
+  ```
+
+  That file is T2's to move.
+- `bun run bench -- --refresh-argos` without `ARGOS_BENCH_HOST` fails at once with a message
+  naming the variable. It does not try an ssh.
+- gitleaks on the working tree finds only the two Sentry scrubber fixtures:
+
+  ```bash
+  mise exec gitleaks@latest -- gitleaks dir --redact .
+  ```
+
+- The gate is green, and `bun run bench:check` passes with no new `bench/results` file.
+
+#### Do not
+- Do not change the diff, the bench scoring or any committed corpus.
+- Do not touch prose docs (T2) or the matrix (T4).
+- Do not rewrite history. That is T12.
+- Do not upload anything to an online scanner.
+
+### T2. Docs and agent files fit for strangers
+
+#### What to build
+- Split `AGENTS.md`:
+  - **The public `AGENTS.md`** keeps what any contributor or agent needs: the project table, the
+    gate, isolated linking, /tmp hygiene, generated-file formatting, the capability-matrix honesty
+    rules, `bench/PERF.md`, and the repo invariants.
+  - **Moved to a private file in omnibus** (suggested: `omnibus/projects/pixelslash/AGENTS.ob.md`):
+    the `ob` tracker, Dispatch, The ob planner, the LAN deploy step of Landing, and the
+    `.opencode/` table.
+  - `CLAUDE.md` stays `@AGENTS.md`.
+  - File an omnibus ticket (planner's job, not the builder's) so the `ob-planner` skill's Step 0
+    reads the omnibus file as well.
+- Generalise the LAN prose. Keep the method, lose the address: "a Proxmox host", `$SSH_HOST`,
+  `$CT`. The files are:
+  - `apps/web/README.md`, including the `ob secret` lines at 57-58: "a secret store; set the
+    variables any way you like".
+  - `apps/web/github-app/README.md`, `apps/web/perf/README.md`
+  - `bench/README.md`, `bench/PERF.md`
+  - `docs/research/argos-local.md`, `docs/rust-upload-service.md`
+  - `ops/argos-bench/runbook.md`
+  - `apps/web/deploy/lan/` (rename it `deploy/ssh/`)
+
+  "Jacobus's desktop" becomes "the maintainer's machine".
+- Move to the private archive or omnibus, and out of the public tree:
+  - `docs/open-source-readiness.md` (this report; it maps the LAN)
+  - `docs/research/competitor-pricing.md` and `docs/visual-compare-map.md` (D11)
+- `scripts/check-slop.ts:9,32`: the `TODO(ob 123)` wording becomes `TODO(#123)`, or both are
+  accepted.
+- Leave `ob N` / `PS-N` refs in code comments as they are (N5). Add one line in `AGENTS.md`:
+  "`ob N` and `PS-N` are the maintainer's private ticket ids; new work cites GitHub issues."
+
+#### Acceptance
+- T1's `git grep` prints nothing anywhere in the tree, this report included.
+- `git grep -nE 'ob secret|ob spinoff|ob agent|Jacobus'` prints nothing outside the one-line
+  `ob N` note and the copyright lines T3 adds.
+- A planner session in the new layout still finds the tracker, the gate and the landing rule:
+  run Step 0 of `ob-planner` and paste what it reads into the commit body.
+- The gate is green, and `format:check` passes.
+
+#### Do not
+- Do not delete the ob workflow. Move it.
+- Do not reflow prose that is not changing.
+- Do not touch code; that was T1.
+- Do not edit the omnibus skill from this repo.
+
+### T3. Licence the repo: Apache-2.0, NOTICE, attribution
+
+#### What to build
+- `LICENSE`: the Apache-2.0 text, verbatim.
+- `NOTICE`: `PixelSlash`, `Copyright 2026 Jacobus Langner and the PixelSlash contributors`, then
+  attributions:
+  - pixelmatch (ISC, Volodymyr Agafonkin), for the YIQ colour-delta and anti-aliasing approach
+    in `packages/engine/src/yiq.ts`, `engines/wasm/src/lib.rs` and
+    `engines/dotnet/.../Diff.cs`, with its licence text
+  - pngjs (MIT), cited at `engines/wasm/src/lib.rs:1-3`
+  - the two papers cited in the engine (§4.4)
+  - the Argos calibration cases in `bench/` (§4.1), with their source and licence
+- A one-line comment at each ported function pointing to `NOTICE`.
+- Set `"license": "Apache-2.0"` in every `package.json`, the root included, and `license` in both
+  `Cargo.toml`. The `.csproj` gets `PackageLicenseExpression`.
+- An SPDX header is not required. Do not add one to every file.
+
+#### Acceptance
+- Re-running `$TMPDIR/ps243/licences.py` (Appendix A) shows no first-party package as
+  `UNLICENSED` or empty.
+- `NOTICE` names every source §4 lists.
+- The gate is green.
+
+#### Do not
+- Do not choose another licence.
+- Do not add a CLA or a DCO bot.
+- Do not copy any rival's code to "match" it.
+
+### T4. The capability matrix, fit for a public page
+
+#### What to build
+- Fix the "No Storybook dependency" row and the `build.py:146` wording (§4.3).
+- Every competitor `n` and `partial` cell gets a note and a deep link to the page it came from.
+- Re-fetch the five vendors' docs and set `updated`.
+- Re-read our column at the current main, then set `audited` and `ours_commit`.
+- Re-run `python3 docs/capabilities/build.py` and commit `matrix.html`.
+
+#### Acceptance
+- Every non-`y` competitor cell has a note and a URL.
+- `build.py` runs clean.
+- The "nothing we have is unique" sentence is still true, or the text is changed because a
+  landing changed it.
+
+#### Do not
+- Do not add rows that flatter us.
+- Do not hand-tune `behind`.
+- Do not fill a `?` from memory.
+
+### T5. Hosted-app hardening for strangers' deployments
+
+#### What to build
+- **SSRF guard on the project and org model `baseUrl`.** Refuse loopback, RFC 1918, link-local
+  (169.254/16, including the metadata address), CGNAT, `.local`/`.internal` names and non-http(s)
+  schemes, both at save time and at call time. DNS resolution counts, so check after resolving
+  where the runtime allows it.
+  - Add a server setting, `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS=1`, for self-hosts that run a
+    local model. It is off by default.
+- **Refuse the GitHub sign-in stub unless the build is dev or test.** A production build with the
+  stub's env set fails at start with a clear message.
+- **Rate limits on `/api/v1/*` and sign-in.** Add a Cloudflare rate-limit binding in
+  `wrangler.jsonc`, and a no-op seam for the self-host.
+- Document the token prefixes (`psu_` and the others) in `SECURITY.md`'s draft section; T8 owns
+  the file.
+
+#### Acceptance
+- Unit tests cover the guard: each refused range, the IPv6 forms, and a name that resolves to a
+  private address. The allow flag lets them through.
+- An e2e test proves that a production-mode build with the stub env does not start.
+- `/api/v1` is unchanged (invariant 7). The `ENDPOINTS` test is still green.
+- The web gate is green: build, `test:e2e`, `test:e2e:dev` and the wrangler dry-run.
+
+#### Do not
+- Do not change what is sent to the model (invariant 4).
+- Do not add an auth provider.
+- Do not rename or retype an `/api/v1` field.
+
+### T6. The gate without a .NET SDK
+
+#### What to build
+- Make `engines/dotnet` opt-in for contributors:
+  - With no `dotnet` on PATH, set `NX_DOTNET_DISABLE=true` automatically, through a tiny wrapper
+    in the root scripts. The gate then runs the TS projects and prints one line: "dotnet SDK not
+    found: skipping engines/dotnet".
+  - With `dotnet` present, nothing changes.
+- Drop the ImageSharp `DecoderCandidates` reference (§1, NuGet).
+- Document both paths in `AGENTS.md`'s gate section.
+
+#### Acceptance
+- On a machine or container without dotnet, `bun install && bun run typecheck && bun run lint &&
+  bun run test` is green and prints the skip line.
+- On this desktop the gate still runs the xunit tests.
+- `bun run bench:check` is unchanged.
+
+#### Do not
+- Do not delete `engines/dotnet`.
+- Do not make the skip silent.
+- Do not touch the diff contract.
+
+### T7. GitHub Actions CI (needs T6)
+
+#### What to build
+- Add `.github/workflows/ci.yml` running the gate on `ubuntu-latest`:
+  - Bun pinned to the repo's version.
+  - `actions/setup-dotnet` reading `global.json`.
+  - `bunx playwright install --with-deps chromium-headless-shell`.
+  - `bun install --frozen-lockfile`, then typecheck, lint, format:check and test.
+- A second job runs the web gate when `apps/web/**` or `packages/**` changes.
+- Use no secrets, and give pull requests from forks read-only permissions.
+
+#### Acceptance
+- The workflow is green on a PR in the private repo.
+- One deliberate lint error turns it red, and the run is linked in the commit body.
+
+#### Do not
+- Do not add Nx Cloud, a remote cache or a paid runner.
+- Do not run `bench:perf` (memory: on demand only).
+- Do not set the workflow to `pull_request_target`.
+
+### T8. Public README and community files (needs T2, T3)
+
+#### What to build
+- Rewrite `README.md` for an outsider:
+  - one paragraph on what it is
+  - a 60-second quickstart (`npx pixelslash --live-png a.png --local-png b.png --out out`)
+  - a report screenshot
+  - a link to the hosted app and the self-host guide
+  - the trademark line from D4
+- Move the full CLI reference to `docs/cli.md`. It is still the contract, so keep it verbatim
+  and only move it.
+- Add `SECURITY.md`:
+  - private vulnerability reporting
+  - the §7 threat model, condensed
+  - the token prefixes
+  - what is in scope
+- Add `CONTRIBUTING.md`: the gate, the invariants, "lint rules are errors", and "no AI
+  attribution trailers are required or expected" (D12).
+- Add `CODE_OF_CONDUCT.md`: Contributor Covenant 2.1, with a contact address on pixelslash.dev
+  or a GitHub noreply address.
+- Add `.github/ISSUE_TEMPLATE/{bug,feature}.yml`, a PR template, and `dependabot.yml` for bun,
+  GitHub Actions and NuGet.
+
+#### Acceptance
+- A fresh-eyes read by someone outside the project (or an agent with no repo context), and the
+  quickstart works as written against T10's packed tarball.
+- The README's "API" table is still in sync with `ENDPOINTS`; the test is green.
+
+#### Do not
+- Do not drop any CLI flag from the docs.
+- Do not promise features that are not in the code (the matrix rules apply).
+- Do not add badges for services we do not run.
+
+### T9. Self-host guide: your own Cloudflare account (needs T5)
+
+#### What to build
+- Write `apps/web/SELF-HOST.md`, from zero to a working instance:
+  - create D1 and R2, set `database_id`, apply the migrations
+  - create your own GitHub App from `github-app/manifest.json` (the URL replaced)
+  - set the secrets
+  - `wrangler deploy`
+  - point the CLI at it with `--upload`
+- Put the variables in one table, saying which are required.
+- Generalise the ssh/LXC deploy from T2 into an "on your own box" section.
+
+#### Acceptance
+- A dry run on a fresh Cloudflare account, or at minimum `wrangler deploy --dry-run` from a clean
+  clone following only the guide, with each step's output pasted into the commit body.
+
+#### Do not
+- Do not hardcode our account, zone or bucket names.
+- Do not ship docker compose here (N2 is separate).
+
+### T10. The `pixelslash` npm package, built but not published
+
+#### What to build
+- Check the name with `npm view pixelslash`. If it is taken, use `@pixelslash/cli` and say so.
+- Make `packages/cli` publishable:
+  - `bun build` into one bundle, with `@pixelslash/engine` inlined.
+  - `bin`, `files`, `engines` (the Bun version, or Node if the bundle runs there).
+  - `"version": "0.1.0"`, `"private"` removed.
+- Playwright stays a peer: say so in the README, and keep the "install chromium-headless-shell
+  once" note.
+- Add `CHANGELOG.md`.
+- Add `.github/workflows/release.yml`:
+  - on a `v*` tag, run the gate, then `npm publish --provenance --access public`
+  - use npm trusted publishing (OIDC), not a long-lived `NPM_TOKEN`
+- The workflow lands but is not run.
+
+#### Acceptance
+- `npm pack` produces a tarball.
+- In an empty directory, `npm i ./pixelslash-0.1.0.tgz && npx pixelslash --live-png ... --local-png ... --out out`
+  writes a report, which is opened and looked at.
+- `--help` matches `docs/cli.md`.
+
+#### Do not
+- Do not publish.
+- Do not create the npm org; that is his step (B2).
+- Do not publish `@pixelslash/engine` or `@pixelslash/playwright` yet.
+
+### T11. The capture image on GHCR (workflow only)
+
+#### What to build
+- Add `.github/workflows/image.yml`: build `docker/` and push `ghcr.io/madangryscientist/pixelslash-capture:<version>`
+  on a `v*` tag.
+- Copy the font licences (§1, container fonts) into the image under `/usr/share/doc/`.
+- Add the image to the README.
+
+#### Acceptance
+- `docker build` locally produces the same PNG hashes as the current image (the AGENTS.md
+  check), and the licences are present in the image.
+
+#### Do not
+- Do not push an image before the flip.
+- Do not change the pinned browser or fonts.
+
+### T12. Go public (needs T1 to T11 landed)
+
+#### What to build
+Run §11 from step 1 to step 9, as written. This ticket is a runbook execution, not a build. Its
+"commit" is the new repo's root plus commit 2.
+
+#### Acceptance
+- Every check in §11 step 11 passes.
+- The new public repo's two commits scan clean.
+- Jacobus has seen the root's tree (`git ls-tree -r --name-only main | less`) before the flip,
+  and said yes.
+
+#### Do not
+- Do not force-push over the existing repo.
+- Do not flip before the scan is clean.
+- Do not publish to npm in this ticket.
+
+### T13. Publish, and the post-flip settings (needs T12)
+
+#### What to build
+- Tag `v0.1.0` on the public repo. The release workflow (T10) publishes `pixelslash` with
+  provenance, and T11 pushes the image.
+- Turn on:
+  - private vulnerability reporting
+  - secret scanning with push protection
+  - Dependabot alerts
+  - branch protection on `main`, requiring CI and the PixelSlash check
+- Apply to GitHub's secret-scanning partner programme for the token prefixes (S9).
+- Later and separate: N2 (docker compose), N3 (compiled binaries), N4 (docs site).
+
+#### Acceptance
+- `npx pixelslash@0.1.0 --help` works from a clean machine.
+- The npm page shows the provenance badge linking to the public workflow run.
+- `docker pull` of the image works anonymously.
+
+#### Do not
+- Do not publish from a laptop.
+- Do not publish the engine or playwright libraries in this ticket.
+
+---
+
+## 11. Go-public runbook
+
+T12 runs this, start to finish. Every step either names a command or a check, and nothing in it
+writes to the existing repo's history.
+
+**Method, decided: a fresh root, not `git filter-repo`.** `filter-repo` keeps the 196 PixelSlash
+commits, but it needs a complete list of patterns to scrub, and it changes every sha anyway (§2).
+A fresh root has no list to get wrong.
+
+**Where it goes: a new repo, not a force-push.** A force-push over `madangryscientist/pixelslash`
+would leave the old history reachable on GitHub:
+- `refs/pull/1..4/head` are read-only refs that GitHub keeps for every PR, and they pin the old
+  commits.
+- A commit's page stays reachable by sha.
+- Only GitHub Support can purge those, on request.
+
+A new repo under the old name contains only what is pushed to it. The old repo, renamed, keeps
+the full history private, as the archive.
+
+**What to keep:** the tree at main after T1 to T11, and nothing else: no branches, no tags, no
+PRs, no issues (there are none; ob is the tracker), no Actions secrets. The `ob N` / `PS-N` refs
+in comments stay; they are only numbers (N5).
+
+### 1. Freeze
+
+- Every open PR is merged or closed (`gh pr list --state open` is empty).
+- Every builder worktree is landed or abandoned: `ob spinoff list` shows nothing in flight.
+- Announce the freeze on the planner thread. Nothing lands on the old repo after step 5.
+
+### 2. Build the tree, outside every clone
+
+```bash
+cd ~/dev/pixelslash && git fetch origin && git status --short   # clean, on main
+root="$TMPDIR/ps-public"; rm -rf "$root"; mkdir -p "$root"
+git archive origin/main | tar -x -C "$root"     # the tree only: no .git, no ignored files
+cd "$root" && git init -q -b main
+```
+
+`git archive` writes the tracked tree and nothing else, so no object of the old history can come
+along. There is no `.gitattributes` with `export-ignore` in the repo, so the archive is the whole
+tree. Check this again on the day: `git ls-files | grep gitattributes` prints nothing.
+
+### 3. Scan the tree before committing anything
+
+```bash
+mise exec gitleaks@latest -- gitleaks dir --redact "$root"
+mise exec trufflehog@latest -- trufflehog filesystem "$root" --no-update --no-verification
+cd "$root" && grep -rnE '192\.168\.|CT 135|VM 101|id_ed25519_mac|debian@|root@192|/home/jacobus|ob secret|competitor-pricing|([0-9a-f]{2}:){5}[0-9a-f]{2}' . | grep -v node_modules
+```
+
+- Expected: gitleaks reports only the Sentry scrubber fixtures (§2), trufflehog reports 0, and
+  the grep prints nothing.
+- Anything else stops the run, goes back to T1 or T2 as a fix on the old repo, and step 2 starts
+  over.
+
+### 4. Commit the root, then the sha fix
+
+```bash
+cd "$root"
+export GIT_AUTHOR_NAME="Jacobus Langner" GIT_COMMITTER_NAME="Jacobus Langner"
+export GIT_AUTHOR_EMAIL="<id>+madangryscientist@users.noreply.github.com"   # gh api user -q .id
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+git add -A && git commit -q -m "Initial public release"
+root_sha=$(git rev-parse --short HEAD)
+```
+
+Commit 2 is the only edit made in the new repo:
+- set `ours_commit` and every row's `commit` in `docs/capabilities/data.json` to `$root_sha`
+- run `python3 docs/capabilities/build.py`
+- in `AGENTS.md`, replace the "names `06a2472`" convention with "names the public root"
+- leave `bench/results/*.json`'s `commit` fields: they are an informational record of the
+  private sha that was measured, which `check.ts` does not read
+
+Then:
+
+```bash
+bun install && bun run typecheck && bun run lint && bun run format:check && bun run test
+git add docs/capabilities/data.json docs/capabilities/matrix.html AGENTS.md
+git commit -q -m "docs: the matrix names the public root"
+```
+
+Re-run step 3's gitleaks as `gitleaks git --redact "$root"`. It now covers both commits, and the
+result must match step 3.
+
+### 5. Swap the repos
+
+```bash
+gh repo rename pixelslash-archive --repo madangryscientist/pixelslash --yes   # stays private
+gh repo create madangryscientist/pixelslash --private \
+  --description "Visual review for any web app: capture, pixel-diff, report"
+cd "$root" && git remote add origin git@github.com:madangryscientist/pixelslash.git
+git push -u origin main
+```
+
+The new repo starts **private**. The rename leaves a redirect, and creating the new repo under
+the old name replaces it, which is what we want: old links now reach the public code.
+
+### 6. Re-wire what pointed at the old repo
+
+- **The PixelSlash GitHub App:** install it on the new repo, because installs are per repository
+  id. Check the web app's project-to-repo link: re-link it if it stores the id, not the name.
+- **Webhooks and Actions secrets:** the new repo has none. T7's CI needs none; add only what
+  T10/T11's workflows need (nothing, with OIDC trusted publishing).
+- **Local clones:**
+  - Move `~/dev/pixelslash` aside: `mv ~/dev/pixelslash ~/dev/pixelslash-archive`, then
+    `git remote set-url origin …/pixelslash-archive.git` inside it.
+  - Clone the new repo fresh to `~/dev/pixelslash`.
+  - The old worktrees belong to the archive. Remove them with `wt` once nothing is in flight.
+- **ob:** `spinoff_launcher_by_repo` is keyed by name and is unchanged. Re-point the T3 project
+  `pixelslash` at the new clone's path if it moved, and re-pin `planner · pixelslash` with
+  `ob t3 planner --repo pixelslash`.
+- **The LAN self-host (CT 135):** its release script builds from a local checkout at a sha, so
+  the next deploy uses the new clone. Nothing changes on the CT.
+
+### 7. Check the private new repo as a stranger would
+
+- Open a throwaway PR in the new repo: CI (T7) is green, and the PixelSlash check runs.
+- Then, in an empty directory:
+
+  ```bash
+  git clone https://github.com/madangryscientist/pixelslash.git
+  ```
+
+  Follow `README.md`'s quickstart, word for word, from that clone.
+- Jacobus reads `git ls-tree -r --name-only main` and says yes. That yes is T12's acceptance.
+
+### 8. Flip
+
+```bash
+gh repo edit madangryscientist/pixelslash --visibility public --accept-visibility-change-consequences
+```
+
+### 9. Lock it down (straight after the flip)
+
+```bash
+gh api -X PUT repos/madangryscientist/pixelslash/private-vulnerability-reporting
+gh api -X PATCH repos/madangryscientist/pixelslash \
+  -f 'security_and_analysis[secret_scanning][status]=enabled' \
+  -f 'security_and_analysis[secret_scanning_push_protection][status]=enabled'
+gh api -X PUT repos/madangryscientist/pixelslash/vulnerability-alerts
+```
+
+Branch protection on `main` (free on a public repo):
+- require the CI check, and the PixelSlash check once it is reliable on PRs from forks
+- no force-push
+- no deletion
+
+### 10. Publish (T13, in this order)
+
+1. Create the `pixelslash` org on npmjs.com (his step, B2) and configure trusted publishing for
+   the new repo's `release.yml`.
+2. Push the `v0.1.0` tag. The release workflow runs the gate and publishes `pixelslash` 0.1.0
+   with `--provenance`. Provenance needs the public repo, which is why this comes after step 8.
+3. The same tag runs `image.yml`, which pushes the capture image to GHCR. Make the package
+   public in its settings.
+4. Later, each in its own ticket: `@pixelslash/engine` and `@pixelslash/playwright`, once their
+   APIs are worth a semver promise.
+
+### 11. Post-flip checks
+
+| Check | Command or place | Pass |
+| --- | --- | --- |
+| Fresh-clone gate | CI on `main` | green |
+| CLI from npm | `npx pixelslash@0.1.0 --live-png a.png --local-png b.png --out out` on a clean machine | report written, opened, looks right |
+| Secrets in the public repo | `gitleaks git --redact` on a fresh clone of the public repo | the same fixtures as step 3, nothing new |
+| The LAN in public | GitHub code search `repo:madangryscientist/pixelslash 192.168` | no results |
+| Old history unreachable | `https://github.com/madangryscientist/pixelslash/commit/<an old main sha, e.g. b01a193>` | 404 |
+| Old PRs stay private | `https://github.com/madangryscientist/pixelslash/pull/4` | 404 on the new repo (the PR lives in the archive) |
+| Archive is private | `gh repo view madangryscientist/pixelslash-archive --json visibility` | `PRIVATE` |
+| The GitHub App works | a test PR on the new repo | the check run appears |
+| The matrix links | open `docs/capabilities/matrix.html` from the public repo; click a `commit` | resolves to the root |
+
+**If something leaks after the flip:**
+1. Set the repo back to private at once with `gh repo edit … --visibility private
+   --accept-visibility-change-consequences`.
+2. Rotate whatever leaked.
+3. Fix the tree on the archive side and start again from step 2 with a new repo. Do not try to
+   scrub the public one.
+
+Forks made in the window keep what they took. That is why step 3 runs before step 8, never after.
 
 ---
 
