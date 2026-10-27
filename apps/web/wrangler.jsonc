@@ -104,7 +104,7 @@
         "IMAGE_SIGNING_SECRET": "e2e-image-secret",
         // A fixed test value (base64 of 32 zero bytes), never a real secret.
         "MODEL_KEY_SECRET": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        // The LAN self-host's diff sidecar (PS-203, deploy/lan/diff-sidecar.ts) on loopback. The
+        // The LAN self-host's diff sidecar (PS-203, deploy/ssh/diff-sidecar.ts) on loopback. The
         // Playwright run points it at its own sidecar's port (vite.config.ts). Cloudflare's vars
         // above never set it: there the server diff stays in-process (diff.wasm, as everywhere).
         "DIFF_SIDECAR_URL": "http://127.0.0.1:4181",

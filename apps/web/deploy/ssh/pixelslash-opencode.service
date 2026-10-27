@@ -12,7 +12,7 @@ User=pixelslash
 WorkingDirectory=/home/pixelslash/releases/current/apps/web
 Environment=PATH=/home/pixelslash/.bun/bin:/home/pixelslash/.opencode/bin:/usr/local/bin:/usr/bin:/bin
 Environment=PIXELSLASH_OPENCODE_KEY_FILE=/home/pixelslash/.config/pixelslash/opencode.key
-ExecStart=/home/pixelslash/.bun/bin/bun deploy/lan/opencode-helper.ts
+ExecStart=/home/pixelslash/.bun/bin/bun deploy/ssh/opencode-helper.ts
 # The CT has 2 GiB and workerd holds most of it: an opencode run (about 350 MB) must not push the
 # review app out. Over the cap the run is killed and the call is a named ai_error.
 MemoryMax=500M

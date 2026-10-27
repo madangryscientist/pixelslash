@@ -66,8 +66,8 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
 **To switch it on (one time):**
 
 1. Create a project in sentry.io (platform: Cloudflare Workers or JavaScript) and copy its DSN.
-2. `ob secret set pixelslash-sentry-dsn` and paste it.
-3. Deploy with it: `PIXELSLASH_SENTRY_DSN="$(ob secret get pixelslash-sentry-dsn)" apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"`
+2. Keep it in a secret store; set the variables any way you like.
+3. Deploy with it: `PIXELSLASH_SENTRY_DSN=<dsn> apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"`
    (the same command as the deploy above). Or put `SENTRY_DSN=<dsn>` in the CT's
    `apps/web/.dev.vars.e2e` and deploy the current sha again.
 4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see the README's "Error reporting".
@@ -106,7 +106,7 @@ CLOUDFLARE_ENV=e2e bun run dev -- --host 127.0.0.1 --strictPort
 
 This is the dev server, so changes to the app reload without a rebuild. The server diff runs under
 it as it does in a build; to serve the production build instead, `CLOUDFLARE_ENV=e2e bun run build`
-then `HOST=127.0.0.1 bun deploy/lan/serve.ts` (the LAN self-host's server, below; `PORT` moves it off :3000).
+then `HOST=127.0.0.1 bun deploy/ssh/serve.ts` (the LAN self-host's server, below; `PORT` moves it off :3000).
 `bunx vite preview --host 127.0.0.1 --port 3000 --strictPort` still serves the same build.
 
 `bunx nx test:e2e web` (and `bun run test:e2e:dev`) does not use :3000 or :4174: `e2e/ports.ts` picks two
@@ -157,48 +157,48 @@ To start over, stop the server and remove `.wrangler/state`.
 
 ## Run it on the Proxmox server
 
-The same local server, on the Proxmox host instead of the desktop, so the dashboard is up without
+The same local server, on a Proxmox host instead of your machine, so the dashboard is up without
 anything running here. It is **LAN only**: sign-in is still the GitHub stand-in, so anyone who can
 reach the address signs in as `e2e-octocat` and sees every org. No port forward, no tunnel, no
 public DNS. Real GitHub sign-in is a later ticket.
 
 | | |
 | --- | --- |
-| Dashboard | `http://192.168.0.34:3000` |
-| Stand-in | `http://192.168.0.34:4174` (the browser is sent there to sign in) |
-| Container | CT 135 `pixelslash` on `192.168.0.20`: Debian 13, unprivileged, 2 vCPU, 2 GB, 10 GB on `local-lvm`, starts on boot. The address is static in the CT config, below the router's DHCP pool. |
-| Releases | `/home/pixelslash/releases/<sha>/`, user `pixelslash`, one per deploy, built on the desktop; `releases/current` is the one serving. The last 3 are kept. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
+| Dashboard | `http://<ct-address>:3000` |
+| Stand-in | `http://<ct-address>:4174` (the browser is sent there to sign in) |
+| Container | CT `$CT` `pixelslash` on the Proxmox host `$SSH_HOST`: Debian 13, unprivileged, 2 vCPU, 2 GB, 10 GB on `local-lvm`, starts on boot. The address is static in the CT config, below the router's DHCP pool. |
+| Releases | `/home/pixelslash/releases/<sha>/`, user `pixelslash`, one per deploy, built on the machine that deploys; `releases/current` is the one serving. The last 3 are kept. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
 | Old checkout | `/home/pixelslash/pixelslash`, the git checkout the CT served from and built in before PS-225. Nothing runs from it now; it holds the state and the secrets below. |
 | State | D1 and R2 in the old checkout's `apps/web/.wrangler/state` on the CT's disk; every release's `apps/web/.wrangler/state` links to it, so it is kept across restarts, deploys and rollbacks. |
-| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/lan/serve.ts`: the production build on Miniflare, no vite), from `deploy/lan/`, in `releases/current/apps/web`. `pixelslash-diff` (`bun deploy/lan/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/ssh/serve.ts`: the production build on Miniflare, no vite), from `deploy/ssh/`, in `releases/current/apps/web`. `pixelslash-diff` (`bun deploy/ssh/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. |
 
-`deploy/lan/serve.ts` calls Miniflare's API on the build (`dist/server` is the Worker, `dist/client` the
+`deploy/ssh/serve.ts` calls Miniflare's API on the build (`dist/server` is the Worker, `dist/client` the
 assets): the D1 and R2 in `.wrangler/state/v3` that `vite preview` kept, the `wrangler.json` vars with
 `.dev.vars` over them, the explain queue. It listens on `0.0.0.0:3000`; `HOST` and `PORT` move it (the
 Rust front door of PS-217 will set `127.0.0.1` and `3001`). It does not migrate or build: the deploy does.
 
 The build is the `e2e` environment's with three values replaced. `apps/web/.dev.vars.e2e` on the CT
-(mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://192.168.0.34:4174`, so the
+(mode 600, gitignored, never in git) sets `GITHUB_OAUTH_BASE=http://<ct-address>:4174`, so the
 browser on another machine is sent to the stand-in at the CT's address rather than its own
 `localhost`, a random `IMAGE_SIGNING_SECRET`, and the deployment's `MODEL_KEY_SECRET` (without it
 the CT would seal keys under the `e2e` env's fixed test value). It lives in the old checkout and never
-leaves the CT: the build runs on the desktop, which ships no `.dev.vars`, and the deploy copies the
+leaves the CT: the build runs on the deploying machine, which ships no `.dev.vars`, and the deploy copies the
 CT's file into the release's `dist/server/.dev.vars` (mode 600), where `serve.ts` reads it. The `e2e`
 env in `wrangler.jsonc`, and so the tests, are unchanged.
 
 **Deploy (PS-225): the CT never builds.** A build beside the running workerd does not fit in the
-CT's 2 GiB, so the build runs on the desktop and the CT gets the result. From a clean checkout of the
-commit (the planner's land worktree, on main after the land):
+CT's 2 GiB, so the build runs on the deploying machine and the CT gets the result. From a clean checkout of
+the commit (main, after the merge):
 
 ```bash
-PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
-  apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+PIXELSLASH_LAN_SSH=root@$SSH_HOST PIXELSLASH_LAN_CT=$CT PIXELSLASH_LAN_SSH_KEY=~/.ssh/<key> \
+  apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"
 ```
 
 `release.sh` refuses a sha that is not `HEAD` or a tree that is not clean, runs
 `CLOUDFLARE_ENV=e2e bun run build`, packs the commit's tracked files (without `bench/`) and
 `dist` into one tarball, sends it over ssh to the Proxmox host and in with `pct push`, and runs that
-release's own `deploy/lan/update.sh` in the CT. The host, the CT and the key come only from those
+release's own `deploy/ssh/update.sh` in the CT. The host, the CT and the key come only from those
 variables (`PIXELSLASH_LAN_SSH_KEY` is optional); nothing is hard-coded. It is not run automatically.
 
 On the CT, `update.sh` unpacks the release into `releases/<sha>` beside the one serving, installs it
@@ -217,7 +217,7 @@ serving release's D1 for builds that are `processing` and began within the last 
 makes it exit 1 with the build ids and `nothing changed`; run it again once they end. A build
 `processing` for longer is an orphan (the run died with its Worker; 7a698500 was one) and never
 blocks. If the D1 cannot be read the deploy stops too, since not knowing is not a go-ahead. To
-deploy anyway: `PIXELSLASH_DEPLOY_FORCE=1 apps/web/deploy/lan/release.sh …` (`release.sh` carries it
+deploy anyway: `PIXELSLASH_DEPLOY_FORCE=1 apps/web/deploy/ssh/release.sh …` (`release.sh` carries it
 into the CT). The first release on a CT has no serving D1 to ask and skips the check.
 
 The Worker also rides out a short lock itself: `database()` (`src/server/env.ts`) wraps the D1
@@ -232,16 +232,15 @@ errored on the server: <reason> (<build page>)`), so CI no longer passes a build
 and stepping to 1.5-1.8 GB (peak 1.82 GB) within one 10-minute sample of an upload burst (the snapshot PUTs and `finalize`),
 then holding there for hours until the unit restarts, which brings it back to 130 MB. It does not grow without bound, but it
 does not give the memory back, and with `vite preview` (~0.5 GB) beside it the peak was more than the CT's 2 GiB: that was the
-two OOM kills of 2026-10-25. `pixelslash-web` has run `deploy/lan/serve.ts` since PS-220 instead, which takes about 450 MB
+two OOM kills of 2026-10-25. `pixelslash-web` has run `deploy/ssh/serve.ts` since PS-220 instead, which takes about 450 MB
 out of the unit at idle and after a burst (`perf/README.md`, desktop A/B); the caps below are unchanged until the same run is
 made on the CT. `pixelslash-web.service` therefore carries `MemoryHigh=1400M`, `MemoryMax=1700M` and
 `OOMPolicy=stop`; every deploy installs the release's unit, so the cap survives an update.
 
-Logs: `pct exec 135 -- journalctl -u pixelslash-web -f`. Point a project's upload at it with
-`PIXELSLASH_SERVER=http://192.168.0.34:3000` and a token issued in its Settings on the CT. A token
-works only on the server that issued it: `~/.config/pixelslash/hackcove-local.token` now holds the
-CT's hackcove token, which replaced the desktop server's, so a desktop server started again needs a
-token of its own in another file.
+Logs: `pct exec $CT -- journalctl -u pixelslash-web -f`. Point a project's upload at it with
+`PIXELSLASH_SERVER=http://<ct-address>:3000` and a token issued in its Settings on the CT. A token
+works only on the server that issued it, so keep one token file per server (the local one and the
+CT's are different tokens).
 
 The diff runs inline in the finalise request with a 25 s budget (`DIFF_BUDGET_MS`), which stands in
 for a Worker's CPU limit. On the CT's 2 vCPU a build of hackcove's 145 shots measures about 126 and
@@ -253,7 +252,7 @@ again by itself while the count falls, so the build ends with all 145 measured a
 
 In-process the server diff is the engine's `diff.wasm`, the CLI's diff (PS-210; there is no pngjs
 diff and no switch). On the self-host the Worker instead sends each
-shot's two PNGs to a Bun process on the same box: `deploy/lan/diff-sidecar.ts`, unit
+shot's two PNGs to a Bun process on the same box: `deploy/ssh/diff-sidecar.ts`, unit
 `pixelslash-diff`, on `127.0.0.1:4181`. It runs the engine's own `diffPngs` (the same `diff.wasm`) with the same
 options and ignore areas, and answers with the result and the overlay, so the verdict, the counts,
 the regions and the overlay's bytes are the same as in-process (`src/diff/sidecar.test.ts` holds
@@ -288,7 +287,7 @@ PS-200's burst); `pixelslash-web`'s cap is unchanged. Logs, one line per diff wi
 ### The AI explain step through opencode
 
 The explain step needs a model, and workerd cannot start a process, so on the CT it reaches the
-`opencode` CLI through a helper on the same box: `deploy/lan/opencode-helper.ts`, unit
+`opencode` CLI through a helper on the same box: `deploy/ssh/opencode-helper.ts`, unit
 `pixelslash-opencode`. It serves one route, `POST /v1/chat/completions` on `127.0.0.1:4180`, in the
 shape `complete()` in `src/ai/model.ts` already sends, and answers each call with the engine's
 tool-less `opencode run` (no `--auto`, a deny-everything agent, no server). A region's three crops
@@ -301,8 +300,8 @@ personal self-host only: the OpenCode Go plan it uses is for personal use.
 echo opencode-go/claude-haiku-5-5 > /etc/pixelslash/opencode-helper
 install -d -o pixelslash -g pixelslash /home/pixelslash/.config/pixelslash
 install -m 600 -o pixelslash -g pixelslash /dev/stdin /home/pixelslash/.config/pixelslash/opencode.key
-# Then, on the desktop, deploy (the sha already serving is restarted, not unpacked again).
-apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+# Then, on the deploying machine, deploy (the sha already serving is restarted, not unpacked again).
+apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"
 ```
 
 While `/etc/pixelslash/opencode-helper` exists, a deploy (`update.sh` on the CT) checks it and the key file (which must
@@ -335,8 +334,8 @@ miniflare's undici pool had kept: `read ECONNRESET`, so a 500 `fetch failed` in 
 retry from the CLI for a request that never ran. Miniflare sets `reset: false` on every request it
 sends, so a `Connection: close` header cannot ask for this; the plugin sets `reset: true` on that
 pool. Preview only; the Cloudflare deploy does not run it.
-`deploy/lan/serve.ts` (the LAN unit since PS-220) has no such hop: workerd listens on the port, and
+`deploy/ssh/serve.ts` (the LAN unit since PS-220) has no such hop: workerd listens on the port, and
 a client reaches it directly, so there is no pool socket to reset and the plugin is not on its path
-(it stays for `vite preview` on the desktop). A client whose keep-alive socket workerd closes right
+(it stays for `vite preview` on a development machine). A client whose keep-alive socket workerd closes right
 after a long answer can still see a reset; the CLI retries a network error for 30 s (1, 2, 4, 8 and 15 s), and a
 finalize is resumable. Whether the CT's workerd does that is checked by the CT run in `perf/README.md`.

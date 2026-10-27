@@ -8,7 +8,7 @@ Needs root (clear_refs) and cgroup v2. Read-only apart from the HWM reset.
 
 PS-220: `CG`, `WEB_UNIT` and `DIFF_UNIT` point it at other cgroups, so the same run can sample two
 `systemd-run --user` units on a desktop (perf/rss-burst.ts --local). Processes of the web unit are
-workerd, `vite` (vite preview), `host` (deploy/lan/serve.ts, PS-220) or `other` (bunx).
+workerd, `vite` (vite preview), `host` (deploy/ssh/serve.ts, PS-220) or `other` (bunx).
 """
 
 import json

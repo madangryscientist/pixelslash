@@ -1,7 +1,6 @@
 # Security
 
-> **Draft.** This file is owned by the open-source ticket T8 (public README and community files,
-> `docs/open-source-readiness.md` §10), which writes the reporting channel, the scope and the
+> **Draft.** This file is owned by the open-source ticket T8 (public README and community files), which writes the reporting channel, the scope and the
 > response target. Until then it holds only the sections the hardening ticket (T5, PS-250) needed
 > written down.
 

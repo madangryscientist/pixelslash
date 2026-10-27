@@ -1,7 +1,7 @@
 # Argos, run locally as a benchmark rival (ob 1476)
 
 Argos (MIT, `github.com/argos-ci/argos`) is the closest rival in
-`docs/research/competitor-pricing.md`. This spike got its screenshot comparison running on our own
+the maintainer's competitor research. This spike got its screenshot comparison running on our own
 hardware, so the benchmark ticket can feed the same pairs to Argos and to PixelSlash and compare
 verdicts. **No Argos code is in this repo.** Argos runs from its own checkout inside a VM, and the
 only Argos-facing code we wrote is the wrapper in `ops/argos-bench/argos-diff.ts`, which imports
@@ -11,8 +11,8 @@ How to rebuild it, start it, stop it and destroy it: `ops/argos-bench/runbook.md
 
 ## What was run, and why only that
 
-**Only Argos's image-comparison step, not the full app.** Jacobus decided this on 2026-10-19,
-after the host check found pve at 15.5 GiB RAM with about 6.6 GiB free, 4 cores and swap already in
+**Only Argos's image-comparison step, not the full app.** The maintainer decided this on 2026-10-19,
+after the host check found the Proxmox host at 15.5 GiB RAM with about 6.6 GiB free, 4 cores and swap already in
 use. The full app needs Postgres, Redis, RabbitMQ, S3 and a GitHub App to accept a build. None of
 that changes the per-screenshot verdict, which is what the benchmark compares, and none of it was
 started.
@@ -27,8 +27,8 @@ database and no queue.
 | runtime | `node:26-bookworm-slim` (Node v26.12.0), pnpm 11.28.2 (their `packageManager` pin), tsx 4.23.15 to run the wrapper |
 | diff engine | `odiff-bin` 4.5.0 (a native binary). `sharp` 0.35.5 for dimensions and padding. `tmp` 0.2.7 for temp paths |
 | installed | the repo root (for vitest) and `@argos/backend` with its workspace deps (`pnpm install --filter . --filter "@argos/backend..."`), then their `tsdown` build of `@argos/util`, `@argos/schemas` and `@argos/knex-scripts`. The frontend is not installed |
-| where | VM 101 `argos-bench` on pve, 192.168.0.45 (DHCP), 2 vCPU / 2048 MB / 20 GB, Debian 13, Docker 26.1.5 |
-| cost | image 1.6 GB. Peak VM memory 1.2 GB during the build, about 0.4 GB idle. One pair takes about 1 s, and a 3-pair run from the desktop took 5 s including ssh |
+| where | VM `argos-bench` on a Proxmox host, address by DHCP, 2 vCPU / 2048 MB / 20 GB, Debian 13, Docker 26.1.5 |
+| cost | image 1.6 GB. Peak VM memory 1.2 GB during the build, about 0.4 GB idle. One pair takes about 1 s, and a 3-pair run from the maintainer's machine took 5 s including ssh |
 
 ## The code path
 
@@ -136,7 +136,7 @@ ops/argos-bench/run-pairs.sh <pairs-dir> <out-dir> [--threshold n]
 
 - **Input:** `<pairs-dir>/<name>/base.png` and `head.png`, one directory per pair. The names
   become the result keys.
-- **Transport:** `tar` over ssh to `debian@192.168.0.45` (key `~/.ssh/id_ed25519_mac`), then
+- **Transport:** `tar` over ssh to `$VM` (your key), then
   `docker run --network none --user debian` with the pair directory mounted. No port is open,
   because the VM serves nothing.
 - **Output:**
@@ -145,8 +145,8 @@ ops/argos-bench/run-pairs.sh <pairs-dir> <out-dir> [--threshold n]
   - `<out-dir>/<name>.diff.png`: the red-on-transparent mask.
 - **Exit codes:** non-zero if ssh or the container fails. Bad input, such as a missing `head.png`,
   fails the whole run, and the container's error goes to stderr.
-- **Preconditions:** VM 101 must be running (`qm start 101`). The address is not reserved, so use
-  `ARGOS_BENCH_HOST=debian@<ip>` if it changed. `provision-vm.sh` re-finds it.
+- **Preconditions:** the VM must be running (`qm start $VMID`). The address is not reserved, so use
+  `ARGOS_BENCH_HOST=<user>@<ip>` if it changed. `provision-vm.sh` re-finds it.
 - **Calibration set:** Argos's own `__fixtures__` cases, with their expected verdicts in
   `index.test.ts`, are inside the image at
   `/argos/apps/backend/src/screenshot-diff/diff/image/__fixtures__/<case>/{base,compare}.png`. The benchmark can run

@@ -1,12 +1,12 @@
 # The Rust upload service — design for approval (PS-217)
 
-Status: **proposed**, waiting on Jacobus. No build ticket is dispatched until he approves this
+Status: **proposed**, waiting on the maintainer. No build ticket is dispatched until he approves this
 and answers the open questions in §9.
 
 Decided before this doc (not reopened here):
 
 - Straight to Rust, no TypeScript streaming stopgap.
-- One Rust codebase: **native** on the self-host (LAN CT 135 now, Docker later), **workers-rs**
+- One Rust codebase: **native** on the self-host (a LAN CT now, Docker later), **workers-rs**
   (WASM) on Cloudflare.
 - On the server everything runs as native Rust, the diff engine included. WASM is the Cloudflare
   build only (and the CLI's `diff.wasm`, which stays). So the diff core must be target-neutral.
@@ -18,7 +18,7 @@ the code on `main` at `b158324` for everything about today's flow.
 
 ## 0. Why: what PS-214 measured
 
-On CT 135 (2 vCPU, 2 GiB; `pixelslash-web` MemoryHigh 1400M, `pixelslash-diff` MemoryMax 600M):
+On the LAN CT (2 vCPU, 2 GiB; `pixelslash-web` MemoryHigh 1400M, `pixelslash-diff` MemoryMax 600M):
 
 | | 50 shots | 200 | 500 |
 | --- | --- | --- | --- |
@@ -301,7 +301,7 @@ the same burst is workerd 330–640 MB growing with N, plus the sidecar's 420 MB
 
 **K = 2**, if the port reaches its estimate. Reasons:
 
-- CT 135 has 2 vCPU. A diff is CPU-bound (0.28 s/shot on one core); K > 2 adds memory and no
+- The CT has 2 vCPU. A diff is CPU-bound (0.28 s/shot on one core); K > 2 adds memory and no
   throughput.
 - 2 × 270 MB + PUT buffers ≈ 555 MB fits **MemoryHigh 600M / MemoryMax 700M** for the Rust unit,
   which is the sidecar's 600M budget plus 100M. The worst case is two 1280x9500 shots at once.
@@ -313,7 +313,7 @@ the same burst is workerd 330–640 MB growing with N, plus the sidecar's 420 MB
 
 Time: 500 shots × 0.28 s / 2 ≈ **70 s of diff, overlapped** with the upload (the 500-shot branch
 PUTs took 66 s in PS-214, stretched by MemoryHigh throttling). The hope is that finalize then
-waits only for the tail, not for 139 s, but that is not a result: K = 2 takes both of CT 135's
+waits only for the tail, not for 139 s, but that is not a result: K = 2 takes both of the CT's
 vCPUs, which workerd also needs during the PUTs, so the overlap may stretch the upload instead.
 T7 measures it. The native diff may well be faster than 0.28 s; that is not assumed either. K is a setting, not a constant; T7
 re-runs the PS-214 harness (`rss-burst.spec.ts`) at 50/200/500 with K = 1, 2 and records the peak
@@ -542,7 +542,7 @@ LAN first, Cloudflare second; each step lands on its own and leaves the system w
 6. **T6** Rust serves the sidecar's synchronous wire at `127.0.0.1:4181/v1/diff`, with the
    native core and K slots; `DIFF_SIDECAR_URL` is unchanged; `compare.ts` loses its in-process
    fallback when a sidecar URL is set.
-   **`pixelslash-diff.service` and `apps/web/deploy/lan/diff-sidecar.ts` are retired here.**
+   **`pixelslash-diff.service` and `apps/web/deploy/ssh/diff-sidecar.ts` are retired here.**
 7. **T7** streaming PUT and finalize on the LAN, behind `PIXELSLASH_UPLOAD_RUST=1` (unset → the
    front door passes the two routes through to the TS path, so a rollback is a restart). The
    contract suite. The PS-214 re-run at K = 1, 2, recorded.
@@ -620,7 +620,7 @@ Each ticket's brief carries its own `## Do not`; common to all: no change to `/a
 no D1 access from Rust, no copyleft crate, and the capability matrix updated by the ticket whose
 landing changes a row (T7 for "streaming upload", T9 for the hosted path).
 
-## 9. Open questions for Jacobus
+## 9. Open questions for the maintainer
 
 Each has a recommendation; the build tickets assume it unless he says otherwise.
 

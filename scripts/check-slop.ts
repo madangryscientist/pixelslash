@@ -29,7 +29,7 @@ for (const path of files) {
     .split("\n")
     .forEach((line, i) => {
       if (TODO_WITHOUT_REF.test(line))
-        hits.push(`${path}:${i + 1}: TODO/FIXME needs a ticket ref, e.g. TODO(ob 123)`);
+        hits.push(`${path}:${i + 1}: TODO/FIXME needs a ticket ref, e.g. TODO(#123)`);
       if (CODE_IN_COMMENT.test(line))
         hits.push(`${path}:${i + 1}: commented-out code; delete it (git keeps it)`);
     });

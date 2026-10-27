@@ -3,7 +3,7 @@ import type { DiffIgnore, DiffOptions, PixelDiff } from "@pixelslash/engine/diff
 
 /**
  * The diff sidecar's wire format (PS-203), shared by the Worker's client (`sidecar.ts`) and the
- * Bun sidecar (`deploy/lan/diff-sidecar.ts`). Pure byte framing, no codec: the PNGs go as they were
+ * Bun sidecar (`deploy/ssh/diff-sidecar.ts`). Pure byte framing, no codec: the PNGs go as they were
  * uploaded and the overlay comes back as PNG bytes, so nothing is base64'd and nothing is decoded
  * twice.
  *

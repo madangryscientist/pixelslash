@@ -6,7 +6,7 @@ Argos is a benchmark rival, never a code source; it runs only through `ops/argos
 
 ```bash
 bun run bench                      # PixelSlash + Argos (from the cache), writes bench/results/<date>.{md,json}
-bun run bench -- --refresh-argos   # ask VM 101 about the pairs the cache lacks, then run as above
+bun run bench -- --refresh-argos   # ask the Argos VM about the pairs the cache lacks, then run as above
 bun run bench -- --calibration     # plus Argos's own 19 calibration cases, streamed from the VM
 bun run bench -- --no-argos        # PixelSlash alone, prints the tables, writes nothing
 bun run bench -- --capture         # plus the capture stage: needs Docker, skipped with a message without it
@@ -25,11 +25,11 @@ bun bench/src/generate.ts --set holdout   # re-render the held-out corpus
 (its diff images). An entry is keyed by the pair's content hash, the Argos commit pinned in
 `ops/argos-bench/Dockerfile` and the threshold, so a re-rendered or new pair is a miss, never a
 stale hit. A miss fails `bun run bench` and names the cases. `--refresh-argos` fills the misses
-and drops entries no case uses any more; that is the only time VM 101 is needed. It refuses to
+and drops entries no case uses any more; that is the only time the VM is needed. It refuses to
 mix versions: if the VM's image is not built from the pinned commit, it stops.
 
-For `--refresh-argos` the VM must be up (`ssh root@192.168.0.20 'qm start 101'`, and
-`qm shutdown 101` afterwards: it holds 2 GB on a tight host; `ops/argos-bench/runbook.md`). The
+For `--refresh-argos` the VM must be up (`ssh root@$SSH_HOST "qm start $VMID"`, and
+`qm shutdown $VMID` afterwards: it holds 2 GB on a tight host; `ops/argos-bench/runbook.md`). The
 address and key come from `ARGOS_BENCH_HOST` and `ARGOS_BENCH_KEY`, the same variables
 `ops/argos-bench/run-pairs.sh` reads. The per-pair Argos time in the cache was measured by the
 wrapper in `ops/argos-bench/argos-diff.ts`, which is baked into the image. `--calibration` adds
@@ -557,7 +557,7 @@ Nothing is added to the committed corpus automatically. To keep a case:
    directory; it needs no entry in `src/cases.ts`, and `generate.ts` never re-renders it.
 4. `bun run bench`, then commit the new `bench/results/<date>.json` with the case (a new case
    moves the counts). The Argos cache has no entry for it, so `bun run bench` stops until
-   `--refresh-argos` asks VM 101; `--no-argos` scores PixelSlash alone and writes nothing.
+   `--refresh-argos` asks the VM; `--no-argos` scores PixelSlash alone and writes nothing.
 
 From then on `bench:check` guards it: a later change that loses it on the case's corpus fails the gate.
 

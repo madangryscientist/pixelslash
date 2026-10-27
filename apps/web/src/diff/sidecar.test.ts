@@ -26,7 +26,7 @@ let sidecar: ReturnType<typeof Bun.spawn> | undefined;
 let url = "";
 
 beforeAll(async () => {
-  const proc = Bun.spawn(["bun", "deploy/lan/diff-sidecar.ts"], {
+  const proc = Bun.spawn(["bun", "deploy/ssh/diff-sidecar.ts"], {
     cwd: join(import.meta.dirname, "..", ".."),
     env: { ...process.env, PIXELSLASH_DIFF_SIDECAR_PORT: "0" },
     stdout: "pipe",

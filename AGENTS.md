@@ -4,44 +4,20 @@ A standalone Bun CLI for visual review: capture Main and Branch (Playwright, or
 existing PNGs), pixel-diff them, write `report.html`, and optionally judge each
 shot against a design system with a local vision model. The destination is a
 Chromatic competitor that is not tied to Storybook. `README.md` is the CLI's
-contract; `docs/visual-compare-map.md` holds the product direction and
-decisions.
+contract.
 
 Extracted from omnibus on 2026-10-19 (ob 1418). History before that commit is
 omnibus's.
 
-This file is the operating agreement for agents working here. The `ob-planner`
-skill reads it in Step 0 to learn this repo's tracker, gate and landing
-convention — keep it accurate or the planner will adapt to a stale repo.
+This file is the operating agreement for contributors and agents working here:
+the gate, the landing rule and the invariants. Keep it accurate. The maintainer
+also keeps a private half (their ticket tracker and deploy host), which is not
+in this tree.
 
-## Tracker: `ob` only
+## Tickets
 
-The repo has a remote — `origin`, `github.com/madangryscientist/pixelslash`,
-**private** — and `gh` is authenticated, so `gh issue` would work. We do not
-use it: one tracker is better than two, and `ob` is where the planning,
-spinoff and landing workflow lives. Do not create GitHub issues unless a human
-asks for them.
-
-- Tickets live in `ob`, project **`pixelslash`**. Create with
-  `ob add "<title>" --project pixelslash --body "<brief>"`.
-- The parent is Visual Compare (ob 649). Refer to tickets **by name**, not bare
-  ids, in anything a human reads.
-- Put the brief in the item's **body**. `ob spinoff brief` reads
-  `wayfinder/tickets/<ref>-*.md` only in omnibus; here there is no such
-  directory, so the brief falls back to the item's title + body. That fallback
-  is the mechanism — use it.
-
-Write each brief with these three headings, because the builder's launch
-prompt is built from them:
-
-```
-## What to build
-## Acceptance
-## Do not
-```
-
-`## Do not` is where you fence scope: files out of bounds, things that must not
-be refactored, "do not add a dependency for this".
+`ob N` and `PS-N` are the maintainer's private ticket ids; new work cites GitHub issues.
+Code comments and docs that carry one are explaining why a line exists; leave them as they are.
 
 ## The gate
 
@@ -156,25 +132,15 @@ bun run pixelslash -- --live-png <main.png> --local-png <branch.png> --out /tmp/
 
 ## Landing: through a pull request
 
-This repo lands through pull requests (Jacobus, 2026-10-27), so the PixelSlash GitHub check
-(PS-23) can be seen working on a real PR. Who opens and who merges is the global rule
-("Pull requests: the builder opens them"); only what is particular to this repo is here.
+Code lands through pull requests: the author runs the gate above on a worktree, rebases on
+`origin/main`, pushes a branch and opens a PR with the commit body as its description, and merges
+it with a squash (`gh pr merge --squash --delete-branch`) once the gate is green on the rebased head.
 
-- The repo is private on GitHub's free plan: no branch protection, no required checks, so
-  nothing on GitHub stops a merge. The planner does. Do not merge a PR whose PixelSlash check
-  is failing or pending (`gh pr checks <pr> --watch`, once PS-234 has installed the App),
+- Do not merge a PR whose PixelSlash check is failing or pending (`gh pr checks <pr> --watch`),
   unless the PR changes nothing a shot can see and says so.
-- When the land changes `apps/web` (or what it imports), deploy main to the LAN self-host
-  (CT 135) from a clean checkout at the merged squash. The build runs here and the CT only
-  installs and switches, so a failed release rolls itself back (`apps/web/README.md`, "Run it
-  on the Proxmox server"):
-
-  ```bash
-  PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
-    apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
-  ```
-
-  There is no `git pull` on the CT any more and no `update.sh` to run there by hand.
+- When the land changes `apps/web` (or what it imports), deploy main from a clean checkout at
+  the merged squash with `apps/web/deploy/ssh/release.sh` (`apps/web/README.md`, "Run it on the
+  Proxmox server"; `apps/web/SELF-HOST.md` for your own Cloudflare account).
 
 Scan several worktrees without opening a diff:
 
@@ -183,53 +149,7 @@ git log --format='%s%n%b' main..<branch>
 ```
 
 Never commit implementation straight to `main`. Never `git commit -am` — stage
-new files explicitly or they are silently dropped. The repo stays private.
-
-## Dispatch
-
-`ob spinoff <ref>` enqueues a launch; the daemon drains it in-session. Dispatch
-is always interactive and `--agent` is a usage error.
-
-`ob config` routes `spinoff_launcher_by_repo` → `pixelslash: t3`, so a spinoff
-opens a **T3 Code thread** in this repo's T3 project (`pixelslash`, workspace
-root `~/dev/pixelslash`), bound to the ob-owned worktree. A fresh spinoff
-worktree has no `node_modules`; `bun install` is the builder's first step.
-
-The planner itself is the pinned T3 thread `planner · pixelslash`, created by
-`ob t3 planner --repo pixelslash` (idempotent: a re-run reads the same thread
-back and creates nothing).
-
-## The ob planner
-
-Everything for driving this repo through `ob` from opencode lives in
-`.opencode/`:
-
-| Path | What it is |
-| --- | --- |
-| `agents/planner.md` | The planning agent. Primary mode, subagents denied. Overrides the global `planner` for this repo only. |
-| `commands/ob-planner.md` | `/ob-planner` — primes a session as the planner. Overrides the global command here. |
-| `SOUL.md` | Injected into every request by `ob-soul`. Keep it short; it costs tokens on every turn. |
-| `plugins/*.ts` | One-line re-exports of ob's four runtime plugins (see below). |
-
-These are the opencode fallback; the planner is the pinned T3 thread. There is
-no launcher script here (thrifty's `planner-tui.sh` was not copied), and the
-`ob-planner` skill sets `disable-model-invocation`, so `/ob-planner` alone cannot
-load it — an opencode planner session needs the skill injected over
-`POST /api/experimental/session/{id}/skill`.
-
-The plugins give a session the `ob agents` heartbeat, always-on memory, SOUL
-injection and the skill-filing nudge. They are re-exported from the omnibus
-checkout by **absolute** path: a relative path breaks from a T3 worktree, and a
-`plugins` entry in `opencode.jsonc` that names files rather than a directory
-loads nothing, silently. After touching any of this, confirm all four load:
-
-```bash
-opencode api get "/api/plugin?location%5Bdirectory%5D=$PWD" \
-  | python3 -c "import json,sys; print([p['id'] for p in json.load(sys.stdin)['data'] if p['id'].startswith('ob-')])"
-```
-
-The skills need no wiring here — the global config registers `omnibus/skills`,
-so `ob-cli`, `ob-spinoff`, `ob-land`, `ob-skeptical-review` and the rest resolve.
+new files explicitly or they are silently dropped.
 
 ## Capability matrix — `docs/capabilities/`
 
@@ -247,13 +167,11 @@ it opens as `file://` without a build step.
   with a ticket number on it.
 
   Each of our cells also has a `commit`: the short sha of the squash on main that made its `v`
-  and `note` true. A commit cannot name its own sha, so the builder leaves `commit` alone and
-  the **planner** fixes it in the land: after the squash, before the push, a second commit
-  `docs(ob N): matrix rows name the <sha> land` sets each changed row's `commit` to the squash's
-  short sha and re-runs `build.py`. Both go out in the same `git push origin main`, so main on
-  the remote never shows a changed row with the old sha. `build.py` stops on a sha `git` cannot
-  resolve. A row whose value and note were already true before the omnibus extraction names `06a2472`
-  and says so in its note.
+  and `note` true. A commit cannot name its own sha, so the change leaves `commit` alone and a
+  follow-up commit after the squash, `docs(...): matrix rows name the <sha> land`, sets each
+  changed row's `commit` to the squash's short sha and re-runs `build.py`. `build.py` stops on a
+  sha `git` cannot resolve. A row whose value and note were already true before the extraction
+  from the maintainer's monorepo names `06a2472` and says so in its note.
   `audited` is the date our column was last read against `ours_commit`; `updated` is the
   competitors' fetch date.
 - **A positioning or pricing decision is about to be made** — refresh the competitor columns

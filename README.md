@@ -946,5 +946,3 @@ bun run pixelslash -- --live-png-dir shots/main --local-png-dir shots/branch --r
 ```
 
 `--ds DIR` is in-repo fixture rasters. `--file FILE_KEY` lists Figma components, writes pngs, then the same compare loop. Token from `FIGMA_TOKEN` or `--token-path` (never git).
-
-The plan lives in [`docs/visual-compare-map.md`](docs/visual-compare-map.md).

@@ -7,7 +7,7 @@
 #     [PIXELSLASH_LAN_SSH_KEY=<identity file>] [PIXELSLASH_SENTRY_DSN=<dsn>] \
 #     [PIXELSLASH_GITHUB_APP_ID=<id>] [PIXELSLASH_GITHUB_APP_KEY=<pem>] \
 #     [PIXELSLASH_PUBLIC_URL=<url>] [PIXELSLASH_DEPLOY_FORCE=1] \
-#     apps/web/deploy/lan/release.sh <sha>
+#     apps/web/deploy/ssh/release.sh <sha>
 #
 # The CT never builds (PS-225): the vite build cannot fit in its 2 GiB beside a running workerd (ob
 # 1887), so it used to stop the server for the build. Here the build runs on this machine, the
@@ -20,7 +20,7 @@
 # it already has in .dev.vars.e2e.
 #
 # The GitHub App (PS-23) travels the same way: PIXELSLASH_GITHUB_APP_ID and PIXELSLASH_GITHUB_APP_KEY
-# (the private key's PEM, e.g. `PIXELSLASH_GITHUB_APP_KEY="$(ob secret get pixelslash-github-app-key)"`)
+# (the private key's PEM, e.g. `PIXELSLASH_GITHUB_APP_KEY="$(cat github-app-key.pem)"`)
 # become GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY, the key base64'd onto one line so it fits one
 # .dev.vars line. PIXELSLASH_PUBLIC_URL is the URL a check run links its build page on. Each one left
 # unset keeps what the CT has. See apps/web/github-app/README.md.
@@ -76,9 +76,9 @@ main() {
 ct=$1 short=$2 force=$3 d=$(mktemp -d)
 trap "rm -rf $d" EXIT
 cat >"$d/$short.tar.gz"
-tar -xzf "$d/$short.tar.gz" -C "$d" ./apps/web/deploy/lan/update.sh
+tar -xzf "$d/$short.tar.gz" -C "$d" ./apps/web/deploy/ssh/update.sh
 pct push "$ct" "$d/$short.tar.gz" "/root/pixelslash-$short.tar.gz"
-pct push "$ct" "$d/apps/web/deploy/lan/update.sh" /root/pixelslash-update.sh --perms 0755
+pct push "$ct" "$d/apps/web/deploy/ssh/update.sh" /root/pixelslash-update.sh --perms 0755
 status=0
 pct exec "$ct" -- env "PIXELSLASH_DEPLOY_FORCE=$force" /root/pixelslash-update.sh "/root/pixelslash-$short.tar.gz" || status=$?
 pct exec "$ct" -- rm -f "/root/pixelslash-$short.tar.gz" /root/pixelslash-update.sh

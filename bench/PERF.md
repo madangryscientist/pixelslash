@@ -6,7 +6,7 @@ commit as the work**, the way `docs/capabilities/data.json` is updated. Raw samp
 gitignored `bench/perf-results/`. This file is the summary we keep.
 
 How the numbers are made: `bun run bench:perf -- --impl <a> --impl <b>`, 10 interleaved rounds after
-a warm-up, median ms, on Jacobus's desktop (busy, not a quiet machine). See `bench/README.md`.
+a warm-up, median ms, on the maintainer's machine (busy, not a quiet machine). See `bench/README.md`.
 Perf runs are on demand only and never in the gate.
 
 > **Compare within a run and an env, not across.** Every run records its `env` (ob 1947): `shared` is
@@ -494,7 +494,7 @@ Self (decode + diff, no process) and wall, median ms:
 
 ### 2026-10-25 · planner · desktop, dedicated · the overlay encode on and off, against cs
 
-Asked for by Jacobus, so it ran on demand, not as part of a ticket. Five implementations of `bench:perf --env dedicated --runs
+Asked for by the maintainer, so it ran on demand, not as part of a ticket. Five implementations of `bench:perf --env dedicated --runs
 10`, interleaved: ts with pngjs and napi-image, each with the overlay encode on (`--overlay pngjs`,
 `--overlay napi-image`) and off (`--overlay none`), and cs (SkiaSharp, parallel, the shipped default).
 cs encodes no overlay, so only the `none` rows are equal work for it. The host was busy (load 5 to 8,
@@ -579,7 +579,7 @@ field and the overlay.
 **Recommendation.** Ship it behind the flag for every size. It is faster on every page, by more on
 the smallest. It is the same answer, and it removes most of pngjs's peak. Before anyone turns it
 on, the overlay encode is the next lever for workerd: on the wasm path it is 62% of the long page.
-Turning the flag on is Jacobus's call, and this ticket does not make it.
+Turning the flag on is the maintainer's call, and this ticket does not make it.
 
 **Not measured.** Cloudflare's own runtime and its CPU limits: the run used local workerd, and
 nothing was deployed. Also not measured: the self-host, which diffs in PS-203's sidecar and does
@@ -730,8 +730,8 @@ under 30 ms of overhead):
 
 The capture-only total is 447 ms above its captures: browser launch and app start, which `captureMs` leaves out.
 
-**Server (hackcove, CT 135), median and p95 ms per step.** Finished builds with `rerun = 0`, the same rows the
-org Timings tab reads. Read-only `SELECT` against the server's D1 SQLite on CT 135 (`python3 -I` with `sqlite3` in `mode=ro`, over ssh and `pct exec`, per `ob hosts pixelslash`); the
+**Server (a hosted project, the LAN CT), median and p95 ms per step.** Finished builds with `rerun = 0`, the same rows the
+org Timings tab reads. Read-only `SELECT` against the server's D1 SQLite on the CT (`python3 -I` with `sqlite3` in `mode=ro`, over ssh and `pct exec`); the
 Timings tab and the build page were not opened, because they need a signed-in session.
 
 | Build | uploaded shots | queue (before diff) | diff | explain | summary | total (claim to finish) | diff share of queue + total |

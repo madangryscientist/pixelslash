@@ -19,3 +19,6 @@ packages/cli/wasm/
 packages/cli/LICENSE
 packages/cli/NOTICE
 packages/cli/*.tgz
+
+# private keys (the GitHub App key, apps/web/github-app/README.md)
+*.pem

@@ -8,7 +8,7 @@
  * shot four at a time, finalise), then a branch build of changed shots that the server diffs in
  * its finalise, finalised again until nothing is left unmeasured. `perf/rss-sampler.py` runs on
  * the CT over ssh and prints the resident memory of workerd, `vite preview` (or, since PS-220,
- * `deploy/lan/serve.ts`) and the diff sidecar.
+ * `deploy/ssh/serve.ts`) and the diff sidecar.
  *
  * `--local 1` (PS-220) runs the sampler on this machine instead, against two `systemd-run --user`
  * units (`--web-unit`, `--diff-unit`; their cgroups sit under `--cg`), and restarts them with

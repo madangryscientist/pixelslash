@@ -224,10 +224,17 @@ unpack_release() {
   as_app "cd $rel && bun install --frozen-lockfile --production"
 }
 
+# The directory holding release $1's units: releases before the rename (PS-247) keep them in
+# `deploy/lan`, and a rollback can land on one.
+deploy_dir() {
+  if [[ -d $1/apps/web/deploy/ssh ]]; then echo "$1/apps/web/deploy/ssh"; else echo "$1/apps/web/deploy/lan"; fi
+}
+
 install_units() {
-  install -m 644 "$1"/apps/web/deploy/lan/pixelslash-stub.service \
-    "$1"/apps/web/deploy/lan/pixelslash-diff.service \
-    "$1"/apps/web/deploy/lan/pixelslash-web.service "$UNIT_DIR"/
+  local d
+  d=$(deploy_dir "$1")
+  install -m 644 "$d"/pixelslash-stub.service "$d"/pixelslash-diff.service \
+    "$d"/pixelslash-web.service "$UNIT_DIR"/
 }
 
 # Points `current` at $1 in one rename, so a unit never sees it missing.
@@ -269,8 +276,10 @@ rollback() {
   # The helper too, when it is installed: it would otherwise run on from the deleted release.
   local units=(pixelslash-diff pixelslash-stub pixelslash-web)
   if [[ -f $UNIT_DIR/pixelslash-opencode.service ]]; then
-    [[ ! -f $prev/apps/web/deploy/lan/pixelslash-opencode.service ]] ||
-      install -m 644 "$prev"/apps/web/deploy/lan/pixelslash-opencode.service "$UNIT_DIR"/
+    local pd
+    pd=$(deploy_dir "$prev")
+    [[ ! -f $pd/pixelslash-opencode.service ]] ||
+      install -m 644 "$pd"/pixelslash-opencode.service "$UNIT_DIR"/
     units+=(pixelslash-opencode)
   fi
   systemctl daemon-reload
@@ -329,7 +338,7 @@ main() {
   trap 'rollback "$prev" "$unpacked"' ERR HUP INT TERM
   install_units "$rel"
   if [[ -n $helper_model ]]; then
-    install -m 644 "$rel"/apps/web/deploy/lan/pixelslash-opencode.service "$UNIT_DIR"/
+    install -m 644 "$rel"/apps/web/deploy/ssh/pixelslash-opencode.service "$UNIT_DIR"/
   elif [[ $had_helper == 1 ]]; then
     systemctl disable --now --quiet pixelslash-opencode || true
     rm -f "$UNIT_DIR"/pixelslash-opencode.service
