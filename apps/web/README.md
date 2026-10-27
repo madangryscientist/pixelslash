@@ -3,6 +3,8 @@
 TanStack Start on Cloudflare Workers, D1 via Drizzle, R2 for the shots, GitHub sign-in. CI uploads
 builds with `pixelslash upload`; people review them here.
 
+To run your own: [`SELF-HOST.md`](SELF-HOST.md), from an empty Cloudflare account (or a box on your LAN) to a first upload.
+
 ## Secrets
 
 A deployment sets these with `wrangler secret put <NAME>` (or in `.dev.vars` locally; the names are
