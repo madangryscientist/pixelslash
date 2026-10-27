@@ -11,12 +11,14 @@ to a review server where a person accepts or rejects them.
 
 You need [Bun](https://bun.sh) (the CLI runs on it, not on Node; `npx` and `bunx` both start it)
 and two screenshots of the same page: Main (the version you ship today) and Branch (your change).
-PixelSlash is early (version 0.1.0), and the package is **not on the npm registry yet**: until it
-is, build the tarball (`bun install && bun run build:cli`, then `npm pack` in `packages/cli`) and
-install it with `npm i -D ./pixelslash-0.1.0.tgz`.
+PixelSlash is early (version 0.1.0). It is published as `@hackcove/pixelslash`, but the package is
+**not on the npm registry yet**: until it is, build the tarball (`bun install && bun run build:cli`,
+then `npm pack` in `packages/cli`) and install the `.tgz` it writes with `npm i -D ./<file>.tgz`.
+Once it is published, `npm i -D @hackcove/pixelslash` installs it. The command is `pixelslash`
+either way.
 
 ```bash
-npx pixelslash --live-png a.png --local-png b.png --out out
+npx @hackcove/pixelslash --live-png a.png --local-png b.png --out out
 ```
 
 Open `out/report.html`. A run with changes prints how many pixels changed and where the report is:
@@ -35,8 +37,8 @@ To shoot two URLs that are already up, install the browser once, then name them.
 server.
 
 ```bash
-npx pixelslash install-browser   # once per machine: Playwright's chromium-headless-shell
-npx pixelslash --live https://example.com --local http://localhost:3000 --out out
+npx @hackcove/pixelslash install-browser   # once per machine: Playwright's chromium-headless-shell
+npx @hackcove/pixelslash --live https://example.com --local http://localhost:3000 --out out
 ```
 
 Each capture waits for the page to settle (fonts, images, network idle, two animation frames) and
