@@ -473,8 +473,8 @@
       "label": "Accept / reject in a web UI",
       "ps": {
         "v": "y",
-        "note": "project / build / snapshot pages and a branch page (the branch against main, plus what changed since its last build, ob 1723); accept or reject records who and when; a mis-detection can be flagged and kept (ob 1721); Playwright e2e",
-        "commit": "32b352e"
+        "note": "project / build / snapshot pages and a branch page (the branch against main, plus what changed since its last build, ob 1723); accept or reject records who and when, and moves the reviewer to the next shot awaiting a decision — a reject goes to the build page, because a rejection fails the build (PS-229); a mis-detection can be flagged and kept (ob 1721); Playwright e2e",
+        "commit": "717a6f8"
       },
       "t": {
         "argos": "y",
@@ -491,8 +491,8 @@
       "label": "Keyboard review",
       "ps": {
         "v": "y",
-        "note": "j/k walk the build, a accept, r reject; e2e walks one",
-        "commit": "b80fe09"
+        "note": "j/k walk the build, a accept, r reject; a decision advances to the next undecided shot, and only j/k and Prev/Next walk decided ones (PS-229); e2e walks one",
+        "commit": "717a6f8"
       },
       "t": {
         "argos": "y",
