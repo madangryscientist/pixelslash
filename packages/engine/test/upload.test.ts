@@ -150,7 +150,7 @@ describe("uploadSnapshots", () => {
     const server = fakeServer();
     const result = await uploadSnapshots(
       { dir, server: "https://ps.example/", token: "psci_t", git: gitOpts(cwd) },
-      { fetch: server.fetch },
+      { fetch: server.fetch, env: {} },
     );
 
     expect(result).toMatchObject({ buildId: "b1", snapshots: 2 });
