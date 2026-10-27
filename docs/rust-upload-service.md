@@ -123,7 +123,7 @@ reads the same fixture in `cargo test` and must match every field.
 So Rust owns exactly the two endpoints that carry pixels or wait on pixels. Opening the build and
 picking baselines stay in TypeScript, where the DB is.
 
-`ENDPOINTS` in `apps/web/src/api/handler.ts` keeps all of them, and the README's API table too:
+`ENDPOINTS` in `apps/web/src/api/handler.ts` keeps all of them, and the API table in `docs/cli.md` too:
 it is the contract, not the routing table. The test that compares the two still holds. If an
 owner column helps a reader, it is additive (an `owner: "upload"` field); not required.
 

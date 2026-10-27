@@ -182,9 +182,7 @@ test("a second variant of the same shot is refused, not silently replaced", asyn
   await snapshot(page, "home", { variant: "signed-in", dir });
 });
 
-test("with the README's pinned clock the video stops and the settle still ends", async ({
-  page,
-}) => {
+test("with a pinned clock the video stops and the settle still ends", async ({ page }) => {
   const time = new Date("2026-01-01T00:00:00Z");
   await page.addInitScript(keepNativeRaf);
   await page.clock.install({ time });

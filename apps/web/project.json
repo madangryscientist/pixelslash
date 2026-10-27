@@ -18,7 +18,7 @@
         "default",
         "^default",
         "{workspaceRoot}/fixtures/**/*",
-        "{workspaceRoot}/README.md"
+        "{workspaceRoot}/docs/cli.md"
       ]
     },
     "build": {

@@ -29,7 +29,7 @@ export const DEFAULT_TO = join(BENCH_DIR, "imported");
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 export type Api = { server: string; token: string; fetch: FetchLike };
 
-/** The fields of an API v1 detection flag this script reads (README, "A detection flag"). */
+/** The fields of an API v1 detection flag this script reads (`docs/cli.md`, "A detection flag"). */
 export type Flag = {
   id: string;
   kind: "missed" | "false_positive";

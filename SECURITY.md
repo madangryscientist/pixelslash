@@ -1,8 +1,55 @@
 # Security
 
-> **Draft.** This file is owned by the open-source ticket T8 (public README and community files), which writes the reporting channel, the scope and the
-> response target. Until then it holds only the sections the hardening ticket (T5, PS-250) needed
-> written down.
+## Reporting a vulnerability
+
+Report it privately, not in a public issue: use GitHub's private vulnerability reporting, **Security
+> Report a vulnerability** on [the repository](https://github.com/madangryscientist/pixelslash/security/advisories/new).
+Only the maintainers can read the report. Say what you found, the version or commit, and the steps
+to reproduce it; a proof of concept helps.
+
+This is a one-maintainer project, so these are targets, not guarantees: an acknowledgement within
+5 working days, and a fix or a plan within 30 days for anything that is in scope. We will credit
+you in the advisory unless you ask us not to. Please give us that time before you disclose, and do
+not test against someone else's deployment or data.
+
+## What is in scope
+
+- **The CLI** (`packages/cli`, the `pixelslash` npm package) and **the engine** it runs
+  (`packages/engine`): for example, a screenshot or a token leaving the machine without
+  `--upload`, a token written to a file or a log, or a crafted PNG or config that runs code.
+- **The review app** (`apps/web`) and **the upload API** (`/api/v1`): authentication and
+  authorisation (reaching another org's builds, shots or tokens), token handling, the signed image
+  URLs, request forgery, injection, and anything that lets one member spend another's resources.
+- **The capture image** (`docker/capture`) as we build it.
+
+Out of scope: a deployment you configured weakly (read "What anyone who can reach it can do" in
+[`apps/web/SELF-HOST.md`](apps/web/SELF-HOST.md)), a vulnerability in a dependency that does not
+affect PixelSlash (report it upstream), findings that need a stolen token or a machine you already
+control, rate-limit tuning, and the e2e GitHub stand-in, which is for tests and refused in a
+production build.
+
+## The threat model, short
+
+The code is public, so assume an attacker has read it. Nothing here depends on the code being
+secret: every secret is read from the environment, never from the tree.
+
+- **Shots stay local unless you upload.** Without `--upload` no page shot leaves the machine. With
+  it, shots go only to the server the project names. The one other place pixels can go is a
+  project's own AI model, opt-in per project: the server sends that endpoint the three crops of a
+  changed region, never a whole shot. We accept reports against either rule.
+- **Sign-in** is GitHub OAuth. Any GitHub account can sign in; what a user can see is decided by
+  org membership, which is by invite. The session is the `HttpOnly` `pss_` cookie.
+- **Tokens** (the prefixes below) are stored only as SHA-256 hashes, can be revoked, and are
+  prefixed so GitHub's secret scanning and the Sentry scrubber can spot them.
+- **Model keys** are sealed with AES-GCM under `MODEL_KEY_SECRET` before they are stored. **Image
+  URLs** are signed with `IMAGE_SIGNING_SECRET` and short-lived.
+- **The model endpoint is attacker-controlled input.** A project owner names the base URL the
+  server calls, so the server refuses private and local targets (below).
+- **The GitHub App** only writes check runs: its manifest subscribes to no webhooks, and each
+  deployment registers its own App.
+- **Errors, never shots, go to Sentry**, and only when a DSN is set. Every report passes
+  `scrubEvent` (`packages/engine/src/sentry-scrub.ts`), which drops request bodies, cookies, query
+  strings, auth headers, tokens and image data.
 
 ## Token prefixes
 

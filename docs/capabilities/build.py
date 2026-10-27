@@ -168,7 +168,7 @@ changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
 </ul>
 
 <div class="foot">
-  Our column: README.md, packages/engine/src, packages/cli/src, apps/web/src at <b>{DATA["ours_commit"]}</b>,
+  Our column: README.md, docs/cli.md, packages/engine/src, packages/cli/src, apps/web/src at <b>{DATA["ours_commit"]}</b>,
   audited {DATA["audited"]}; each of our cells names the land that made it true.<br>
   Theirs: the public docs of each tool, fetched {DATA["updated"]}; every cell that is not a yes links the page it was read from, and its note says what that page says. Starting points: {" · ".join(f'<a href="{t["src"]}">{t["name"]}</a>' for t in TOOLS if t["key"] != "ps")}.<br>
   A "partial" is a documented subset, not a guess: read the note on the cell. Regenerate with
