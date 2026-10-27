@@ -12,10 +12,10 @@
     "playwright": "1.60.0"
   },
   "devDependencies": {
-    "@pixelslash/cli": "workspace:*",
     "@playwright/test": "1.60.0",
     "@types/bun": "1.4.3",
     "@types/pngjs": "^6.0.5",
+    "pixelslash": "workspace:*",
     "pngjs": "^7.0.0"
   }
 }

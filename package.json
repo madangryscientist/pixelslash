@@ -22,6 +22,7 @@
     "bench:perf:check": "bun bench/src/perf/run.ts --check",
     "bench:decoders": "bun bench/src/perf/decoders.ts",
     "bench:import-flags": "bun bench/src/import-flags.ts",
+    "build:cli": "bun scripts/build-cli.ts",
     "wasm:build": "bun scripts/build-wasm.ts",
     "wasm:check": "bun scripts/build-wasm.ts --check"
   },
