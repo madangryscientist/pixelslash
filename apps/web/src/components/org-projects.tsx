@@ -35,7 +35,7 @@ function BuildCell({ project }: { project: ProjectOverview }) {
       <Stack gap="xs">
         <Body tone="muted">no builds</Body>
         <TextLink
-          size="xs"
+          size="sm"
           render={(props) => (
             <Link
               to="/projects/$projectId/settings"

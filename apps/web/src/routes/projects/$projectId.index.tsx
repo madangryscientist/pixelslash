@@ -127,7 +127,7 @@ function BuildRow({
             {build.prNumber !== null && <Caption>PR #{build.prNumber}</Caption>}
             {build.branch !== defaultBranch && (
               <TextLink
-                size="xs"
+                size="sm"
                 tone="muted"
                 data-testid="branch-link"
                 render={(props) => (
