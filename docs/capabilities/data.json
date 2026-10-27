@@ -275,8 +275,8 @@
       "label": "Skip an area in the diff, keep it visible",
       "ps": {
         "v": "y",
-        "note": "dropped before clustering, hatched, counted; drawn per test or variant in the review UI, audited, exportable as config (ob 1499)",
-        "commit": "fdbdbb4"
+        "note": "dropped before clustering, hatched, counted; drawn per test or variant in the review UI, audited, exportable as config (ob 1499); capture warns once per shot with each <video>/<audio> element's box that no ignore area covers, so the rect to add is named where it happens (PS-230)",
+        "commit": "23af4e9"
       },
       "t": {
         "argos": "n",
@@ -671,8 +671,8 @@
       "label": "Flake detection",
       "ps": {
         "v": "y",
-        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724); `pixelslash flake ID` reproduces one locally N times, names each difference's cause, suggests the config fix (`--write` adds it after a prompt) and resolves it only when stable (ob 1725)",
-        "commit": "1859027"
+        "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree (ob 1737); the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1 (ob 1724); `pixelslash flake ID` reproduces one locally N times, names each difference's cause, suggests the config fix (`--write` adds it after a prompt) and resolves it only when stable (ob 1725); a flaky shot that holds media is offered that element's ignore rect first (PS-230)",
+        "commit": "23af4e9"
       },
       "t": {
         "argos": "y",
