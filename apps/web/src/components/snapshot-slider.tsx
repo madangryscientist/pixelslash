@@ -4,7 +4,7 @@ import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
 import { useHydrated } from "#/components/ui";
 import type { DiffResult } from "#/db/schema";
 
-function Stack({
+function ShotLayers({
   name,
   mainUrl,
   branchUrl,
@@ -135,7 +135,7 @@ export function SnapshotSlider({
   return (
     <div>
       <Viewport width={frameW || null} scale={scale} crop={crop}>
-        <Stack
+        <ShotLayers
           name={name}
           mainUrl={mainUrl}
           branchUrl={branchUrl}
