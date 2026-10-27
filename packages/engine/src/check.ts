@@ -248,7 +248,7 @@ export async function checkAgainstServer(
   };
   await rm(dirs.main, { recursive: true, force: true });
   await rm(dirs.report, { recursive: true, force: true });
-  const { manifest, shots: captured } = await captureInto(shooting, dirs.branch);
+  const { manifest, shots: captured, media } = await captureInto(shooting, dirs.branch);
   const client = clientOf(opts, deps);
   const { picks, removed } = await preview(client, ctx, opts.projectId, manifest.snapshots);
   await writeBaselines(client, dirs, manifest.snapshots, picks);
@@ -281,7 +281,7 @@ export async function checkAgainstServer(
       result.timings,
     ),
   );
-  const shots = shotsOf(result, manifest.snapshots, dirs);
+  const shots = shotsOf(result, manifest.snapshots, dirs, media);
   return {
     ...result,
     git: ctx,

@@ -107,6 +107,51 @@ describe("pixelslash capture", () => {
   });
 });
 
+describe("pixelslash capture, media (PS-230)", () => {
+  test("warns on stderr and carries the rect in --json, per shot; a page without media has none", async () => {
+    const pages: Record<string, string> = {
+      "/video": `<video style="position:absolute;left:580px;top:36px;width:112px;height:118px"></video>`,
+      "/plain": "<p>no media</p>",
+    };
+    const server = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: (req) =>
+        new Response(pages[new URL(req.url).pathname] ?? "", {
+          headers: { "content-type": "text/html" },
+        }),
+    });
+    try {
+      const dir = await tmp();
+      const config = join(dir, "pixelslash.config.json");
+      await Bun.write(
+        config,
+        JSON.stringify({
+          baseUrl: `http://127.0.0.1:${server.port}`,
+          routes: [
+            { path: "/video", name: "clip" },
+            { path: "/plain", name: "plain" },
+          ],
+          variants: [{ name: "small", viewport: { width: 800, height: 300 } }],
+        }),
+      );
+      const json = capture();
+      const argv = ["capture", "--config", config, "--out", join(dir, "out"), "--json"];
+      expect(await run(argv, json.io, pinned)).toBe(0);
+      expect(json.stderr.split("\n").filter((l) => l.startsWith("warning:"))).toEqual([
+        "warning: <video> at 580,36 112x118 on clip (small) — media renders unreliably; add an exclusion zone (route.ignore) for this shot",
+      ]);
+      const shots: { name: string; media: unknown }[] = JSON.parse(json.stdout).shots;
+      expect(shots.map((s) => [s.name, s.media])).toEqual([
+        ["clip", [{ tag: "video", x: 580, y: 36, width: 112, height: 118 }]],
+        ["plain", []],
+      ]);
+    } finally {
+      await server.stop(true);
+    }
+  }, 60_000);
+});
+
 describe("pixelslash capture, composition-only (ob 1850)", () => {
   test("prints the gap list's counts and link, puts the findings in --json, and still exits 0", async () => {
     const project = await libraryProject();

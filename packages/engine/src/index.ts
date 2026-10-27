@@ -70,6 +70,7 @@ export {
   recapture,
   toImageRects,
   type CaptureSession,
+  type MediaBox,
   type Shoot,
   type SnapshotDeps,
   type SnapshotEntry,
@@ -107,6 +108,7 @@ export type { FlakeRecord } from "./flake.ts";
 export {
   CAUSE_WORDS,
   measureRepro,
+  mediaOfShots,
   renderReproReport,
   suggestFixes,
   type ConfigEdit,

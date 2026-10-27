@@ -33,7 +33,7 @@ function session(ms: (name: string) => number, fail?: string) {
       await Bun.sleep(ms(name));
       seen.running--;
       if (name === fail) throw new CaptureError(`capture settle exceeded on ${name}`);
-      return { png: png(), ignore: [] };
+      return { png: png(), ignore: [], media: [] };
     },
     close: async () => {},
   };

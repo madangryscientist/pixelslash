@@ -69,7 +69,7 @@ async function upload(opts: { where?: "ci" | "server"; retries?: number; flaky?:
     busy--;
     const bytes = e.name === "flicker" ? flickers.shift() : png(4);
     if (!bytes) throw new Error("re-captured too often");
-    return { png: bytes, ignore: [] };
+    return { png: bytes, ignore: [], media: [] };
   };
   const fake = server(opts.where ?? "server");
   const result = await uploadSnapshots(

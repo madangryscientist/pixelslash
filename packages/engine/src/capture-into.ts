@@ -66,7 +66,7 @@ export async function captureInto(
   const taken = await mapLimit(pairs, concurrency, async ({ route, variant }) => {
     const file = `${route.name}/${variant.name}.png`;
     const started = performance.now();
-    const { png, ignore, composition, steps } = await session.shoot(route, variant);
+    const { png, ignore, media, composition, steps } = await session.shoot(route, variant);
     const captureMs = elapsed(started);
     await mkdir(join(out, route.name), { recursive: true });
     await Bun.write(join(out, file), png);
@@ -83,14 +83,17 @@ export async function captureInto(
       ...(composition && { composition }),
     };
     const shot: ShotTiming = { name: identity(entry), captureMs, ...steps };
-    return { entry, shot };
+    return { entry, shot, media };
   });
   const snapshots = taken.map((t) => t.entry);
   const shots = taken.map((t) => t.shot);
+  const media = Object.fromEntries(
+    taken.filter((t) => t.media.length > 0).map((t) => [t.shot.name, t.media]),
+  );
   const manifest: SnapshotManifest = { version: 1, snapshots };
   const manifestPath = join(out, "manifest.json");
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  if (!config.composition) return { manifest, manifestPath, shots };
+  if (!config.composition) return { manifest, manifestPath, shots, media };
   const gapsPath = await writeGapsReport(out, manifest, config.composition.name);
-  return { manifest, manifestPath, shots, gapsPath };
+  return { manifest, manifestPath, shots, media, gapsPath };
 }

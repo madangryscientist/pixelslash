@@ -4,6 +4,7 @@ import type { CompareRow } from "./compare-report.ts";
 import { type SnapshotCompareResult, shotKeyLabel } from "./compare-snapshots.ts";
 import { identity } from "./manifest.ts";
 import type { Region } from "./regions.ts";
+import type { MediaBox } from "./page-areas.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 
 /** `pixelslash check`'s rows (ob 1732): what the server would remove, and `--json`'s shot list. */
@@ -16,6 +17,8 @@ export type CheckShot = {
   regions: Region[];
   mismatch: string[];
   flaky: { runs: number; differed: number } | undefined;
+  /** The `<video>` / `<audio>` on the shot that no ignore area covers, in CSS px: add an exclusion zone for each. */
+  media: MediaBox[];
   files: { branch?: string; main?: string; diff?: string; report?: string };
 };
 
@@ -53,6 +56,7 @@ export function shotsOf(
   result: SnapshotCompareResult,
   entries: SnapshotEntry[],
   dirs: { branch: string; main: string; report: string },
+  media: Record<string, MediaBox[]> = {},
 ): CheckShot[] {
   const byKey = new Map(entries.map((e) => [identity(e), e]));
   const lists = [
@@ -74,6 +78,7 @@ export function shotsOf(
         regions: row.regions,
         mismatch: row.mismatch,
         flaky: row.flaky,
+        media: media[row.key] ?? [],
         files: {
           ...(e && { branch: join(dirs.branch, e.file) }),
           ...(e && measured && { main: join(dirs.main, e.file) }),

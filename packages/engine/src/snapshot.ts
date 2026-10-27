@@ -27,7 +27,15 @@ import {
   type Fingerprint,
   type ListFonts,
 } from "./fingerprint.ts";
-import { maskLocators, measureIgnore, toImageRects } from "./page-areas.ts";
+import {
+  maskLocators,
+  measureIgnore,
+  measureMedia,
+  toImageRects,
+  unexcluded,
+  type MediaBox,
+} from "./page-areas.ts";
+import { mediaWarner } from "./media.ts";
 import { joinOrigin } from "./routes.ts";
 import { captureInto } from "./capture-into.ts";
 import { signIn, type Session } from "./setup.ts";
@@ -89,9 +97,12 @@ export type SnapshotResult = {
   shots: ShotTiming[];
   /** `gaps.html` beside the manifest, for a composition-only project. */
   gapsPath?: string;
+  /** The media no ignore area covers, by shot (`identity`), for the shots that have any (PS-230). Not in the manifest. */
+  media: Record<string, MediaBox[]>;
 };
 
 export { toImageRects };
+export type { MediaBox };
 export { captureInto } from "./capture-into.ts";
 
 /** Launch flags that take host-specific rendering choices out of the picture. */
@@ -177,6 +188,12 @@ export type Shoot = {
   loadMs?: number;
   /** Navigate, settle and screenshot apart (PS-195). */
   steps?: CaptureSteps;
+  /**
+   * The `<video>` and `<audio>` on the page that no ignore area covers, in CSS px: media renders
+   * unreliably, so each is a region to exclude (PS-230). Measured after the settle; nothing is done
+   * to the media, and the PNG and the diff are as they were.
+   */
+  media: MediaBox[];
   composition?: Composition;
 };
 
@@ -227,6 +244,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
     // The PNG's size from its IHDR chunk, without decoding the image.
     const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
     const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
+    const media = unexcluded(await measureMedia(page), ignore, stabilise.deviceScaleFactor, size);
     const composition =
       shot.library &&
       (await measureComposition(page, shot.library, {
@@ -241,6 +259,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
         stabilise.deviceScaleFactor,
       ),
       ignore,
+      media,
       loadMs: opened.navigateMs + opened.settleMs,
       steps,
       ...(composition && { composition }),
@@ -276,6 +295,7 @@ export async function openCaptureSession(
   deps: SnapshotDeps = {},
 ): Promise<CaptureSession> {
   const warn = deps.warn ?? (() => {});
+  const warnMedia = mediaWarner(warn);
   const image = imageId(deps.env ?? process.env);
   if (image === BARE)
     warn(
@@ -313,8 +333,8 @@ export async function openCaptureSession(
       routes,
       fingerprint,
       browserLaunchMs,
-      shoot: (route, variant) =>
-        shoot(launched, {
+      shoot: async (route, variant) => {
+        const taken = await shoot(launched, {
           url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
           route,
           variant,
@@ -323,7 +343,10 @@ export async function openCaptureSession(
           session,
           library,
           warn,
-        }),
+        });
+        warnMedia(route, variant, taken.media);
+        return taken;
+      },
       close,
     };
   } catch (e) {

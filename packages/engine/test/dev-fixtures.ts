@@ -51,7 +51,7 @@ export function fakeSession(settleMs = 40) {
     shoot: async () => {
       page.shots++;
       await Bun.sleep(settleMs);
-      return { png: png(page.at), ignore: [], loadMs: settleMs };
+      return { png: png(page.at), ignore: [], media: [], loadMs: settleMs };
     },
     close: async () => {},
   };

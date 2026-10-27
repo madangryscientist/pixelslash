@@ -2,6 +2,7 @@ import { type DiffOptions, type IgnoreRect, diffPngs } from "./diff.ts";
 import type { CaptureConfig, Route, Variant } from "./config.ts";
 import type { Region, RegionKind } from "./regions.ts";
 import { esc } from "./report.ts";
+import { contains, mediaKey, type MediaBox } from "./page-areas.ts";
 import type { Shoot } from "./snapshot.ts";
 
 /**
@@ -115,6 +116,33 @@ function cssRect(r: IgnoreRect, scale: number): IgnoreRect {
   };
 }
 
+/** The media of every capture, each box once: a video seen in all five runs is one suggestion. */
+export function mediaOfShots(shots: Shoot[]): MediaBox[] {
+  const seen = new Map<string, MediaBox>();
+  for (const m of shots.flatMap((s) => s.media)) seen.set(mediaKey(m), m);
+  return [...seen.values()];
+}
+
+/**
+ * The ignore rect for each medium, first of the fixes: media renders unreliably (a spinner arc, a
+ * late poster), so a flaky shot that holds one is most likely flaky there. The rect is the
+ * element's own box, filled in. Nothing is frozen or masked by this; it is the edit to make.
+ */
+function mediaFixes(media: MediaBox[], route: Route, variant: Variant): Suggestion[] {
+  const story = route.storybook !== undefined;
+  return media.map((m) => {
+    const rect = { x: m.x, y: m.y, width: m.width, height: m.height };
+    const where = `<${m.tag}> ${m.width}x${m.height} at ${m.x},${m.y} (CSS px)`;
+    const why = `The shot holds a ${where}, and media renders unreliably. Exclude it`;
+    return story
+      ? { text: `${why}: put \`data-pixelslash-ignore\` on the element in the story.` }
+      : {
+          text: `${why}: ignore that rect for the ${variant.name} variant of ${route.name}.`,
+          edit: { kind: "ignore", route: route.name, variant: variant.name, rect },
+        };
+  });
+}
+
 /** The stabilisation the config turned off, each as an edit that turns it back on. */
 function stabilisation(config: CaptureConfig): Suggestion[] {
   const s = config.stabilise;
@@ -149,12 +177,12 @@ function stabilisation(config: CaptureConfig): Suggestion[] {
 export function suggestFixes(
   repro: Repro,
   config: CaptureConfig,
-  route: Route,
-  variant: Variant,
+  at: { route: Route; variant: Variant; media?: MediaBox[] },
 ): Suggestion[] {
+  const { route, variant, media = [] } = at;
   if (repro.stable) return [];
   const story = route.storybook !== undefined;
-  const out: Suggestion[] = [];
+  const out: Suggestion[] = mediaFixes(media, route, variant);
   const differing = repro.runs.filter((r) => r.differed);
   if (differing.some((r) => r.causes.includes("size"))) {
     const heights = [...new Set(repro.runs.map((r) => `${r.width}x${r.height}`))].join(", ");
@@ -163,8 +191,9 @@ export function suggestFixes(
     });
   }
   out.push(...stabilisation(config));
-  if (repro.area) {
-    const rect = cssRect(repro.area, config.stabilise.deviceScaleFactor);
+  // The differing area is the media's own when a suggestion above already excludes it.
+  const rect = repro.area && cssRect(repro.area, config.stabilise.deviceScaleFactor);
+  if (rect && !media.some((m) => contains(m, rect))) {
     const where = `${rect.width}x${rect.height} at ${rect.x},${rect.y} (CSS px)`;
     const why = `The runs differ in one area, ${where}. If that is live content (a random or rotating element, an ad, a map), ignore it there`;
     out.push(

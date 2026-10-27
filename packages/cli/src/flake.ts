@@ -2,6 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   type CaptureConfig,
+  type MediaBox,
   type Repro,
   type Route,
   type Shoot,
@@ -11,6 +12,7 @@ import {
   findConfig,
   loadConfig,
   measureRepro,
+  mediaOfShots,
   openCaptureSession,
   renderReproReport,
   resolveDiff,
@@ -211,6 +213,8 @@ export type FlakeRun = {
   config: CaptureConfig;
   repro: Repro;
   fixes: Suggestion[];
+  /** The media on the shot, in any run, that no ignore area covers (PS-230). */
+  media: MediaBox[];
   out: string;
   report: string;
   files: Record<number, string>;
@@ -240,10 +244,11 @@ export async function reproduceFlake(
     watch,
   });
   const repro = measureRepro(shots, resolveDiff(config, route, variant));
-  const fixes = suggestFixes(repro, config, route, variant);
+  const media = mediaOfShots(shots);
+  const fixes = suggestFixes(repro, config, { route, variant, media });
   const out = resolve(cwd, flags.out ?? "pixelslash-flake");
   const written = await writeRuns(out, { title: key(flake), repro, shots, fixes });
-  return { id, flake, remote, configPath, config, repro, fixes, out, ...written };
+  return { id, flake, remote, configPath, config, repro, fixes, media, out, ...written };
 }
 
 /** Resolve the flake on the server when the run was stable; false, and nothing sent, when not. */
@@ -269,6 +274,7 @@ export function flakeJson(r: FlakeRun, resolved: boolean | null) {
     stable: repro.stable,
     differed: repro.differed,
     area: repro.area ?? null,
+    media: r.media,
     runs: repro.runs.map(({ overlay: _overlay, ...run }) => ({
       ...run,
       file: join(r.out, r.files[run.run] ?? ""),

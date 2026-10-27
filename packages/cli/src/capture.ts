@@ -5,6 +5,7 @@ import {
   buildTimings,
   captureInto,
   findConfig,
+  identity,
   loadConfig,
   onlyRoutes,
   openCaptureSession,
@@ -60,7 +61,7 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
 /** `--json` and `capture_local`: every shot taken, with its PNG's absolute path. */
 export function captureJson(
   out: string,
-  { manifest, manifestPath, timings, gapsPath }: TimedSnapshotResult,
+  { manifest, manifestPath, timings, gapsPath, media }: TimedSnapshotResult,
 ) {
   return {
     measured: "local",
@@ -75,6 +76,7 @@ export function captureJson(
       viewport: `${e.variant.viewport.width}x${e.variant.viewport.height}`,
       theme: e.variant.theme,
       file: join(out, e.file),
+      media: media[identity(e)] ?? [],
       ...(e.composition && { composition: e.composition }),
     })),
   };

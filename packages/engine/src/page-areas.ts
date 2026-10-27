@@ -57,6 +57,88 @@ export async function measureIgnore(
   return boxes;
 }
 
+/** A `<video>` or `<audio>` on the page and its box, in whole CSS px from the top of the document. */
+export type MediaBox = {
+  tag: "video" | "audio";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type MeasuredMedia = Measured & { tagName: string };
+
+/** Each media element's box in CSS px from the top of the document, unrounded. Runs in the page. */
+function mediaOf(elements: MeasuredMedia[]): (Omit<MediaBox, "tag"> & { tag: string })[] {
+  return elements.map((el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      tag: el.tagName.toLowerCase(),
+      x: r.left + window.scrollX,
+      y: r.top + window.scrollY,
+      width: r.width,
+      height: r.height,
+    };
+  });
+}
+
+/** One key per medium: the same box of the same kind is the same medium. */
+export const mediaKey = (m: MediaBox): string => `${m.tag}\0${m.x},${m.y},${m.width},${m.height}`;
+
+/** Whether `inner` lies wholly inside `outer` (the same unit for both). */
+export function contains(outer: Box, inner: Box): boolean {
+  return (
+    outer.x <= inner.x &&
+    outer.y <= inner.y &&
+    outer.x + outer.width >= inner.x + inner.width &&
+    outer.y + outer.height >= inner.y + inner.height
+  );
+}
+
+type Box = { x: number; y: number; width: number; height: number };
+
+/**
+ * Every `<video>` and `<audio>` on the live page that takes up room, boxes unrounded. Nothing is
+ * touched: media renders unreliably (a spinner arc, a poster that arrives late), and the answer is to
+ * exclude it, not to pause it.
+ */
+export async function measureMedia(page: Page): Promise<(Box & { tag: MediaBox["tag"] })[]> {
+  const found = await page.locator("video, audio").evaluateAll(mediaOf);
+  return found.flatMap((m) =>
+    m.width > 0 && m.height > 0 ? [{ ...m, tag: m.tag === "audio" ? "audio" : "video" }] : [],
+  );
+}
+
+/**
+ * The media that is not already excluded: those no single ignore rect (image px) covers, as
+ * whole-CSS-px boxes grown outward, so one can be pasted into an `ignore` rectangle as it is. The
+ * test is on the unrounded box, in image px, the way an ignore area is resolved: a video that is
+ * itself the `data-pixelslash-ignore` element is covered at any `deviceScaleFactor`. One only partly
+ * inside is kept, with its whole box. Media that falls outside the image is dropped as well.
+ */
+export function unexcluded(
+  media: Awaited<ReturnType<typeof measureMedia>>,
+  ignore: IgnoreRect[],
+  scale: number,
+  image: { width: number; height: number },
+): MediaBox[] {
+  return media.flatMap((m) => {
+    const [box] = toImageRects([m], scale, image);
+    if (!box || ignore.some((r) => contains(r, box))) return [];
+    const x = Math.floor(m.x);
+    const y = Math.floor(m.y);
+    return [
+      {
+        tag: m.tag,
+        x,
+        y,
+        width: Math.ceil(m.x + m.width) - x,
+        height: Math.ceil(m.y + m.height) - y,
+      },
+    ];
+  });
+}
+
 /** A locator per mask selector, for `page.screenshot`; a selector that matches nothing is passed to `unmatched`. */
 export async function maskLocators(
   page: Page,
