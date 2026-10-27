@@ -24,6 +24,8 @@ const settings = {
   apiKey: "sk-one",
   autoPassNoise: false,
   modelKeySecret: SECRET as string | undefined,
+  // Every name resolves to a public address (TEST-NET-3): no lookup leaves the test.
+  modelHosts: { allowPrivate: false, resolve: async () => ["203.0.113.10"] },
 };
 
 /** The org's model (ob 1789): shared by its projects, overridden by a project's own. */

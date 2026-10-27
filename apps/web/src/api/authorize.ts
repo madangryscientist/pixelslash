@@ -2,7 +2,8 @@ import type { Actor } from "#/db/actor";
 import type { Db } from "#/db/db";
 import { verifyCiToken, verifyOrgToken, verifyUserToken } from "#/db/tokens";
 
-function bearer(request: Request): string | null {
+/** The request's `Authorization: Bearer` token, or null. */
+export function bearer(request: Request): string | null {
   const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") ?? "");
   return match?.[1] ?? null;
 }

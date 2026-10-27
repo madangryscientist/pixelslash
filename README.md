@@ -728,8 +728,11 @@ There are no write endpoints besides the four upload ones, creating a project by
 | 404 | `not_found` | an unknown path, or an id the token cannot reach |
 | 405 | `method_not_allowed` | a path that exists, with another method |
 | 426 | `cli_outdated` | the CLI is older than the server takes (below) |
+| 429 | `rate_limited` | too many requests from one token (or, for a refused token, one IP); wait and retry (below) |
 
 The upload endpoints also answer 409 (a write to a finalised build, or a finalise whose count is wrong) 413 (a PNG over 32 MiB) and 422 (a brief over 4000 characters); their codes are `conflict`, `too_large` and `unprocessable` if a read endpoint ever needs them.
+
+**Rate limits.** On Cloudflare, every endpoint counts requests per token, and a refused token's per client IP, against the `API_RATE_LIMIT` binding in `apps/web/wrangler.jsonc` (3000 a minute, far above an upload's pace). Over it, the answer is **429** with `Retry-After: 60`; on a read endpoint the code is `rate_limited`, on an upload endpoint the message is the plain-string error. A self-host without the binding is never limited.
 
 **Pagination.** A list that can grow (`builds`, `detection-flags`) returns at most `limit` rows (default 50, at most 100) and a `next_cursor`. Pass it back as `cursor` with the same filters for the next page. `next_cursor` is `null` on the last page. A cursor is opaque: a malformed one is a 400. `projects` is not paginated yet: its length is the projects of your orgs, and its `next_cursor` is always `null`, so a client that follows it keeps working when it is.
 

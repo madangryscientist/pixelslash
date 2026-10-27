@@ -3,7 +3,7 @@ import { summarizeBuild } from "#/ai/summary";
 import { getBuild } from "#/db/builds";
 import { clearOrgModel, clearProjectModel, setOrgModel, setProjectModel } from "#/db/models";
 import { getProjectWithOrg } from "#/db/orgs";
-import { database, modelKeySecret } from "./env";
+import { database, modelFetch, modelHosts, modelKeySecret } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
 
@@ -35,6 +35,7 @@ export const saveProjectModel = createServerFn({ method: "POST" })
       setProjectModel(database(), user.id, projectId, {
         ...settings,
         modelKeySecret: modelKeySecret(),
+        modelHosts: modelHosts(),
       }),
     );
   });
@@ -53,7 +54,11 @@ export const saveOrgModel = createServerFn({ method: "POST" })
     const user = await requireViewer();
     const { orgId, ...settings } = data;
     await or404(
-      setOrgModel(database(), user.id, orgId, { ...settings, modelKeySecret: modelKeySecret() }),
+      setOrgModel(database(), user.id, orgId, {
+        ...settings,
+        modelKeySecret: modelKeySecret(),
+        modelHosts: modelHosts(),
+      }),
     );
   });
 
@@ -77,5 +82,10 @@ export const regenerateBuildSummary = createServerFn({ method: "POST" })
     const build = await or404(getBuild(db, project.id, data.buildId));
     if (build.status !== "changes" && build.status !== "passed" && build.status !== "failed")
       throw new Error(`build is ${build.status}: it has no verdict to summarise yet`);
-    return { stored: await summarizeBuild({ db, modelKeySecret: modelKeySecret() }, build) };
+    return {
+      stored: await summarizeBuild(
+        { db, modelKeySecret: modelKeySecret(), modelFetch: modelFetch() },
+        build,
+      ),
+    };
   });

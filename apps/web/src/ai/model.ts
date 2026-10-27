@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { ENGINE_VERSION } from "@pixelslash/engine/diff";
 import { AI_LABELS, type AiLabel } from "#/db/schema";
+import { ModelHostError, type ModelHostPolicy, checkModelHost } from "./model-host";
 import { type TokenUsage, usageOf } from "./usage";
 
 /**
@@ -19,8 +20,23 @@ export type RegionAnswer = { label: AiLabel; explanation: string };
 /** One call's text and the tokens its reply reported (PS-233), null when it reported none. */
 export type Reply = { text: string; usage: TokenUsage | null };
 
-/** The transport: the global `fetch`, or a test's stub. */
+/** The transport: `guardedFetch` over the global `fetch`, or a test's stub. */
 export type ModelFetch = (url: string, init: RequestInit) => Promise<Response>;
+
+/**
+ * The transport the server calls a model with (PS-250): the host is checked again at call time,
+ * after resolving, since a stored name may since point somewhere private, and a redirect is not
+ * followed (it answers as a failed call) so it cannot lead somewhere the check did not see.
+ */
+export function guardedFetch(policy: ModelHostPolicy): ModelFetch {
+  return async (url, init) => {
+    await checkModelHost(url, policy);
+    return fetch(url, { ...init, redirect: "manual" });
+  };
+}
+
+/** Without the server's setting, the strict policy: public hosts only. */
+const strictFetch = guardedFetch({ allowPrivate: false });
 
 /** One region's call: the build it is for (ob 1794), and the transport and time it may take. */
 type RegionCall = { buildId: string; fetcher?: ModelFetch | undefined; timeoutMs?: number };
@@ -144,7 +160,11 @@ export async function complete(
   endpoint: ModelEndpoint,
   content: Part[],
   buildId: string,
-  { fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS, maxTokens = MODEL_MAX_TOKENS }: CallOptions = {},
+  {
+    fetcher = strictFetch,
+    timeoutMs = MODEL_TIMEOUT_MS,
+    maxTokens = MODEL_MAX_TOKENS,
+  }: CallOptions = {},
 ): Promise<Reply> {
   let res: Response;
   try {
@@ -160,6 +180,7 @@ export async function complete(
       signal: AbortSignal.timeout(Math.min(timeoutMs, MODEL_TIMEOUT_MS)),
     });
   } catch (e) {
+    if (e instanceof ModelHostError) throw new ModelError(e.message);
     throw new ModelError(`the model did not answer: ${e instanceof Error ? e.name : "error"}`);
   }
   if (!res.ok) throw new ModelError(`the model answered ${res.status}`);
@@ -181,7 +202,7 @@ type CallOptions = {
 export async function explainRegion(
   endpoint: ModelEndpoint,
   images: RegionImages,
-  { buildId, fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS }: RegionCall,
+  { buildId, fetcher, timeoutMs = MODEL_TIMEOUT_MS }: RegionCall,
 ): Promise<RegionAnswer & Pick<Reply, "usage">> {
   const { text, usage } = await complete(
     endpoint,

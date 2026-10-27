@@ -11,9 +11,10 @@ import { type Db, NotFoundError } from "#/db/db";
 import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process";
 import type { DiffLocation } from "#/db/schema";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
+import { type RateLimiter, overApiLimit, retryAfter } from "#/server/rate-limit";
 import { reportError } from "#/server/sentry";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
-import { authorize } from "./authorize";
+import { authorize, bearer } from "./authorize";
 import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
 import { createProjectByName } from "./project-create";
 import { listFlakes, resolveProjectFlake } from "./flakes";
@@ -51,6 +52,8 @@ export type ApiDeps = {
   defaultDiffLocation: () => DiffLocation;
   /** The GitHub App and public URL a finalised build's check run is synced with (PS-23); unset syncs none. */
   checkRuns?: Omit<CheckRunDeps, "db">;
+  /** Counts requests per token, or per client IP when the token is refused (PS-250); unset counts none. */
+  rateLimit?: RateLimiter | undefined;
 };
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -332,6 +335,14 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
       message: `upgrade the CLI: this server needs pixelslash ${deps.minCliVersion} or newer`,
     });
   const actor = await authorize({ db: deps.db, request });
+  if (await overApiLimit(deps.rateLimit, request, actor && bearer(request)))
+    return retryAfter(
+      failWith(upload, {
+        status: 429,
+        code: "rate_limited",
+        message: "too many requests: wait a minute and try again",
+      }),
+    );
   if (!actor)
     return failWith(upload, {
       status: 401,
