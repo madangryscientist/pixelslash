@@ -50,6 +50,7 @@ export {
   type Variant,
 } from "./config.ts";
 export { maskLocators, measureIgnore } from "./page-areas.ts";
+export { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
 export {
   CUSTOM_ATTRIBUTE,
   parseCompositionEntry,

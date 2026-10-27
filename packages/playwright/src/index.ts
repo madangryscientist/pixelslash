@@ -10,6 +10,7 @@ import {
   pngPath,
   settleCapture,
   toImageRects,
+  unmatchedTally,
   type Fingerprint,
   type SnapshotEntry,
   type SnapshotManifest,
@@ -71,11 +72,15 @@ export async function snapshot(
   const variant = opts.variant ?? `${viewport.width}x${viewport.height}-${theme}`;
 
   const fullPage = opts.fullPage ?? true;
-  const png = await shoot(page, name, opts.redact ?? [], fullPage);
+  const png = await shoot(page, opts.redact ?? [], fullPage);
   // The PNG's size from its IHDR chunk, without decoding the image.
   const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
-  const boxes = await measureIgnore(page, opts.ignore ?? [], fullPage, (selector) =>
-    warn(`ignore "${selector}" matched nothing in ${name}`),
+  const ignoreSelectors = opts.ignore ?? [];
+  const boxes = await measureIgnore(
+    page,
+    ignoreSelectors,
+    fullPage,
+    unmatched.checked("ignore", ignoreSelectors),
   );
   const ignore = toImageRects(boxes, scale, size);
 
@@ -118,7 +123,12 @@ async function fingerprintOf(browser: Browser): Promise<Fingerprint> {
   };
 }
 
-const warn = (message: string) => process.stderr.write(`warning: ${message}\n`);
+/**
+ * The selectors that matched nothing (PS-241). Playwright runs each worker as its own process, so
+ * the tally is per worker: each one prints its summary as it exits.
+ */
+const unmatched = unmatchedTally((message) => process.stderr.write(`${message}\n`));
+process.once("exit", () => unmatched.flush());
 
 /** The manifest names one browser, chromium, and a variant needs the viewport it was shot at. */
 function launched(page: Page): { browser: Browser; viewport: Size } {
@@ -131,10 +141,8 @@ function launched(page: Page): { browser: Browser; viewport: Size } {
 }
 
 /** The screenshot, with animations off, the caret hidden and every `redact` match painted over. */
-async function shoot(page: Page, name: string, selectors: string[], fullPage: boolean) {
-  const mask = await maskLocators(page, selectors, (selector) =>
-    warn(`redact "${selector}" matched nothing in ${name}`),
-  );
+async function shoot(page: Page, selectors: string[], fullPage: boolean) {
+  const mask = await maskLocators(page, selectors, unmatched.checked("redact", selectors));
   return page.screenshot({
     fullPage,
     animations: "disabled",

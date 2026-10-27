@@ -199,3 +199,28 @@ test("with the README's pinned clock the video stops and the settle still ends",
   );
   expect(diffPngs(first!, second!).changed).toBe(false);
 });
+
+/** The stderr lines a worker process prints as it exits, for the ones that name `selector` (PS-241). */
+async function tallyLines(selector: string, bodies: string[], dir: string): Promise<string[]> {
+  const proc = Bun.spawn(
+    [process.execPath, "run", join(import.meta.dirname, "unmatched-child.ts"), selector, ...bodies],
+    { env: { ...process.env, PIXELSLASH_SNAPSHOT_DIR: dir }, stdout: "ignore", stderr: "pipe" },
+  );
+  const err = await new Response(proc.stderr).text();
+  expect(await proc.exited).toBe(0);
+  return err.split("\n").filter((line) => line.includes(selector));
+}
+
+test("a selector that matches some shots is one summary line at exit, not a line per shot", async () => {
+  const lines = await tallyLines(
+    ".video",
+    ['<div class="video">a</div>', "<p>plain</p>", "<p>plain</p>"],
+    join(work, "some"),
+  );
+  expect(lines).toEqual(['ignore ".video" matched nothing on 2 of 3 shots']);
+});
+
+test("a selector that matches no shot is one warning at exit, naming it as matching no shot", async () => {
+  const lines = await tallyLines(".vdeo", ["<p>a</p>", "<p>b</p>"], join(work, "none"));
+  expect(lines).toEqual(['warning: ignore ".vdeo" matched no shot in this run']);
+});

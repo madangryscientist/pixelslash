@@ -165,7 +165,7 @@ describe("captureSnapshots", () => {
     expect(result.manifest.snapshots[0]?.fingerprint.image).toBe("bare");
     expect(warnings).toHaveLength(2);
     expect(warnings[0]).toMatch(/outside the pinned PixelSlash image/);
-    expect(warnings[1]).toBe('warning: mask ".nope" matched nothing on /');
+    expect(warnings[1]).toBe('warning: mask ".nope" matched no shot in this run');
   }, 60_000);
 });
 
@@ -176,6 +176,28 @@ const ignoreConfig = (scale: number, ignore: unknown[], masks: unknown[] = []) =
     variants: [{ name: "desktop", viewport: { width: 800, height: 400 } }],
     stabilise: { deviceScaleFactor: scale },
   });
+
+describe("selectors that match nothing (PS-241)", () => {
+  const twoShots = parseConfig({
+    baseUrl: `http://127.0.0.1:${server.port}`,
+    routes: [
+      { path: "/ignore", name: "page", ignore: [".video", ".nope"], masks: [".nope"] },
+      { path: "/", name: "home", ignore: [".video", ".nope"], masks: [".nope"] },
+    ],
+    variants: [{ name: "desktop", viewport: { width: 800, height: 400 } }],
+  });
+
+  test("a selector that matches some shots is one summary line, not a line per shot", async () => {
+    const warnings: string[] = [];
+    await captureSnapshots(twoShots, await tmp(), { ...pinned, warn: (m) => warnings.push(m) });
+    // One line per selector, for the run: none per shot, and the two shots' misses summed.
+    expect(warnings.toSorted()).toEqual([
+      'ignore ".video" matched nothing on 1 of 2 shots',
+      'warning: ignore ".nope" matched no shot in this run',
+      'warning: mask ".nope" matched no shot in this run',
+    ]);
+  }, 60_000);
+});
 
 describe("ignore areas", () => {
   test.each([1, 2])(
@@ -191,7 +213,7 @@ describe("ignore areas", () => {
         { x: 40 * scale, y: 40 * scale, width: 200 * scale, height: 100 * scale },
         { x: 300 * scale, y: 40 * scale, width: 100 * scale, height: 60 * scale },
       ]);
-      expect(warnings).toEqual(['warning: ignore ".nope" matched nothing on /ignore']);
+      expect(warnings).toEqual(['warning: ignore ".nope" matched no shot in this run']);
       const img = PNG.sync.read(Buffer.from(await Bun.file(join(out, "page/desktop.png")).bytes()));
       expect(img.width).toBe(800 * scale);
       // The real pixels are still there: green video, amber marked box.

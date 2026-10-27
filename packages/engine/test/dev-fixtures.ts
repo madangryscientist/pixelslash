@@ -53,6 +53,7 @@ export function fakeSession(settleMs = 40) {
       await Bun.sleep(settleMs);
       return { png: png(page.at), ignore: [], media: [], loadMs: settleMs };
     },
+    flush: () => {},
     close: async () => {},
   };
   return { session, page };

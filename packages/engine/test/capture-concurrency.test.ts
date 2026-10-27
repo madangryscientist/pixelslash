@@ -35,6 +35,7 @@ function session(ms: (name: string) => number, fail?: string) {
       if (name === fail) throw new CaptureError(`capture settle exceeded on ${name}`);
       return { png: png(), ignore: [], media: [] };
     },
+    flush: () => {},
     close: async () => {},
   };
   return { fake, seen };
