@@ -8,7 +8,7 @@
  *                        [--impl <cmd> [--timeout-ms <n>]]
  *
  * Argos's verdicts come from bench/argos-cache.json, so no VM is needed. --refresh-argos asks
- * VM 101 (ops/argos-bench/run-pairs.sh, ARGOS_BENCH_HOST / ARGOS_BENCH_KEY) about the pairs the
+ * the argos-bench VM (ops/argos-bench/run-pairs.sh, ARGOS_BENCH_HOST / ARGOS_BENCH_KEY) about the pairs the
  * cache does not know and rewrites the cache. --no-argos scores PixelSlash alone and writes no
  * files. --calibration adds Argos's own 19 cases, which are streamed from the VM. --capture adds
  * the capture stage (ob 1489): fixture pages captured in the pinned image and bare. It needs Docker

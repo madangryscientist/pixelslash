@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Inside the argos-bench VM, as root (ob 1476): Docker from Debian's own archive.
-# Run from the desktop:  ssh debian@<ip> 'sudo bash -s' < ops/argos-bench/setup-vm.sh
+# Run from the maintainer's machine:  ssh <vm-user>@<ip> 'sudo bash -s' < ops/argos-bench/setup-vm.sh
 # Idempotent: re-running changes nothing that is already in place.
 set -euo pipefail
 

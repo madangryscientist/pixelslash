@@ -15,7 +15,7 @@ describe("refusedAddress", () => {
     ["10.1.2.3", "RFC 1918"],
     ["172.16.0.1", "RFC 1918"],
     ["172.31.255.255", "RFC 1918"],
-    ["192.168.0.17", "RFC 1918"],
+    ["192.168.1.10", "RFC 1918"],
     ["169.254.169.254", "link-local"],
     ["100.64.0.1", "CGNAT"],
     ["100.127.255.255", "CGNAT"],
@@ -121,7 +121,7 @@ describe("checkModelHost", () => {
     const resolve = vi.fn<HostResolver>(async () => ["10.0.0.7"]);
     for (const url of [
       "http://localhost:11434/v1",
-      "http://192.168.0.17:4180/v1",
+      "http://10.0.0.9:4180/v1",
       "http://[::1]:8080/v1",
       "http://ollama.local/v1",
       "http://model.example/v1",

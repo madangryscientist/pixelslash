@@ -1,7 +1,8 @@
 /**
  * PS-214's measurement, not a test: an upload burst of N shots against a LAN self-host (the CT),
  * with the server's memory sampled on the CT and split by phase and by process. Not in the gate;
- * `bun perf/rss-burst.ts --shots 50` from `apps/web`, see perf/README.md.
+ * `bun perf/rss-burst.ts --shots 50 --server <url> --ssh '<ssh command>' --ct <id>` from `apps/web`,
+ * see perf/README.md.
  *
  * It replays what the CLI sends (`packages/engine/src/upload.ts`): a main build (open, PUT every
  * shot four at a time, finalise), then a branch build of changed shots that the server diffs in
@@ -23,17 +24,27 @@ const args = new Map<string, string>();
 for (let i = 2; i < process.argv.length; i += 2)
   args.set((process.argv[i] ?? "").replace(/^--/, ""), process.argv[i + 1] ?? "");
 const opt = (name: string, fallback: string) => args.get(name) ?? fallback;
+const need = (name: string, what: string): string => {
+  const value = args.get(name);
+  if (!value) throw new Error(`--${name} is required: ${what}`);
+  return value;
+};
 
 const COUNT = Number(opt("shots", "50"));
-const SERVER = opt("server", "http://192.168.0.34:3000").replace(/\/+$/, "");
+const SERVER = need("server", "the review app's base URL, e.g. http://host:3000").replace(
+  /\/+$/,
+  "",
+);
 const CONCURRENCY = Number(opt("concurrency", "4")); // the CLI's
 const MIX = opt("mix", "mixed"); // "mixed", or "WxH" for one size
 const SETTLE_S = [10, 60, 180];
 const OUT = opt("out", "");
-const SSH = opt("ssh", "ssh -i ~/.ssh/id_ed25519_mac root@192.168.0.20");
-const CT = opt("ct", "135");
 /** PS-220: sample two local `systemd-run --user` units, not the CT's. */
 const LOCAL = opt("local", "0") === "1";
+const SSH = LOCAL
+  ? ""
+  : need("ssh", "the ssh command to the Proxmox host, e.g. 'ssh -i ~/.ssh/key root@pve'");
+const CT = LOCAL ? "" : need("ct", "the id of the container the server runs in");
 const WEB_UNIT = opt("web-unit", "pixelslash-web.service");
 const DIFF_UNIT = opt("diff-unit", "pixelslash-diff.service");
 const CG = opt("cg", "/sys/fs/cgroup/system.slice/");

@@ -201,7 +201,7 @@ export function resultsMarkdown(
     `Two corpora, scored the same way for both tools: \`bench/corpus/\` (main), ${COMPOSITION(main)}, and \`bench/corpus-holdout/\` (held out), ${COMPOSITION(holdout)}. Tuning work looks at the main corpus only; the held-out one, made from pages the main corpus never sees, says whether a change helped beyond them. \`bun run bench\` reproduces this; \`bench/README.md\` says how it is measured.`,
     "",
     `- PixelSlash: \`${info.pixelslashCommit}\`, \`diffPngs\` at its defaults (perceptual threshold, anti-aliased edges set aside, a size mismatch is a change). Its regions are the engine's own (clustered at 24px, specks dropped, noise regions left out of the IoU); Argos's are extracted from its diff image at 8px (\`src/regions.ts\`).`,
-    `- Argos: ${info.argosCommit ? `\`${info.argosCommit}\`` : "not run"}, \`diffImages\` at threshold ${ARGOS_THRESHOLD}, answers from \`bench/argos-cache.json\` (VM 101 only for new or changed pairs, \`--refresh-argos\`). Its time is \`diffImages\` alone, as measured when the cache entry was made, without ssh, tar or container start.`,
+    `- Argos: ${info.argosCommit ? `\`${info.argosCommit}\`` : "not run"}, \`diffImages\` at threshold ${ARGOS_THRESHOLD}, answers from \`bench/argos-cache.json\` (the argos-bench VM only for new or changed pairs, \`--refresh-argos\`). Its time is \`diffImages\` alone, as measured when the cache entry was made, without ssh, tar or container start.`,
     "",
     "## Scores",
     "",

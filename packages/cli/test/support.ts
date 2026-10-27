@@ -180,7 +180,7 @@ export function parseSpawn(): SpawnProc {
   };
 }
 
-export const FILE_KEY = "dT3GXFF5uVHQtmn12XgWEI";
+export const FILE_KEY = "ExampleFigmaFileKey000";
 export const FIGMA_TOKEN = "test-figma-token";
 
 export function figmaFetch(): (input: string, init?: RequestInit) => Promise<Response> {

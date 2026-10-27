@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Provision the argos-bench VM on the Proxmox host (ob 1476).
 #
-# Runs AS ROOT ON THE PROXMOX HOST (192.168.0.20). It creates ONE small Debian 13 VM from the
-# official cloud image, on DHCP on vmbr0, with the desktop's ssh key for user `debian`, then
+# Runs AS ROOT ON THE PROXMOX HOST. It creates ONE small Debian 13 VM from the
+# official cloud image, on DHCP on the bridge you name, with the desktop's ssh key for user `debian`, then
 # finds the address DHCP gave it and prints it. It does not install anything inside the VM:
 # that is setup-vm.sh, run from the desktop over ssh (this host holds no key for the VM).
 #
@@ -15,14 +15,18 @@
 # one VM's disks on $STORAGE. No storage, bridge, firewall or other guest is changed.
 set -euo pipefail
 
-VMID="${ARGOS_BENCH_VMID:-101}"
+# The VM id, the bridge and the subnet are this host's, so there is no default for them:
+#   provision-vm.sh <vmid> <bridge> <subnet>      e.g.  provision-vm.sh 9000 vmbr0 10.0.0.0/24
+# <subnet> is where nmap looks for the VM's DHCP address (step 4).
+[ $# -eq 3 ] || { sed -n '/^# The VM id/,/^# <subnet>/p' "$0" >&2; exit 2; }
+VMID="$1"
+BRIDGE="$2"
+SUBNET="$3"
 NAME="${ARGOS_BENCH_NAME:-argos-bench}"
 CORES="${ARGOS_BENCH_CORES:-2}"
 MEMORY_MB="${ARGOS_BENCH_MEMORY:-2048}"
 DISK_GB="${ARGOS_BENCH_DISK_GB:-20}"
 STORAGE="${ARGOS_BENCH_STORAGE:-local-lvm}"
-BRIDGE="${ARGOS_BENCH_BRIDGE:-vmbr0}"
-SUBNET="${ARGOS_BENCH_SUBNET:-192.168.0.0/24}"
 MIN_FREE_MB="${ARGOS_BENCH_MIN_FREE_MB:-2560}"
 PUBKEY="${ARGOS_BENCH_PUBKEY:-/root/argos-bench/desktop.pub}"
 # A dated build, not `latest`, so a rebuild gets the same image. The checksum is checked against
@@ -31,6 +35,7 @@ IMAGE_BUILD="${ARGOS_BENCH_IMAGE_BUILD:-20261017-2634}"
 IMAGE_NAME="debian-13-genericcloud-amd64-${IMAGE_BUILD}.qcow2"
 IMAGE_URL="https://cloud.debian.org/images/cloud/trixie/${IMAGE_BUILD}/${IMAGE_NAME}"
 SUMS_URL="https://cloud.debian.org/images/cloud/trixie/${IMAGE_BUILD}/SHA512SUMS"
+CIUSER=debian
 WORK=/root/argos-bench
 TAG="argos-bench (ob 1476)"
 
@@ -49,10 +54,10 @@ exists=0
 if qm status "$VMID" >/dev/null 2>&1; then
   case "$(qm config "$VMID" | sed -n 's/^description: //p')" in
     *"ob 1476"*) exists=1; echo "VM $VMID already exists and is this one; leaving its config alone" ;;
-    *) echo "REFUSING: VMID $VMID exists and was not created by this script. Pick a free id with ARGOS_BENCH_VMID." >&2; exit 1 ;;
+    *) echo "REFUSING: VMID $VMID exists and was not created by this script. Pick a free id." >&2; exit 1 ;;
   esac
 elif pct status "$VMID" >/dev/null 2>&1; then
-  echo "REFUSING: $VMID is a container. Pick a free id with ARGOS_BENCH_VMID." >&2; exit 1
+  echo "REFUSING: $VMID is a container. Pick a free id." >&2; exit 1
 fi
 
 if [ "$exists" -eq 0 ]; then
@@ -94,7 +99,7 @@ else
     --ide2 "${STORAGE}:cloudinit" \
     --boot order=scsi0 \
     --serial0 socket --vga serial0 \
-    --ciuser debian \
+    --ciuser "$CIUSER" \
     --sshkeys "$PUBKEY" \
     --ipconfig0 ip=dhcp \
     --onboot 0
@@ -127,8 +132,8 @@ done
 cat <<EOF
 
 VM $VMID ($NAME) is running at $ip  (MAC $mac, DHCP on $BRIDGE).
-$CORES vCPU, $MEMORY_MB MB, ${DISK_GB} GB on $STORAGE. User: debian, key: $PUBKEY.
+$CORES vCPU, $MEMORY_MB MB, ${DISK_GB} GB on $STORAGE. User: $CIUSER, key: $PUBKEY.
 
 Next (from the desktop): ops/argos-bench/runbook.md, step 3.
-  ssh debian@$ip true
+  ssh ${CIUSER}@$ip true
 EOF

@@ -18,7 +18,7 @@ desktop, run from this repo's root.
 | --- | --- |
 | VM | **101** `argos-bench`. Full VM, not an LXC, because it builds and runs downloaded code. `onboot: 0` |
 | host | Proxmox `pve` at 192.168.0.20 (PVE 9.2.2) |
-| address | **192.168.0.45** by DHCP on `vmbr0`, MAC `BC:24:11:53:59:B5`. Not reserved on the router (see below) |
+| address | **192.168.0.45** by DHCP on `vmbr0`. Not reserved on the router (see below) |
 | resources | 2 vCPU (`cpu: host`), 2048 MB RAM, no swap, 20 GB disk on `local-lvm` |
 | OS | Debian 13 genericcloud `20261017-2634`, user `debian`, key `~/.ssh/id_ed25519_mac.pub` |
 | Docker | `docker.io` 26.1.5 + `docker-buildx` from Debian's archive |
@@ -61,10 +61,10 @@ small and does not start at boot.
 desk$ ssh root@192.168.0.20 'install -d -m 0700 /root/argos-bench'
 desk$ scp ~/.ssh/id_ed25519_mac.pub root@192.168.0.20:/root/argos-bench/desktop.pub
 desk$ scp ops/argos-bench/provision-vm.sh root@192.168.0.20:/root/argos-bench/
-desk$ ssh root@192.168.0.20 bash /root/argos-bench/provision-vm.sh
+desk$ ssh root@192.168.0.20 bash /root/argos-bench/provision-vm.sh <vmid> <bridge> <subnet>
 ```
 
-The defaults are environment variables at the top of the script (`ARGOS_BENCH_VMID`, `_MEMORY`,
+The VM id, the bridge and the subnet to scan are required arguments; the other defaults are environment variables at the top of the script (`ARGOS_BENCH_MEMORY`,
 `_CORES`, `_DISK_GB`, `_IMAGE_BUILD`, …). A re-run is safe: it leaves an existing VM 101 alone if
 the description says `ob 1476`, and refuses if 101 is anything else. The last thing it prints is
 the VM's address. If DHCP hands out a different one later, the same re-run finds it again.
@@ -114,8 +114,8 @@ desk$ ops/argos-bench/run-pairs.sh /tmp/pairs /tmp/argos-out          # [--thres
 ```
 
 The script prints one JSON line per pair and writes `/tmp/argos-out/verdicts.jsonl` plus
-`<name>.diff.png` for each pair Argos calls changed. `ARGOS_BENCH_HOST` (default
-`debian@192.168.0.45`) and `ARGOS_BENCH_KEY` override the target.
+`<name>.diff.png` for each pair Argos calls changed. `ARGOS_BENCH_HOST` and
+`ARGOS_BENCH_KEY` are required: the VM's `user@host` and the ssh key that logs in to it.
 
 ## Start and stop
 
@@ -141,6 +141,6 @@ That removes everything this ticket put on the host.
 
 ## Left for a human
 
-- **DHCP reservation** for `BC:24:11:53:59:B5` → `192.168.0.45` on the router, if you want the
+- **DHCP reservation** for the VM's MAC (`qm config 101`, `net0`) on the router, if you want the
   address stable. This is optional: `provision-vm.sh` re-finds the address.
 - Nothing else. No GitHub App, no OAuth app, no Argos account was needed.

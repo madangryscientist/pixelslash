@@ -78,7 +78,7 @@ describe("uploadSnapshots retries what the API never answered", () => {
     let clock = 0;
     const { run } = await upload(
       async (url, init) => {
-        if (clock < 13_000) throw new Error("connect ECONNREFUSED 192.168.0.135:3000");
+        if (clock < 13_000) throw new Error("connect ECONNREFUSED example.test:3000");
         return server.fetch(url, init);
       },
       (ms) => (clock += ms),
@@ -88,7 +88,7 @@ describe("uploadSnapshots retries what the API never answered", () => {
 
   test("a server that stays refused past the window still fails loudly, naming the step", async () => {
     const { run, waits } = await upload(async () => {
-      throw new Error("connect ECONNREFUSED 192.168.0.135:3000");
+      throw new Error("connect ECONNREFUSED example.test:3000");
     });
     await expect(run).rejects.toThrow(
       /^upload failed: open build: POST https:\/\/ps\.example\/api\/v1\/builds: connect ECONNREFUSED .* \(after 6 tries\)$/,

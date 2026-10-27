@@ -1,6 +1,6 @@
 /**
  * Argos's verdicts, kept in the repo (ob 1488) so `bun run bench` makes the whole comparison
- * without VM 101. An entry is keyed by the pair's content hash, the Argos commit and the
+ * without the argos-bench VM. An entry is keyed by the pair's content hash, the Argos commit and the
  * threshold, so a changed pair, a rebuilt image or a new threshold is a miss, never a stale hit.
  * The VM is needed only to fill misses (`--refresh-argos`).
  *
@@ -21,7 +21,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { argosHost, argosNote, liveArgosCommit, runArgos } from "./argos.ts";
+import { argosHost, argosKey, argosNote, liveArgosCommit, runArgos } from "./argos.ts";
 import { BENCH_DIR, caseKey, isRecord, type CorpusCase } from "./corpus.ts";
 import type { Rect } from "./regions.ts";
 import { say } from "./say.ts";
@@ -170,7 +170,7 @@ async function fill(
   const live = await liveArgosCommit();
   if (live === null) {
     throw new Error(
-      `${misses.size} pair(s) need Argos and the VM at ${argosHost()} does not answer. Start it (\`ssh root@192.168.0.20 'qm start 101'\`, ops/argos-bench/runbook.md) and run again.`,
+      `${misses.size} pair(s) need Argos and the VM at ${argosHost()} does not answer. Start it (ops/argos-bench/runbook.md) and run again.`,
     );
   }
   if (live !== commit) {
@@ -236,10 +236,13 @@ export async function argosVerdicts(cases: CorpusCase[], refresh: boolean): Prom
   if (misses.size > 0 && !refresh) {
     const names = [...misses.values()].map(caseKey);
     throw new Error(
-      `bench/argos-cache.json has no Argos verdict for ${names.length} case(s): ${names.slice(0, 8).join(", ")}${names.length > 8 ? ", ..." : ""}.\nRun \`bun run bench -- --refresh-argos\` with VM 101 up to fill them, or \`--no-argos\` to leave Argos out.`,
+      `bench/argos-cache.json has no Argos verdict for ${names.length} case(s): ${names.slice(0, 8).join(", ")}${names.length > 8 ? ", ..." : ""}.\nRun \`bun run bench -- --refresh-argos\` with the argos-bench VM up to fill them, or \`--no-argos\` to leave Argos out.`,
     );
   }
   if (refresh) {
+    // Fail on a missing ARGOS_BENCH_HOST / ARGOS_BENCH_KEY before anything else, with or without misses.
+    argosHost();
+    argosKey();
     if (misses.size > 0) await fill(cache, misses, commit);
     prune(cache, new Set([...keys.values()].map((k) => k.key)));
     writeFileSync(CACHE_FILE, cacheText(cache));
