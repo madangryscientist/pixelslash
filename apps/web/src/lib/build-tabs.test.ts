@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { defaultTab, firstToReview, tabCounts } from "./build-tabs";
+import { defaultTab, firstToReview, nextToReviewId, tabCounts } from "./build-tabs";
 
 const row = (
   diffStatus: "changed" | "new" | "removed" | "unchanged" | null,
@@ -71,5 +71,28 @@ describe("firstToReview", () => {
       },
     ] as const;
     expect(firstToReview(rows)?.id).toBe("b");
+  });
+});
+
+describe("nextToReviewId", () => {
+  const steady = { flakeId: null, flakyPolicy: null, carriedFrom: null } as const;
+  const shot = (id: string, reviewState: "pending" | "accepted" | "rejected") => ({
+    id,
+    diffStatus: "changed" as const,
+    reviewState,
+    ...steady,
+  });
+
+  test("searches forward from the shot first, then wraps to the earlier ones", () => {
+    const rows = [shot("a", "pending"), shot("b", "pending"), shot("c", "accepted")];
+    expect(nextToReviewId(rows, "c")).toBe("a");
+    expect(nextToReviewId(rows, "a")).toBe("b");
+    expect(nextToReviewId(rows, "b")).toBe("a");
+  });
+
+  test("a shot is never its own next, and none left is null", () => {
+    const rows = [shot("a", "pending"), shot("b", "accepted")];
+    expect(nextToReviewId(rows, "a")).toBeNull();
+    expect(nextToReviewId([shot("a", "accepted")], "a")).toBeNull();
   });
 });

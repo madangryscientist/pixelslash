@@ -58,3 +58,12 @@ type Reviewable = { id: string } & Parameters<typeof awaitsDecision>[0];
 export function firstToReview<T extends Reviewable>(rows: readonly T[]): T | undefined {
   return rows.find(awaitsDecision);
 }
+
+/**
+ * The shot still waiting for a decision after `id` (which must be one of `rows`): forward from it
+ * first, then wrapping to the earlier ones. `id` itself is never its own next.
+ */
+export function nextToReviewId(rows: readonly Reviewable[], id: string): string | null {
+  const at = rows.findIndex((row) => row.id === id);
+  return (firstToReview(rows.slice(at + 1)) ?? firstToReview(rows.slice(0, at)))?.id ?? null;
+}

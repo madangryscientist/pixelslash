@@ -1,5 +1,5 @@
 import { Breadcrumbs, Callout, FullBleedLayout, Stack } from "@hackcove/ui";
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
 import { CompositionFocus, CompositionPanel } from "#/components/composition";
@@ -34,22 +34,50 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snap
   },
 );
 
-/** Accept or reject the shot on screen, then reload the page's data to show the decision. */
-function useDecision(projectId: string, snapshotId: string, reviewable: boolean) {
-  const router = useRouter();
+/**
+ * Accept or reject the shot on screen. An accept that lands moves the reviewer on to the next shot
+ * still awaiting one, or to the build page when none is left; the next shot is read after the
+ * decision, because this shot's loaded data predates decisions made on the others since it was
+ * opened. A reject always goes to the build page: it fails the build, and a failed build takes no
+ * more decisions, so the next shot would be a dead screen. Only a refused decision is an error.
+ */
+function useDecision(data: ReturnType<typeof Route.useLoaderData>, reviewable: boolean) {
+  const { project, build, snapshot } = data;
+  const projectId = project.id;
+  const buildId = build.id;
+  const snapshotId = snapshot.id;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const go = useWalk(projectId, buildId);
+  const navigate = useNavigate();
   const decide = useCallback(
     (state: "accepted" | "rejected") => {
       if (!reviewable) return;
       setBusy(true);
       setError(null);
+      const toBuild = () =>
+        void navigate({
+          to: "/projects/$projectId/builds/$buildId",
+          params: { projectId, buildId },
+        });
+      const advance = () =>
+        getSnapshotPage({ data: { projectId, buildId, snapshotId } }).then(
+          ({ build: fresh, nextToReviewId }) => {
+            // Another reviewer's reject can land between this accept and the read: the build is failed then.
+            const stillDecidable = fresh.status === "changes" || fresh.status === "passed";
+            if (nextToReviewId && stillDecidable) go(nextToReviewId);
+            else toBuild();
+          },
+          toBuild,
+        );
       reviewShot({ data: { projectId, snapshotId, state } })
-        .then(() => router.invalidate())
-        .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+        .then(
+          () => (state === "rejected" ? toBuild() : advance()),
+          (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
+        )
         .finally(() => setBusy(false));
     },
-    [reviewable, projectId, snapshotId, router],
+    [reviewable, projectId, buildId, snapshotId, go, navigate],
   );
   return { busy, error, decide };
 }
@@ -137,7 +165,7 @@ function SnapshotPage() {
   const data = Route.useLoaderData();
   const { project, org, build, snapshot, images, previousId, nextId, names } = data;
   const reviewable = build.status === "changes" || build.status === "passed";
-  const { busy, error, decide } = useDecision(project.id, snapshot.id, reviewable);
+  const { busy, error, decide } = useDecision(data, reviewable);
   const [help, setHelp] = useState(false);
   const flag = useFlagDraft(snapshot.id, data.flags, snapshot.diffResult !== null);
   const ignore = useIgnoreDraft(snapshot.id);

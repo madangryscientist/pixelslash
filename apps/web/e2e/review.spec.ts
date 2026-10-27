@@ -257,10 +257,12 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await page.keyboard.press("k");
   await expect(page.getByTestId("position")).toHaveText("1 of 5");
 
-  // a accepts the shot on screen.
+  // a accepts the shot on screen, and the reviewer moves to the next shot awaiting a decision.
   await page.keyboard.press("a");
+  await expect(page.getByTestId("position")).toHaveText("2 of 5");
+  // Back on shot 1: its decision is there, and accepting did not clear its flag (they are independent).
+  await page.keyboard.press("k");
   await expect(page.getByTestId("review-state")).toHaveText("accepted by e2e-octocat");
-  // Accepting does not clear a flag: the two are independent.
   await expect(page.getByTestId("detection-flag")).toHaveCount(1);
   await open(page, buildUrl);
   await expect(page.getByText("1 to review")).toBeVisible();
@@ -268,7 +270,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   // r rejects the size-changed shot and the build fails.
   await group(page, "changed").getByRole("link", { name: /hero/i }).click();
   await expect(page.getByTestId("position")).toHaveText("2 of 5");
-  await rejectThenWalkFailedBuild(page);
+  await rejectThenWalkFailedBuild(page, buildUrl);
   await open(page, buildUrl);
   await expect(page.getByTestId("build-status")).toHaveText("failed");
   await expect(page.getByRole("button", { name: "Accept all" })).toBeDisabled();
@@ -304,4 +306,68 @@ test("the branch page: against main, since last build, and an accept the build p
   upload(await snapshotDir(REVIEW), token, "feature", { judge: await stubJudge() });
   await open(page, `/projects/${projectId}`);
   await expectBranchPage(page, projectId, "feature", capture);
+});
+
+/* ------------------------------------------------------------------ decisions move the reviewer on */
+
+const THREE_BASE: Fixture[] = ["s1", "s2", "s3"].map((name) => ({ name, png: png(40, 40) }));
+const THREE_CHANGED: Fixture[] = ["s1", "s2", "s3"].map((name) => ({
+  name,
+  png: png(40, 40, [{ x: 10, y: 10, w: 10, h: 10, rgb: RED }]),
+}));
+
+/** Three changed shots in one review build, opened from its project page: the page is hydrated. */
+async function threeChangedBuild(page: Page, orgName: string) {
+  const { token, projectId } = await provision(page, orgName);
+  upload(await snapshotDir(THREE_BASE), token, "main");
+  await page.waitForTimeout(1100);
+  upload(await snapshotDir(THREE_CHANGED), token, "review", { pr: 7 });
+  await open(page, `/projects/${projectId}`);
+  await page.getByTestId("build-row").first().getByRole("link", { name: "review" }).click();
+  await expect(group(page, "changed")).toBeVisible();
+}
+
+test("a decision moves the reviewer on: accept advances, a failed decision stays put", async ({
+  page,
+}) => {
+  await threeChangedBuild(page, "Advance Co");
+  const position = page.getByTestId("position");
+  await group(page, "changed").getByRole("link", { name: /s2/i }).click();
+  await expect(position).toHaveText("2 of 3");
+  // Wrap: shot 3 is the last, so deciding it goes back to shot 1, still undecided.
+  await page.keyboard.press("j");
+  await expect(position).toHaveText("3 of 3");
+  await page.keyboard.press("a");
+  await expect(position).toHaveText("1 of 3");
+  // A failed decision stays on the shot and shows the error.
+  await page.route("**/*", (route) => {
+    const body = route.request().postData() ?? "";
+    return route.request().method() === "POST" && body.includes("accepted")
+      ? route.fulfill({ status: 500, body: "decision refused" })
+      : route.continue();
+  });
+  await page.keyboard.press("a");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(position).toHaveText("1 of 3");
+  await page.unroute("**/*");
+
+  // Accept 1, then 2: none is left undecided, so the build page shows the settled state.
+  await page.keyboard.press("a");
+  await expect(position).toHaveText("2 of 3");
+  await page.keyboard.press("a");
+  await page.waitForURL(/\/builds\/[^/?]+(\?.*)?$/);
+});
+
+test("re-deciding a shot: a rejection goes to the build page", async ({ page }) => {
+  await threeChangedBuild(page, "Redecide Co");
+  const position = page.getByTestId("position");
+  await group(page, "changed").getByRole("link", { name: /s1/i }).click();
+  await expect(position).toHaveText("1 of 3");
+  await page.keyboard.press("a");
+  await expect(position).toHaveText("2 of 3");
+  // Back to shot 1 and reject it: the build fails, so the reviewer goes to the build page.
+  await page.keyboard.press("k");
+  await expect(position).toHaveText("1 of 3");
+  await page.keyboard.press("r");
+  await page.waitForURL(/\/builds\/[^/?]+(\?.*)?$/);
 });

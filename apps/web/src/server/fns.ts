@@ -25,6 +25,7 @@ import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
 import { BadRequest, parseRect } from "#/api/validate";
+import { nextToReviewId } from "#/lib/build-tabs";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import { signedImagePath } from "#/storage/signed";
@@ -263,6 +264,8 @@ export const getSnapshotPage = createServerFn()
       total: view.snapshots.length,
       previousId: index > 0 ? (view.snapshots[index - 1]?.id ?? null) : null,
       nextId: view.snapshots[index + 1]?.id ?? null,
+      /** Where a decision on this shot moves the reviewer: the next shot still awaiting one. */
+      nextToReviewId: nextToReviewId(view.snapshots, snapshot.id),
       /** Every name in the build, so the label reads the same as on the build page. */
       names: view.snapshots.map((shot) => shot.name),
       /**
