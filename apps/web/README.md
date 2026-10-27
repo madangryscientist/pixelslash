@@ -16,6 +16,16 @@ in `.dev.vars.example`). Never in git.
 
 The `e2e` env in `wrangler.jsonc` carries fixed test values for these; they are not secrets.
 
+## Hardening for a deployment strangers sign in to (PS-250)
+
+On by default; `SECURITY.md` says why each exists.
+
+| Setting | Where | Meaning |
+| --- | --- | --- |
+| `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS` | `wrangler.jsonc` vars (`1` under `env.e2e`) | Empty (the default): a project's or org's model base URL on loopback, RFC 1918, link-local, CGNAT, their IPv6 forms, or a `.local`/`.internal`/single-label name is refused at save and before each call, after resolving the name (`src/ai/model-host.ts`). `1` lets them through, for a self-host running its own model; the LAN CT's helper on loopback needs it. Never set it on a deployment strangers can sign in to. |
+| `GITHUB_OAUTH_BASE`, `GITHUB_API_BASE` | `wrangler.jsonc` vars | A production build refuses to start unless they are `https://github.com` and `https://api.github.com` (`src/auth/stub-guard.ts`). Only `vite dev` and the `CLOUDFLARE_ENV=e2e` build may point at the GitHub stand-in. |
+| `API_RATE_LIMIT`, `SIGNIN_RATE_LIMIT` | `wrangler.jsonc` `ratelimits` | Cloudflare rate-limit bindings: `/api/v1/*` per token (a refused token per client IP), 3000 a minute; `/auth/github` and its callback per client IP, 30 a minute. Over the limit is a 429. Not under `env.e2e`, so the e2e build and the LAN CT run with the no-op seam in `src/server/rate-limit.ts` and are never limited. |
+
 ## Error reporting to Sentry (PS-227)
 
 Optional, and off until a DSN is set. With no `SENTRY_DSN` the Worker is not wrapped, the browser is

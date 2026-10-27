@@ -50,6 +50,7 @@ export async function withModel(ctx: Ctx) {
     apiKey: KEY,
     autoPassNoise: false,
     modelKeySecret: SECRET,
+    modelHosts: { allowPrivate: true },
   });
 }
 

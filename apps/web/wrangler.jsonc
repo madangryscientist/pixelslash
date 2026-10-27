@@ -32,6 +32,19 @@
       },
     ],
   },
+  // Rate limits (PS-250): `/api/v1/*` per token (else per client IP), and sign-in per client IP.
+  // Cloudflare counts per location and lets a little through over the limit; it is a brake on abuse,
+  // not a quota. The API's is far above a CLI upload's pace (4 requests at a time), since the CLI
+  // does not retry a 429. Not under `env.e2e`: bindings are not inherited, so the e2e build and the
+  // LAN self-host run without one and `src/server/rate-limit.ts` lets every request through.
+  "ratelimits": [
+    { "name": "API_RATE_LIMIT", "namespace_id": "2501", "simple": { "limit": 3000, "period": 60 } },
+    {
+      "name": "SIGNIN_RATE_LIMIT",
+      "namespace_id": "2502",
+      "simple": { "limit": 30, "period": 60 },
+    },
+  ],
   // GITHUB_CLIENT_SECRET and MODEL_KEY_SECRET are secrets (`wrangler secret put`, or `.dev.vars` locally).
   // MODEL_KEY_SECRET (ob 1786) is base64 of 32 random bytes and seals each project's model API key at rest.
   "vars": {
@@ -54,6 +67,10 @@
     "GITHUB_APP_ID": "",
     // The server's public URL (no trailing slash), which a check run's "Details" link points at.
     "PIXELSLASH_PUBLIC_URL": "",
+    // `1` lets a project's model be on a private network (PS-250): loopback, RFC 1918, link-local,
+    // CGNAT, `.local`/`.internal`. Off, such a base URL is refused at save and at call time. Only for a
+    // self-host that runs its own model; never on a deployment strangers can sign in to.
+    "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "",
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
@@ -99,6 +116,8 @@
         // No App here: the e2e build sends no check run. The LAN self-host's `.dev.vars` sets both.
         "GITHUB_APP_ID": "",
         "PIXELSLASH_PUBLIC_URL": "",
+        // The Playwright run's model is a stub on localhost, and the LAN self-host's helper is on loopback.
+        "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "1",
       },
     },
   },

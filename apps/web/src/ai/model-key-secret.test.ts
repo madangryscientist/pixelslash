@@ -24,6 +24,7 @@ describe("a project's sealed model key on a server without its secret", () => {
       apiKey: KEY,
       autoPassNoise: true,
       modelKeySecret: TEST_MODEL_KEY_SECRET,
+      modelHosts: { allowPrivate: true },
     });
     const asked: string[] = [];
     const modelFetch: ModelFetch = async (input) => {

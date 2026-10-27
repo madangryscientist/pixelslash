@@ -2,14 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { setCookie } from "@tanstack/react-start/server";
 import { authorizeUrl } from "#/auth/github";
 import { randomToken } from "#/lib/crypto";
-import { githubConfig } from "#/server/env";
+import { githubConfig, signInRateLimit } from "#/server/env";
+import { ipKey, overLimit, signInLimited } from "#/server/rate-limit";
 
 export const OAUTH_STATE_COOKIE = "ps_oauth_state";
 
 export const Route = createFileRoute("/auth/github")({
   server: {
     handlers: {
-      GET: ({ request }) => {
+      GET: async ({ request }) => {
+        if (await overLimit(signInRateLimit(), ipKey(request))) return signInLimited();
         const url = new URL(request.url);
         const state = randomToken("");
         setCookie(OAUTH_STATE_COOKIE, state, {

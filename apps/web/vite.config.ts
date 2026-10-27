@@ -52,7 +52,18 @@ function pointAtStub(config: { vars?: Record<string, unknown> }) {
   };
 }
 
-export default defineConfig({
+/**
+ * Which build this is (`src/auth/stub-guard.ts`): `vite dev` is dev, a `CLOUDFLARE_ENV=e2e` build is
+ * the test build (Playwright and the LAN self-host), and any other is production, which refuses to
+ * start pointed at the GitHub stand-in (PS-250).
+ */
+function buildKind(command: "serve" | "build"): string {
+  if (command === "serve") return "dev";
+  return process.env["CLOUDFLARE_ENV"] === "e2e" ? "test" : "production";
+}
+
+export default defineConfig(({ command }) => ({
+  define: { PIXELSLASH_BUILD_KIND: JSON.stringify(buildKind(command)) },
   resolve: { tsconfigPaths: true },
   // `vite dev` pre-bundles pngjs, and that bundling does not run Vite's resolver plugins: it needs
   // the same swap of its own (ob 1625).
@@ -79,4 +90,4 @@ export default defineConfig({
     tanstackStart(),
     viteReact(),
   ],
-});
+}));

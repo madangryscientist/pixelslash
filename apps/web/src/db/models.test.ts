@@ -22,6 +22,8 @@ const settings = {
   apiKey: "sk-one",
   autoPassNoise: false,
   modelKeySecret: SECRET as string | undefined,
+  // Every name resolves to a public address (TEST-NET-3): no lookup leaves the test.
+  modelHosts: { allowPrivate: false, resolve: async () => ["203.0.113.10"] },
 };
 
 const rowOf = async (db: Awaited<ReturnType<typeof setup>>["db"], projectId: string) => {
@@ -58,7 +60,7 @@ describe("project model settings", () => {
     await expect(
       setProjectModel(db, acme.user.id, acme.project.id, {
         ...settings,
-        baseUrl: "http://localhost:11434/v1",
+        baseUrl: "https://elsewhere.example/v1",
         apiKey: "",
       }),
     ).rejects.toThrow(/needs its key again/);
@@ -77,6 +79,23 @@ describe("project model settings", () => {
     );
     await expect(save({ model: " " })).rejects.toBeInstanceOf(ModelSettingsError);
     expect(await projectModelFor(db, acme.project.id, SECRET)).toBeNull();
+  });
+
+  test("a private host is refused at save (PS-250), named or resolved, unless the server allows it", async () => {
+    const { db, acme } = await setup();
+    const save = (extra: object) =>
+      setProjectModel(db, acme.user.id, acme.project.id, { ...settings, ...extra });
+    await expect(save({ baseUrl: "http://169.254.169.254/v1" })).rejects.toThrow(/link-local/);
+    await expect(save({ baseUrl: "http://localhost:11434/v1" })).rejects.toThrow(/loopback/);
+    const rebound = { allowPrivate: false, resolve: async () => ["10.0.0.7"] };
+    await expect(
+      save({ baseUrl: "https://model.example/v1", modelHosts: rebound }),
+    ).rejects.toBeInstanceOf(ModelSettingsError);
+    expect(await projectModelFor(db, acme.project.id, SECRET)).toBeNull();
+    await save({ baseUrl: "http://localhost:11434/v1", modelHosts: { allowPrivate: true } });
+    expect(await projectModelFor(db, acme.project.id, SECRET)).toMatchObject({
+      baseUrl: "http://localhost:11434/v1",
+    });
   });
 
   test("a non-member can neither see nor set it, and removing it removes the key", async () => {

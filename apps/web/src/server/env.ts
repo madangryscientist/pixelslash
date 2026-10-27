@@ -1,14 +1,18 @@
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import type { GithubConfig } from "#/auth/github";
+import { buildKind, githubStubRefusal } from "#/auth/stub-guard";
 import type { Db } from "#/db/db";
 import type { ExplainQueue } from "#/ai/explain-queue";
+import { type ModelFetch, guardedFetch } from "#/ai/model";
+import type { ModelHostPolicy } from "#/ai/model-host";
 import { retryBusy } from "#/db/busy";
 import { diffLocationOf } from "#/db/orgs";
 import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
+import { type RateLimiter, rateLimiterOf } from "./rate-limit";
 import { type SentryConfig, sentryConfigOf } from "./sentry-config";
 
 /**
@@ -37,6 +41,21 @@ export function imageSigningSecret(): string {
 export const modelKeySecret = (): string | undefined => env.MODEL_KEY_SECRET || undefined;
 
 /**
+ * Which hosts a project's model may be on (PS-250): public ones, unless the self-host sets
+ * `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS=1` to run its own model on its own network.
+ */
+export const modelHosts = (): ModelHostPolicy => ({
+  allowPrivate: env.PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS === "1",
+});
+
+/** The transport for every model call: the host checked again, after resolving, under `modelHosts`. */
+export const modelFetch = (): ModelFetch => guardedFetch(modelHosts());
+
+/** The rate limits (PS-250): Cloudflare's bindings, or the no-op seam where there are none. */
+export const apiRateLimit = (): RateLimiter => rateLimiterOf(env.API_RATE_LIMIT);
+export const signInRateLimit = (): RateLimiter => rateLimiterOf(env.SIGNIN_RATE_LIMIT);
+
+/**
  * The self-host's diff sidecar (PS-203): a loopback URL where a Bun process runs the same
  * `diff.wasm` diff outside workerd's memory. Cloudflare never sets it; unset, the server diff runs
  * here in-process, in the same module (PS-210).
@@ -54,6 +73,9 @@ export const minCliVersion = (): string | undefined => env.MIN_CLI_VERSION || un
 
 /** Where a new project diffs (ob 1727): `DEFAULT_DIFF_LOCATION`, read by `diffLocationOf`. */
 export const defaultDiffLocation = (): DiffLocation => diffLocationOf(env.DEFAULT_DIFF_LOCATION);
+
+/** Why this deployment may not start (PS-250): a production build pointed at the GitHub stand-in. */
+export const startRefusal = (): string | null => githubStubRefusal(buildKind(), env);
 
 export function githubConfig(): GithubConfig {
   const clientSecret = env.GITHUB_CLIENT_SECRET;

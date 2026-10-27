@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "./db";
 import { warn } from "#/lib/log";
+import { ModelHostError, type ModelHostPolicy, checkModelHost } from "#/ai/model-host";
 import {
   ModelKeySecretError,
   ModelKeyUnreadableError,
@@ -195,6 +196,8 @@ export type ModelSettings = {
   autoPassNoise: boolean;
   /** The server's `MODEL_KEY_SECRET`, which seals the key (ob 1786); never user input. */
   modelKeySecret: string | undefined;
+  /** Which hosts the server may call (PS-250): its own setting, never user input. */
+  modelHosts: ModelHostPolicy;
 };
 
 /**
@@ -228,6 +231,9 @@ async function fieldsToStore(
   settings: ModelSettings,
 ) {
   const baseUrl = modelBaseUrl(settings.baseUrl);
+  await checkModelHost(baseUrl, settings.modelHosts).catch((e: unknown) => {
+    throw e instanceof ModelHostError ? new ModelSettingsError(e.message) : e;
+  });
   const model = settings.model.trim();
   if (!model) throw new ModelSettingsError("name the model, e.g. deepseek-flash");
   const apiKey = await keyToStore(current, baseUrl, settings.apiKey, settings.modelKeySecret);

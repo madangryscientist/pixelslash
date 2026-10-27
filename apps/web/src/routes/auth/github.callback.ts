@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { deleteCookie, getCookie } from "@tanstack/react-start/server";
 import { fetchGithubProfile } from "#/auth/github";
 import { signInGithubUser } from "#/db/users";
-import { database, githubConfig } from "#/server/env";
+import { database, githubConfig, signInRateLimit } from "#/server/env";
+import { ipKey, overLimit, signInLimited } from "#/server/rate-limit";
 import { startSession } from "#/server/session";
 import { OAUTH_STATE_COOKIE } from "./github";
 
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/auth/github/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (await overLimit(signInRateLimit(), ipKey(request))) return signInLimited();
         const url = new URL(request.url);
         const code = url.searchParams.get("code");
         const state = getCookie(OAUTH_STATE_COOKIE);

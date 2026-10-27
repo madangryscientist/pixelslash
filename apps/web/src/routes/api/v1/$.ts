@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { handleApi } from "#/api/handler";
 import {
+  apiRateLimit,
   blobStore,
   checkRunDeps,
   database,
@@ -24,6 +25,7 @@ const handle = ({ request }: { request: Request }) => {
     diffSidecar: diffSidecarUrl(),
     defaultDiffLocation,
     checkRuns: checkRunDeps(db),
+    rateLimit: apiRateLimit(),
   });
 };
 
