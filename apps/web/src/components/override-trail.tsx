@@ -7,6 +7,7 @@ import {
   Code,
   CodeBlock,
   CopyButton,
+  Disclosure,
   Empty,
   Overline,
   SectionHeading,
@@ -150,20 +151,22 @@ function ClearButton({
 /** The overrides and ignore boxes as the config a route would carry, to copy. */
 function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: boolean }) {
   return (
-    <details className="space-y-2 text-sm" data-testid="override-export">
-      <summary className="cursor-pointer text-violet-700">Export as config</summary>
-      <Body as="p" tone="muted">
-        Merge each route&apos;s <Code>diff</Code>, <Code>ignore</Code> and <Code>variants</Code>{" "}
-        into the route of that name in <Code>pixelslash.config.json</Code>, then clear the overrides
-        and ignore boxes here: the builds measure the same. A key the config already sets on that
-        variant beats a route&apos;s; move it to the variant. Ignore boxes are in image px, the
-        config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise divide by it.
-      </Body>
-      <Cluster justify="end">
-        <CopyButton text={exported} disabled={!hydrated} />
-      </Cluster>
-      <CodeBlock data-testid="override-export-json">{exported}</CodeBlock>
-    </details>
+    <Disclosure summary="Export as config" data-testid="override-export">
+      <Stack gap="sm">
+        <Body as="p" tone="muted">
+          Merge each route&apos;s <Code>diff</Code>, <Code>ignore</Code> and <Code>variants</Code>{" "}
+          into the route of that name in <Code>pixelslash.config.json</Code>, then clear the
+          overrides and ignore boxes here: the builds measure the same. A key the config already
+          sets on that variant beats a route&apos;s; move it to the variant. Ignore boxes are in
+          image px, the config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise
+          divide by it.
+        </Body>
+        <Cluster justify="end">
+          <CopyButton text={exported} disabled={!hydrated} />
+        </Cluster>
+        <CodeBlock data-testid="override-export-json">{exported}</CodeBlock>
+      </Stack>
+    </Disclosure>
   );
 }
 

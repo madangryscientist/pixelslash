@@ -264,7 +264,7 @@ test("a project switched to CI diffs in the CLI: the server stores what it measu
   page,
 }) => {
   const token = await provision(page, "Ci Co", "ci-shots", true);
-  await page.getByLabel(/In CI/).check();
+  await page.getByText("In CI", { exact: true }).click();
   const saved = page.waitForResponse(
     (res) => res.request().method() === "POST" && !!res.request().postData()?.includes('"ci"'),
   );

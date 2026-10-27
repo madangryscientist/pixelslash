@@ -9,6 +9,8 @@ import {
   Field,
   Input,
   Overline,
+  Radio,
+  RadioGroup,
   Stack,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
@@ -160,22 +162,17 @@ export function DiffOverride({
 
 function ScopePicker({ scope, onChange }: { scope: Scope; onChange: (scope: Scope) => void }) {
   return (
-    <fieldset className="space-y-1">
-      <legend className="sr-only">Applies to</legend>
-      {(["test", "variant"] as const).map((option) => (
-        <label key={option} className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="override-scope"
-            value={option}
-            checked={scope === option}
-            onChange={() => onChange(option)}
-            data-testid={`override-scope-${option}`}
-          />
-          {option === "test" ? "This test" : "This test, this variant"}
-        </label>
-      ))}
-    </fieldset>
+    <RadioGroup
+      name="override-scope"
+      label="Applies to"
+      value={scope}
+      onChange={(value) => {
+        if (value === "test" || value === "variant") onChange(value);
+      }}
+    >
+      <Radio value="test" label="This test" data-testid="override-scope-test" />
+      <Radio value="variant" label="This test, this variant" data-testid="override-scope-variant" />
+    </RadioGroup>
   );
 }
 

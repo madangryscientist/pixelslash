@@ -11,6 +11,8 @@ import {
   ListRow,
   Overline,
   Pill,
+  Radio,
+  RadioGroup,
   Section,
   Stack,
   TextLink,
@@ -112,24 +114,21 @@ function FlagList({ flags }: { flags: SnapshotFlag[] }) {
 
 function KindPicker({ kind, onKind }: { kind: FlagKind | null; onKind: (kind: FlagKind) => void }) {
   return (
-    <Stack gap="xs">
+    <RadioGroup
+      name="flag-kind"
+      label="Kind"
+      value={kind ?? ""}
+      onChange={(value) => KINDS.filter((option) => option === value).forEach(onKind)}
+    >
       {KINDS.map((option) => (
-        <label key={option} className="flex items-start gap-2">
-          <input
-            type="radio"
-            name="flag-kind"
-            value={option}
-            checked={kind === option}
-            onChange={() => onKind(option)}
-            className="mt-1"
-          />
-          <span className="grid">
-            <Body>{FLAG_LABELS[option]}</Body>
-            <Caption tone="muted">{KIND_HINTS[option]}</Caption>
-          </span>
-        </label>
+        <Radio
+          key={option}
+          value={option}
+          label={FLAG_LABELS[option]}
+          description={KIND_HINTS[option]}
+        />
       ))}
-    </Stack>
+    </RadioGroup>
   );
 }
 

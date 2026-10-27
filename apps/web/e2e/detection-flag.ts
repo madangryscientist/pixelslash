@@ -19,7 +19,7 @@ export async function flagFalsePositive(page: Page) {
 
   await page.getByRole("button", { name: "Flag detection" }).click();
   const form = page.getByRole("form", { name: "Flag detection" });
-  await form.getByLabel(/False positive/).check();
+  await form.getByText("False positive", { exact: true }).click();
   await form.getByLabel("Note (optional)").fill("anti-aliasing on the heading");
   await form.getByRole("button", { name: "Mark an area" }).click();
   const layer = page.getByTestId("flag-draw").last();

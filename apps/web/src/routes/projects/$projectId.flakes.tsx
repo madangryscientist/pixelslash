@@ -8,6 +8,7 @@ import {
   Card,
   Cluster,
   ClusterGrow,
+  Disclosure,
   Input,
   ListLayout,
   Pill,
@@ -138,14 +139,15 @@ function FlakeItem({ projectId, flake, now }: { projectId: string; flake: FlakeV
               </TextLink>
             </Stack>
           )}
-          <details>
-            <summary className="cursor-pointer">
-              <Body tone="muted">Policy: {policy}. Change it in config</Body>
-            </summary>
-            <div className="mt-2">
-              <FlakyPolicyControl policy={policy} />
-            </div>
-          </details>
+          <Disclosure
+            summary={
+              <Body as="span" tone="muted">
+                Policy: {policy}. Change it in config
+              </Body>
+            }
+          >
+            <FlakyPolicyControl policy={policy} />
+          </Disclosure>
         </Stack>
       </Card>
     </li>

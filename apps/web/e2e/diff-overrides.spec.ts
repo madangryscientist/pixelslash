@@ -28,7 +28,7 @@ test("an override set on the snapshot screen flips the verdict and exports as co
   await expect(page.getByTestId("option-minChangedPixels")).toHaveText("engine default");
 
   // The change is 10x10 = 100 px: a floor of 200 makes it unchanged, and the build passes.
-  await page.getByTestId("override-scope-variant").check();
+  await page.getByTestId("override-scope-variant").click();
   await page.getByTestId("override-minChangedPixels").fill("200");
   await page.getByTestId("override-save").click();
   await expect(page.getByTestId("override-note")).toHaveText(
@@ -49,7 +49,10 @@ test("an override set on the snapshot screen flips the verdict and exports as co
 
   await open(page, `/projects/${projectId}/settings`);
   await expect(page.getByTestId("override-row")).toHaveCount(1);
-  await page.getByTestId("override-export").locator("summary").click();
+  await page
+    .getByTestId("override-export")
+    .getByRole("button", { name: "Export as config" })
+    .click();
   const exported = JSON.parse((await page.getByTestId("override-export-json").textContent()) ?? "");
   expect(exported).toEqual({
     variants: [

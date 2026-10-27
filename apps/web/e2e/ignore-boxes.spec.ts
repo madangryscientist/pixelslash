@@ -68,7 +68,10 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
   await open(page, `/projects/${projectId}/settings`);
   await expect(page.getByTestId("ignore-row")).toHaveCount(1);
   await expect(page.getByTestId("ignore-trail-row")).toHaveCount(1);
-  await page.getByTestId("override-export").locator("summary").click();
+  await page
+    .getByTestId("override-export")
+    .getByRole("button", { name: "Export as config" })
+    .click();
   const exported = JSON.parse((await page.getByTestId("override-export-json").textContent()) ?? "");
   expect(exported).toEqual({
     variants: [
