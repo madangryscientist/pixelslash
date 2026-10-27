@@ -146,52 +146,25 @@ bun run pixelslash -- --live-png <main.png> --local-png <branch.png> --out /tmp/
 
 ## Landing: through a pull request
 
-Decided by Jacobus 2026-10-27: pixelslash and hackcove merge through PRs, so the PixelSlash
-GitHub check (PS-23) can be seen working on a real PR. **The builder opens the PR and hands it
-back; the planner gates and merges it.** Tickets dispatched before this rule (up to PS-233 and
-PS-23) land the old way, a squash pushed straight to `main`.
+This repo lands through pull requests (Jacobus, 2026-10-27), so the PixelSlash GitHub check
+(PS-23) can be seen working on a real PR. Who opens and who merges is the global rule
+("Pull requests: the builder opens them"); only what is particular to this repo is here.
 
-1. Builder commits on its own branch, ending the message with one of
-   `State: landable` / `State: needs-human` / `State: blocked` / `State: partial`.
-2. On `landable` or `needs-human`, the builder rebases on `origin/main`, pushes its branch and
-   opens the PR, then hands off (`ob spinoff handoff`) with the PR URL in the note:
+- The repo is private on GitHub's free plan: no branch protection, no required checks, so
+  nothing on GitHub stops a merge. The planner does. Do not merge a PR whose PixelSlash check
+  is failing or pending (`gh pr checks <pr> --watch`, once PS-234 has installed the App),
+  unless the PR changes nothing a shot can see and says so.
+- When the land changes `apps/web` (or what it imports), deploy main to the LAN self-host
+  (CT 135) from a clean checkout at the merged squash. The build runs here and the CT only
+  installs and switches, so a failed release rolls itself back (`apps/web/README.md`, "Run it
+  on the Proxmox server"):
 
-   ```bash
-   git fetch origin && git rebase origin/main
-   git push -u origin <branch>
-   gh pr create --base main --head <branch> --title "<type>(ps N): <title>" --body-file <msg>
-   ```
+  ```bash
+  PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
+    apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
+  ```
 
-   The PR body is the commit body: what changed, how it was gated, the `State:` line. The
-   builder never merges, never pushes to `main`, and never opens a PR for `blocked`/`partial`.
-3. The planner gates the PR's head in a land worktree (as before), and only on a green gate
-   merges it. Merging is the planner's step and only the planner's:
-
-   ```bash
-   gh pr checks <pr> --watch            # once PS-234 has installed the App: wait for PixelSlash
-   gh pr merge <pr> --squash --delete-branch --subject "<squash subject>" --body-file <msg>
-   ```
-
-   If `main` moved and the PR no longer rebases cleanly, the planner sends it back to the
-   builder to rebase; it does not resolve the builder's conflicts itself.
-
-   The repo is private on GitHub's free plan, so branch protection and required checks are not
-   available: nothing on GitHub stops a merge. The planner does. Do not merge a PR whose
-   PixelSlash check is failing or pending, unless the PR changes nothing a shot can see and
-   says so. No commit, PR title or PR body carries a `Co-Authored-By` or any AI attribution
-   line.
-
-4. When the land changes `apps/web` (or what it imports), deploy main to the LAN self-host
-   (CT 135) from the land worktree, clean and at the pushed squash. The build runs here and the
-   CT only installs and switches, so a failed release rolls itself back
-   (`apps/web/README.md`, "Run it on the Proxmox server"):
-
-   ```bash
-   PIXELSLASH_LAN_SSH=root@192.168.0.20 PIXELSLASH_LAN_CT=135 PIXELSLASH_LAN_SSH_KEY=~/.ssh/id_ed25519_mac \
-     apps/web/deploy/lan/release.sh "$(git rev-parse HEAD)"
-   ```
-
-   There is no `git pull` on the CT any more and no `update.sh` to run there by hand.
+  There is no `git pull` on the CT any more and no `update.sh` to run there by hand.
 
 Scan several worktrees without opening a diff:
 
