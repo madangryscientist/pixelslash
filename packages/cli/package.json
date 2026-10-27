@@ -1,6 +1,7 @@
 {
   "name": "@pixelslash/cli",
   "private": true,
+  "license": "Apache-2.0",
   "bin": {
     "pixelslash": "src/index.ts"
   },

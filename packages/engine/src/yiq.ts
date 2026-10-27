@@ -3,9 +3,11 @@
  * pixel loop and its anti-alias test run in `diff.wasm` (PS-210).
  */
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /** Largest YIQ delta (squared, weighted) between black and white. */
 export const MAX_YIQ_DELTA = 35215;
 
+// Ported from pixelmatch (ISC): see NOTICE.
 function lumaIq(data: Uint8Array, i: number): [number, number, number] {
   let r = data[i] ?? 0;
   let g = data[i + 1] ?? 0;
@@ -23,6 +25,7 @@ function lumaIq(data: Uint8Array, i: number): [number, number, number] {
   ];
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /** Perceptual distance between two pixels, signed: negative when `b` is the lighter one. */
 export function colourDelta(a: Uint8Array, ia: number, b: Uint8Array, ib: number): number {
   const same =

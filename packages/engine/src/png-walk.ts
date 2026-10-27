@@ -61,6 +61,7 @@ class Reader {
 /** The walk's state: the reader, the CRC of the file's bytes, and the image once IHDR is read. */
 type Walk = { reader: Reader; crc: (at: number, len: number) => number; png: Png | null };
 
+// Ported from pngjs (MIT): see NOTICE.
 /** The IHDR fields, or the error pngjs gives for the first one it does not support. */
 function headerOf(data: Buffer): Png {
   const [depth, colour, compression, filter, interlace] = [8, 9, 10, 11, 12].map((i) => data[i]);
@@ -74,6 +75,7 @@ function headerOf(data: Buffer): Png {
   return { width, height, depth, colour, interlace, idat: [], palette: [], trans: [] };
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /** A tRNS chunk applied to `png` as pngjs's `_parseTRNS` does. */
 function readTrns(png: Png, data: Buffer) {
   if (png.colour === 3) {
@@ -132,6 +134,7 @@ function nextChunk(walk: Walk): Png | null {
   return null;
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /**
  * Walk `bytes` chunk by chunk, as pngjs's parser and sync reader do; `crc(at, len)` is the CRC of
  * `len` bytes from offset `at`. The errors are pngjs's too, including its quirk: an error raised

@@ -31,6 +31,7 @@ public static class PixelDiff
     /// <summary>The engine's DEFAULT_THRESHOLD.</summary>
     public const double DefaultThreshold = 0.01;
 
+    // Ported from pixelmatch (ISC): see NOTICE.
     /// <summary>Largest YIQ delta (squared, weighted) between black and white.</summary>
     public const double MaxYiqDelta = 35215;
 
@@ -94,6 +95,7 @@ public static class PixelDiff
     /// <summary>JavaScript's Math.round for the non-negative values used here (C# rounds half to even).</summary>
     static int RoundHalfUp(double v) => (int)Math.Floor(v + 0.5);
 
+    // Ported from pixelmatch (ISC): see NOTICE.
     static double Luma(byte[] d, int i, out double inPhase, out double quadrature)
     {
         double r = d[i];
@@ -113,6 +115,7 @@ public static class PixelDiff
 
     static double Luma(byte[] d, int i) => Luma(d, i, out _, out _);
 
+    // Ported from pixelmatch (ISC): see NOTICE.
     /// <summary>Perceptual distance between two pixels, signed: negative when `b` is the lighter one.</summary>
     public static double ColourDelta(byte[] a, int ia, byte[] b, int ib)
     {
@@ -129,6 +132,7 @@ public static class PixelDiff
     static bool SameRgba(byte[] d, int a, int b) =>
         d[a] == d[b] && d[a + 1] == d[b + 1] && d[a + 2] == d[b + 2] && d[a + 3] == d[b + 3];
 
+    // Ported from pixelmatch (ISC): see NOTICE.
     /// <summary>More than two of the 8 neighbours share the pixel's exact colour: it sits in a flat area.</summary>
     static bool HasManySiblings(Raster img, int x, int y)
     {
@@ -147,6 +151,7 @@ public static class PixelDiff
         return same > 2;
     }
 
+    // Ported from pixelmatch (ISC): see NOTICE.
     /// <summary>
     /// Whether (x, y) is an anti-aliased edge pixel of `img` (Vysniauskas, 2009): neighbours run
     /// both darker and lighter, few match it, and the extreme neighbour is flat in both shots.
