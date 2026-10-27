@@ -19,14 +19,6 @@ export type Candidate = {
   missing?: string;
 };
 
-/** What `native/build.sh` could not make and why, for the "could not build" list. */
-export const COULD_NOT_BUILD: { name: string; why: string }[] = [
-  {
-    name: "ImageSharp 3.2 / 4.x (C#)",
-    why: "the build stops without a Six Labors licence key; buying one is not ours to do, so 3.1.12 is measured",
-  },
-];
-
 function bytesOf(path: string): number {
   if (!existsSync(path)) return 0;
   const s = statSync(path);
@@ -147,10 +139,6 @@ export function render(
     "| candidate | page | self median | self p95 | wall | startup | decode read / inflate / unfilter / other | pixel_compare / regions | peak RSS MB | licence | install MB |",
     "| --- | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | ---: |",
     ...rows.flatMap((r) => pageRows(t, r)),
-    "",
-    "## Could not build",
-    "",
-    ...COULD_NOT_BUILD.map((c) => `- **${c.name}**: ${c.why}`),
   ];
   return `${out.join("\n")}\n`;
 }

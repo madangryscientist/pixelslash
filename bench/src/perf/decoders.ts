@@ -7,8 +7,7 @@
  *
  *   bun bench/src/perf/decoders.ts [--runs <n>] [--env none|dedicated] [--only <step,...>]
  *
- * It builds what it times first: the C# engine with every candidate compiled in
- * (`-p:DecoderCandidates=true`, into native/out/candidates). The `bun build --compile` start-up row
+ * It builds what it times first: the C# engine (Release, into native/out/candidates). The `bun build --compile` start-up row
  * went in PS-210: a compiled binary does not carry `diff.wasm`, which the engine reads from disk.
  * The native libraries come from `native/build.sh`, which fetches sources and so is not run from
  * here; a candidate whose library is missing is a "could not build" row with the reason, not a
@@ -60,13 +59,6 @@ const CS_DECODERS: CsDecoder[] = [
     licence: "MIT (SkiaSharp) + BSD-3-Clause (Skia)",
     weight: ["SkiaSharp.dll", "runtimes/linux-x64/native"],
   },
-  {
-    name: "imagesharp",
-    licence: "Six Labors Split License 1.0 (3.1.12)",
-    weight: ["SixLabors.ImageSharp.dll"],
-    never:
-      "Six Labors Split: a paid licence for commercial use over $1M revenue; 3.2+ needs a key to build",
-  },
 ];
 
 function csRows(): Candidate[] {
@@ -95,14 +87,13 @@ async function sh(argv: string[], cwd = ROOT): Promise<void> {
 }
 
 async function build(): Promise<void> {
-  warn("decoders: building the C# engine with every candidate");
+  warn("decoders: building the C# engine");
   await sh([
     "dotnet",
     "build",
     join(DOTNET, "PixelSlash.Diff"),
     "-c",
     "Release",
-    "-p:DecoderCandidates=true",
     "-o",
     CANDIDATES_DIR,
     "--nologo",
