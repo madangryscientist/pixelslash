@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# From the desktop (ob 1476): send N screenshot pairs to the argos-bench VM, run Argos's
+# From the maintainer's machine (ob 1476): send N screenshot pairs to the argos-bench VM, run Argos's
 # comparison on them there, and bring the verdicts and diff images back.
 #
 #   ops/argos-bench/run-pairs.sh <pairs-dir> <out-dir> [--threshold n]
@@ -10,8 +10,8 @@
 # and nothing leaves the VM.
 set -euo pipefail
 
-VM="${ARGOS_BENCH_HOST:-debian@192.168.0.45}"
-KEY="${ARGOS_BENCH_KEY:-$HOME/.ssh/id_ed25519_mac}"
+VM="${ARGOS_BENCH_HOST:?set ARGOS_BENCH_HOST to user@host of the argos-bench VM}"
+KEY="${ARGOS_BENCH_KEY:?set ARGOS_BENCH_KEY to the ssh private key that logs in to the VM}"
 [ $# -ge 2 ] || { sed -n '4,9p' "$0" >&2; exit 2; }
 pairs="$1"; out="$2"; shift 2
 

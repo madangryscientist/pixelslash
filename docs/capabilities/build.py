@@ -10,7 +10,9 @@ import pathlib
 import subprocess
 
 HERE = pathlib.Path(__file__).resolve().parent
-REPO = "https://github.com/madangryscientist/pixelslash/commit/"
+# The repo URL lives once, in the GitHub App manifest; a commit link is that URL plus /commit/.
+MANIFEST = HERE.parents[1] / "apps" / "web" / "github-app" / "manifest.json"
+REPO = json.loads(MANIFEST.read_text())["url"].rstrip("/") + "/commit/"
 DATA = json.loads((HERE / "data.json").read_text())
 OUT = HERE / "matrix.html"
 

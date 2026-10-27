@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy a commit to the LAN self-host (CT 135): build it here, ship the release, switch on the CT.
+# Deploy a commit to a self-host container: build it here, ship the release, switch on the CT.
 # Run from a clean checkout of that commit (the planner's land worktree), on the desktop. See
 # apps/web/README.md, "Run it on the Proxmox server".
 #

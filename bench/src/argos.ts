@@ -12,9 +12,16 @@ import type { ToolResult } from "./types.ts";
 
 const RUN_PAIRS = join(BENCH_DIR, "..", "ops", "argos-bench", "run-pairs.sh");
 
-export const argosHost = () => process.env["ARGOS_BENCH_HOST"] ?? "debian@192.168.0.45";
+function required(name: string, what: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set: ${what}. See ops/argos-bench/runbook.md.`);
+  return value;
+}
+
+export const argosHost = () =>
+  required("ARGOS_BENCH_HOST", "set it to user@host of the argos-bench VM");
 export const argosKey = () =>
-  process.env["ARGOS_BENCH_KEY"] ?? join(process.env["HOME"] ?? "", ".ssh", "id_ed25519_mac");
+  required("ARGOS_BENCH_KEY", "set it to the ssh private key that logs in to the argos-bench VM");
 
 type Verdict = {
   name: string;
@@ -64,7 +71,7 @@ export async function runArgos(
   if (code !== 0) {
     throw new Error(
       `Argos run failed (exit ${code}) on ${argosHost()}:\n${stderr.trim()}\n` +
-        "Is VM 101 up? `ssh root@192.168.0.20 'qm start 101'`; set ARGOS_BENCH_HOST if its address changed. See ops/argos-bench/runbook.md.",
+        "Is the argos-bench VM up? Set ARGOS_BENCH_HOST if its address changed. See ops/argos-bench/runbook.md.",
     );
   }
   const results = new Map<string, ArgosResult>();

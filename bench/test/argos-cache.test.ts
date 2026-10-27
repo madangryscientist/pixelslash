@@ -117,6 +117,8 @@ describe("the committed cache", () => {
         return !cache.entries[cacheKey(hash, commit, ARGOS_THRESHOLD)];
       })
       .map(caseKey);
-    expect(missing, "run `bun run bench -- --refresh-argos` with VM 101 up").toEqual([]);
+    expect(missing, "run `bun run bench -- --refresh-argos` with the argos-bench VM up").toEqual(
+      [],
+    );
   });
 });

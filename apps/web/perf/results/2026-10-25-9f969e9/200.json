@@ -1,6 +1,6 @@
 {
   "commit": "9f969e9",
-  "server": "http://192.168.0.34:3000",
+  "server": "server",
   "shots": 200,
   "mix": "mixed",
   "concurrency": 4,
