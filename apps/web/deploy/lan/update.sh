@@ -20,6 +20,10 @@
 # (never printed); every release then gets SENTRY_RELEASE (its sha) and SENTRY_ENVIRONMENT=lan
 # beside it in dist/server/.dev.vars. With no DSN nothing is added and the server reports nowhere.
 #
+# The GitHub App (PS-23) is carried the same way: `.github-app-id`, `.github-app-key` (the PEM,
+# base64) and `.public-url` become GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY and PIXELSLASH_PUBLIC_URL
+# in .dev.vars.e2e. Without both App vars the server sends GitHub nothing.
+#
 # A deploy under a live build (PS-228): the restart kills the Worker mid-diff, and the migration
 # can hold the database's write lock, so a build that is `processing` errors. update.sh refuses,
 # before it changes anything, while the serving release's D1 has a build that began processing in
@@ -184,13 +188,20 @@ upsert_var() {
   mv "$tmp" "$file"
 }
 
-# A DSN release.sh carried in release $1 is saved with the CT's secrets, where every later release
-# finds it, and the carried copy is removed.
-take_sentry_dsn() {
-  local carried=$1/.sentry-dsn
-  [[ -f $carried ]] || return 0
-  upsert_var "$SHARED_WEB/.dev.vars.e2e" SENTRY_DSN <"$carried"
-  rm -f "$carried"
+# The secrets release.sh can carry, as `<file in the release>:<var in .dev.vars.e2e>`.
+CARRIED=(.sentry-dsn:SENTRY_DSN .github-app-id:GITHUB_APP_ID .github-app-key:GITHUB_APP_PRIVATE_KEY
+  .public-url:PIXELSLASH_PUBLIC_URL)
+
+# Each secret release.sh carried in release $1 is saved with the CT's secrets, where every later
+# release finds it, and the carried copy is removed.
+take_carried() {
+  local pair carried
+  for pair in "${CARRIED[@]}"; do
+    carried=$1/${pair%%:*}
+    [[ -f $carried ]] || continue
+    upsert_var "$SHARED_WEB/.dev.vars.e2e" "${pair#*:}" <"$carried"
+    rm -f "$carried"
+  done
 }
 
 # Names release $1 (sha $2) to Sentry, in the secrets copied into it: the deployed commit and `lan`.
@@ -307,7 +318,7 @@ main() {
     unpacked=$rel
     unpack_release "$tarball" "$rel"
   fi
-  take_sentry_dsn "$rel"
+  take_carried "$rel"
   copy_secrets "$rel"
   stamp_sentry "$rel" "$name"
   [[ -z $helper_model ]] || install_opencode "$rel"

@@ -4,6 +4,7 @@ import { chunk } from "#/db/chunks";
 import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
 import { refreshBuildStatus } from "#/db/review";
+import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { builds, projects, snapshots } from "#/db/schema";
 import { finishedAfter, msBetween, recordExplained } from "#/db/server-timings";
 import { projectOf } from "#/diff/build-writes";
@@ -153,6 +154,8 @@ export type ConsumerDeps = {
   /** The model's transport; a test passes a stub. Never a real endpoint in tests. */
   modelFetch?: ModelFetch | undefined;
   modelKeySecret?: string | undefined;
+  /** The GitHub App a build's check run is synced with when a shot's notes pass it (PS-23). */
+  checkRuns?: Omit<CheckRunDeps, "db"> | undefined;
 };
 
 function jobOf(body: unknown): ExplainJob | null {
@@ -246,7 +249,10 @@ async function explainJob(
     .where(and(eq(snapshots.id, shot.id), eq(snapshots.aiQueuedAt, shot.aiQueuedAt)))
     .returning({ id: snapshots.id });
   if (settled.length > 0) await recordSettled(deps, job);
-  if (outcome.passed) await refreshBuildStatus(deps.db, job.buildId);
+  if (outcome.passed) {
+    await refreshBuildStatus(deps.db, job.buildId);
+    if (deps.checkRuns) await syncCheckRuns({ db: deps.db, ...deps.checkRuns }, [job.buildId]);
+  }
   return "done";
 }
 

@@ -508,8 +508,8 @@
       "k": "checks",
       "label": "PR status blocked on review",
       "ps": {
-        "v": "p",
-        "note": "no check run; a CI job blocks on review by exit code with `pixelslash status --wait` or `upload --wait` (ob 1731)",
+        "v": "y",
+        "note": "a PixelSlash check run on each build's commit in the project's connected repo: failure while changes await review or one is rejected, success once all are accepted or nothing changed, updated in place on each decision (PS-23; needs the GitHub App registered, apps/web/github-app). A CI job can also block by exit code with `pixelslash status --wait` (ob 1731)",
         "commit": "f093755"
       },
       "t": {
@@ -519,7 +519,7 @@
         "applitools": "y",
         "lost": "y"
       },
-      "plan": "ob 1471"
+      "plan": ""
     },
     {
       "g": "flow",
@@ -527,7 +527,7 @@
       "label": "GitHub App integration",
       "ps": {
         "v": "p",
-        "note": "sign-in only",
+        "note": "sign-in, and an outbound-only App that posts the check run (PS-23); no webhooks and no PR comment yet",
         "commit": "853940f"
       },
       "t": {
@@ -537,7 +537,7 @@
         "applitools": "y",
         "lost": "y"
       },
-      "plan": "ob 1471"
+      "plan": "PS-82"
     },
     {
       "g": "flow",

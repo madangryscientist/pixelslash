@@ -5,7 +5,8 @@
 #
 #   PIXELSLASH_LAN_SSH=root@<proxmox host> PIXELSLASH_LAN_CT=<ct id> \
 #     [PIXELSLASH_LAN_SSH_KEY=<identity file>] [PIXELSLASH_SENTRY_DSN=<dsn>] \
-#     [PIXELSLASH_DEPLOY_FORCE=1] \
+#     [PIXELSLASH_GITHUB_APP_ID=<id>] [PIXELSLASH_GITHUB_APP_KEY=<pem>] \
+#     [PIXELSLASH_PUBLIC_URL=<url>] [PIXELSLASH_DEPLOY_FORCE=1] \
 #     apps/web/deploy/lan/release.sh <sha>
 #
 # The CT never builds (PS-225): the vite build cannot fit in its 2 GiB beside a running workerd (ob
@@ -17,7 +18,19 @@
 # private file, over the same ssh stream, and update.sh saves it with the CT's secrets. It is read
 # from the environment and never printed or put on a command line. Without it the CT keeps the DSN
 # it already has in .dev.vars.e2e.
+#
+# The GitHub App (PS-23) travels the same way: PIXELSLASH_GITHUB_APP_ID and PIXELSLASH_GITHUB_APP_KEY
+# (the private key's PEM, e.g. `PIXELSLASH_GITHUB_APP_KEY="$(ob secret get pixelslash-github-app-key)"`)
+# become GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY, the key base64'd onto one line so it fits one
+# .dev.vars line. PIXELSLASH_PUBLIC_URL is the URL a check run links its build page on. Each one left
+# unset keeps what the CT has. See apps/web/github-app/README.md.
 set -Eeuo pipefail
+
+# Writes value $2 to the private file $1 in the release, for update.sh to save with the CT's
+# secrets; an empty value writes nothing, so the CT keeps what it has.
+carry() {
+  [[ -z $2 ]] || (umask 077 && printf '%s\n' "$2" >"$1")
+}
 
 main() {
   local sha=${1:?usage: release.sh <sha>}
@@ -49,9 +62,10 @@ main() {
   cp -a apps/web/dist "$stage/$short/apps/web/dist"
   # This machine's .dev.vars must never reach the CT: it carries its own, which update.sh puts here.
   rm -f "$stage/$short/apps/web/dist/server/.dev.vars"
-  if [[ -n ${PIXELSLASH_SENTRY_DSN:-} ]]; then
-    (umask 077 && printf '%s\n' "$PIXELSLASH_SENTRY_DSN" >"$stage/$short/.sentry-dsn")
-  fi
+  carry "$stage/$short/.sentry-dsn" "${PIXELSLASH_SENTRY_DSN:-}"
+  carry "$stage/$short/.github-app-id" "${PIXELSLASH_GITHUB_APP_ID:-}"
+  carry "$stage/$short/.github-app-key" "$(printf '%s' "${PIXELSLASH_GITHUB_APP_KEY:-}" | base64 -w0)"
+  carry "$stage/$short/.public-url" "${PIXELSLASH_PUBLIC_URL:-}"
   tar -czf "$stage/$short.tar.gz" -C "$stage/$short" .
   echo "release $short: $(du -h "$stage/$short.tar.gz" | cut -f1)" >&2
 

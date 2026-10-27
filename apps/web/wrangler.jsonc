@@ -49,6 +49,11 @@
     "SENTRY_DSN": "",
     "SENTRY_RELEASE": "",
     "SENTRY_ENVIRONMENT": "dev",
+    // The GitHub App's check run per build (PS-23), off while either is empty. GITHUB_APP_PRIVATE_KEY is a
+    // secret (`wrangler secret put`, or `.dev.vars`): the App's PEM, or base64 of it. See github-app/README.md.
+    "GITHUB_APP_ID": "",
+    // The server's public URL (no trailing slash), which a check run's "Details" link points at.
+    "PIXELSLASH_PUBLIC_URL": "",
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
@@ -91,6 +96,9 @@
         "SENTRY_DSN": "",
         "SENTRY_RELEASE": "e2e",
         "SENTRY_ENVIRONMENT": "e2e",
+        // No App here: the e2e build sends no check run. The LAN self-host's `.dev.vars` sets both.
+        "GITHUB_APP_ID": "",
+        "PIXELSLASH_PUBLIC_URL": "",
       },
     },
   },

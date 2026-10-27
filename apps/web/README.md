@@ -60,6 +60,15 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
    `apps/web/.dev.vars.e2e` and deploy the current sha again.
 4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see the README's "Error reporting".
 
+## GitHub check runs (PS-23)
+
+Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a
+**PixelSlash** check run on each build's commit: failing while changes await review or one is
+rejected, passing once every change is accepted or nothing changed, updated in place as the build
+is reviewed. It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
+`PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. Registering the
+App, its permissions and deploying its key: [`github-app/README.md`](github-app/README.md).
+
 ## Run it locally as a project's server
 
 A local server is a real PixelSlash server: a CLI pointed at it uploads, the server diffs, and the

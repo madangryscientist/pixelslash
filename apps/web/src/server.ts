@@ -1,6 +1,6 @@
 import handler from "@tanstack/react-start/server-entry";
 import { type ExplainDelivery, consumeExplain } from "#/ai/explain-queue";
-import { blobStore, database, modelKeySecret } from "#/server/env";
+import { blobStore, checkRunDeps, database, modelKeySecret } from "#/server/env";
 import { withOptionalSentry } from "#/server/sentry";
 import { orgBlobs } from "#/storage/blobs";
 
@@ -14,8 +14,9 @@ export default withOptionalSentry({
   async queue(batch: { messages: readonly ExplainDelivery[] }): Promise<void> {
     const store = blobStore();
     const blobs = (orgId: string) => orgBlobs(store, orgId);
+    const db = database();
     await consumeExplain(
-      { db: database(), blobs, modelKeySecret: modelKeySecret() },
+      { db, blobs, modelKeySecret: modelKeySecret(), checkRuns: checkRunDeps(db) },
       batch.messages,
     );
   },

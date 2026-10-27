@@ -14,7 +14,14 @@ import { NoRecoveryError } from "#/diff/claim";
 import { saveAndRediff } from "#/diff/override";
 import { RerunError } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database, diffSidecarUrl, explainQueue, modelKeySecret } from "./env";
+import {
+  blobStore,
+  database,
+  diffSidecarUrl,
+  explainQueue,
+  modelKeySecret,
+  syncChecks,
+} from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
 
@@ -56,7 +63,7 @@ export const saveDiffOverride = createServerFn({ method: "POST" })
     const target = await or404(shotTarget(db, build.id, data.snapshotId, data.scope));
     const blobs = orgBlobs(blobStore(), project.orgId);
     try {
-      return await saveAndRediff(
+      const saved = await saveAndRediff(
         {
           db,
           blobs,
@@ -66,6 +73,8 @@ export const saveDiffOverride = createServerFn({ method: "POST" })
         },
         { userId: user.id, build, target, options: data.options },
       );
+      await syncChecks(db, [build.id]);
+      return saved;
     } catch (error) {
       // A refusal is a message the page states, not a 500.
       if (

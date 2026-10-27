@@ -5,6 +5,8 @@ import type { Db } from "#/db/db";
 import type { ExplainQueue } from "#/ai/explain-queue";
 import { retryBusy } from "#/db/busy";
 import { diffLocationOf } from "#/db/orgs";
+import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app";
+import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
 import { type SentryConfig, sentryConfigOf } from "./sentry-config";
@@ -64,3 +66,31 @@ export function githubConfig(): GithubConfig {
     apiBase: env.GITHUB_API_BASE,
   };
 }
+
+/**
+ * The deployment's GitHub App (PS-23), or null without `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY`.
+ * One client per isolate, so its installation tokens are cached across requests until they near
+ * expiry.
+ */
+let app: GithubApp | undefined;
+
+function githubApp(): GithubApp | null {
+  const config = githubAppConfigOf(env);
+  if (!config) return null;
+  app ??= createGithubApp(config);
+  return app;
+}
+
+/** What a build's check run is synced with: the App and the public URL its link points at. */
+export const checkRunDeps = (db: Db): CheckRunDeps => ({
+  db,
+  app: githubApp(),
+  publicUrl: env.PIXELSLASH_PUBLIC_URL || undefined,
+});
+
+/** Whether the deployment has a GitHub App, for the project settings' note. */
+export const githubAppConfigured = (): boolean => githubApp() !== null;
+
+/** Bring the builds' check runs up to their state (PS-23); never throws. */
+export const syncChecks = (db: Db, buildIds: Iterable<string>): Promise<void> =>
+  syncCheckRuns(checkRunDeps(db), buildIds);

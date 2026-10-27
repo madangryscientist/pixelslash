@@ -10,6 +10,7 @@ import {
 import { type Db, NotFoundError } from "#/db/db";
 import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process";
 import type { DiffLocation } from "#/db/schema";
+import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { reportError } from "#/server/sentry";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { authorize } from "./authorize";
@@ -48,6 +49,8 @@ export type ApiDeps = {
   modelKeySecret?: ProcessDeps["modelKeySecret"];
   /** Where a project made through the API diffs (ob 1787). */
   defaultDiffLocation: () => DiffLocation;
+  /** The GitHub App and public URL a finalised build's check run is synced with (PS-23); unset syncs none. */
+  checkRuns?: Omit<CheckRunDeps, "db">;
 };
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -116,10 +119,15 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // The model's explanations are not in it: they are queued once the verdict is written (ob 1875).
   const blobs = orgBlobs(ctx.store, orgId);
   const { db, diff, diffSidecar, explainQueue, modelKeySecret } = ctx;
+  // The check run says `in_progress` while the diff runs, then the verdict (PS-23); neither call
+  // can fail the finalise.
+  const sync = () => (ctx.checkRuns ? syncCheckRuns({ db, ...ctx.checkRuns }, [done.id]) : null);
+  await sync();
   const result = await processBuild(
     { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret },
     done,
   );
+  await sync();
   return json({
     id: done.id,
     status: result.status,

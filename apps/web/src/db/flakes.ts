@@ -138,12 +138,13 @@ export async function labelFlake(
 /**
  * A reviewer marks a shot flaky by hand: the key's flake opens (or reopens) with no CLI evidence,
  * and the shot is labelled with it. Its config's policy then applies, so the build's verdict is
- * read again. A member of the project's org only; anything else is the same 404.
+ * read again. A member of the project's org only; anything else is the same 404. Returns the flake
+ * and the shot's build, whose check run is synced (PS-23).
  */
 export async function markFlaky(
   db: Db,
   input: { userId: string; projectId: string; snapshotId: string; note: string | null },
-): Promise<string> {
+): Promise<{ flakeId: string; buildId: string }> {
   await getProject(db, input.userId, input.projectId);
   const [shot] = await db
     .select({
@@ -166,7 +167,7 @@ export async function markFlaky(
   });
   await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, input.snapshotId));
   if (status === "changes" || status === "passed") await refreshBuildStatus(db, buildId);
-  return flakeId;
+  return { flakeId, buildId };
 }
 
 /** The project a flake belongs to, for the caller to check the actor may reach it. */

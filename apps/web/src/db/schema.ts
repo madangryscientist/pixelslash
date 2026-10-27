@@ -5,8 +5,8 @@ import type {
   AiSummary,
   BuildTimings,
   DiffOptions,
-  DiffRegion,
   DiffResult,
+  FlakeEvidence,
   IgnoreRect,
   ResolvedDiff,
 } from "./diff-json";
@@ -82,6 +82,8 @@ export const projects = sqliteTable(
      * a new one takes the deployment's `DEFAULT_DIFF_LOCATION`. Set on the settings page.
      */
     diffLocation: text("diff_location", { enum: DIFF_LOCATIONS }).notNull().default("server"),
+    /** The GitHub repo (`owner/name`) its builds' check runs go to (PS-23); null sends none. */
+    githubRepo: text("github_repo"),
     createdAt: createdAt(),
   },
   (t) => [unique().on(t.orgId, t.name)],
@@ -203,6 +205,8 @@ export const builds = sqliteTable(
      * cannot write `errored`, so this is how a `processing` build is told from a dead one.
      */
     processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
+    /** The build's "PixelSlash" check run on GitHub (PS-23), once one is created; updated in place. */
+    checkRunId: integer("check_run_id"),
     /** The project model's summary of what changed (ob 1668); null when none was made. Text only. */
     aiSummary: text("ai_summary", { mode: "json" }).$type<AiSummary>(),
     /**
@@ -421,25 +425,6 @@ export const detectionFlags = sqliteTable(
 
 export const FLAKE_STATUSES = ["open", "resolved"] as const;
 export type FlakeStatus = (typeof FLAKE_STATUSES)[number];
-
-/**
- * One build's evidence that a shot is flaky (ob 1724): the CLI captured it again and the captures
- * disagreed. Run 1 is the shot itself (`imageKey`); `captures` are the re-captures, run 2 onwards,
- * stored beside it. `regions` are where each differing run differed from run 1.
- */
-export type FlakeEvidence = {
-  buildId: string;
-  snapshotId: string;
-  imageKey: string;
-  /** The re-captures that were stored, by run number; a part that was not a PNG is not. */
-  captures: { run: number; key: string }[];
-  runs: number;
-  differed: number[];
-  regions: { run: number; regions: DiffRegion[] }[];
-  engineVersion: string;
-  policy: FlakyPolicy;
-  at: number;
-};
 
 /**
  * A snapshot key (name + variant) whose captures disagreed within one run, or that a reviewer

@@ -20,7 +20,7 @@ import {
   withdrawInvite,
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
-import { NotReviewableError, acceptAllSnapshots, buildView, reviewSnapshot } from "#/db/review";
+import { NotReviewableError, buildView, decideAll, decideShot } from "#/db/review";
 import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
@@ -29,7 +29,13 @@ import { BadRequest, parseRect } from "#/api/validate";
 import { nextToReviewId } from "#/lib/build-tabs";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
-import { database, defaultDiffLocation, sentryConfig } from "./env";
+import {
+  database,
+  defaultDiffLocation,
+  githubAppConfigured,
+  sentryConfig,
+  syncChecks,
+} from "./env";
 import { signFlakeOrNull } from "./flake-images";
 import { imageUrls } from "./image-urls";
 import { field, noteInput, or404 } from "./input";
@@ -117,7 +123,8 @@ export const getProjectSettings = createServerFn()
     const tokens = await listCiTokens(db, user.id, project.id);
     const overrides = await settingsOverrides(db, user.id, project.id);
     const model = await projectModelSource(db, user.id, project.id);
-    return { org, project, tokens, overrides, model, serverUrl: getRequestUrl().origin };
+    const githubApp = githubAppConfigured();
+    return { org, project, tokens, overrides, model, githubApp, serverUrl: getRequestUrl().origin };
   });
 
 export const saveDefaultBranch = createServerFn({ method: "POST" })
@@ -282,28 +289,20 @@ export const reviewShot = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const user = await requireViewer();
-    const status = await orConflict(
-      reviewSnapshot(database(), {
-        projectId: data.projectId,
-        snapshotId: data.snapshotId,
-        state: data.state,
-        userId: user.id,
-      }),
-    );
-    return { status };
+    const db = database();
+    const decided = await orConflict(decideShot(db, { ...data, userId: user.id }));
+    await syncChecks(db, decided.buildIds);
+    return { status: decided.verdict };
   });
 
 export const acceptBuild = createServerFn({ method: "POST" })
   .validator((d: unknown) => ({ projectId: field(d, "projectId"), buildId: field(d, "buildId") }))
   .handler(async ({ data }) => {
     const user = await requireViewer();
-    return orConflict(
-      acceptAllSnapshots(database(), {
-        projectId: data.projectId,
-        buildId: data.buildId,
-        userId: user.id,
-      }).then((status) => ({ status })),
-    );
+    const db = database();
+    const decided = await orConflict(decideAll(db, { ...data, userId: user.id }));
+    await syncChecks(db, decided.buildIds);
+    return { status: decided.verdict };
   });
 
 /* ------------------------------------------------------------ detection flags (ob 1721) */

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { listFlakes, markFlaky, setFlakeStatus } from "#/db/flakes";
 import { getProjectWithOrg } from "#/db/orgs";
-import { database } from "./env";
+import { database, syncChecks } from "./env";
 import { signedFlake } from "./flake-images";
 import { field, noteInput, or404 } from "./input";
 import { requireViewer } from "./session";
@@ -19,7 +19,9 @@ export const markShotFlaky = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const user = await requireViewer();
-    await or404(markFlaky(database(), { ...data, userId: user.id }));
+    const db = database();
+    const { buildId } = await or404(markFlaky(db, { ...data, userId: user.id }));
+    await syncChecks(db, [buildId]);
   });
 
 export const getFlakesPage = createServerFn()

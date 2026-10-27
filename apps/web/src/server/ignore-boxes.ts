@@ -9,7 +9,14 @@ import { NoRecoveryError } from "#/diff/claim";
 import { addBoxAndRediff, clearBoxAndRediff } from "#/diff/ignore-box";
 import { RerunError } from "#/diff/rerun";
 import { orgBlobs } from "#/storage/blobs";
-import { blobStore, database, diffSidecarUrl, explainQueue, modelKeySecret } from "./env";
+import {
+  blobStore,
+  database,
+  diffSidecarUrl,
+  explainQueue,
+  modelKeySecret,
+  syncChecks,
+} from "./env";
 import { field, or404 } from "./input";
 import { scopeInput } from "./overrides";
 import { requireViewer } from "./session";
@@ -72,9 +79,11 @@ export const addIgnoreBoxFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { user, build, deps } = await openBuild(data.projectId, data.buildId);
     const target = await or404(shotTarget(deps.db, build.id, data.snapshotId, data.scope));
-    return refusalsStated(
+    const added = await refusalsStated(
       addBoxAndRediff(deps, { userId: user.id, build, target, rect: data.rect }),
     );
+    await syncChecks(deps.db, [build.id]);
+    return added;
   });
 
 /** Clear a box from a shot's screen: the open build's shots it applied to are measured again. */
@@ -86,7 +95,11 @@ export const clearIgnoreBoxFn = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data }) => {
     const { user, build, deps } = await openBuild(data.projectId, data.buildId);
-    return refusalsStated(clearBoxAndRediff(deps, { userId: user.id, build, boxId: data.boxId }));
+    const cleared = await refusalsStated(
+      clearBoxAndRediff(deps, { userId: user.id, build, boxId: data.boxId }),
+    );
+    await syncChecks(deps.db, [build.id]);
+    return cleared;
   });
 
 /**

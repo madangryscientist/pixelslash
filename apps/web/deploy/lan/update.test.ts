@@ -214,4 +214,39 @@ describe("update.sh", () => {
       expect(next).not.toContain("SENTRY_RELEASE=aaaaaaa");
     });
   });
+
+  describe("the GitHub App (PS-23)", () => {
+    const KEY = Buffer.from(
+      "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n",
+    ).toString("base64");
+
+    test("the App's id, key and the public URL are saved for every later release, printed nowhere", () => {
+      const s = setup();
+      const carried = {
+        ".github-app-id": "123456",
+        ".github-app-key": KEY,
+        ".public-url": "http://pixelslash.lan:3000",
+      };
+      const { status, stderr, commands } = deploy(s, pack("aaaaaaa", { carried }));
+
+      expect(status).toBe(0);
+      const shared = readFileSync(join(s.legacyWeb, ".dev.vars.e2e"), "utf8");
+      expect(shared).toContain("GITHUB_APP_ID=123456");
+      expect(shared).toContain(`GITHUB_APP_PRIVATE_KEY=${KEY}`);
+      expect(shared).toContain("PIXELSLASH_PUBLIC_URL=http://pixelslash.lan:3000");
+      expect(statSync(join(s.legacyWeb, ".dev.vars.e2e")).mode & 0o777).toBe(0o600);
+      for (const file of Object.keys(carried))
+        expect(existsSync(join(s.releases, "aaaaaaa", file))).toBe(false);
+      expect([stderr, ...commands].join("\n")).not.toContain(KEY);
+
+      // The next release carries none and keeps them; a new id replaces the old one.
+      expect(deploy(s, pack("bbbbbbb", { carried: { ".github-app-id": "654321" } })).status).toBe(
+        0,
+      );
+      const next = varsOf(join(s.releases, "bbbbbbb"));
+      expect(next).toContain(`GITHUB_APP_PRIVATE_KEY=${KEY}`);
+      expect(next).toContain("GITHUB_APP_ID=654321");
+      expect(next).not.toContain("GITHUB_APP_ID=123456");
+    });
+  });
 });

@@ -25,7 +25,7 @@ import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { ModelSettings } from "#/components/model-settings";
 import { OverrideSettings } from "#/components/override-trail";
-import { DefaultBranch, UploadCommand } from "#/components/project-cards";
+import { DefaultBranch, GithubRepo, UploadCommand } from "#/components/project-cards";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
 import type { DiffLocation } from "#/db/schema";
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
 });
 
 function ProjectSettings() {
-  const { project, org, tokens, overrides, model, serverUrl } = Route.useLoaderData();
+  const { project, org, tokens, overrides, model, githubApp, serverUrl } = Route.useLoaderData();
   const router = useRouter();
   const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
@@ -82,6 +82,7 @@ function ProjectSettings() {
         </Card>
         <DefaultBranch projectId={project.id} branch={project.defaultBranch} />
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
+        <GithubRepo projectId={project.id} repo={project.githubRepo} appConfigured={githubApp} />
         <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
         <IgnoreBoxSettings
           projectId={project.id}

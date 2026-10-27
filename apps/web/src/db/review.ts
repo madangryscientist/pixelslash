@@ -62,6 +62,9 @@ async function refreshBuilds(db: Db, buildIds: string[]): Promise<void> {
   for (const buildId of buildIds) await refreshBuildStatus(db, buildId);
 }
 
+/** A decision's outcome: the decided build's verdict, and every build whose status it refreshed. */
+export type Decided = { verdict: Verdict; buildIds: string[] };
+
 /** A build still uploading, processing or errored has no verdict to review. */
 export class NotReviewableError extends Error {
   constructor(status: string) {
@@ -303,22 +306,28 @@ async function reviewableSnapshot(
   return row;
 }
 
+type ShotDecision = {
+  projectId: string;
+  snapshotId: string;
+  state: "accepted" | "rejected";
+  userId: string;
+};
+
 /** Record one reviewer's decision on one shot and move the build to its verdict. */
-export async function reviewSnapshot(
-  db: Db,
-  input: {
-    projectId: string;
-    snapshotId: string;
-    state: "accepted" | "rejected";
-    userId: string;
-  },
-): Promise<Verdict> {
+export async function reviewSnapshot(db: Db, input: ShotDecision): Promise<Verdict> {
+  return (await decideShot(db, input)).verdict;
+}
+
+/** `reviewSnapshot`, also naming the builds it moved: the carried shots' builds as well (PS-23). */
+export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> {
   const shot = await reviewableSnapshot(db, input.projectId, input.snapshotId);
   const decision = { reviewState: input.state, reviewedBy: input.userId, reviewedAt: new Date() };
   await db.update(snapshots).set(decision).where(eq(snapshots.id, input.snapshotId));
   const group = groupOfShot(shot.carriedFrom ?? input.snapshotId);
-  await refreshBuilds(db, await decideGroup(db, input.projectId, group, decision));
-  return refreshBuildStatus(db, shot.buildId);
+  const moved = await decideGroup(db, input.projectId, group, decision);
+  await refreshBuilds(db, moved);
+  const verdict = await refreshBuildStatus(db, shot.buildId);
+  return { verdict, buildIds: [shot.buildId, ...moved] };
 }
 
 /**
@@ -327,10 +336,14 @@ export async function reviewSnapshot(
  * until a new build arrives. The acceptance reaches the other builds' shots that carry the same
  * change (`decideGroup`).
  */
-export async function acceptAllSnapshots(
-  db: Db,
-  input: { projectId: string; buildId: string; userId: string },
-): Promise<Verdict> {
+export async function acceptAllSnapshots(db: Db, input: BuildDecision): Promise<Verdict> {
+  return (await decideAll(db, input)).verdict;
+}
+
+type BuildDecision = { projectId: string; buildId: string; userId: string };
+
+/** `acceptAllSnapshots`, also naming the builds it moved (PS-23). */
+export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> {
   const buildId = await reviewableBuildId(db, input.projectId, input.buildId);
   const decision = {
     reviewState: "accepted",
@@ -345,6 +358,7 @@ export async function acceptAllSnapshots(
       and(eq(snapshots.buildId, buildId), ne(snapshots.reviewState, "accepted"), notSkippedFlaky()),
     );
   const group = groupsOfBuild(db, buildId);
-  await refreshBuilds(db, await decideGroup(db, input.projectId, group, decision));
-  return refreshBuildStatus(db, buildId);
+  const moved = await decideGroup(db, input.projectId, group, decision);
+  await refreshBuilds(db, moved);
+  return { verdict: await refreshBuildStatus(db, buildId), buildIds: [buildId, ...moved] };
 }

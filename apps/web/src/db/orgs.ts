@@ -298,6 +298,20 @@ export async function setDiffLocation(
   await db.update(projects).set({ diffLocation }).where(eq(projects.id, projectId));
 }
 
+/** The GitHub repo the project's builds report a check run to (PS-23); null disconnects it. */
+export async function setGithubRepo(
+  db: Db,
+  userId: string,
+  projectId: string,
+  githubRepo: string | null,
+): Promise<void> {
+  const project = await getProject(db, userId, projectId);
+  await db.update(projects).set({ githubRepo }).where(eq(projects.id, projectId));
+  // A run id belongs to the repo it was made in: another repo gets new runs on the next sync.
+  if (project.githubRepo?.toLowerCase() !== githubRepo?.toLowerCase())
+    await db.update(builds).set({ checkRunId: null }).where(eq(builds.projectId, projectId));
+}
+
 /** A project the user can see, or NotFoundError: another org's project does not exist to them. */
 export async function getProject(db: Db, userId: string, projectId: string): Promise<Project> {
   const [row] = await db

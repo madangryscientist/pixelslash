@@ -90,7 +90,14 @@ export function bunxBody(rest = ""): string {
 }
 
 // A release tarball as release.sh packs it, cut down to what update.sh touches.
-export function pack(sha: string, { broken = false, sentryDsn = "" } = {}) {
+export function pack(
+  sha: string,
+  {
+    broken = false,
+    sentryDsn = "",
+    carried = {},
+  }: { broken?: boolean; sentryDsn?: string; carried?: Record<string, string> } = {},
+) {
   const dir = join(root, "pack", sha);
   mkdirSync(join(dir, "apps/web/deploy/lan"), { recursive: true });
   for (const unit of [...UNITS, "pixelslash-opencode.service"])
@@ -100,6 +107,9 @@ export function pack(sha: string, { broken = false, sentryDsn = "" } = {}) {
   if (broken) writeFileSync(join(dir, "apps/web/BROKEN"), "");
   // What release.sh adds when PIXELSLASH_SENTRY_DSN is set.
   if (sentryDsn) writeFileSync(join(dir, ".sentry-dsn"), `${sentryDsn}\n`, { mode: 0o600 });
+  // And the other secrets it carries, by file name (`.github-app-id`, ...).
+  for (const [file, value] of Object.entries(carried))
+    writeFileSync(join(dir, file), `${value}\n`, { mode: 0o600 });
   const tarball = join(root, `pixelslash-${sha}.tar.gz`);
   const tar = spawnSync("tar", ["-czf", tarball, "-C", dir, "."]);
   expect(tar.status).toBe(0);

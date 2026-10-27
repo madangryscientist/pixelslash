@@ -1,4 +1,6 @@
-/* The JSON a snapshot row stores for its diff, as typed columns of `schema.ts`. */
+/* The JSON a snapshot row stores for its diff, and a flake its evidence, as typed columns of `schema.ts`. */
+
+import type { FlakyPolicy } from "./schema";
 
 /** The diff tolerance a snapshot is compared with; the same keys as the engine's `DiffOptions`. */
 export type DiffOptions = {
@@ -159,4 +161,23 @@ export type AiSummary = {
   match?: AiSummarySentence;
   /** The summary call's tokens (PS-233); absent on a summary older than that. */
   usage?: AiUsage;
+};
+
+/**
+ * One build's evidence that a shot is flaky (ob 1724): the CLI captured it again and the captures
+ * disagreed. Run 1 is the shot itself (`imageKey`); `captures` are the re-captures, run 2 onwards,
+ * stored beside it. `regions` are where each differing run differed from run 1.
+ */
+export type FlakeEvidence = {
+  buildId: string;
+  snapshotId: string;
+  imageKey: string;
+  /** The re-captures that were stored, by run number; a part that was not a PNG is not. */
+  captures: { run: number; key: string }[];
+  runs: number;
+  differed: number[];
+  regions: { run: number; regions: DiffRegion[] }[];
+  engineVersion: string;
+  policy: FlakyPolicy;
+  at: number;
 };

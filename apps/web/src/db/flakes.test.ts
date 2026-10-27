@@ -105,12 +105,13 @@ describe("flakes are stored per key (ob 1724)", () => {
     const ctx = await context();
     const build = await mainThen(ctx, 2, {});
     const about = await onlyShot(ctx, build);
-    const id = await markFlaky(ctx.db, {
+    const { flakeId: id, buildId } = await markFlaky(ctx.db, {
       userId: ctx.userId,
       projectId: ctx.projectId,
       snapshotId: about.id,
       note: "animation",
     });
+    expect(buildId).toBe(build.id);
     const [flake] = await listFlakes(ctx.db, ctx.userId, ctx.projectId);
     expect(flake).toMatchObject({ id, status: "open", evidence: [], note: "animation" });
     expect(flake?.createdBy).toBe("ada");
