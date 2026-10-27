@@ -20,8 +20,8 @@
     "apps/web": {
       "name": "@pixelslash/web",
       "dependencies": {
-        "@hackcove/theme-catppuccin-mocha": "0.2.8",
-        "@hackcove/ui": "0.4.4",
+        "@hackcove/theme-catppuccin-mocha": "0.2.9",
+        "@hackcove/ui": "0.4.5",
         "@pixelslash/engine": "workspace:*",
         "@sentry/cloudflare": "11.9.0",
         "@sentry/react": "11.9.0",
@@ -226,9 +226,9 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
-    "@hackcove/theme-catppuccin-mocha": ["@hackcove/theme-catppuccin-mocha@0.2.8", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-GXUqSbPZaD9bNPmFJ+UW+izFLyhBFcKoqraL+ukas4fMQw64jGYoVGqSrFqJ47QS2EkBFI3MGzio7n8C0Czw0w=="],
+    "@hackcove/theme-catppuccin-mocha": ["@hackcove/theme-catppuccin-mocha@0.2.9", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-QfPuRVQpZx/FCgo0sLoAZExal5TsQKLK0/V7rixGC+YuuMLPCHK53t64BG0AQxkyYSwiwQ3/42xWEQYcPOUsgA=="],
 
-    "@hackcove/ui": ["@hackcove/ui@0.4.4", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-fCqUggXRw6nrUmXNG+wVMdoGdKR+rYEVsvt5Oe+JVrxbD6vSiZDp2oZMvF8DZ5S5jRDpk82cYkTfVdzlZA9LYw=="],
+    "@hackcove/ui": ["@hackcove/ui@0.4.5", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-QwzjUnrOud92FIUBlKEP9zGPDtyJ+q4jsA8Y0LMzUNKg/2Isjsg5Pw6jEP/XPyf5U1MUKwiQV/W0mHZVB/UE5w=="],
 
     "@hono/node-server": ["@hono/node-server@2.1.5", "", { "peerDependencies": { "hono": "^4 || ^5.0.0-0" } }, "sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q=="],
 

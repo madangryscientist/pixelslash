@@ -26,7 +26,6 @@ export function OrgRail({
             <ListRow
               key={org.id}
               size="sm"
-              data-testid="org-link"
               selected={org.id === selectedId}
               leading={<Avatar name={org.name} size="sm" />}
               trailing={

@@ -126,23 +126,20 @@ function BuildRow({
             <Caption mono>{build.commitSha.slice(0, 7)}</Caption>
             {build.prNumber !== null && <Caption>PR #{build.prNumber}</Caption>}
             {build.branch !== defaultBranch && (
-              // Gap: nothing in hackcove lifts a link above a stretched rowLinkClass link.
-              <span className="relative z-10">
-                <TextLink
-                  size="xs"
-                  tone="muted"
-                  data-testid="branch-link"
-                  render={(props) => (
-                    <Link
-                      to="/projects/$projectId/branches/$branch"
-                      params={{ projectId, branch: build.branch }}
-                      {...props}
-                    />
-                  )}
-                >
-                  whole branch
-                </TextLink>
-              </span>
+              <TextLink
+                size="xs"
+                tone="muted"
+                data-testid="branch-link"
+                render={(props) => (
+                  <Link
+                    to="/projects/$projectId/branches/$branch"
+                    params={{ projectId, branch: build.branch }}
+                    {...props}
+                  />
+                )}
+              >
+                whole branch
+              </TextLink>
             )}
           </Cluster>
         }

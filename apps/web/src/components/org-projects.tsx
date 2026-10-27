@@ -34,21 +34,18 @@ function BuildCell({ project }: { project: ProjectOverview }) {
     return (
       <Stack gap="xs">
         <Body tone="muted">no builds</Body>
-        {/* Gap: nothing in hackcove lifts a link above a stretched rowLinkClass link. */}
-        <span className="relative z-10">
-          <TextLink
-            size="xs"
-            render={(props) => (
-              <Link
-                to="/projects/$projectId/settings"
-                params={{ projectId: project.id }}
-                {...props}
-              />
-            )}
-          >
-            Set up uploads →
-          </TextLink>
-        </span>
+        <TextLink
+          size="xs"
+          render={(props) => (
+            <Link
+              to="/projects/$projectId/settings"
+              params={{ projectId: project.id }}
+              {...props}
+            />
+          )}
+        >
+          Set up uploads →
+        </TextLink>
       </Stack>
     );
   }
