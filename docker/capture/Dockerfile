@@ -26,11 +26,19 @@ ADD --checksum=sha256:fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e84
     https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2 /tmp/
 ADD --checksum=sha256:39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817 \
     https://github.com/googlefonts/noto-emoji/raw/v2.047/fonts/NotoColorEmoji.ttf /fonts/
+# Each font's licence, shipped with the image (it is redistributed). Liberation and DejaVu carry
+# theirs in the tarball; Noto Color Emoji's OFL is fetched from the same tag.
+ADD --checksum=sha256:6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2 \
+    https://raw.githubusercontent.com/googlefonts/noto-emoji/v2.047/fonts/LICENSE /licences/noto-color-emoji/LICENSE
 RUN apt-get update \
  && apt-get install -y --no-install-recommends bzip2 \
  && tar -xzf /tmp/liberation-fonts-ttf-2.1.5.tar.gz -C /fonts --strip-components=1 --wildcards '*.ttf' \
  && tar -xjf /tmp/dejavu-fonts-ttf-2.37.tar.bz2 -C /fonts --strip-components=2 --wildcards '*/ttf/*.ttf' \
- && chmod 644 /fonts/*.ttf
+ && chmod 644 /fonts/*.ttf \
+ && mkdir -p /licences/liberation-fonts /licences/dejavu-fonts \
+ && tar -xzf /tmp/liberation-fonts-ttf-2.1.5.tar.gz -C /licences/liberation-fonts --strip-components=1 --wildcards '*/LICENSE' '*/AUTHORS' \
+ && tar -xjf /tmp/dejavu-fonts-ttf-2.37.tar.bz2 -C /licences/dejavu-fonts --strip-components=1 --wildcards '*/LICENSE' '*/AUTHORS' \
+ && chmod -R a+rX /licences
 
 # opencode, the pinned release. The tarball is @opencode/cli-linux-x64 (glibc, x86-64) from
 # the npm registry, where `opencode upgrade` fetches it; the sha256 below was computed from
@@ -65,6 +73,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=fonts /fonts/ /usr/share/fonts/pixelslash/
+COPY --from=fonts /licences/ /usr/share/doc/pixelslash-fonts/
 RUN find /usr/share/fonts -mindepth 1 -maxdepth 1 ! -name pixelslash -exec rm -rf {} + \
  && rm -rf /usr/local/share/fonts /root/.fonts /root/.local/share/fonts \
  && fc-cache -f \

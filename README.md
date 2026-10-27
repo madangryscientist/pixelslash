@@ -107,6 +107,8 @@ docker build -f docker/capture/Dockerfile -t pixelslash-capture:dev .
 docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [--config FILE] [--out DIR] [--only NAME]... [--json]
 ```
 
+A release also publishes the image: pushing a `v*` tag builds it and pushes `ghcr.io/madangryscientist/pixelslash-capture:<version>` (`v0.1.0` becomes `0.1.0`; `linux/amd64`). Pull it in place of the local build, and pin by digest in CI. The licences of the bundled fonts (Liberation, DejaVu, Noto Color Emoji) are in the image under `/usr/share/doc/pixelslash-fonts/`.
+
 `--config` defaults to the first `pixelslash.config.{ts,js,mjs,json}` in the working dir (JS/TS: the default export). `--out` defaults to `pixelslash-snapshots`. `--only NAME` (repeatable) captures just those routes or stories, every variant; an unknown name is exit 2. `--json` prints `{ measured: "local", uploaded: false, manifest, shots, timings }` instead of the summary, each shot with its `name`, `variant`, `browser`, `viewport`, `theme`, absolute `file` and `media` (see the media note under `ignore`); it is what the `capture_local` MCP tool returns. Exit 0 on success, 1 when a page cannot be captured or the start command fails, 2 on a bad flag or config.
 
 ```json
