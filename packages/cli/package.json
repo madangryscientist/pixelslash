@@ -1,5 +1,5 @@
 {
-  "name": "pixelslash",
+  "name": "@hackcove/pixelslash",
   "version": "0.1.0",
   "description": "Visual review from the command line: capture Main and Branch, pixel-diff them, write a report.",
   "keywords": [
@@ -25,6 +25,9 @@
     "NOTICE"
   ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
     "@sentry/bun": "11.9.0",

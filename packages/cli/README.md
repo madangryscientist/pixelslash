@@ -10,8 +10,8 @@ reference for every command and flag is that repository's README.
 ## Install
 
 ```bash
-npm i -D pixelslash
-npx pixelslash install-browser   # once per machine, for URL capture
+npm i -D @hackcove/pixelslash
+npx @hackcove/pixelslash install-browser   # once per machine, for URL capture
 ```
 
 - **Bun is required.** The bundle runs on the Bun runtime (`#!/usr/bin/env bun`), not Node; install
@@ -25,10 +25,10 @@ npx pixelslash install-browser   # once per machine, for URL capture
 
 ```bash
 # two screenshots you already have
-npx pixelslash --live-png main.png --local-png branch.png --out out
+npx @hackcove/pixelslash --live-png main.png --local-png branch.png --out out
 
 # two URLs that are already up
-npx pixelslash --live https://example.com --local http://localhost:3000 --out out
+npx @hackcove/pixelslash --live https://example.com --local http://localhost:3000 --out out
 ```
 
 Open `out/report.html`. The exit code is 0 unless new violations were found on Branch; 2 is a
