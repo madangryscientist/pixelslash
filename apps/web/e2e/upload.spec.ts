@@ -215,7 +215,10 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
 
   // A revoked token is refused.
   await page.goto("/orgs");
-  await page.getByTestId("org-link").filter({ hasText: "Upload Co" }).click();
+  await page
+    .getByRole("navigation", { name: "Organizations" })
+    .getByRole("link", { name: /^Upload Co \d+$/ })
+    .click();
   await openSettings(page, "ship");
   await page.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByRole("row", { name: /ci/ })).toContainText("revoked");

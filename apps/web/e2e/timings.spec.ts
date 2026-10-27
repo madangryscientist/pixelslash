@@ -5,7 +5,10 @@ import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from
 
 async function openTimings(page: Page, org: string) {
   await open(page, "/orgs");
-  await page.getByTestId("org-link").filter({ hasText: org }).click();
+  await page
+    .getByRole("navigation", { name: "Organizations" })
+    .getByRole("link", { name: new RegExp(`^${org} \\d+$`) })
+    .click();
   await expect(page.getByRole("heading", { name: org, exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Timings", exact: true }).click();
   await expect(page).toHaveURL(/tab=timings/);

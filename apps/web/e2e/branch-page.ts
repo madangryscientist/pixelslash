@@ -15,6 +15,13 @@ export async function expectBranchPage(
   branch: string,
   capture: (page: Page, name: string) => Promise<void>,
 ) {
+  // A click elsewhere on the build row follows the row; the branch link below takes its own click.
+  await page
+    .getByTestId("build-row")
+    .first()
+    .click({ position: { x: 600, y: 3 } });
+  await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/builds/[^/]+$`));
+  await page.goBack();
   await page.getByTestId("build-row").first().getByTestId("branch-link").click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/branches/${branch}$`));
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();

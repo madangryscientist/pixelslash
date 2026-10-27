@@ -32,6 +32,16 @@ test("an empty org says what a project is, and a pending invite can be withdrawn
   await expect(page.getByTestId("project-row")).toHaveCount(1);
   await expect(page.getByTestId("project-row")).toContainText("no builds yet");
 
+  // The link inside the stretched row takes its own click; a click elsewhere on the row follows the row.
+  const projectRow = page.getByTestId("project-row");
+  await projectRow.getByRole("link", { name: "Set up uploads →" }).click();
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/settings/);
+  await page.goBack();
+  await projectRow.click({ position: { x: 600, y: 3 } });
+  await expect(page).toHaveURL(/\/projects\/[^/]+$/);
+  await page.goBack();
+  await expect(page.getByTestId("project-row")).toHaveCount(1);
+
   await page.getByRole("link", { name: /^Members/ }).click();
   await page.getByLabel("Invite a member by GitHub login").fill("octo-dev");
   await page.getByRole("button", { name: "Invite", exact: true }).last().click();
