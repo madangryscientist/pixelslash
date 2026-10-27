@@ -13,6 +13,7 @@ import {
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { MainGroups } from "#/components/branch-main-groups";
+import { BranchMetrics } from "#/components/branch-metrics";
 import { BuildBrief } from "#/components/build-brief";
 import {
   type BranchMode,
@@ -109,6 +110,7 @@ function BranchPage() {
       >
         <BranchMeta project={project} build={build} buildCount={buildCount} />
         <BuildBrief brief={build.brief} />
+        <BranchMetrics metrics={data.metrics} />
         <MainSummaryBox summary={summary} status={build.status} />
         <ModeTabs projectId={project.id} branch={build.branch} active={mode} />
         {error && (

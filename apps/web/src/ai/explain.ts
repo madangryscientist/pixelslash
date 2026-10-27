@@ -5,9 +5,10 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { inChunks } from "#/db/chunks";
 import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
-import { type AiRegionNote, type AiReview, snapshots } from "#/db/schema";
+import { type AiRegionNote, type AiReview, type AiUsage, snapshots } from "#/db/schema";
 import type { BlobStore } from "#/storage/blobs";
 import { MODEL_TIMEOUT_MS, type ModelFetch, explainRegion } from "./model";
+import { tally } from "./usage";
 
 /**
  * Explaining a build's changes (ob 1473): after the pixel diff, each `change` region of a changed
@@ -97,11 +98,11 @@ async function explainShot(
   endpoint: { baseUrl: string; model: string; apiKey: string },
   shot: Shot,
   buildId: string,
-): Promise<{ notes: AiRegionNote[]; whole: boolean; failure: string | null }> {
+): Promise<{ notes: AiRegionNote[]; usage: AiUsage; whole: boolean; failure: string | null }> {
   const changes = (shot.diffResult?.regions ?? []).filter((r) => r.kind === "change");
   const asked: Box[] = changes.slice(0, MAX_REGIONS_PER_SHOT);
   if (asked.length === 0 || !shot.baselineKey || !shot.diffKey)
-    return { notes: [], whole: false, failure: null };
+    return { notes: [], usage: tally([]), whole: false, failure: null };
   const [main, branch, diff] = await Promise.all([
     readBlob(deps.blobs, shot.baselineKey),
     readBlob(deps.blobs, shot.imageKey),
@@ -118,18 +119,21 @@ async function explainShot(
   const answers = await settleLimited(asked, MODEL_CONNECTIONS, async (region, i) => {
     const crop = crops[i];
     if (!crop) throw new Error("region is outside the overlap");
-    const answer = await explainRegion(endpoint, crop, {
+    const { usage, ...answer } = await explainRegion(endpoint, crop, {
       buildId,
       fetcher: deps.modelFetch,
       timeoutMs: MODEL_TIMEOUT_MS,
     });
     const note: AiRegionNote = { x: region.x, y: region.y, w: region.w, h: region.h, ...answer };
-    return note;
+    return { note, usage };
   });
-  const notes = answers.flatMap((a) => (a.status === "fulfilled" ? [a.value] : []));
+  const fulfilled = answers.flatMap((a) => (a.status === "fulfilled" ? [a.value] : []));
+  const notes = fulfilled.map((a) => a.note);
   const failed = answers.find((a) => a.status === "rejected");
   return {
     notes,
+    // A failed call's tokens are not counted: only the answers stored.
+    usage: tally(fulfilled.map((a) => a.usage)),
     whole: notes.length === changes.length,
     failure: failed ? messageOf(failed.reason) : null,
   };
@@ -161,14 +165,14 @@ export async function storeShot(
   { buildId, now }: { buildId: string; now: () => number },
 ): Promise<{ stored: boolean; passed: boolean; failure: string | null }> {
   const endpoint = { baseUrl: model.baseUrl, model: model.model, apiKey: model.apiKey };
-  const { notes, whole, failure } = await explainShot(deps, endpoint, shot, buildId);
+  const { notes, usage, whole, failure } = await explainShot(deps, endpoint, shot, buildId);
   if (notes.length === 0) return { stored: false, passed: false, failure };
   const autoPassed =
     model.autoPassNoise &&
     whole &&
     !shot.diffResult?.sizeChanged &&
     notes.every((note) => note.label === "noise");
-  const aiReview: AiReview = { model: model.model, at: now(), regions: notes, autoPassed };
+  const aiReview: AiReview = { model: model.model, at: now(), regions: notes, autoPassed, usage };
   const decided = autoPassed
     ? { reviewState: "accepted" as const, reviewedBy: null, reviewedAt: new Date(now()) }
     : {};

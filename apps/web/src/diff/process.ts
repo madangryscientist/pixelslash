@@ -23,11 +23,13 @@ import {
   ciComparer,
   diffKeyOf,
   serverComparer,
+  timedComparer,
 } from "./compare";
 import { measureAgainstMain } from "./against-main";
-import { Budget } from "./budget";
+import { Budget, DiffCeilingError } from "./budget";
 import {
   type ProjectOfBuild,
+  UNCOMPARED,
   acceptDefaultBranchBuild,
   clearMarkers,
   markErrored,
@@ -53,7 +55,7 @@ export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
  * diffed here instead.
  */
 
-export { DIFF_BUDGET_MS } from "./budget";
+export { DIFF_BUDGET_MS, DiffCeilingError } from "./budget";
 
 export type ProcessDeps = {
   db: Db;
@@ -69,24 +71,6 @@ export type ProcessDeps = {
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
   modelKeySecret?: string | undefined;
 };
-
-/**
- * This run stopped before the Worker's limit with shots left. Not a failure to start over from:
- * what was measured is kept, and the next finalise measures only the rest (ob 1645). Its count
- * includes shots a changed baseline sends back, which a count of rows with no result would miss.
- */
-export class DiffCeilingError extends Error {
-  readonly unmeasured: number;
-  constructor(measured: number, total: number, usedMs: number, slowestMs: number) {
-    super(
-      `diff ceiling: measured ${measured} of ${total} shots (${total - measured} left); this run ` +
-        `used ${(usedMs / 1000).toFixed(1)} s (slowest shot ${(slowestMs / 1000).toFixed(1)} s) ` +
-        `and the next could pass the Worker's 30 s CPU limit. Finalise again to measure the rest.`,
-    );
-    this.name = "DiffCeilingError";
-    this.unmeasured = total - measured;
-  }
-}
 
 async function storeSnapshot(
   db: Db,
@@ -113,30 +97,16 @@ async function storeUncompared(
     shot.id,
     baseline
       ? {
-          diffStatus: null,
-          diffResult: null,
-          diffKey: null,
+          ...UNCOMPARED,
           rebaselineNeeded: true,
           baselineKey: baseline.imageKey,
           baselineSnapshotId: baseline.id,
-          carriedFrom: null,
-          measuredBy: null,
-          engineVersion: null,
-          diffError: null,
-          aiReview: null,
         }
       : {
+          ...UNCOMPARED,
           diffStatus: "new",
-          diffResult: null,
-          diffKey: null,
           baselineKey: null,
           baselineSnapshotId: null,
-          rebaselineNeeded: false,
-          carriedFrom: null,
-          measuredBy: null,
-          engineVersion: null,
-          diffError: null,
-          aiReview: null,
         },
   );
   await dropOwnOverlay(deps, shot);
@@ -158,6 +128,7 @@ async function storeDiff(
   const { baseline, carriedFrom } = against;
   const diffKey = await measured.diffKey();
   await storeSnapshot(deps.db, shot.id, {
+    diffMs: measured.compareMs?.() ?? null,
     baselineKey: baseline.imageKey,
     baselineSnapshotId: baseline.id,
     diffKey,
@@ -257,8 +228,9 @@ async function measure(
     if (!stands(shot, baseline)) {
       if (!budget.fits())
         throw new DiffCeilingError(done, rows.length, budget.used(), budget.slowest);
-      await budget.spend(async () => {
-        const reason = await diffOrRecord(deps, compare, shot, baseline);
+      await budget.spend(async (began) => {
+        const timed = timedComparer(compare, deps.now ?? Date.now, began);
+        const reason = await diffOrRecord(deps, timed, shot, baseline);
         if (reason) failed.push(reason);
       });
     }
@@ -295,6 +267,7 @@ async function diffOrRecord(
       diffResult: null,
       rebaselineNeeded: false,
       diffError: reason,
+      diffMs: null,
     });
     return `${shotLabel(shot)}: ${reason}`;
   }

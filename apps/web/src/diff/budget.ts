@@ -31,12 +31,31 @@ export class Budget {
     return this.ran === 0 || this.used() + this.slowest <= DIFF_BUDGET_MS;
   }
 
-  async spend(work: () => Promise<void>): Promise<void> {
+  /** Run one shot's `work`, handing it the moment it began so it need not read the clock again. */
+  async spend(work: (began: number) => Promise<void>): Promise<void> {
     const began = this.now();
-    await work();
+    await work(began);
     // The diff is synchronous: yield so the isolate answers other requests between shots.
     await new Promise((resolve) => setTimeout(resolve, 0));
     this.ran++;
     this.slowest = Math.max(this.slowest, this.now() - began);
+  }
+}
+
+/**
+ * This run stopped before the Worker's limit with shots left. Not a failure to start over from:
+ * what was measured is kept, and the next finalise measures only the rest (ob 1645). Its count
+ * includes shots a changed baseline sends back, which a count of rows with no result would miss.
+ */
+export class DiffCeilingError extends Error {
+  readonly unmeasured: number;
+  constructor(measured: number, total: number, usedMs: number, slowestMs: number) {
+    super(
+      `diff ceiling: measured ${measured} of ${total} shots (${total - measured} left); this run ` +
+        `used ${(usedMs / 1000).toFixed(1)} s (slowest shot ${(slowestMs / 1000).toFixed(1)} s) ` +
+        `and the next could pass the Worker's 30 s CPU limit. Finalise again to measure the rest.`,
+    );
+    this.name = "DiffCeilingError";
+    this.unmeasured = total - measured;
   }
 }

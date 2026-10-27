@@ -11,6 +11,7 @@ import {
 import { release } from "@pixelslash/engine/release";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
+import { msBetween } from "#/db/server-timings";
 import type { BlobStore } from "#/storage/blobs";
 import { checkCiResult } from "./ci-result";
 import {
@@ -50,6 +51,11 @@ export type Measured = {
   diffKey: () => Promise<string | null>;
   measuredBy: DiffLocation;
   engineVersion: string;
+  /**
+   * Milliseconds from this shot's first compare starting to now (PS-233); read once its overlay is
+   * written. Only the server's own compares carry it: a CI result was not measured here.
+   */
+  compareMs?: () => number;
 };
 
 export type Comparer = (shot: SnapshotRow, baseline: BaselineSnapshot) => Promise<Measured>;
@@ -168,6 +174,19 @@ export function serverComparer(deps: {
         return key;
       },
     };
+  };
+}
+
+/**
+ * One shot's comparer, timed (PS-233) from `started`, the moment the budget began the shot: every
+ * compare it makes, the carry path's two included, counts from there. Read after the overlay's
+ * write: workerd advances its clock only at I/O, so the diff's own CPU time shows up once the next
+ * write returns.
+ */
+export function timedComparer(compare: Comparer, now: () => number, started: number): Comparer {
+  return async (shot, baseline) => {
+    const measured = await compare(shot, baseline);
+    return { ...measured, compareMs: () => msBetween(started, now()) };
   };
 }
 

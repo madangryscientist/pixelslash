@@ -110,6 +110,21 @@ export type AiReview = {
   regions: AiRegionNote[];
   /** The project opted in and every `change` region was labelled noise: accepted without a reviewer. */
   autoPassed: boolean;
+  /** The tokens of the calls whose notes are stored (PS-233); absent on a review older than that. */
+  usage?: AiUsage;
+};
+
+/**
+ * The tokens a set of model calls spent (PS-233), as the endpoint's replies reported them: only calls
+ * whose answer was stored are counted, never a failed one. `reported` of `calls` said their usage;
+ * the sums cover those only, and with `reported` 0 they are null: no count was reported.
+ */
+export type AiUsage = {
+  calls: number;
+  reported: number;
+  input: number | null;
+  output: number | null;
+  total: number | null;
 };
 
 /**
@@ -142,4 +157,6 @@ export type AiSummary = {
    * Absent when the build had no brief or the model wrote none.
    */
   match?: AiSummarySentence;
+  /** The summary call's tokens (PS-233); absent on a summary older than that. */
+  usage?: AiUsage;
 };

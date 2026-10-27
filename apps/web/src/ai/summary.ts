@@ -11,6 +11,7 @@ import { type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
 import { warn } from "#/lib/log";
 import { tooManyChanges } from "#/lib/summary-limit";
 import { MODEL_TIMEOUT_MS, ModelError, type ModelFetch, complete } from "./model";
+import { tally } from "./usage";
 
 /**
  * A build's summary (ob 1668): one text-only call to the project's own model, after the diff and
@@ -255,7 +256,7 @@ async function ask(deps: SummaryDeps, build: Build): Promise<AiSummary | null> {
   if (tooManyChanges(rows.filter((row) => row.diffStatus === "changed").length)) return null;
   const input = summaryInput(rows, build.brief);
   if (!input.describable) return null;
-  const raw = await complete(model, [{ type: "text", text: input.prompt }], build.id, {
+  const { text, usage } = await complete(model, [{ type: "text", text: input.prompt }], build.id, {
     fetcher: deps.modelFetch,
     timeoutMs: MODEL_TIMEOUT_MS,
   });
@@ -263,7 +264,8 @@ async function ask(deps: SummaryDeps, build: Build): Promise<AiSummary | null> {
   return {
     model: model.model,
     at: now(),
-    ...parseSummary(raw, input.refs, { brief: Boolean(build.brief) }),
+    ...parseSummary(text, input.refs, { brief: Boolean(build.brief) }),
+    usage: tally([usage]),
   };
 }
 

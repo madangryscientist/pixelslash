@@ -21,6 +21,7 @@ import {
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
 import { NotReviewableError, acceptAllSnapshots, buildView, reviewSnapshot } from "#/db/review";
+import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
@@ -28,9 +29,9 @@ import { BadRequest, parseRect } from "#/api/validate";
 import { nextToReviewId } from "#/lib/build-tabs";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
-import { signedImagePath } from "#/storage/signed";
-import { database, defaultDiffLocation, imageSigningSecret, sentryConfig } from "./env";
+import { database, defaultDiffLocation, sentryConfig } from "./env";
 import { signFlakeOrNull } from "./flake-images";
+import { imageUrls } from "./image-urls";
 import { field, noteInput, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
 
@@ -40,28 +41,6 @@ function orConflict<T>(work: Promise<T>): Promise<T> {
     if (error instanceof NotReviewableError) throw new Error(error.message);
     throw error;
   });
-}
-
-/**
- * Images are only ever handed out as signed, short-lived URLs (invariant 5). Snapshot rows hold
- * keys inside the org's prefix; the URL carries the full blob key, so the route needs no database.
- */
-async function imageUrls(
-  orgId: string,
-  keys: {
-    main: string | null;
-    branch: string | null;
-    diff: string | null;
-  },
-): Promise<{ main: string | null; branch: string | null; diff: string | null }> {
-  const secret = imageSigningSecret();
-  const sign = (key: string | null) =>
-    key ? signedImagePath(`orgs/${orgId}/${key}`, secret) : null;
-  return {
-    main: await sign(keys.main),
-    branch: await sign(keys.branch),
-    diff: await sign(keys.diff),
-  };
 }
 
 /**
@@ -212,7 +191,17 @@ export const getBuildPage = createServerFn()
     const names = [...new Set(view.snapshots.map((shot) => shot.name))];
     const thresholdChanges = await overrideChanges(db, user.id, project.id, names);
     const modelConfigured = (await projectModelSource(db, user.id, project.id)).source !== "none";
-    return { org, project, ...view, thumbs, firstBuild, thresholdChanges, modelConfigured };
+    const recaptures = await flakeRecaptures(db, view.build.id, view.snapshots);
+    return {
+      org,
+      project,
+      ...view,
+      thumbs,
+      firstBuild,
+      thresholdChanges,
+      modelConfigured,
+      recaptures,
+    };
   });
 
 export const getSnapshotPage = createServerFn()

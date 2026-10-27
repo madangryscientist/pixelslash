@@ -105,6 +105,8 @@ export type SnapshotView = {
   measuredBy: DiffLocation | null;
   /** The engine that measured it; null until measured. */
   engineVersion: string | null;
+  /** The server's compare time for it (PS-233); read through `compareMsOf`, which drops a stale one. */
+  diffMs: number | null;
   /** Why the shot could not be measured, when it could not. */
   diffError: string | null;
   /** The flake it is labelled with (ob 1724): detected on upload, open for its key, or marked. */
@@ -170,6 +172,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       carriedFrom: snapshots.carriedFrom,
       measuredBy: snapshots.measuredBy,
       engineVersion: snapshots.engineVersion,
+      diffMs: snapshots.diffMs,
       diffError: snapshots.diffError,
       flakeId: snapshots.flakeId,
       flakyPolicy: snapshots.flakyPolicy,

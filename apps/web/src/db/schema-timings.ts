@@ -24,3 +24,13 @@ export const serverTimingColumns = {
   /** The numbers are a later run's: the build was resumed after a stop, or a shot was re-diffed. */
   rerun: integer("rerun", { mode: "boolean" }).notNull().default(false),
 };
+
+/**
+ * How long one shot's compare took on this server (PS-233), in whole milliseconds: both images read
+ * and diffed against the baseline, and against the carried shot too when there was one. Written by
+ * the run that measured the shot, so a resumed run rewrites only what it measured; null when no run
+ * here measured it (a CI result, a new shot, a failed diff, or a row older than the column).
+ */
+export const snapshotTimingColumns = {
+  diffMs: integer("diff_ms"),
+};

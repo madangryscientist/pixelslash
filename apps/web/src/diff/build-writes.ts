@@ -98,3 +98,17 @@ export async function clearMarkers(deps: ProcessDeps, build: Build): Promise<voi
     .delete(snapshots)
     .where(and(eq(snapshots.buildId, build.id), eq(snapshots.diffStatus, "removed")));
 }
+
+/** What a shot compared with nothing holds of a comparison: none of it, its compare time included. */
+export const UNCOMPARED = {
+  diffStatus: null,
+  diffResult: null,
+  rebaselineNeeded: false,
+  diffKey: null,
+  carriedFrom: null,
+  measuredBy: null,
+  engineVersion: null,
+  diffError: null,
+  aiReview: null,
+  diffMs: null,
+} as const;

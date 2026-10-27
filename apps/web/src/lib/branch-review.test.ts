@@ -50,6 +50,7 @@ const view = (name: string, over: Partial<SnapshotView> = {}): SnapshotView => (
   approvedEarlier: null,
   measuredBy: null,
   engineVersion: null,
+  diffMs: null,
   diffError: null,
   flakeId: null,
   flakyPolicy: null,

@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { ENGINE_VERSION } from "@pixelslash/engine/diff";
 import { AI_LABELS, type AiLabel } from "#/db/schema";
+import { type TokenUsage, usageOf } from "./usage";
 
 /**
  * The client for a project's own vision model (ob 1473): any OpenAI-compatible chat-completions
@@ -14,6 +15,9 @@ export type ModelEndpoint = { baseUrl: string; model: string; apiKey: string };
 export type RegionImages = { main: Uint8Array; branch: Uint8Array; diff: Uint8Array };
 
 export type RegionAnswer = { label: AiLabel; explanation: string };
+
+/** One call's text and the tokens its reply reported (PS-233), null when it reported none. */
+export type Reply = { text: string; usage: TokenUsage | null };
 
 /** The transport: the global `fetch`, or a test's stub. */
 export type ModelFetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -132,7 +136,7 @@ function headersFor(endpoint: ModelEndpoint, buildId: string): Record<string, st
 }
 
 /**
- * One chat-completions call with one user message; the reply's text. `buildId` names the build the
+ * One chat-completions call with one user message; the reply's text and reported tokens. `buildId` names the build the
  * call is for (see `headersFor`). Throws ModelError on any failure (network, status, timeout, no
  * content). The key goes only in the Authorization header, and no error message carries it.
  */
@@ -141,7 +145,7 @@ export async function complete(
   content: Part[],
   buildId: string,
   { fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS, maxTokens = MODEL_MAX_TOKENS }: CallOptions = {},
-): Promise<string> {
+): Promise<Reply> {
   let res: Response;
   try {
     res = await fetcher(`${endpoint.baseUrl}/chat/completions`, {
@@ -159,7 +163,8 @@ export async function complete(
     throw new ModelError(`the model did not answer: ${e instanceof Error ? e.name : "error"}`);
   }
   if (!res.ok) throw new ModelError(`the model answered ${res.status}`);
-  return contentOf(await res.json().catch(() => null));
+  const body: unknown = await res.json().catch(() => null);
+  return { text: contentOf(body), usage: usageOf(body) };
 }
 
 type CallOptions = {
@@ -169,15 +174,16 @@ type CallOptions = {
 };
 
 /**
- * Ask the model about one region: one call, three images. Throws on any failure (see `complete`) or
- * an answer in the wrong shape; the caller stores nothing for that region.
+ * Ask the model about one region: one call, three images, and the tokens it reported. Throws on any
+ * failure (see `complete`) or an answer in the wrong shape; the caller stores nothing for that
+ * region, and counts none of its tokens.
  */
 export async function explainRegion(
   endpoint: ModelEndpoint,
   images: RegionImages,
   { buildId, fetcher = fetch, timeoutMs = MODEL_TIMEOUT_MS }: RegionCall,
-): Promise<RegionAnswer> {
-  const raw = await complete(
+): Promise<RegionAnswer & Pick<Reply, "usage">> {
+  const { text, usage } = await complete(
     endpoint,
     [
       { type: "text", text: REGION_PROMPT },
@@ -188,5 +194,5 @@ export async function explainRegion(
     buildId,
     { fetcher, timeoutMs },
   );
-  return parseRegionAnswer(raw);
+  return { ...parseRegionAnswer(text), usage };
 }

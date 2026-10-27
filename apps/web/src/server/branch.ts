@@ -1,6 +1,8 @@
 import { redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { branchView } from "#/db/branch-view";
+import { branchWindow } from "#/db/run-metrics";
+import { branchMetrics } from "#/lib/branch-metrics";
 import { getProjectWithOrg } from "#/db/orgs";
 import { isFirstBuild } from "#/db/first-build";
 import { signedImagePath } from "#/storage/signed";
@@ -32,5 +34,6 @@ export const getBranchPage = createServerFn()
       thumbs[shot.id] = await signedImagePath(`orgs/${project.orgId}/${shot.imageKey}`, secret);
     }
     const firstBuild = await isFirstBuild(db, view.build);
-    return { org, project, ...view, thumbs, firstBuild };
+    const metrics = branchMetrics(await branchWindow(db, project.id, data.branch));
+    return { org, project, ...view, thumbs, firstBuild, metrics };
   });

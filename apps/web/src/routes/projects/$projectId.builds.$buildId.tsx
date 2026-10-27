@@ -73,6 +73,19 @@ function RejectionNote() {
   );
 }
 
+/** The "This run" card (PS-233), from the page's own data. */
+function RunCard() {
+  const { project, build, snapshots, recaptures } = Route.useLoaderData();
+  return (
+    <BuildTimings
+      build={build}
+      shots={snapshots}
+      defaultBranch={project.defaultBranch}
+      recaptures={recaptures}
+    />
+  );
+}
+
 function BuildPage() {
   const {
     project,
@@ -124,7 +137,7 @@ function BuildPage() {
             />
           )}
         </BuildHeader>
-        <BuildTimings build={build} />
+        <RunCard />
         <BuildError project={project} build={build} />
         {error && (
           <Callout tone="danger" role="alert">

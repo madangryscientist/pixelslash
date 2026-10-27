@@ -12,6 +12,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { AiExplanation } from "#/components/ai-notes";
+import { Provenance } from "#/components/provenance";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions, OptionSource } from "#/db/schema";
 import { formatDateTime, formatNumber } from "#/lib/format";
@@ -53,21 +54,6 @@ function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
     <Body as="p" data-testid="sizes" tone="muted">
       {line}
     </Body>
-  );
-}
-
-const MEASURED_BY = { ci: "CI (the CLI)", server: "PixelSlash server" } as const;
-
-/** Where the diff ran and on which engine (ob 1727); nothing for a shot measured before it was recorded. */
-function Provenance({ snapshot }: { snapshot: SnapshotView }) {
-  if (!snapshot.measuredBy) return null;
-  return (
-    <>
-      <KeyValue label="Measured by">
-        <span data-testid="measured-by">{MEASURED_BY[snapshot.measuredBy]}</span>
-      </KeyValue>
-      <KeyValue label="Engine">{snapshot.engineVersion ?? "unknown"}</KeyValue>
-    </>
   );
 }
 

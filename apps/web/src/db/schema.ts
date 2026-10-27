@@ -11,7 +11,7 @@ import type {
   ResolvedDiff,
 } from "./diff-json";
 import type { Composition } from "@pixelslash/engine/composition-entry";
-import { serverTimingColumns } from "./schema-timings";
+import { serverTimingColumns, snapshotTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
 
 export const createdAt = () =>
@@ -372,6 +372,7 @@ export const snapshots = sqliteTable(
      * image px. Shown only; nothing reads it for a review state. Null for any other project.
      */
     composition: text("composition", { mode: "json" }).$type<Composition>(),
+    ...snapshotTimingColumns,
     createdAt: createdAt(),
   },
   (t) => [

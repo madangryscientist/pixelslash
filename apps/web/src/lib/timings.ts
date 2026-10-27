@@ -59,7 +59,7 @@ export function percentile(sorted: readonly number[], p: number): number {
   return sorted[Math.min(rank, sorted.length) - 1] ?? 0;
 }
 
-function statsOf(values: (number | null)[]): StepStats | null {
+export function statsOf(values: (number | null)[]): StepStats | null {
   const sorted = values.filter((v): v is number => v !== null).toSorted((a, b) => a - b);
   if (sorted.length === 0) return null;
   return {

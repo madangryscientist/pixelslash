@@ -71,6 +71,7 @@ describe("a reply cut off by the token ceiling (ob 1833)", () => {
     expect(await explainRegion(endpoint, images, { buildId: "build-1", fetcher })).toEqual({
       label: "noise",
       explanation: "Edges moved.",
+      usage: null,
     });
   });
 });
