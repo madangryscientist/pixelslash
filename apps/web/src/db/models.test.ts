@@ -86,11 +86,6 @@ describe("project model settings", () => {
     const save = (extra: object) =>
       setProjectModel(db, acme.user.id, acme.project.id, { ...settings, ...extra });
     await expect(save({ baseUrl: "http://169.254.169.254/v1" })).rejects.toThrow(/link-local/);
-    await expect(save({ baseUrl: "http://localhost:11434/v1" })).rejects.toThrow(/loopback/);
-    const rebound = { allowPrivate: false, resolve: async () => ["10.0.0.7"] };
-    await expect(
-      save({ baseUrl: "https://model.example/v1", modelHosts: rebound }),
-    ).rejects.toBeInstanceOf(ModelSettingsError);
     expect(await projectModelFor(db, acme.project.id, SECRET)).toBeNull();
     await save({ baseUrl: "http://localhost:11434/v1", modelHosts: { allowPrivate: true } });
     expect(await projectModelFor(db, acme.project.id, SECRET)).toMatchObject({

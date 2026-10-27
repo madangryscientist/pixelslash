@@ -34,7 +34,10 @@ at sign-out. All four are 32 random bytes after the prefix.
   of those, a `.local`/`.internal` or single-label name, or a scheme other than http(s) is refused
   when it is saved and again before every call, after the name is resolved; a redirect is not
   followed. A self-host that runs its own model on its own network sets
-  `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS=1`; the scheme check holds either way.
+  `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS=1`; the scheme check holds either way. Known limit: the
+  check resolves the name and the request resolves it again, and a Worker's `fetch` cannot pin the
+  address it checked, so a name whose DNS answer changes between the two (DNS rebinding) is not
+  caught. On Cloudflare the request leaves from Cloudflare's network, not the deployment's.
 - **The GitHub sign-in stand-in is for tests.** A production build whose `GITHUB_OAUTH_BASE` or
   `GITHUB_API_BASE` is not GitHub's does not start, and says why. Only `vite dev` and the
   `CLOUDFLARE_ENV=e2e` build may point at the stand-in, which lets anyone sign in as anyone.

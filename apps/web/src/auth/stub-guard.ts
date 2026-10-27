@@ -15,8 +15,8 @@ export function buildKind(): BuildKind {
   return kind === "dev" || kind === "test" ? kind : "production";
 }
 
-export const GITHUB_OAUTH_BASE = "https://github.com";
-export const GITHUB_API_BASE = "https://api.github.com";
+const GITHUB_OAUTH_BASE = "https://github.com";
+const GITHUB_API_BASE = "https://api.github.com";
 
 type GithubBases = { GITHUB_OAUTH_BASE?: string; GITHUB_API_BASE?: string };
 

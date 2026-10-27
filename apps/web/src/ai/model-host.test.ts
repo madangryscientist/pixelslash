@@ -142,14 +142,12 @@ describe("the call-time guard", () => {
   };
 
   test("a stored private host is refused before any request goes out", async () => {
-    const sent = vi.spyOn(globalThis, "fetch");
+    const sent = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     try {
-      await expect(
-        explainRegion(endpoint, images, { buildId: "b1", fetcher: guardedFetch(publicDns) }),
-      ).rejects.toThrow(ModelError);
-      await expect(explainRegion(endpoint, images, { buildId: "b1" })).rejects.toThrow(
-        /link-local/,
-      );
+      // The default fetcher is the guarded one.
+      const refused = explainRegion(endpoint, images, { buildId: "b1" });
+      await expect(refused).rejects.toThrow(ModelError);
+      await expect(refused).rejects.toThrow(/link-local/);
       expect(sent).not.toHaveBeenCalled();
     } finally {
       sent.mockRestore();

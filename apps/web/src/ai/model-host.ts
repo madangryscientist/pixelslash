@@ -113,7 +113,7 @@ export function refusedAddress(ip: string): string | null {
   return v6 ? refusedV6(v6) : null;
 }
 
-export function isIpAddress(text: string): boolean {
+function isIpAddress(text: string): boolean {
   const bare = text.replace(/^\[|\]$/g, "");
   return v4Number(bare) !== null || (bare.includes(":") && v6Groups(bare) !== null);
 }
@@ -129,7 +129,7 @@ function refusedName(host: string): string | null {
 }
 
 /** The scheme and literal checks, with no lookup: the parsed URL, or ModelHostError. */
-export function checkModelUrl(raw: string, allowPrivate: boolean): URL {
+function checkModelUrl(raw: string, allowPrivate: boolean): URL {
   let url: URL;
   try {
     url = new URL(raw);
@@ -149,8 +149,9 @@ const refusal = (host: string, why: string) =>
   `base URL host ${host} is ${why}: a model must be on the public internet (a self-host may set PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS=1)`;
 
 /**
- * The runtime's resolver: `node:dns` in Bun and Node, DNS over HTTPS in workerd. Null when the
- * runtime has none, so the check falls back to the literal checks rather than refusing every model.
+ * The runtime's resolver: `node:dns` in Bun and Node, DNS over HTTPS in workerd. Where the runtime
+ * has none, `checkModelHost` falls back to the literal checks rather than refusing every
+ * model; Bun, Node and workerd (nodejs_compat) all have one.
  */
 const systemResolver: HostResolver = async (host) => {
   const dns = await import("node:dns/promises");

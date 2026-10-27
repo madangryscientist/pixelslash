@@ -12,7 +12,7 @@ import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import type { DiffLocation } from "#/db/schema";
 import { type BlobStore, r2BlobStore } from "#/storage/blobs";
-import { type RateLimiter, rateLimiterOf } from "./rate-limit";
+import type { RateLimiter } from "./rate-limit";
 import { type SentryConfig, sentryConfigOf } from "./sentry-config";
 
 /**
@@ -51,9 +51,9 @@ export const modelHosts = (): ModelHostPolicy => ({
 /** The transport for every model call: the host checked again, after resolving, under `modelHosts`. */
 export const modelFetch = (): ModelFetch => guardedFetch(modelHosts());
 
-/** The rate limits (PS-250): Cloudflare's bindings, or the no-op seam where there are none. */
-export const apiRateLimit = (): RateLimiter => rateLimiterOf(env.API_RATE_LIMIT);
-export const signInRateLimit = (): RateLimiter => rateLimiterOf(env.SIGNIN_RATE_LIMIT);
+/** The rate limits (PS-250): Cloudflare's bindings, undefined (no limit) where there are none. */
+export const apiRateLimit = (): RateLimiter | undefined => env.API_RATE_LIMIT;
+export const signInRateLimit = (): RateLimiter | undefined => env.SIGNIN_RATE_LIMIT;
 
 /**
  * The self-host's diff sidecar (PS-203): a loopback URL where a Bun process runs the same

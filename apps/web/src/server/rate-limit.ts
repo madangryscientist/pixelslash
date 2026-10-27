@@ -3,41 +3,34 @@ import { sha256Hex } from "#/lib/crypto";
 /**
  * A brake on abuse (PS-250): `/api/v1/*` and sign-in each count requests per key. On Cloudflare the
  * counter is a rate-limit binding (`wrangler.jsonc`'s `ratelimits`); a deployment without one (the
- * self-host, the e2e build, a test) gets `noRateLimit`, which lets every request through.
+ * self-host, the e2e build, a test) has none, and every request goes through.
  */
 export type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
-export const noRateLimit: RateLimiter = { limit: async () => ({ success: true }) };
-
-/** The binding, or the no-op seam when the deployment has none. */
-export const rateLimiterOf = (binding: RateLimiter | undefined): RateLimiter =>
-  binding ?? noRateLimit;
-
 /** The caller's address as Cloudflare saw it; one shared key when there is none (a local run). */
-export const clientIp = (request: Request): string =>
-  request.headers.get("cf-connecting-ip") ?? "unknown";
+const clientIp = (request: Request): string => request.headers.get("cf-connecting-ip") ?? "unknown";
 
 /** A token's key: its hash, so the counter never holds a token. */
-export const tokenKey = async (token: string): Promise<string> => `token:${await sha256Hex(token)}`;
+const tokenKey = async (token: string): Promise<string> => `token:${await sha256Hex(token)}`;
 
 export const ipKey = (request: Request): string => `ip:${clientIp(request)}`;
 
-/** True when this request is over the limit for `key`. */
-export async function overLimit(limiter: RateLimiter, key: string): Promise<boolean> {
+/** True when this request is over the limit for `key`; never without a limiter (the no-op seam). */
+export async function overLimit(limiter: RateLimiter | undefined, key: string): Promise<boolean> {
+  if (!limiter) return false;
   const { success } = await limiter.limit({ key });
   return !success;
 }
 
 /**
  * Whether an `/api/v1` request is over the limit: counted per accepted token, and per client IP
- * when the token is refused, so a flood of made-up tokens is braked too. No limiter counts none.
+ * when the token is refused, so a flood of made-up tokens is braked too.
  */
 export async function overApiLimit(
   limiter: RateLimiter | undefined,
   request: Request,
   acceptedToken: string | null,
 ): Promise<boolean> {
-  if (!limiter) return false;
   return overLimit(limiter, acceptedToken ? await tokenKey(acceptedToken) : ipKey(request));
 }
 

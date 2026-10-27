@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type RateLimiter, noRateLimit, rateLimiterOf } from "#/server/rate-limit";
+import type { RateLimiter } from "#/server/rate-limit";
 import { call, setup } from "./test-support";
 
 /** `/api/v1` answers 429 `rate_limited` over the limit (PS-250); a deployment without one is never limited. */
@@ -51,15 +51,5 @@ describe("the API's rate limit", () => {
     expect((await call(limited, "GET /api/v1/projects", "made-up-1")).status).toBe(401);
     expect((await call(limited, "GET /api/v1/projects", "made-up-2")).status).toBe(429);
     expect(seen).toEqual(["ip:unknown", "ip:unknown"]);
-  });
-
-  test("without a binding every request goes through", async () => {
-    expect(rateLimiterOf(undefined)).toBe(noRateLimit);
-    const { deps, acme } = await setup();
-    for (let i = 0; i < 5; i += 1)
-      expect(
-        (await call({ ...deps, rateLimit: noRateLimit }, "GET /api/v1/projects", acme.token))
-          .status,
-      ).toBe(200);
   });
 });
