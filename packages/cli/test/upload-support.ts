@@ -26,7 +26,13 @@ export async function gitRepo(): Promise<string> {
   return dir;
 }
 
-export type UploadCall = { method: string; path: string; auth: string | null };
+export type UploadCall = {
+  method: string;
+  path: string;
+  auth: string | null;
+  /** A JSON body as sent; a form is not kept. */
+  body?: string;
+};
 
 /** A stand-in for the upload API that records each request; `refuse` answers with that status instead. */
 export function fakeUploadApi(refuse?: number) {
@@ -37,6 +43,7 @@ export function fakeUploadApi(refuse?: number) {
       method: init?.method ?? "GET",
       path,
       auth: new Headers(init?.headers).get("authorization"),
+      ...(typeof init?.body === "string" && { body: init.body }),
     });
     if (refuse) return Response.json({ error: "no" }, { status: refuse });
     return Response.json({ id: "build-1", status: "passed" });

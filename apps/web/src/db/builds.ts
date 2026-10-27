@@ -24,6 +24,8 @@ export type NewBuild = {
   mergeBaseSha: string | null;
   ancestorShas: string[];
   prNumber: number | null;
+  /** The uploader's brief (PS-232), trimmed; null when none was sent. */
+  brief?: string | null;
 };
 
 /** What a snapshot is: a name and a fixed variant, plus what rendered it. */

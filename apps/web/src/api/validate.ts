@@ -1,3 +1,4 @@
+import { brief } from "#/api/validate-brief";
 import { composition } from "#/api/validate-composition";
 import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
@@ -12,20 +13,14 @@ import {
   type RegionKind,
 } from "#/db/schema";
 
-/** A request the client got wrong: surfaces as a 400 with this message. */
-export class BadRequest extends Error {}
+import { BadRequest, bad } from "./errors";
 
-/** The actor may reach the row but not do this to it (a CI token resolving a flake): a 403. */
-export class Forbidden extends Error {}
+export { BadRequest, Forbidden } from "./errors";
 
 type Obj = Record<string, unknown>;
 
 function isObj(v: unknown): v is Obj {
   return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function bad(where: string, what: string): never {
-  throw new BadRequest(`${where} ${what}`);
 }
 
 function text(v: unknown, where: string, max: number, pattern?: RegExp): string {
@@ -71,6 +66,7 @@ export function parseNewBuild(raw: unknown): NewBuild {
     mergeBaseSha: b.mergeBaseSha == null ? null : sha(b.mergeBaseSha, "mergeBaseSha"),
     ancestorShas: ancestors.map((s, i) => sha(s, `ancestorShas[${i}]`)),
     prNumber: pr,
+    brief: brief(b.brief),
   };
 }
 

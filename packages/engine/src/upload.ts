@@ -35,6 +35,8 @@ export type UploadOptions = {
   flakeRetries?: number | undefined;
   /** The CLI's own timings so far, such as its capture; sent with the build at finalize (ob 1791). */
   timings?: Timings | undefined;
+  /** The author's brief (PS-232), sent with the build when given; never written to the manifest. */
+  brief?: string | undefined;
 };
 
 /** How far an upload got, filled in as it goes (PS-223), so a failure can say what reached the server. */
@@ -148,12 +150,18 @@ async function openBuild(
   client: Client,
   ctx: GitContext,
   projectId: string | undefined,
+  brief: string | undefined,
 ): Promise<OpenBuild> {
   const body = await send(client, {
     step: "open build",
     method: "POST",
     path: "/api/v1/builds",
-    body: JSON.stringify({ ...ctx, ...(projectId ? { projectId } : {}), clientDiff: true }),
+    body: JSON.stringify({
+      ...ctx,
+      ...(projectId ? { projectId } : {}),
+      ...(brief ? { brief } : {}),
+      clientDiff: true,
+    }),
   });
   if (!isObj(body) || typeof body.id !== "string")
     throw new UploadError("upload failed: server did not return a build id");
@@ -228,7 +236,7 @@ export async function uploadSnapshots(
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
     onRequest: (step, ms) => log.record(step, ms),
   };
-  const { id, diffLocation } = await openBuild(client, ctx, opts.projectId);
+  const { id, diffLocation } = await openBuild(client, ctx, opts.projectId, opts.brief);
   progress.opened = true;
   // A server from before ob 1727 has no baselines endpoint and diffs every build itself.
   const picked = diffLocation

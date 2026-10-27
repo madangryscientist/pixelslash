@@ -183,6 +183,13 @@
       "when": 1792871846887,
       "tag": "0025_dusty_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1793088810194,
+      "tag": "0026_lumpy_giant_girl",
+      "breakpoints": true
     }
   ]
 }

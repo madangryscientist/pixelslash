@@ -190,6 +190,11 @@ export const builds = sqliteTable(
     mergeBaseSha: text("merge_base_sha"),
     ancestorShas: text("ancestor_shas", { mode: "json" }).$type<string[]>().notNull().default([]),
     prNumber: integer("pr_number"),
+    /**
+     * The uploader's brief (PS-232): their own words on what the build meant to change, trimmed, at
+     * most `BRIEF_LIMIT` characters; null when none was sent. Read by the summary, decides nothing.
+     */
+    brief: text("brief"),
     status: text("status", { enum: BUILD_STATUSES }).notNull().default("uploading"),
     /** Why processing ended in `errored`; null otherwise. Never a guess at a diff. */
     error: text("error"),

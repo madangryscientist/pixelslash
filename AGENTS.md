@@ -296,8 +296,9 @@ run; never mix numbers from different runs into one percentage.
    org's) name an AI model (an OpenAI-compatible endpoint), the server sends
    that endpoint the three crops
    of each `change` region (baseline, branch and diff, cut to the region plus
-   16 px) and, for the build summary, text only (shot names, counts and those
-   region notes). It never sends a whole shot, and no other server-side call
+   16 px) and, for the build summary, text only (shot names, counts, those
+   region notes and the build's brief, the uploader's own words, when it has
+   one). The brief goes to that one call and no other. It never sends a whole shot, and no other server-side call
    carries pixels. Tokens (Figma, CI upload) come from env or a token file,
    never git; a project's model key is entered in its settings and stored by
    the server. One more sink, and only when its DSN is set: **errors, never
@@ -310,7 +311,8 @@ run; never mix numbers from different runs into one percentage.
    SDK init and no outbound request. *Amended 2026-10-19: was "Local only";
    the hosted review app needs uploads. Amended 2026-10-23: the project's own
    model (ob 1473, 1668); a project without one uses its org's (ob 1789).
-   Amended 2026-10-26: the error sink (PS-227).*
+   Amended 2026-10-26: the error sink (PS-227). Amended 2026-10-27: the
+   brief in the summary call (PS-232).*
 5. **The local pair mode does not start a dev server.** `--live` / `--local`
    URLs must already be up; a down URL fails. *Amended 2026-10-19: the pinned
    capture image may start the app from a command named in its config.*

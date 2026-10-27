@@ -56,17 +56,22 @@ export type BuildSpec = {
   mergeBase?: string;
   ancestors?: string[];
   shots: Shot[];
+  /** The uploader's brief (PS-232). */
+  brief?: string;
 };
+
+const createArgs = (spec: BuildSpec) => ({
+  commitSha: spec.commit,
+  branch: spec.branch,
+  mergeBaseSha: spec.mergeBase ?? null,
+  ancestorShas: spec.ancestors ?? [],
+  prNumber: null,
+  brief: spec.brief ?? null,
+});
 
 /** Create a build and send its shots, as a client does before it finalises. */
 async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
-  const id = await createBuild(ctx.db, ctx.projectId, {
-    commitSha: spec.commit,
-    branch: spec.branch,
-    mergeBaseSha: spec.mergeBase ?? null,
-    ancestorShas: spec.ancestors ?? [],
-    prNumber: null,
-  });
+  const id = await createBuild(ctx.db, ctx.projectId, createArgs(spec));
   const build = await getBuild(ctx.db, ctx.projectId, id);
   for (const s of spec.shots) {
     await putSnapshot({ db: ctx.db, blobs: ctx.scoped }, build, {

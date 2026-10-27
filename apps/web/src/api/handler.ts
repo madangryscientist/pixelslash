@@ -29,6 +29,7 @@ import {
   markDetectionFlagExported,
 } from "./read";
 import { BadRequest, Forbidden, object, parseFinalise, parseNewBuild } from "./validate";
+import { Unprocessable } from "./errors";
 
 export type ApiDeps = {
   db: Db;
@@ -263,6 +264,7 @@ function errorOf(e: unknown): ApiError {
   if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };
   if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
   if (e instanceof Forbidden) return { status: 403, code: "forbidden", message: e.message };
+  if (e instanceof Unprocessable) return { status: 422, code: "unprocessable", message: e.message };
   if (
     e instanceof BuildFinalisedError ||
     e instanceof SnapshotCountError ||

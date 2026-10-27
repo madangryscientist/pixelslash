@@ -22,6 +22,7 @@ export {
   type CapturePage,
 } from "./capture.ts";
 export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
+export { BRIEF_LIMIT, briefTooLong, trimBrief } from "./brief.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
 export {
   askOpencode,

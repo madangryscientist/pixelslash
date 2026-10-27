@@ -137,4 +137,9 @@ export type AiSummary = {
   /** Epoch ms of the summary. */
   at: number;
   sentences: AiSummarySentence[];
+  /**
+   * The model's closing sentence on whether the changes match the brief: its read, never a verdict.
+   * Absent when the build had no brief or the model wrote none.
+   */
+  match?: AiSummarySentence;
 };

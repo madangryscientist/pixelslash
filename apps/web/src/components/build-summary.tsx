@@ -1,7 +1,18 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Body, Button, Caption, Cluster, Divider, Overline, Pill, Stack } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Button,
+  Caption,
+  Cluster,
+  Divider,
+  Overline,
+  Pill,
+  Stack,
+} from "@hackcove/ui";
 import { useHydrated } from "#/components/ui";
+import type { AiSummarySentence } from "#/db/diff-json";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { tabCounts } from "#/lib/build-tabs";
 import { formatDateTime } from "#/lib/format";
@@ -43,7 +54,57 @@ function linkText(shot: SnapshotView, label: ShotLabel, variantOnly: boolean): s
 
 type Build = BuildView["build"];
 
-/** The stored sentences, each followed by links to the shots it names. */
+/** One stored sentence, followed by links to the shots it names. */
+function Sentence({
+  projectId,
+  buildId,
+  sentence,
+  byId,
+  label,
+  testId,
+  lead,
+}: {
+  projectId: string;
+  buildId: string;
+  sentence: AiSummarySentence;
+  byId: Map<string, SnapshotView>;
+  label: (name: string) => ShotLabel;
+  testId: string;
+  lead?: string;
+}) {
+  return (
+    <Body as="p" data-testid={testId}>
+      {lead && <BodyStrong>{lead} </BodyStrong>}
+      {sentence.text}{" "}
+      {sentence.shots.flatMap((id, _, ids) => {
+        const shot = byId.get(id);
+        if (!shot) return [];
+        return [
+          <Pill
+            key={id}
+            tone="violet"
+            data-testid="summary-shot-link"
+            render={(props) => (
+              <Link
+                to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                params={{ projectId, buildId, snapshotId: id }}
+                {...props}
+              />
+            )}
+          >
+            {linkText(shot, label(shot.name), oneStory(ids, byId))}
+          </Pill>,
+          " ",
+        ];
+      })}
+    </Body>
+  );
+}
+
+/**
+ * The stored sentences, then, for a summary read against the uploader's brief (PS-232), the
+ * model's sentence on whether the changes match it: the model's read, never a verdict.
+ */
 function Sentences({
   projectId,
   build,
@@ -55,34 +116,21 @@ function Sentences({
 }) {
   const label = shotLabeller(snapshots.map((shot) => shot.name));
   const byId = new Map(snapshots.map((shot) => [shot.id, shot]));
+  const summary = build.aiSummary;
+  const shared = { projectId, buildId: build.id, byId, label };
   return (
     <Stack gap="xs" data-testid="summary-text">
-      {build.aiSummary?.sentences.map((sentence, i) => (
-        <Body as="p" key={i} data-testid="summary-sentence">
-          {sentence.text}{" "}
-          {sentence.shots.flatMap((id, _, ids) => {
-            const shot = byId.get(id);
-            if (!shot) return [];
-            return [
-              <Pill
-                key={id}
-                tone="violet"
-                data-testid="summary-shot-link"
-                render={(props) => (
-                  <Link
-                    to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-                    params={{ projectId, buildId: build.id, snapshotId: id }}
-                    {...props}
-                  />
-                )}
-              >
-                {linkText(shot, label(shot.name), oneStory(ids, byId))}
-              </Pill>,
-              " ",
-            ];
-          })}
-        </Body>
+      {summary?.sentences.map((sentence, i) => (
+        <Sentence key={i} {...shared} sentence={sentence} testId="summary-sentence" />
       ))}
+      {summary?.match && (
+        <Sentence
+          {...shared}
+          sentence={summary.match}
+          testId="summary-match"
+          lead="Against the brief:"
+        />
+      )}
     </Stack>
   );
 }
@@ -119,6 +167,7 @@ function Footer({
       {summary && (
         <Caption data-testid="summary-model">
           {summary.model} · {formatDateTime(new Date(summary.at))}
+          {summary.match && " · read against the brief"}
         </Caption>
       )}
       {canRegenerate && (
@@ -183,6 +232,10 @@ function SummaryBody({
   );
 }
 
+/** With a brief, nothing changed is still not a match: there was nothing to read against it. */
+const nothingChanged = (brief: string | null) =>
+  brief ? "Nothing changed, so there is nothing to read against the brief. " : "Nothing changed. ";
+
 const DESCRIBED = new Set(["changed", "new", "removed"]);
 const VERDICTS = new Set(["changes", "passed", "failed"]);
 
@@ -224,7 +277,7 @@ export function BuildSummary({
         pending={pending}
       />
       <Body as="p" tone="muted" data-testid="summary-counts">
-        {describable ? "" : "Nothing changed. "}
+        {describable ? "" : nothingChanged(build.brief)}
         {measuredCounts(snapshots).join(" · ")}.
       </Body>
       <Footer

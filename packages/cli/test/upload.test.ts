@@ -97,6 +97,48 @@ describe("pixelslash upload", () => {
     expect(api.calls).toHaveLength(0);
   });
 
+  test("--brief FILE and --brief-text send the author's words, trimmed, with the build", async () => {
+    const [cwd, dir] = [await gitRepo(), await snapshotDir()];
+    await Bun.write(join(cwd, "brief.md"), "  Make the header sticky.\n");
+    const env = { PIXELSLASH_TOKEN: "psci_env" };
+    const sent = async (flags: string[]) => {
+      const api = fakeUploadApi();
+      expect(
+        await run(["upload", dir, "--server", SERVER, ...flags], capture().io, {
+          fetch: api.fetch,
+          cwd,
+          env,
+        }),
+      ).toBe(0);
+      const body: unknown = JSON.parse(api.calls[0]?.body ?? "{}");
+      return body;
+    };
+    expect(await sent(["--brief", "brief.md"])).toHaveProperty("brief", "Make the header sticky.");
+    expect(await sent(["--brief-text", "One line."])).toHaveProperty("brief", "One line.");
+    expect(await sent([])).not.toHaveProperty("brief");
+  });
+
+  test("both brief flags, a missing file or an over-long brief are exit 2, nothing sent", async () => {
+    const [cwd, dir, api] = [await gitRepo(), await snapshotDir(), fakeUploadApi()];
+    await Bun.write(join(cwd, "long.md"), "x".repeat(4001));
+    const tries: [string[], RegExp][] = [
+      [["--brief", "a.md", "--brief-text", "b"], /--brief FILE or --brief-text TEXT, not both/],
+      [["--brief", "missing.md"], /--brief: no such file: missing.md/],
+      [["--brief", "long.md"], /brief is 4001 characters; the limit is 4000/],
+    ];
+    for (const [flags, message] of tries) {
+      const cap = capture();
+      const code = await run(["upload", dir, "--server", SERVER, ...flags], cap.io, {
+        fetch: api.fetch,
+        cwd,
+        env: { PIXELSLASH_TOKEN: "t" },
+      });
+      expect(code).toBe(2);
+      expect(cap.stderr).toMatch(message);
+    }
+    expect(api.calls).toHaveLength(0);
+  });
+
   test("--judge with no local judge says `skip: no judge` and uploads as without it", async () => {
     const [cwd, dir, api, cap] = [await gitRepo(), await snapshotDir(), fakeUploadApi(), capture()];
     const code = await run(["upload", dir, "--server", SERVER, "--judge"], cap.io, {

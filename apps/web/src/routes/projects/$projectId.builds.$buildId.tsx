@@ -1,6 +1,7 @@
 import { Body, BodyStrong, Breadcrumbs, Callout, ListLayout, Stack } from "@hackcove/ui";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { BuildBrief } from "#/components/build-brief";
 import { BuildHeader } from "#/components/build-header";
 import { BuildTimings } from "#/components/build-timings";
 import { BuildSummary } from "#/components/build-summary";
@@ -112,6 +113,7 @@ function BuildPage() {
           onAccept={acceptAll}
           baseline={baseline}
         >
+          <BuildBrief brief={build.brief} />
           {build.branch !== project.defaultBranch && (
             <BuildSummary
               projectId={project.id}

@@ -39,7 +39,7 @@ describe("summaryInput and parseSummary", () => {
       ["N1", ["s3"]],
     ]);
     const long = "x".repeat(400);
-    const parsed = parseSummary(
+    const { sentences: parsed } = parseSummary(
       `Intro with no ref.\nBoth changed. [C1] [C1]\nMade up. [C9]\n${long} [N1]\n${"More. [N1]\n".repeat(9)}`,
       refs,
     );
