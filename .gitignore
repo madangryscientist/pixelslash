@@ -12,3 +12,10 @@ bench/env/dist/
 engines/dotnet/native/out/
 engines/wasm/target/
 engines/wasm/native/target/
+
+# the pixelslash npm package's build output (scripts/build-cli.ts)
+packages/cli/dist/
+packages/cli/wasm/
+packages/cli/LICENSE
+packages/cli/NOTICE
+packages/cli/*.tgz

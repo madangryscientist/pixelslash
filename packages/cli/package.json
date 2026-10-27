@@ -1,20 +1,45 @@
 {
-  "name": "@pixelslash/cli",
-  "private": true,
+  "name": "pixelslash",
+  "version": "0.1.0",
+  "description": "Visual review from the command line: capture Main and Branch, pixel-diff them, write a report.",
+  "keywords": [
+    "cli",
+    "pixel-diff",
+    "playwright",
+    "screenshot",
+    "visual-regression"
+  ],
   "license": "Apache-2.0",
-  "bin": {
-    "pixelslash": "src/index.ts"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/madangryscientist/pixelslash.git",
+    "directory": "packages/cli"
   },
+  "bin": {
+    "pixelslash": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "LICENSE",
+    "NOTICE"
+  ],
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@pixelslash/engine": "workspace:*",
-    "@sentry/bun": "11.9.0"
+    "@sentry/bun": "11.9.0",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
+    "@pixelslash/engine": "workspace:*",
     "@types/bun": "1.4.3",
     "@types/pngjs": "^6.0.5",
-    "pngjs": "^7.0.0",
     "vitest": "5.0.5"
+  },
+  "peerDependencies": {
+    "playwright": "^1.60.0"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
   }
 }
