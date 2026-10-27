@@ -120,6 +120,7 @@ pub extern "C" fn crc32(ptr: usize, len: usize) -> u32 {
     !c
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// pngjs's Paeth predictor: left, then above, then upper-left on ties.
 #[inline(always)]
 fn paeth(left: u8, above: u8, up_left: u8) -> u8 {
@@ -136,6 +137,7 @@ fn paeth(left: u8, above: u8, up_left: u8) -> u8 {
     }
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// Unfilter an 8-bit, non-interlaced PNG's inflated rows at `src` (`channels` 3 or 4,
 /// `(width * channels + 1) * height` bytes) and write them to `dst` as RGBA (RGB gets alpha 255,
 /// as pngjs's bitmapper does). 0 on success, 1 on a filter type pngjs refuses, or 2 when memory
@@ -191,6 +193,7 @@ fn unfilter_rgb(data: &[u8], w: usize, h: usize, out: &mut [u8]) -> u32 {
     failed
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// One line of `B`-byte pixels: `line` (filtered, without its filter byte) unfiltered into `out`,
 /// against `up` (None on the first line, where every byte above is 0). Each filter is its own
 /// loop with no test inside, a pixel at a time, so the compiler can keep the left pixel in
@@ -239,6 +242,7 @@ fn unfilter_pixels<const B: usize>(filter: u8, line: &[u8], up: Option<&[u8]>, o
     true
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// pngjs's Adam7 passes (`interlace.js`): the columns and rows of each 8x8 tile a pass covers.
 const PASSES: [(&[usize], &[usize]); 7] = [
     (&[0], &[0]),
@@ -258,6 +262,7 @@ struct Pass {
     index: Option<usize>,
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// pngjs's `getImagePasses`: the passes with pixels, in file order; the whole image when not interlaced.
 fn passes(width: usize, height: usize, interlace: bool) -> ([Pass; 7], usize) {
     let mut out = [Pass { width: 0, height: 0, index: None }; 7];
@@ -289,6 +294,7 @@ fn channels_of(colour: u32) -> usize {
     }
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// The bytes of one filtered line, without its filter byte (pngjs's `byteWidth`).
 fn line_bytes(width: usize, channels: usize, depth: usize) -> usize {
     (width * channels * depth).div_ceil(8)
@@ -306,6 +312,7 @@ pub extern "C" fn inflated_len(width: u32, height: u32, depth: u32, colour: u32,
         .sum::<usize>() as u32
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// Unfilter one line in place against the line above (`up`, empty on a pass's first line), with
 /// pngjs's `xComparison` as `bpp`. False on a filter type pngjs refuses.
 fn unfilter_line(filter: u8, line: &mut [u8], up: &[u8], bpp: usize) -> bool {
@@ -352,6 +359,7 @@ fn sample(line: &[u8], i: usize, depth: usize) -> u32 {
     }
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// Decode any PNG pngjs reads (PS-210): every bit depth, grey, palette and alpha, tRNS and Adam7,
 /// to the same RGBA bytes as `PNG.sync.read`. `src` holds the inflated lines (`inflated_len`
 /// bytes), unfiltered in place. `palette` is `entries` RGBA colours with tRNS's alpha applied;
@@ -504,6 +512,7 @@ fn load(bytes: &[u8], at: usize) -> v128 {
     unsafe { v128_load(bytes.as_ptr().add(at) as *const v128) }
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// The five filters' sums over one row: for each byte, |byte − predictor| unwrapped, as pngjs
 /// adds them. `up` is the row above, all zeros for the first. 16 bytes at a time in i16 lanes;
 /// the first pixel (no left neighbour) and the tail are added one byte at a time.
@@ -555,6 +564,7 @@ fn filter_sums(line: &[u8], up: &[u8]) -> [u64; 5] {
     sums
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// One row filtered with `filter` into `to`, each byte wrapped to u8 as pngjs's Buffer stores it.
 #[target_feature(enable = "simd128")]
 #[cfg(target_arch = "wasm32")]
@@ -590,6 +600,7 @@ fn filter_row(filter: usize, line: &[u8], up: &[u8], to: &mut [u8]) {
     (x..row).for_each(|x| one(x, to));
 }
 
+// Ported from pngjs (MIT): see NOTICE.
 /// pngjs's adaptive filter for an 8-bit RGBA image (`PNG.sync.write`'s default, PS-205): for each
 /// row, the sum of the absolute differences between each byte and its predictor, unwrapped, under
 /// None, Sub, Up, Average and Paeth, and the first filter with the smallest sum wins. Writes the
@@ -628,6 +639,7 @@ pub extern "C" fn filter(src: usize, width: u32, height: u32, dst: usize) -> u32
     0
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /// Largest YIQ delta (squared, weighted) between black and white; `MAX_YIQ_DELTA` in diff.ts.
 const MAX_YIQ_DELTA: f64 = 35215.0;
 const PIXEL_CHANGED: u8 = 1;
@@ -639,6 +651,7 @@ struct Img<'a> {
     h: usize,
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /// The pixel at `i` blended over white when it is not opaque, as `lumaIq` does.
 #[inline(always)]
 fn blended(d: &[u8], i: usize) -> (f64, f64, f64) {
@@ -654,12 +667,14 @@ fn blended(d: &[u8], i: usize) -> (f64, f64, f64) {
     (r, g, b)
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 #[inline(always)]
 fn luma(d: &[u8], i: usize) -> f64 {
     let (r, g, b) = blended(d, i);
     r * 0.29889531 + g * 0.58662247 + b * 0.11448223
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 #[inline(always)]
 fn luma_iq(d: &[u8], i: usize) -> (f64, f64, f64) {
     let (r, g, b) = blended(d, i);
@@ -670,6 +685,7 @@ fn luma_iq(d: &[u8], i: usize) -> (f64, f64, f64) {
     )
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /// `colourDelta`: signed perceptual distance, negative when `b` is the lighter one.
 #[inline(always)]
 fn colour_delta(a: &[u8], ia: usize, b: &[u8], ib: usize) -> f64 {
@@ -691,6 +707,7 @@ fn window(img: &Img, x: usize, y: usize) -> (usize, usize, usize, usize) {
     (y.saturating_sub(1), (y + 1).min(img.h - 1), x.saturating_sub(1), (x + 1).min(img.w - 1))
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /// `hasManySiblings`: more than two of the 8 neighbours have the pixel's exact RGBA. A pixel
 /// outside `img` is not flat in it (PS-222): `is_antialiased` asks about the other shot at a
 /// neighbour of the overlap's last row or column, and when the shots differ in size that
@@ -720,6 +737,7 @@ fn has_many_siblings(img: &Img, x: usize, y: usize) -> bool {
     false
 }
 
+// Ported from pixelmatch (ISC): see NOTICE.
 /// `isAntialiased`: (x, y) is an anti-aliased edge pixel of `img`.
 fn is_antialiased(img: &Img, x: usize, y: usize, other: &Img) -> bool {
     let centre = luma(img.d, (y * img.w + x) * 4);

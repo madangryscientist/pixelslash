@@ -3,7 +3,7 @@ name = "pixelslash-diff-wasm"
 version = "0.1.0"
 edition = "2024"
 publish = false
-license = "UNLICENSED"
+license = "Apache-2.0"
 description = "The server diff's hot loops (unfilter, pixel loop, region blobs) for workerd (PS-204)"
 
 # No dependencies: plain `extern "C"` exports, no wasm-bindgen, no allocator crate.
