@@ -1,4 +1,12 @@
-import { Body, Caption, Disclosure, Stack, SubsectionHeading } from "@hackcove/ui";
+import {
+  Body,
+  BodyStrong,
+  Caption,
+  Disclosure,
+  Empty,
+  Stack,
+  SubsectionHeading,
+} from "@hackcove/ui";
 import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/engine/a11y-entry";
 
 /**
@@ -15,14 +23,12 @@ function ViolationList({ label, violations }: { label: string; violations: A11yV
         <li key={i}>
           <Stack gap="xs">
             <Body as="p">
-              <strong>{v.rule}</strong>
+              <BodyStrong>{v.rule}</BodyStrong>
               {v.impact ? ` (${v.impact})` : ""}: {v.help}
             </Body>
-            <div className="break-all">
-              <Caption as="p" mono>
-                {v.selector}
-              </Caption>
-            </div>
+            <Caption as="p" mono truncate title={v.selector}>
+              {v.selector}
+            </Caption>
           </Stack>
         </li>
       ))}
@@ -69,9 +75,7 @@ export function A11yPanel({ diff }: { diff: A11yDiff }) {
         Accessibility: new on Branch ({diff.fresh.length})
       </SubsectionHeading>
       {diff.fresh.length === 0 ? (
-        <Body as="p" tone="muted">
-          Nothing new on Branch.
-        </Body>
+        <Empty>Nothing new on Branch.</Empty>
       ) : (
         <ViolationList label="New violations" violations={diff.fresh} />
       )}
