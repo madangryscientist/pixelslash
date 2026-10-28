@@ -603,7 +603,7 @@
       "label": "Self-hosting",
       "ps": {
         "v": "y",
-        "note": "apps/web/SELF-HOST.md: your own Cloudflare account (Worker, D1, R2, Queue) with real GitHub sign-in, or a Proxmox container on your LAN with a GitHub stand-in; the DB and blob seams are swappable. The guide is prose; the gate checks the build and a wrangler dry run, not the walkthrough",
+        "note": "docker/self-host: one image and one volume (`docker compose up`), with the app, the diff worker, D1 as a SQLite file, R2 as files and real GitHub sign-in, no Cloudflare account; `test:e2e:docker` builds it, signs in through a stand-in, uploads with the CLI, diffs, restarts and finds it all kept (needs Docker, not in the gate). Also your own Cloudflare account, or a Proxmox container on your LAN (apps/web/SELF-HOST.md)",
         "commit": "c4694c0"
       },
       "t": {

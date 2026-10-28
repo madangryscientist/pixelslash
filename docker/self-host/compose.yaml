@@ -1,0 +1,18 @@
+# The PixelSlash self-host (PS-240). In this directory: `cp .env.example .env`, fill it in, then
+# `docker compose up -d`. The data is the named volume below; `docker compose down` keeps it and
+# `docker compose down -v` deletes it. See apps/web/README.md, "Self-host in 5 minutes".
+services:
+  pixelslash:
+    build:
+      context: ../..
+      dockerfile: docker/self-host/Dockerfile
+    image: pixelslash-self-host:local
+    env_file: .env
+    ports:
+      - "${PIXELSLASH_PORT:-3000}:3000"
+    volumes:
+      - pixelslash-data:/data
+    restart: unless-stopped
+
+volumes:
+  pixelslash-data:

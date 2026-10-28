@@ -14,7 +14,8 @@
  * which is not on the path here. See apps/web/README.md, "Run it on the Proxmox server".
  *
  * `PORT` (default 3000) and `HOST` (default 0.0.0.0) move it; the Rust front door (PS-217) will set
- * `HOST=127.0.0.1 PORT=3001`.
+ * `HOST=127.0.0.1 PORT=3001`. The Docker self-host (PS-240, `deploy/docker/start.ts`) runs the same
+ * options with its own state directory and bindings.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -84,7 +85,7 @@ function toBindings(list: Binding[] | undefined, idKey: string): Record<string, 
 }
 
 /** The build's `wrangler.json`, which `bun run build` writes beside the Worker. */
-function readConfig(): BuiltConfig {
+export function readConfig(): BuiltConfig {
   const configPath = join(SERVER_DIR, "wrangler.json");
   if (!existsSync(configPath))
     throw new Error(`${configPath} is missing: run CLOUDFLARE_ENV=e2e bun run build first`);
@@ -113,7 +114,7 @@ function queueConsumers(config: BuiltConfig): Record<string, V4QueueConsumerOpti
   );
 }
 
-function workerOptions(config: BuiltConfig, devVars: Record<string, string>): V4WorkerOptions {
+function workerOptions(config: BuiltConfig, overVars: Record<string, string>): V4WorkerOptions {
   const compatibilityFlags = config.compatibility_flags ?? [];
   return {
     name: "pixelslash-web",
@@ -121,7 +122,7 @@ function workerOptions(config: BuiltConfig, devVars: Record<string, string>): V4
     compatibilityDate: config.compatibility_date,
     compatibilityFlags,
     modules: moduleFiles(SERVER_DIR, config.main),
-    bindings: { ...config.vars, ...devVars },
+    bindings: { ...config.vars, ...overVars },
     d1Databases: toBindings(config.d1_databases, "database_id"),
     r2Buckets: toBindings(config.r2_buckets, "bucket_name"),
     queueProducers: Object.fromEntries(
@@ -139,16 +140,29 @@ function workerOptions(config: BuiltConfig, devVars: Record<string, string>): V4
   };
 }
 
-function miniflareOptions(): ReturnType<typeof convertV4MiniflareOptions> {
+/** Where D1 and R2 persist, and the values laid over the build's `vars`. */
+type ServeOptions = {
+  persistRoot: string;
+  tmpPath: string;
+  bindings: Record<string, string>;
+};
+
+export function miniflareOptions(
+  options: ServeOptions = {
+    persistRoot: PERSIST_ROOT,
+    tmpPath: join(WEB_ROOT, ".wrangler/tmp"),
+    bindings: readDevVars(),
+  },
+): ReturnType<typeof convertV4MiniflareOptions> {
   return convertV4MiniflareOptions({
     host: process.env["HOST"] ?? "0.0.0.0",
     port: Number(process.env["PORT"] ?? 3000),
     log: new Log(LogLevel.INFO),
     logRequests: false,
     telemetry: { enabled: false },
-    resourcePersistencePath: PERSIST_ROOT,
-    resourceTmpPath: join(WEB_ROOT, ".wrangler/tmp"),
-    workers: [workerOptions(readConfig(), readDevVars())],
+    resourcePersistencePath: options.persistRoot,
+    resourceTmpPath: options.tmpPath,
+    workers: [workerOptions(readConfig(), options.bindings)],
   });
 }
 

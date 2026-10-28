@@ -5,6 +5,57 @@ builds with `pixelslash upload`; people review them here.
 
 To run your own: [`SELF-HOST.md`](SELF-HOST.md), from an empty Cloudflare account (or a box on your LAN) to a first upload.
 
+## Self-host in 5 minutes
+
+One Docker image runs the app and the diff worker, with real GitHub sign-in. Everything is kept in one
+volume: the database (D1, a SQLite file), the shots (R2, files) and two generated secrets. You need
+Docker with Compose and a GitHub account. There is no Cloudflare account and nothing is pulled from a
+registry: the image is built from this checkout.
+
+1. Create a GitHub OAuth app (GitHub → Settings → Developer settings → OAuth Apps). Set its homepage
+   to the URL people will open, e.g. `http://localhost:3000`, and its callback URL to that URL plus
+   `/auth/github/callback`.
+2. From the repo root:
+
+   ```bash
+   cd docker/self-host
+   cp .env.example .env        # fill in GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET
+   docker compose up -d        # builds pixelslash-self-host:local, then serves on :3000
+   ```
+
+3. Open the URL, sign in with GitHub, and create an org, a project and a token. Then upload from CI
+   or a shell with `PIXELSLASH_TOKEN=<token> pixelslash upload --server <URL> --branch main`.
+
+What it does (`deploy/docker/start.ts`, `docker/self-host/`):
+
+- The app is the production build on Miniflare, as on [the LAN box](#run-it-on-the-proxmox-server), through
+  the same `deploy/ssh/serve.ts` options. Its `Db` and `orgBlobs` are the Cloudflare ones, backed by
+  files under `/data/state/v3`, so the code is the hosted app's.
+- On every start it applies any pending `drizzle/` migration before it listens. It records each one
+  in wrangler's `d1_migrations` table, so `wrangler d1 migrations apply DB --local --persist-to
+  <volume>/state` agrees with it.
+- New projects diff on the server (`DEFAULT_DIFF_LOCATION=server`). The diff worker
+  (`deploy/ssh/diff-sidecar.ts`) runs in the same container on 127.0.0.1:4181 and is restarted if it
+  exits.
+- `IMAGE_SIGNING_SECRET` and `MODEL_KEY_SECRET` are generated into `/data/secrets` on the first start,
+  unless `.env` sets them. A restart keeps them, and with them the signed image URLs and the sealed
+  model keys.
+- Any other name in [SELF-HOST.md's Variables table](SELF-HOST.md#variables) can go in `.env`. A
+  production build still refuses a GitHub other than github.com.
+- Nothing is fetched from Cloudflare at start (`cf: false`).
+
+`docker compose down` keeps the volume. `docker compose down -v` deletes every org, build and shot.
+To update, `git pull` and then `docker compose up -d --build`.
+
+The same image is proven by `bun run test:e2e:docker` (in `apps/web`; it needs Docker, so it is not
+part of `test:e2e`):
+
+- The e2e build signs in against the GitHub stand-in, makes an org, a project and a token, and takes
+  two CLI uploads, which the server diffs.
+- It then restarts the container and checks that the builds, the session, the stored PNG and a new
+  diff against the stored baseline all survived.
+- The production build is checked to send `/auth/github` to github.com with the configured client id.
+
 ## Secrets
 
 A deployment sets these with `wrangler secret put <NAME>` (or in `.dev.vars` locally; the names are

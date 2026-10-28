@@ -3,3 +3,7 @@
 .git
 .pixelslash
 pixelslash-snapshots
+**/.wrangler
+**/dist
+**/.dev.vars
+docker/self-host/.env

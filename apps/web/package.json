@@ -14,6 +14,7 @@
     "test": "bun --bun vitest run",
     "test:e2e": "playwright test",
     "test:e2e:dev": "PIXELSLASH_E2E_DEV=1 playwright test",
+    "test:e2e:docker": "playwright test -c deploy/docker/playwright.config.ts",
     "dogfood:upload": "rm -rf .wrangler/dogfood-snapshots && bun ../../packages/cli/src/index.ts capture --config e2e/dogfood-review.config.ts --out .wrangler/dogfood-snapshots --upload --server \"${PIXELSLASH_SERVER:?set PIXELSLASH_SERVER}\" --token-path \"${PIXELSLASH_TOKEN_FILE:?set PIXELSLASH_TOKEN_FILE}\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
