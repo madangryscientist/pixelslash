@@ -69,7 +69,8 @@ test("one gap and one special case are listed and drawn on the branch shot", asy
   // Hovering a box lights its row, and a row its box. The pointer is still where the click on the
   // build page's link left it, which is over the box now; park it first.
   await page.mouse.move(0, 0);
-  const row = panel.getByRole("list", { name: "Hack Cove UI gaps" }).getByRole("listitem");
+  const item = panel.getByRole("list", { name: "Hack Cove UI gaps" }).getByRole("listitem");
+  const row = item.locator(":scope > div");
   await expect(row).not.toHaveAttribute("data-focused");
   await gap.hover();
   await expect(row).toHaveAttribute("data-focused", "true");

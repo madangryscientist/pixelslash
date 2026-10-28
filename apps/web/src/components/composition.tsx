@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Caption, Stack, SubsectionHeading, Text } from "@hackcove/ui";
+import { Caption, ListRow, Stack, SubsectionHeading, Text } from "@hackcove/ui";
 import {
   GAP_COLOUR,
   MAX_FINDINGS,
@@ -129,39 +129,43 @@ export function CompositionBoxes({
   );
 }
 
-function Row({ finding, children }: { finding: Finding; children: ReactNode }) {
+/** What a list row needs to light with its box on the shot, and to light the box in turn. */
+function useRowFocus(finding: Finding) {
   const { focus, setFocus } = useContext(FocusContext);
+  const focused = isFocused(focus, finding.kind, finding.index);
+  return {
+    active: focused,
+    "data-focused": focused || undefined,
+    onPointerEnter: () => setFocus(finding),
+    onPointerLeave: () => setFocus(null),
+  };
+}
+
+function GapItem({ gap, index, library }: { gap: Gap; index: number; library: string }) {
+  const row = useRowFocus({ kind: "gap", index });
   return (
-    <li
-      data-focused={isFocused(focus, finding.kind, finding.index) || undefined}
-      className="py-1.5 data-[focused]:bg-slate-100"
-      onMouseEnter={() => setFocus(finding)}
-      onMouseLeave={() => setFocus(null)}
-    >
-      {children}
+    <li>
+      <ListRow static size="sm" divided={index > 0} {...row}>
+        <Caption as="code" mono>
+          {gap.selector}
+        </Caption>
+        <Text as="p">{gapReason(gap, library)}</Text>
+      </ListRow>
     </li>
   );
 }
 
-function GapItem({ gap, index, library }: { gap: Gap; index: number; library: string }) {
-  return (
-    <Row finding={{ kind: "gap", index }}>
-      <Caption as="code" mono>
-        {gap.selector}
-      </Caption>
-      <Text as="p">{gapReason(gap, library)}</Text>
-    </Row>
-  );
-}
-
 function SpecialItem({ special, index }: { special: SpecialCase; index: number }) {
+  const row = useRowFocus({ kind: "special", index });
   return (
-    <Row finding={{ kind: "special", index }}>
-      <Caption as="code" mono>
-        {special.selector}
-      </Caption>
-      <Text as="p">{special.reason}</Text>
-    </Row>
+    <li>
+      <ListRow static size="sm" divided={index > 0} {...row}>
+        <Caption as="code" mono>
+          {special.selector}
+        </Caption>
+        <Text as="p">{special.reason}</Text>
+      </ListRow>
+    </li>
   );
 }
 
@@ -188,7 +192,7 @@ export function CompositionPanel({ composition }: { composition: Composition | n
             Everything styled here comes from {library}.
           </Text>
         ) : (
-          <ul aria-label={`${library} gaps`} className="divide-y divide-slate-200">
+          <ul aria-label={`${library} gaps`}>
             {gaps.map((gap, i) => (
               // Walk order, fixed for one page load.
               <GapItem key={i} gap={gap} index={i} library={library} />
@@ -205,7 +209,7 @@ export function CompositionPanel({ composition }: { composition: Composition | n
             Nothing on this shot is declared custom.
           </Text>
         ) : (
-          <ul aria-label="Special cases" className="divide-y divide-slate-200">
+          <ul aria-label="Special cases">
             {special.map((s, i) => (
               <SpecialItem key={i} special={s} index={i} />
             ))}

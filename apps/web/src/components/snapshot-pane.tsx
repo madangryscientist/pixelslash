@@ -1,5 +1,5 @@
-import { Card, Text } from "@hackcove/ui";
-import { type ReactNode, type SyntheticEvent, useCallback, useState } from "react";
+import { Card, RegionFrame, Text } from "@hackcove/ui";
+import { type ReactNode, type SyntheticEvent, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionBoxes } from "#/components/composition";
 import {
@@ -27,17 +27,14 @@ type Size = { width: number; height: number };
 /** An image's own size once it has loaded; a shot nothing measured is still drawn on at this size. */
 function useNaturalSize(url: string) {
   const [loaded, setLoaded] = useState<(Size & { url: string }) | null>(null);
-  const read = useCallback(
-    (img: HTMLImageElement | null) => {
-      if (img?.complete && img.naturalWidth > 0)
-        setLoaded({ url, width: img.naturalWidth, height: img.naturalHeight });
-    },
-    [url],
-  );
-  const onLoad = (e: SyntheticEvent<HTMLImageElement>) => read(e.currentTarget);
+  const onLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0)
+      setLoaded({ url, width: img.naturalWidth, height: img.naturalHeight });
+  };
   // Another shot's size is not this one's.
   const size = loaded && loaded.url === url ? loaded : null;
-  return [size, read, onLoad] as const;
+  return [size, onLoad] as const;
 }
 
 /**
@@ -70,19 +67,11 @@ function ShotImage({
   alt: string;
   children: (natural: Size | null) => ReactNode;
 }) {
-  const [size, attach, onLoad] = useNaturalSize(url);
+  const [size, onLoad] = useNaturalSize(url);
   return (
-    <Card as="div" flush>
-      <img
-        ref={attach}
-        onLoad={onLoad}
-        src={url}
-        alt={alt}
-        loading="lazy"
-        className="block w-full"
-      />
+    <RegionFrame src={url} alt={alt} loading="lazy" onLoad={onLoad}>
       {children(size)}
-    </Card>
+    </RegionFrame>
   );
 }
 

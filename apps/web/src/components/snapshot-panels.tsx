@@ -231,7 +231,11 @@ export function ShortcutHelp({ onClose }: { onClose: () => void }) {
       size="sm"
       onClose={onClose}
       footer={
-        <Button variant="outline" autoFocus onClick={onClose}>
+        <Button
+          variant="outline"
+          autoFocus
+          onClick={(event) => event.currentTarget.closest("dialog")?.close()}
+        >
           Close
         </Button>
       }
