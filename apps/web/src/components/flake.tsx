@@ -112,20 +112,22 @@ export function FlakeRuns({ evidence }: { evidence: FlakeView["evidence"][number
           const differed = evidence.differed.includes(image.run);
           return (
             <li key={image.run} data-testid="flake-run" data-differed={differed}>
-              <a href={image.url} target="_blank" rel="noreferrer" className="block">
-                <img
-                  src={image.url}
-                  alt={`Run ${image.run}`}
-                  loading="lazy"
-                  className={`aspect-[3/2] w-full rounded border object-cover object-top ${
-                    differed ? "border-2 border-amber-500" : "border-slate-200"
-                  }`}
-                />
-              </a>
-              <Caption>
-                run {image.run}
-                {differed ? " · differed" : ""}
-              </Caption>
+              <Card as="div" size="sm" attention={differed}>
+                <Stack gap="xs">
+                  <a href={image.url} target="_blank" rel="noreferrer" className="block">
+                    <img
+                      src={image.url}
+                      alt={`Run ${image.run}`}
+                      loading="lazy"
+                      className="aspect-[3/2] w-full rounded object-cover object-top"
+                    />
+                  </a>
+                  <Caption>
+                    run {image.run}
+                    {differed ? " · differed" : ""}
+                  </Caption>
+                </Stack>
+              </Card>
             </li>
           );
         })}

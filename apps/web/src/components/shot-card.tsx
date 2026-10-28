@@ -196,9 +196,14 @@ export function ShotCard({
 }) {
   const line = measured(shot, baseline);
   return (
-    <div data-testid="snapshot-row" className="relative">
+    <div data-testid="snapshot-row">
       <Card
         size="sm"
+        badge={
+          shot.flakeId ? (
+            <FlakyBadge projectId={projectId} flakeId={shot.flakeId} skipped={skippedFlaky(shot)} />
+          ) : undefined
+        }
         render={(props) => (
           <Link
             to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
@@ -241,12 +246,6 @@ export function ShotCard({
           <GapsLine composition={shot.composition} />
         </Stack>
       </Card>
-      {/* Beside the card's link, not in it: a link inside a link is not HTML. */}
-      {shot.flakeId && (
-        <span className="absolute top-4 left-4">
-          <FlakyBadge projectId={projectId} flakeId={shot.flakeId} skipped={skippedFlaky(shot)} />
-        </span>
-      )}
     </div>
   );
 }

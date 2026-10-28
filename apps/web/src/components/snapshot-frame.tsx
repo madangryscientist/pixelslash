@@ -1,4 +1,5 @@
 import { type PointerEvent, type ReactNode, useState } from "react";
+import { Pill } from "@hackcove/ui";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { useRegionNote } from "#/components/ai-notes";
 import type { DiffRegion, IgnoreRect } from "#/db/schema";
@@ -270,8 +271,8 @@ export function IgnoreAreas({
             background: HATCH,
           }}
         >
-          <span className="absolute top-0 left-0 bg-sky-800 px-1 text-[10px] leading-tight text-white">
-            {source}
+          <span className="absolute top-0 left-0">
+            <Pill tone="sky">{source}</Pill>
           </span>
         </div>
       ))}

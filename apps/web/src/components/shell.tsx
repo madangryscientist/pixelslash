@@ -2,6 +2,7 @@ import { Link, getRouteApi } from "@tanstack/react-router";
 import {
   AppShellBrand,
   Avatar,
+  Body,
   Button,
   ButtonLink,
   Cluster,
@@ -13,9 +14,9 @@ import { useHydrated } from "#/lib/use-hydrated";
 const rootRoute = getRouteApi("__root__");
 
 /** The mark: a slash through a pixel. Gradient and cut colours are fixed, so it reads in both themes. */
-export function Logo({ className = "h-5 w-5" }: { className?: string }) {
+export function Logo() {
   return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" className={className}>
+    <svg viewBox="0 0 20 20" aria-hidden="true">
       <defs>
         <linearGradient id="ps-logo" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#cba6f7" />
@@ -50,10 +51,10 @@ function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }
       <span
         data-testid="viewer"
         title={viewer.name ?? viewer.login}
-        className="hidden items-center gap-2 text-sm text-slate-600 sm:flex"
+        className="hidden items-center gap-2 sm:flex"
       >
         <Avatar name={viewer.login} size="sm" />
-        {viewer.login}
+        <Body>{viewer.login}</Body>
       </span>
       <ButtonLink variant="link" render={(props) => <Link to="/settings" {...props} />}>
         Settings
@@ -73,6 +74,7 @@ export function AppBrand() {
   return (
     <AppShellBrand
       logo={<Logo />}
+      logoSize="sm"
       label="PixelSlash"
       render={(props) => <Link to={viewer ? "/orgs" : "/"} {...props} />}
     />
