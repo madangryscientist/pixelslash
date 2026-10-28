@@ -11,6 +11,7 @@ import {
   KeyValue,
   KeyValueList,
   Pill,
+  Stack,
   SubsectionHeading,
 } from "@hackcove/ui";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
@@ -36,11 +37,18 @@ function reviewText(review: Review): string {
   return `not to review · ${review.total} with a change`;
 }
 
-/**
- * The readable name with the raw key as its tooltip, the name's variants, and where the build and
- * this shot's decision stand.
- */
-function ShotTitle({
+/** The readable name, with the raw key as its tooltip. */
+function ShotTitle({ snapshot, label }: { snapshot: SnapshotView; label: ShotLabel }) {
+  const title = label.component ? `${label.component} · ${label.story}` : label.story;
+  return (
+    <SubsectionHeading as="h1" size="md" truncate title={snapshot.name}>
+      {title}
+    </SubsectionHeading>
+  );
+}
+
+/** The variant chips, the build's status, and this shot's decision: none of them truncate, so the title gives way. */
+function ShotMeta({
   build,
   snapshot,
   label,
@@ -49,12 +57,8 @@ function ShotTitle({
   snapshot: SnapshotView;
   label: ShotLabel;
 }) {
-  const title = label.component ? `${label.component} · ${label.story}` : label.story;
   return (
     <>
-      <SubsectionHeading as="h1" size="md" truncate title={snapshot.name}>
-        {title}
-      </SubsectionHeading>
       {variantChips(label).map((chip) => (
         <Pill key={chip} tone="slate">
           {chip}
@@ -62,7 +66,12 @@ function ShotTitle({
       ))}
       <StatusBadge status={build.status} />
       <ReviewChip state={snapshot.reviewState} by={snapshot.reviewedBy} />
-      {snapshot.reviewedAt && <Body tone="muted">{formatDateTime(snapshot.reviewedAt)}</Body>}
+      {/* The date is the first thing a narrow row gives up: below xl the title keeps the room. */}
+      {snapshot.reviewedAt && (
+        <div className="hidden xl:block">
+          <Body tone="muted">{formatDateTime(snapshot.reviewedAt)}</Body>
+        </div>
+      )}
     </>
   );
 }
@@ -190,18 +199,30 @@ export function ViewerBar({
   return (
     <div className="sticky top-14 z-10 border-b border-slate-200 bg-white">
       <Container>
-        {breadcrumbs}
-        <Cluster gap="sm" wrap>
-          <ShotTitle build={build} snapshot={snapshot} label={label} />
-          <ClusterGrow />
-          <Body data-testid="review-position" tone="muted" numeric>
-            {reviewText(review)}
-          </Body>
-          <Body data-testid="position" tone="muted" numeric>
-            {position} of {total}
-          </Body>
-          <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
-        </Cluster>
+        {/* Three fixed rows: the title line never wraps, so the action row sits at the same y for every shot. */}
+        <Stack gap="xs">
+          {breadcrumbs}
+          <Cluster gap="sm">
+            {/* The title is the only part that shrinks; the chips, the review state and the counters keep their width. */}
+            <ClusterGrow>
+              <ShotTitle snapshot={snapshot} label={label} />
+            </ClusterGrow>
+            <div className="shrink-0 whitespace-nowrap">
+              <Cluster gap="sm">
+                <ShotMeta build={build} snapshot={snapshot} label={label} />
+                <Body data-testid="review-position" tone="muted" numeric>
+                  {reviewText(review)}
+                </Body>
+                <Body data-testid="position" tone="muted" numeric>
+                  {position} of {total}
+                </Body>
+              </Cluster>
+            </div>
+          </Cluster>
+          <Cluster justify="end">
+            <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
+          </Cluster>
+        </Stack>
       </Container>
     </div>
   );
