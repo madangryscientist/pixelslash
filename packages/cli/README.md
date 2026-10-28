@@ -35,4 +35,4 @@ npx @hackcove/pixelslash --live https://example.com --local http://localhost:300
 Open `out/report.html`. The exit code is 0 unless new violations were found on Branch; 2 is a
 usage error.
 
-Apache-2.0.
+MIT. See the `LICENSE` file at the repository root.

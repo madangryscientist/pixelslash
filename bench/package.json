@@ -1,7 +1,7 @@
 {
   "name": "@pixelslash/bench",
   "private": true,
-  "license": "Apache-2.0",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@pixelslash/engine": "workspace:*",
