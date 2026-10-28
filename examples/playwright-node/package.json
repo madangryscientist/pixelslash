@@ -1,0 +1,15 @@
+{
+  "name": "playwright-node-example",
+  "private": true,
+  "description": "A plain Node + Playwright project that takes PixelSlash snapshots. Outside the workspace: it installs the packed tarballs, as a user would.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "^24.0.0",
+    "typescript": "7.0.2"
+  }
+}

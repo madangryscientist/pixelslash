@@ -4,10 +4,32 @@
   "sourceRoot": "packages/playwright/src",
   "projectType": "library",
   "targets": {
-    "typecheck": { "command": "tsc -p packages/playwright/tsconfig.json" },
+    "typecheck": {
+      "command": "tsc -p packages/playwright/tsconfig.json"
+    },
     "lint": {
       "command": "oxlint --type-aware --deny-warnings packages/playwright && bun scripts/check-slop.ts packages/playwright"
     },
-    "test": { "command": "bun --bun playwright test", "options": { "cwd": "packages/playwright" } }
+    "test": {
+      "command": "playwright test",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "packages/playwright"
+      }
+    },
+    "build": {
+      "command": "bun scripts/build-playwright.ts",
+      "options": {
+        "cwd": "{workspaceRoot}"
+      },
+      "inputs": [
+        "{projectRoot}/src/**",
+        "{projectRoot}/types/**",
+        "{projectRoot}/package.json",
+        "{workspaceRoot}/scripts/build-playwright.ts",
+        "{workspaceRoot}/packages/engine/src/**"
+      ],
+      "outputs": ["{projectRoot}/dist"]
+    }
   }
 }

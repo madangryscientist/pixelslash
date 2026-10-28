@@ -2,9 +2,12 @@ import type { Locator, Page } from "playwright";
 import type { MaskRect } from "./config.ts";
 import type { IgnoreRect } from "./diff.ts";
 
+/** Masked regions are painted this colour, by Playwright for selectors and by us for rectangles. */
+export const MASK_COLOR = "#FF00FF";
+
 /**
  * Areas of a live page, measured at screenshot time: what the diff ignores and what is masked.
- * `capture` and `@pixelslash/playwright` both measure through here, so the two read a page alike.
+ * `capture` and `@hackcove/pixelslash-playwright` both measure through here, so the two read a page alike.
  */
 
 /** The attribute that marks an element as an ignore area without a config entry. */

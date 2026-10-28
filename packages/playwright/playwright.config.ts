@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-// Runs under the Bun runtime (`bun --bun playwright test`): the engine `snapshot` imports uses Bun APIs.
+// Runs under Node, as a user's suite does (PS-237): the helper has no Bun API on its path.
 export default defineConfig({
   testDir: "./test",
   globalSetup: "../../scripts/test-tmp-scope.ts",

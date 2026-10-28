@@ -14,6 +14,7 @@
     ".": "./src/index.ts",
     "./diff": "./src/diff.ts",
     "./diff-wasm": "./src/diff-wasm.ts",
+    "./playwright": "./src/playwright-entry.ts",
     "./release": "./src/release.ts",
     "./judge": "./src/judge.ts",
     "./ci-diff": "./src/ci-diff.ts",

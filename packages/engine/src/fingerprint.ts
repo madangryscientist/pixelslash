@@ -1,4 +1,6 @@
-import { CryptoHasher } from "bun";
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 /**
  * What a snapshot was rendered by. Only snapshots with equal fingerprints are
@@ -26,27 +28,29 @@ export function imageId(env: NodeJS.ProcessEnv): string {
 /** Lists the font files fontconfig resolves, one path per line. Swapped in tests. */
 export type ListFonts = () => Promise<string[] | undefined>;
 
-export const fcList: ListFonts = async () => {
-  if (!Bun.which("fc-list")) return undefined;
-  const proc = Bun.spawn(["fc-list", "--format", "%{file}\\n"], {
-    stdout: "pipe",
-    stderr: "ignore",
+export const fcList: ListFonts = () =>
+  new Promise((resolve) => {
+    const proc = spawn("fc-list", ["--format", "%{file}\\n"], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let out = "";
+    proc.stdout.setEncoding("utf8");
+    proc.stdout.on("data", (chunk: string) => (out += chunk));
+    // No fc-list on PATH is an `error` event (ENOENT), not a throw.
+    proc.on("error", () => resolve(undefined));
+    proc.on("close", (code) => resolve(code === 0 ? out.split("\n").filter(Boolean) : undefined));
   });
-  const out = await new Response(proc.stdout).text();
-  if ((await proc.exited) !== 0) return undefined;
-  return out.split("\n").filter(Boolean);
-};
 
 /** Hash the font set: sorted unique paths, each followed by its bytes. */
 export async function fontSetHash(listFonts: ListFonts = fcList): Promise<string> {
   const files = await listFonts();
   if (!files) return "unknown";
-  const hasher = new CryptoHasher("sha256");
+  const hasher = createHash("sha256");
   for (const path of [...new Set(files)].toSorted()) {
-    const file = Bun.file(path);
-    if (!(await file.exists())) continue;
+    const bytes = await readFile(path).catch(() => undefined);
+    if (!bytes) continue;
     hasher.update(`${path}\0`);
-    hasher.update(await file.arrayBuffer());
+    hasher.update(bytes);
   }
   return `sha256:${hasher.digest("hex")}`;
 }

@@ -36,6 +36,7 @@ import {
   maskLocators,
   measureIgnore,
   measureMedia,
+  MASK_COLOR,
   toImageRects,
   unexcluded,
   type MediaBox,
@@ -49,8 +50,6 @@ import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
 import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
 import { storybookRoutes } from "./storybook.ts";
 
-/** Masked regions are painted this colour, by Playwright for selectors and by us for rectangles. */
-export const MASK_COLOR = "#FF00FF";
 const MASK_RGBA = [255, 0, 255, 255] as const;
 
 /** One snapshot in the manifest: what it is (name + variant + tags), what made it, and its PNG. */
@@ -113,7 +112,7 @@ export type SnapshotResult = {
   media: Record<string, MediaBox[]>;
 };
 
-export { toImageRects };
+export { MASK_COLOR, toImageRects };
 export type { MediaBox };
 export { captureInto } from "./capture-into.ts";
 

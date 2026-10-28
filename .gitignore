@@ -22,3 +22,10 @@ packages/cli/*.tgz
 
 # private keys (the GitHub App key, apps/web/github-app/README.md)
 *.pem
+
+# the Playwright helper's build output (scripts/build-playwright.ts) and the packed tarballs (scripts/pack-npm.ts)
+packages/playwright/dist/
+packages/playwright/LICENSE
+packages/playwright/NOTICE
+packages/playwright/*.tgz
+packs/

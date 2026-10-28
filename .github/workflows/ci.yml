@@ -50,6 +50,30 @@ jobs:
       # Includes bench:check (the regression guard); never bench:perf.
       - run: bun run test
 
+  # The Playwright helper on plain Node, outside the workspace (PS-237): both packages are packed,
+  # installed from their tarballs into a copy of examples/playwright-node, its tests run with no `bun`
+  # on PATH, and `pixelslash upload` takes the dir they wrote. Nothing is published.
+  example:
+    name: Playwright example on Node (packed tarballs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - run: bun install --frozen-lockfile
+      # System libraries for chromium; the check installs the browser itself, from the sample's Playwright.
+      - name: Install the browser's system libraries
+        working-directory: packages/engine
+        run: bunx playwright install-deps chromium-headless-shell
+      - run: bun run check:example
+
   changes:
     name: Did the web app change?
     runs-on: ubuntu-latest

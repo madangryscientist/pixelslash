@@ -1,5 +1,6 @@
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   MASK_COLOR,
   fontSetHash,
@@ -14,11 +15,11 @@ import {
   type Fingerprint,
   type SnapshotEntry,
   type SnapshotManifest,
-} from "@pixelslash/engine";
+} from "@pixelslash/engine/playwright";
 import type { Browser, Page } from "playwright";
 
 /** Add as an init script before pausing the page clock, so the settle keeps real frames. */
-export { keepNativeRaf } from "@pixelslash/engine";
+export { keepNativeRaf } from "@pixelslash/engine/playwright";
 
 export type SnapshotOptions = {
   /** Selectors the diff skips. Measured at the screenshot as boxes in image px; the pixels stay. */
@@ -99,7 +100,7 @@ export async function snapshot(
   // The engine's own check: a name or variant that climbs out of the dir is refused.
   const path = pngPath(dir, entry);
   await mkdir(dirname(path), { recursive: true });
-  await Bun.write(path, png);
+  await writeFile(path, png);
   await locked(dir, () => addEntry(dir, entry));
   return entry;
 }
@@ -166,7 +167,7 @@ async function locked<T>(dir: string, work: () => Promise<T>): Promise<T> {
         throw new Error(`pixelslash: ${lock} is still held; remove it if no test run is going`, {
           cause: e,
         });
-      await Bun.sleep(10);
+      await sleep(10);
     }
   }
   try {
@@ -179,10 +180,12 @@ async function locked<T>(dir: string, work: () => Promise<T>): Promise<T> {
 /** Add `entry` to the dir's manifest, replacing one with its identity; sorted, so reruns match. */
 async function addEntry(dir: string, entry: SnapshotEntry): Promise<void> {
   const path = join(dir, "manifest.json");
-  const file = Bun.file(path);
-  const manifest: SnapshotManifest = (await file.exists())
-    ? JSON.parse(await file.text())
-    : { version: 1, snapshots: [] };
+  const text = await readFile(path, "utf8").catch((e: unknown) => {
+    if (e instanceof Error && "code" in e && e.code === "ENOENT") return undefined;
+    throw e;
+  });
+  const manifest: SnapshotManifest =
+    text !== undefined ? JSON.parse(text) : { version: 1, snapshots: [] };
   const id = identity(entry);
   const clash = manifest.snapshots.find((e) => identity(e) === id && e.file !== entry.file);
   if (clash)
@@ -193,6 +196,6 @@ async function addEntry(dir: string, entry: SnapshotEntry): Promise<void> {
     (a, b) => identity(a).localeCompare(identity(b)),
   );
   const tmp = `${path}.${process.pid}.tmp`;
-  await Bun.write(tmp, `${JSON.stringify({ version: 1, snapshots }, null, 2)}\n`);
+  await writeFile(tmp, `${JSON.stringify({ version: 1, snapshots }, null, 2)}\n`);
   await rename(tmp, path);
 }
