@@ -1,5 +1,5 @@
 import {
-  ButtonLink,
+  Button,
   Card,
   CardGrid,
   Cluster,
@@ -59,10 +59,10 @@ export function HomePage(): ReactNode {
           hosted judge.
         </Lead>
         <Cluster gap="sm">
-          <ButtonLink href="/self-host">Self-host it</ButtonLink>
-          <ButtonLink href="/docs" variant="outline">
+          <Button href="/self-host">Self-host it</Button>
+          <Button href="/docs" variant="outline">
             Read the docs
-          </ButtonLink>
+          </Button>
         </Cluster>
       </Stack>
       <img

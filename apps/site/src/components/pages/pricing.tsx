@@ -1,4 +1,4 @@
-import { Body, Callout, Card, CardGrid, ProseLayout, Section, TextLink } from "@hackcove/ui";
+import { Text, Callout, Card, CardGrid, ProseLayout, Section, TextLink } from "@hackcove/ui";
 import type { ReactNode } from "react";
 import { CONTACT } from "../../content/links.ts";
 import { COMMITMENT, FACTS } from "../../content/pricing.ts";
@@ -17,9 +17,9 @@ export function PricingPage(): ReactNode {
         {COMMITMENT}
       </Callout>
       <Section title="Questions">
-        <Body as="p">
+        <Text as="p">
           Write to <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>.
-        </Body>
+        </Text>
       </Section>
     </ProseLayout>
   );

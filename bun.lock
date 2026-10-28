@@ -21,7 +21,7 @@
       "name": "@pixelslash/site",
       "dependencies": {
         "@hackcove/theme-catppuccin-mocha": "0.2.11",
-        "@hackcove/ui": "^0.5.2",
+        "@hackcove/ui": "^0.6.1",
         "@tailwindcss/vite": "^4.1.18",
         "@tanstack/react-router": "1.170.46",
         "@tanstack/react-start": "1.169.4",
@@ -512,6 +512,8 @@
     "@pixelslash/engine": ["@pixelslash/engine@workspace:packages/engine"],
 
     "@pixelslash/site": ["@pixelslash/site@workspace:apps/site"],
+
+    "@pixelslash/site/@hackcove/ui": ["@hackcove/ui@0.6.1", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-D7VTpPvLRbMfxtsfOeZIRf9cvqyrJBDy7HfvF6s6WmAAFa7tIe2GCu427EYloGXf7p85CGUAgEFxQi48O1569Q=="],
 
     "@pixelslash/web": ["@pixelslash/web@workspace:apps/web"],
 

@@ -1,10 +1,10 @@
 import {
   AppShell,
   AppShellBrand,
-  ButtonLink,
+  Button,
   Caption,
   Cluster,
-  NavTabs,
+  Tabs,
   Stack,
   TextLink,
 } from "@hackcove/ui";
@@ -29,13 +29,13 @@ function Controls(): ReactNode {
   return (
     <>
       {APP_LIVE && (
-        <ButtonLink href={APP_URL} variant="outline" size="sm">
+        <Button href={APP_URL} variant="outline" size="sm">
           Sign in
-        </ButtonLink>
+        </Button>
       )}
-      <ButtonLink href="/self-host" size="sm">
+      <Button href="/self-host" size="sm">
         Get started
-      </ButtonLink>
+      </Button>
     </>
   );
 }
@@ -73,7 +73,7 @@ export function Shell({
       subnav={
         // One scrolling row on a phone rather than wrapping out of the fixed-height bar.
         <div className="-mx-1 overflow-x-auto px-1 [&>nav]:flex-nowrap [&_a]:whitespace-nowrap">
-          <NavTabs items={items} label="Site" size="sm" data-testid="site-nav" />
+          <Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />
         </div>
       }
       footer={<Footer />}

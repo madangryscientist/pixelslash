@@ -1,5 +1,5 @@
 import {
-  Body,
+  Text,
   BulletList,
   Caption,
   CardGrid,
@@ -123,10 +123,10 @@ function Behind(): ReactNode {
   const behind = ROWS.filter((row) => row.behind);
   return (
     <Section title={`Where we are behind (${behind.length})`}>
-      <Body as="p">
+      <Text as="p">
         These are the rows where at least one other tool does more than we do. Each one says what is
         missing, in the words of the comparison file.
-      </Body>
+      </Text>
       <BulletList data-testid="behind-list">
         {behind.map((row) => (
           <li key={row.key} data-behind-item={row.key}>
@@ -163,14 +163,14 @@ export function ComparePage(): ReactNode {
             data-testid="stat-behind"
           />
         </CardGrid>
-        <Body as="p">{METHOD}</Body>
+        <Text as="p">{METHOD}</Text>
         <Behind />
       </ProseLayout>
       <div className="mt-10 flex flex-col gap-10">
         <Section title="The whole table">
-          <Body as="p">
+          <Text as="p">
             Hover a cell for its note. Every competitor cell links the page it was read from.
-          </Body>
+          </Text>
           <Matrix />
         </Section>
         <Section title="Sources">

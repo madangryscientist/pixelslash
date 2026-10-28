@@ -1,5 +1,5 @@
 import {
-  Body,
+  Text,
   Caption,
   CodeBlock,
   ProseLayout,
@@ -59,21 +59,21 @@ export function HowItWorksPage(): ReactNode {
         </CodeBlock>
       </Section>
       <Section title="Exit codes">
-        <Body as="p">
+        <Text as="p">
           0 means the run finished, whatever it found in pixels. 1 means a design-system judge found
           new violations on Branch. 2 is a usage error. A crash never exits 1, so CI can read the
           code. <TextLink href="/docs#exit-codes-and-the-failed-line">The full list</TextLink> is in
           the docs.
-        </Body>
+        </Text>
       </Section>
       <Section title="Then, if you want a person to decide">
-        <Body as="p">
+        <Text as="p">
           pixelslash upload sends the shots to a PixelSlash review server you run. It diffs them
           against the default branch, holds the build for review and reports a GitHub check, and
           pixelslash check blocks CI until someone accepts or rejects it.{" "}
           <TextLink href="/self-host">Self-host the server</TextLink> or{" "}
           <TextLink href="/docs#uploading-to-a-server">read how uploads work</TextLink>.
-        </Body>
+        </Text>
       </Section>
     </ProseLayout>
   );
