@@ -16,14 +16,31 @@
     ]
   },
   "targetDefaults": {
-    "typecheck": { "cache": true, "inputs": ["default", "^default"] },
-    "lint": { "cache": true, "inputs": ["default", "^default"] },
-    "test": { "cache": true, "inputs": ["default", "^default", "{workspaceRoot}/fixtures/**/*"] }
+    "typecheck": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default", "^default", "{workspaceRoot}/fixtures/**/*"]
+    }
   },
   "plugins": [
     {
       "plugin": "@nx/dotnet",
-      "options": { "build": { "dependsOn": ["restore", "^build"] } }
+      "options": {
+        "restore": true,
+        "build": {
+          "dependsOn": ["restore", "^build"]
+        }
+      }
     }
-  ]
+  ],
+  "affected": {
+    "legacy": true
+  }
 }
