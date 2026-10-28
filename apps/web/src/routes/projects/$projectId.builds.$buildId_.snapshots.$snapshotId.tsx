@@ -100,7 +100,7 @@ function useWalk(projectId: string, buildId: string) {
 function DecisionError({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <Callout tone="danger" banner role="alert">
+    <Callout tone="danger" role="alert">
       {error}
     </Callout>
   );
@@ -171,9 +171,18 @@ function SideColumn({
   );
 }
 
+function ShotCrumbs({ data }: { data: ReturnType<typeof Route.useLoaderData> }) {
+  const { org, project, build, snapshot } = data;
+  return (
+    <Breadcrumbs
+      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumb(project.id, build), snapshot.name]}
+    />
+  );
+}
+
 function SnapshotPage() {
   const data = Route.useLoaderData();
-  const { project, org, build, snapshot, images, previousId, nextId, names } = data;
+  const { project, build, snapshot, images, previousId, nextId, names } = data;
   const reviewable = build.status === "changes" || build.status === "passed";
   const { busy, error, decide } = useDecision(data, reviewable);
   const [help, setHelp] = useState(false);
@@ -198,56 +207,48 @@ function SnapshotPage() {
   return (
     <Page bleed>
       <FullBleedLayout
+        padded
+        bar={
+          <ViewerBar
+            {...data}
+            breadcrumbs={<ShotCrumbs data={data} />}
+            label={label}
+            reviewable={reviewable}
+            busy={busy}
+            actions={{
+              onPrevious: previousId ? () => go(previousId) : null,
+              onNext: nextId ? () => go(nextId) : null,
+              onAccept: () => decide("accepted"),
+              onReject: () => decide("rejected"),
+              onFlag: flag.toggle,
+              flagOpen: flag.open,
+              onHelp: openHelp,
+            }}
+          />
+        }
         panel={<SideColumn data={data} flag={flag} ignore={ignore} reviewable={reviewable} />}
       >
-        <ViewerBar
-          {...data}
-          breadcrumbs={
-            <Breadcrumbs
-              crumbs={[
-                orgCrumb(org),
-                projectCrumb(project),
-                buildCrumb(project.id, build),
-                snapshot.name,
-              ]}
-            />
-          }
-          label={label}
-          reviewable={reviewable}
-          busy={busy}
-          actions={{
-            onPrevious: previousId ? () => go(previousId) : null,
-            onNext: nextId ? () => go(nextId) : null,
-            onAccept: () => decide("accepted"),
-            onReject: () => decide("rejected"),
-            onFlag: flag.toggle,
-            flagOpen: flag.open,
-            onHelp: openHelp,
-          }}
-        />
-        <DecisionError error={error} />
-        <div className="p-4">
-          <Stack gap="sm">
-            <EdgeWarning result={snapshot.diffResult} />
-            <CompositionFocus>
-              <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
-                <SnapshotViewer
-                  name={snapshot.name}
-                  mainUrl={images.main}
-                  branchUrl={images.branch}
-                  diffUrl={images.diff}
-                  result={snapshot.diffResult}
-                  removed={snapshot.diffStatus === "removed"}
-                  composition={snapshot.composition}
-                  marks={flag.marks}
-                  onDraw={flag.onDraw ?? ignore.onDraw}
-                  ignored={ignored}
-                />
-              </RegionNotesProvider>
-              <CompositionPanel composition={snapshot.composition} />
-            </CompositionFocus>
-          </Stack>
-        </div>
+        <Stack gap="sm">
+          <DecisionError error={error} />
+          <EdgeWarning result={snapshot.diffResult} />
+          <CompositionFocus>
+            <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
+              <SnapshotViewer
+                name={snapshot.name}
+                mainUrl={images.main}
+                branchUrl={images.branch}
+                diffUrl={images.diff}
+                result={snapshot.diffResult}
+                removed={snapshot.diffStatus === "removed"}
+                composition={snapshot.composition}
+                marks={flag.marks}
+                onDraw={flag.onDraw ?? ignore.onDraw}
+                ignored={ignored}
+              />
+            </RegionNotesProvider>
+            <CompositionPanel composition={snapshot.composition} />
+          </CompositionFocus>
+        </Stack>
       </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}
     </Page>

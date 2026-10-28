@@ -1,4 +1,4 @@
-import { Checkbox, Cluster, Legend, type LegendItem, Stack } from "@hackcove/ui";
+import { Card, Checkbox, Cluster, Legend, type LegendItem, Stack } from "@hackcove/ui";
 import { useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
@@ -108,7 +108,7 @@ export function SnapshotOverlay({
   return (
     <Stack gap="xs">
       <Viewport width={result?.branchWidth ?? null} scale={scale} crop={crop}>
-        <div className="border border-slate-200">
+        <Card as="div" flush>
           <ShotStack
             name={name}
             shown={branchUrl ?? mainUrl}
@@ -116,7 +116,7 @@ export function SnapshotOverlay({
             showDiff={showDiff}
             boxes={boxes}
           />
-        </div>
+        </Card>
       </Viewport>
       <Controls regions={regions} diffUrl={diffUrl} showDiff={showDiff} onShowDiff={setShowDiff} />
     </Stack>

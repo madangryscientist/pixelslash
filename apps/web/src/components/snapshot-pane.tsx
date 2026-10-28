@@ -1,4 +1,4 @@
-import { Card } from "@hackcove/ui";
+import { Body, Card } from "@hackcove/ui";
 import { type ReactNode, type SyntheticEvent, useCallback, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionBoxes } from "#/components/composition";
@@ -72,7 +72,7 @@ function ShotImage({
 }) {
   const [size, attach, onLoad] = useNaturalSize(url);
   return (
-    <div className="relative border border-slate-200">
+    <Card as="div" flush>
       <img
         ref={attach}
         onLoad={onLoad}
@@ -82,7 +82,7 @@ function ShotImage({
         className="block w-full"
       />
       {children(size)}
-    </div>
+    </Card>
   );
 }
 
@@ -137,7 +137,12 @@ export function Pane({
     <figure className="min-w-0">
       <figcaption className="mb-2 text-sm font-medium">
         {label}
-        {caption && <span className="ml-2 font-normal text-slate-500">{caption}</span>}
+        {caption && (
+          <>
+            {" "}
+            <Body tone="muted">{caption}</Body>
+          </>
+        )}
       </figcaption>
       {url ? (
         <Viewport width={width} scale={scale} crop={crop}>
