@@ -1,4 +1,4 @@
-import { Body, Caption, ListRow, Stack, SubsectionHeading } from "@hackcove/ui";
+import { Body, Caption, Disclosure, Stack, SubsectionHeading } from "@hackcove/ui";
 import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/engine/a11y-entry";
 
 /**
@@ -9,11 +9,11 @@ import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/e
 
 function ViolationList({ label, violations }: { label: string; violations: A11yViolation[] }) {
   return (
-    <ul aria-label={label}>
+    <Stack as="ul" gap="sm" aria-label={label}>
       {violations.map((v, i) => (
         // Scan order, fixed for one page load.
         <li key={i}>
-          <ListRow static divided={i > 0}>
+          <Stack gap="xs">
             <Body as="p">
               <strong>{v.rule}</strong>
               {v.impact ? ` (${v.impact})` : ""}: {v.help}
@@ -23,10 +23,10 @@ function ViolationList({ label, violations }: { label: string; violations: A11yV
                 {v.selector}
               </Caption>
             </div>
-          </ListRow>
+          </Stack>
         </li>
       ))}
-    </ul>
+    </Stack>
   );
 }
 
@@ -65,23 +65,20 @@ export function A11yPanel({ diff }: { diff: A11yDiff }) {
   return (
     <Stack as="section" gap="sm" aria-label="Accessibility">
       {omitted}
-      <div>
-        <SubsectionHeading as="h2" size="sm">
-          Accessibility: new on Branch ({diff.fresh.length})
-        </SubsectionHeading>
-        {diff.fresh.length === 0 ? (
-          <Body as="p" tone="muted">
-            Nothing new on Branch.
-          </Body>
-        ) : (
-          <ViolationList label="New violations" violations={diff.fresh} />
-        )}
-      </div>
+      <SubsectionHeading as="h2" size="sm">
+        Accessibility: new on Branch ({diff.fresh.length})
+      </SubsectionHeading>
+      {diff.fresh.length === 0 ? (
+        <Body as="p" tone="muted">
+          Nothing new on Branch.
+        </Body>
+      ) : (
+        <ViolationList label="New violations" violations={diff.fresh} />
+      )}
       {diff.already.length > 0 && (
-        <details>
-          <summary>Already on the baseline ({diff.already.length})</summary>
+        <Disclosure summary={`Already on the baseline (${diff.already.length})`}>
           <ViolationList label="Existing violations" violations={diff.already} />
-        </details>
+        </Disclosure>
       )}
     </Stack>
   );
