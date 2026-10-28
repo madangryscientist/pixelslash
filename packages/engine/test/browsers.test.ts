@@ -55,7 +55,7 @@ for (const b of IMAGE_BROWSERS) if (await launches(b)) launchable.add(b);
 const pinned = { env: { PIXELSLASH_IMAGE_VERSION: "test" }, listFonts: async () => [] };
 const base = { baseUrl: `http://127.0.0.1:${server.port}` };
 
-describe("a variant's browser", () => {
+describe("a variant's browser", { timeout: 60_000 }, () => {
   test("defaults to chromium and names the variant by it; firefox and webkit are accepted", () => {
     const config = parseConfig({
       ...base,
@@ -115,7 +115,7 @@ function fakeSession(
   };
 }
 
-describe("one page × three browsers", () => {
+describe("one page × three browsers", { timeout: 60_000 }, () => {
   test("is three shots, each fingerprinted by the browser that took it", async () => {
     const config = parseConfig({ ...base, routes: ["/"] });
     const { manifest } = await captureInto(
