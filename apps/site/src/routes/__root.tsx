@@ -36,6 +36,8 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // The homepage draws its own header and footer (components/pages/home.tsx).
+  if (pathname === "/") return <Outlet />;
   return (
     <Shell pathname={pathname}>
       <Outlet />

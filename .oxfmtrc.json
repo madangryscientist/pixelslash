@@ -15,6 +15,7 @@
     "apps/web/drizzle/**",
     "apps/web/perf/results/**",
     "packages/engine/wasm/diff.wasm.json",
-    "packages/engine/test/fixtures/*.json"
+    "packages/engine/test/fixtures/*.json",
+    "apps/site/src/content/hero.json"
   ]
 }

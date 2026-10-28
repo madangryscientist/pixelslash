@@ -63,6 +63,8 @@ for (const { to, label } of PAGES) {
     const dir = process.env["SITE_SHOTS_DIR"];
     if (dir) {
       const name = to === "/" ? "home" : to.slice(1);
+      // Still, and with every scroll reveal shown: a full-page shot does not scroll the page.
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await page.screenshot({
         path: join(dir, `${name}-${info.project.name}.png`),
         fullPage: true,

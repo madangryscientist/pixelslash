@@ -1,0 +1,269 @@
+<!doctype html>
+<!--
+  The homepage's demo pair: this page as Main, and with ?branch as Branch. scripts/hero.ts shoots
+  both with the real CLI and keeps what the run measured. Only system fonts, so the pixels do not
+  depend on a download.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Northwind · Billing</title>
+    <script>
+      if (location.search.includes("branch")) document.documentElement.classList.add("branch");
+    </script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+        color: #1f2333;
+        background: #f4f5fa;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        height: 720px;
+      }
+      aside {
+        background: #1f2333;
+        color: #c9cde0;
+        padding: 22px 16px;
+      }
+      .brand {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 28px;
+      }
+      .brand i {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, #ff8a5b, #ffcf5b);
+      }
+      nav a {
+        display: block;
+        padding: 8px 12px;
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+        margin-bottom: 2px;
+      }
+      nav a.on {
+        background: #343a55;
+        color: #fff;
+      }
+      main {
+        padding: 30px 40px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 26px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .muted {
+        color: #6b7190;
+      }
+      .seg {
+        display: flex;
+        background: #e6e8f2;
+        border-radius: 9px;
+        padding: 3px;
+      }
+      .seg span {
+        padding: 6px 14px;
+        border-radius: 7px;
+      }
+      .seg .on {
+        background: #fff;
+        box-shadow: 0 1px 2px #0002;
+      }
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      .plan {
+        background: #fff;
+        border: 1px solid #e3e5ef;
+        border-radius: 14px;
+        padding: 22px;
+        position: relative;
+      }
+      .plan.pop {
+        border: 2px solid #6d5dfc;
+      }
+      .tag {
+        position: absolute;
+        top: -11px;
+        left: 20px;
+        background: #6d5dfc;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 99px;
+      }
+      .price {
+        font-size: 34px;
+        font-weight: 800;
+        margin: 10px 0 4px;
+      }
+      .price small {
+        font-size: 14px;
+        font-weight: 500;
+        color: #6b7190;
+      }
+      ul {
+        padding: 0;
+        list-style: none;
+        margin: 16px 0 22px;
+      }
+      li {
+        padding: 5px 0 5px 22px;
+        position: relative;
+      }
+      li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        width: 12px;
+        height: 7px;
+        border: 2px solid #3cb37a;
+        border-top: 0;
+        border-right: 0;
+        transform: rotate(-45deg);
+      }
+      button {
+        width: 100%;
+        padding: 11px;
+        border-radius: 9px;
+        border: 1px solid #d5d8e6;
+        background: #fff;
+        font: inherit;
+        font-weight: 600;
+      }
+      .pop button {
+        background: #6d5dfc;
+        color: #fff;
+        border-color: #6d5dfc;
+      }
+      .usage {
+        margin-top: 24px;
+        background: #fff;
+        border: 1px solid #e3e5ef;
+        border-radius: 14px;
+        padding: 18px 22px;
+        display: flex;
+        gap: 40px;
+      }
+      .bar {
+        width: 260px;
+        height: 8px;
+        border-radius: 99px;
+        background: #e6e8f2;
+        margin-top: 8px;
+        overflow: hidden;
+      }
+      .bar b {
+        display: block;
+        height: 100%;
+        width: 62%;
+        background: #6d5dfc;
+      }
+      .b {
+        display: none;
+      }
+      .branch .m {
+        display: none;
+      }
+      .branch .b {
+        display: inline;
+      }
+      .branch .pop button {
+        background: #16a06a;
+        border-color: #16a06a;
+      }
+      .branch .bar b {
+        width: 81%;
+        background: #f0883e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <div class="brand"><i></i>Northwind</div>
+        <nav><a>Overview</a><a>Projects</a><a>Team</a><a class="on">Billing</a><a>Settings</a></nav>
+      </aside>
+      <main>
+        <header>
+          <div>
+            <h1>Billing</h1>
+            <p class="muted">Pick the plan that fits your team.</p>
+          </div>
+          <div class="seg"><span class="on">Monthly</span><span>Yearly</span></div>
+        </header>
+        <div class="plans">
+          <div class="plan">
+            <strong>Starter</strong>
+            <div class="price">$0<small> / month</small></div>
+            <p class="muted">For side projects.</p>
+            <ul>
+              <li>3 projects</li>
+              <li>1 GB storage</li>
+              <li>Community support</li>
+            </ul>
+            <button>Current plan</button>
+          </div>
+          <div class="plan pop">
+            <span class="tag">Most popular</span>
+            <strong>Pro</strong>
+            <div class="price">
+              <span class="m">$24</span><span class="b">$29</span><small> / month</small>
+            </div>
+            <p class="muted">For growing teams.</p>
+            <ul>
+              <li>Unlimited projects</li>
+              <li>50 GB storage</li>
+              <li>Email support</li>
+            </ul>
+            <button><span class="m">Upgrade</span><span class="b">Start free trial</span></button>
+          </div>
+          <div class="plan">
+            <strong>Enterprise</strong>
+            <div class="price">Custom</div>
+            <p class="muted">For large organisations.</p>
+            <ul>
+              <li>SSO and audit log</li>
+              <li>Unlimited storage</li>
+              <li>A named contact</li>
+            </ul>
+            <button>Talk to sales</button>
+          </div>
+        </div>
+        <div class="usage">
+          <div>
+            <strong>Storage this month</strong>
+            <div class="bar"><b></b></div>
+          </div>
+          <div class="muted">
+            <span class="m">31 GB of 50 GB</span><span class="b">40.5 GB of 50 GB</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
