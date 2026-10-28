@@ -27,10 +27,10 @@
     "wasm:check": "bun scripts/build-wasm.ts --check"
   },
   "devDependencies": {
-    "@nx/dotnet": "23.3.0",
+    "@nx/dotnet": "24.0.1",
     "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
-    "nx": "23.3.0",
+    "nx": "24.0.1",
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
