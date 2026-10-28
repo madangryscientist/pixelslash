@@ -9,6 +9,7 @@ import {
   CodeBlock,
   CopyButton,
   Overline,
+  Pill,
   Stack,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
@@ -209,8 +210,8 @@ function BoxRow({
         <Stack gap="xs">
           <Cluster justify="between" gap="sm">
             <Body>
-              <span className="mr-1 rounded bg-sky-800 px-1 text-[10px] text-white">UI</span>
-              {box.variant ? "This variant" : "This test"} · {box.rect.width}×{box.rect.height}
+              <Pill tone="sky">UI</Pill> {box.variant ? "This variant" : "This test"} ·{" "}
+              {box.rect.width}×{box.rect.height}
             </Body>
             <Button
               variant="outline"

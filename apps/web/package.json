@@ -21,8 +21,8 @@
     "cf-typegen": "wrangler types --strict-vars=false"
   },
   "dependencies": {
-    "@hackcove/theme-catppuccin-mocha": "0.2.9",
-    "@hackcove/ui": "^0.5.0",
+    "@hackcove/theme-catppuccin-mocha": "0.2.10",
+    "@hackcove/ui": "^0.5.1",
     "@pixelslash/engine": "workspace:*",
     "@sentry/cloudflare": "11.9.0",
     "@sentry/react": "11.9.0",
