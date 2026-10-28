@@ -5,7 +5,6 @@ import {
   ButtonGroup,
   Cluster,
   ClusterGrow,
-  Container,
   Dialog,
   Kbd,
   KeyValue,
@@ -196,35 +195,31 @@ export function ViewerBar({
   actions: BarActions;
 }) {
   const why = reviewable ? undefined : `This build is ${build.status}; a new build is needed.`;
+  // Three fixed rows: the title line never wraps, so the action row sits at the same y for every shot.
   return (
-    <div className="sticky top-14 z-10 border-b border-slate-200 bg-white">
-      <Container>
-        {/* Three fixed rows: the title line never wraps, so the action row sits at the same y for every shot. */}
-        <Stack gap="xs">
-          {breadcrumbs}
+    <Stack gap="xs">
+      {breadcrumbs}
+      <Cluster gap="sm">
+        {/* The title is the only part that shrinks; the chips, the review state and the counters keep their width. */}
+        <ClusterGrow>
+          <ShotTitle snapshot={snapshot} label={label} />
+        </ClusterGrow>
+        <div className="shrink-0 whitespace-nowrap">
           <Cluster gap="sm">
-            {/* The title is the only part that shrinks; the chips, the review state and the counters keep their width. */}
-            <ClusterGrow>
-              <ShotTitle snapshot={snapshot} label={label} />
-            </ClusterGrow>
-            <div className="shrink-0 whitespace-nowrap">
-              <Cluster gap="sm">
-                <ShotMeta build={build} snapshot={snapshot} label={label} />
-                <Body data-testid="review-position" tone="muted" numeric>
-                  {reviewText(review)}
-                </Body>
-                <Body data-testid="position" tone="muted" numeric>
-                  {position} of {total}
-                </Body>
-              </Cluster>
-            </div>
+            <ShotMeta build={build} snapshot={snapshot} label={label} />
+            <Body data-testid="review-position" tone="muted" numeric>
+              {reviewText(review)}
+            </Body>
+            <Body data-testid="position" tone="muted" numeric>
+              {position} of {total}
+            </Body>
           </Cluster>
-          <Cluster justify="end">
-            <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
-          </Cluster>
-        </Stack>
-      </Container>
-    </div>
+        </div>
+      </Cluster>
+      <Cluster justify="end">
+        <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
+      </Cluster>
+    </Stack>
   );
 }
 
