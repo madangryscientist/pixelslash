@@ -1,14 +1,34 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { expect, test } from "@playwright/test";
-import { readManifest } from "@pixelslash/engine";
-import { diffPngs } from "@pixelslash/engine/diff";
 import { PNG } from "pngjs";
 import { keepNativeRaf, snapshot } from "../src/index.ts";
-import { type ShotMeta, uploadStub } from "./upload-stub.ts";
+import { portOf, type ShotMeta, uploadStub } from "./upload-stub.ts";
 
 const CLI = join(import.meta.dirname, "../../cli/src/index.ts");
+const exec = promisify(execFile);
+
+/** This spec runs under Node, as a user's suite does; only the CLI it uploads with runs on Bun. */
+type Manifest = { snapshots: { name: string }[] };
+
+async function readManifest(dir: string): Promise<Manifest> {
+  const parsed: unknown = JSON.parse(await readFile(join(dir, "manifest.json"), "utf8"));
+  if (typeof parsed !== "object" || parsed === null || !("snapshots" in parsed))
+    throw new Error(`${dir}/manifest.json has no snapshots`);
+  const { snapshots } = parsed;
+  if (!Array.isArray(snapshots)) throw new Error(`${dir}/manifest.json: snapshots is not a list`);
+  return { snapshots };
+}
+
+/** Two PNGs' decoded pixels differ (the bytes alone could differ by compression). */
+async function pixelsDiffer(a: string, b: string): Promise<boolean> {
+  const [x, y] = await Promise.all([a, b].map(async (f) => PNG.sync.read(await readFile(f))));
+  return x!.width !== y!.width || x!.height !== y!.height || !x!.data.equals(y!.data);
+}
 
 /** The page globals the callbacks touch (the tsconfig has no DOM lib). Type-only. */
 declare const window: { scrollY: number; scrollTo(x: number, y: number): void };
@@ -36,49 +56,46 @@ const FIXTURE = `<!doctype html>
   </script>
 </body></html>`;
 
-let site: ReturnType<typeof Bun.serve>;
+let site: Server;
+let siteUrl: string;
 let work: string;
 
 test.beforeAll(async () => {
-  site = Bun.serve({
-    port: 0,
-    fetch: () => new Response(FIXTURE, { headers: { "content-type": "text/html" } }),
+  site = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "text/html" }).end(FIXTURE);
   });
+  await new Promise<void>((done) => site.listen(0, "127.0.0.1", done));
+  siteUrl = `http://127.0.0.1:${portOf(site)}/`;
   work = await mkdtemp(join(tmpdir(), "ps-playwright-"));
 });
 
 test.afterAll(async () => {
-  await site.stop(true);
+  site.closeAllConnections();
+  await new Promise((done) => site.close(done));
   await rm(work, { recursive: true, force: true });
 });
 
-async function run(cmd: string[], cwd: string, env: Record<string, string> = {}): Promise<string> {
-  const proc = Bun.spawn(cmd, {
-    cwd,
-    env: { ...process.env, ...env },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [out, err] = [
-    await new Response(proc.stdout).text(),
-    await new Response(proc.stderr).text(),
-  ];
-  if ((await proc.exited) !== 0) throw new Error(`${cmd.join(" ")} failed:\n${out}${err}`);
-  return out;
+async function run(cmd: string, args: string[], cwd: string, env: Record<string, string> = {}) {
+  try {
+    return (await exec(cmd, args, { cwd, env: { ...process.env, ...env } })).stdout;
+  } catch (e) {
+    throw new Error(`${cmd} ${args.join(" ")} failed:\n${String(e)}`, { cause: e });
+  }
 }
 
 /** Upload each dir in turn, from a git repo on `main`, to a stub; the shots' metas, in order. */
 async function uploadEach(dirs: string[]): Promise<ShotMeta[]> {
   const repo = join(work, "repo");
-  await run(["git", "init", "-q", "-b", "main", repo], work);
+  await run("git", ["init", "-q", "-b", "main", repo], work);
   const author = ["-c", "user.name=t", "-c", "user.email=t@t"];
-  await run(["git", ...author, "commit", "-q", "--allow-empty", "-m", "m0"], repo);
+  await run("git", [...author, "commit", "-q", "--allow-empty", "-m", "m0"], repo);
   const stub = uploadStub();
+  const url = await stub.ready();
   try {
     const env = { PIXELSLASH_TOKEN: "psci_test", HOME: work };
     for (const dir of dirs) {
-      const flags = ["--server", stub.url, "--branch", "e2e", "--flake-retries", "0"];
-      await run(["bun", CLI, "upload", dir, ...flags], repo, env);
+      const flags = ["--server", url, "--branch", "e2e", "--flake-retries", "0"];
+      await run("bun", [CLI, "upload", dir, ...flags], repo, env);
     }
   } finally {
     await stub.stop();
@@ -95,7 +112,7 @@ test.describe("a device scale factor of 2", () => {
     const dirs = [join(work, "run1"), join(work, "run2")];
 
     for (const dir of dirs) {
-      await page.goto(`${site.url.href}watch`);
+      await page.goto(`${siteUrl}watch`);
       await page.evaluate(() => window.scrollTo(0, 400));
       const entry = await snapshot(page, "watch", { ignore: [".player"], dir, tags: ["video"] });
       // Scrolled 400px down, the box is still measured from the top of the document, at 2x.
@@ -112,12 +129,8 @@ test.describe("a device scale factor of 2", () => {
     }
 
     // The video really changed between the runs: without the ignore box the diff says so.
-    const [first, second] = await Promise.all(
-      dirs.map(async (d) =>
-        Buffer.from(await Bun.file(join(d, "watch/640x480-light.png")).arrayBuffer()),
-      ),
-    );
-    expect(diffPngs(first!, second!).changed).toBe(true);
+    const [first, second] = dirs.map((d) => join(d, "watch/640x480-light.png"));
+    expect(await pixelsDiffer(first!, second!)).toBe(true);
 
     const [baseline, rerun] = await uploadEach(dirs);
     expect(baseline?.ci).toBeUndefined();
@@ -134,7 +147,7 @@ test("a viewport shot measures from the viewport, and redact paints the element 
 }) => {
   const dir = join(work, "viewport");
   await page.setViewportSize({ width: 400, height: 800 });
-  await page.goto(`${site.url.href}watch`);
+  await page.goto(`${siteUrl}watch`);
   await page.evaluate(() => window.scrollTo(0, 300));
   const entry = await snapshot(page, "watch", {
     ignore: [".player"],
@@ -148,10 +161,9 @@ test("a viewport shot measures from the viewport, and redact paints the element 
   // The secret is at (20, 60) on the page, so (20, -240) in this shot: scroll back and shoot it.
   await page.evaluate(() => window.scrollTo(0, 0));
   const top = await snapshot(page, "top", { redact: [".secret"], fullPage: false, dir });
-  const img = PNG.sync.read(Buffer.from(await Bun.file(join(dir, top.file)).arrayBuffer()));
+  const img = PNG.sync.read(await readFile(join(dir, top.file)));
   const at = (65 * img.width + 25) << 2;
   expect([...img.data.subarray(at, at + 4)]).toEqual([255, 0, 255, 255]);
-  await readManifest(dir);
 });
 
 test("shots from parallel calls all land in one manifest", async ({ browser }) => {
@@ -160,7 +172,7 @@ test("shots from parallel calls all land in one manifest", async ({ browser }) =
   await Promise.all(
     names.map(async (name) => {
       const page = await browser.newPage();
-      await page.goto(`${site.url.href}${name}`);
+      await page.goto(`${siteUrl}${name}`);
       await snapshot(page, name, { dir, ignore: [".player"] });
       await page.close();
     }),
@@ -170,13 +182,13 @@ test("shots from parallel calls all land in one manifest", async ({ browser }) =
 });
 
 test("a name that climbs out of the dir is refused", async ({ page }) => {
-  await page.goto(site.url.href);
+  await page.goto(siteUrl);
   await expect(snapshot(page, "../out", { dir: join(work, "bad") })).rejects.toThrow(/outside/);
 });
 
 test("a second variant of the same shot is refused, not silently replaced", async ({ page }) => {
   const dir = join(work, "clash");
-  await page.goto(site.url.href);
+  await page.goto(siteUrl);
   await snapshot(page, "home", { variant: "signed-in", dir });
   await expect(snapshot(page, "home", { variant: "signed-out", dir })).rejects.toThrow(/same shot/);
   await snapshot(page, "home", { variant: "signed-in", dir });
@@ -187,25 +199,24 @@ test("with a pinned clock the video stops and the settle still ends", async ({ p
   await page.addInitScript(keepNativeRaf);
   await page.clock.install({ time });
   await page.clock.pauseAt(time);
-  await page.goto(`${site.url.href}watch`);
+  await page.goto(`${siteUrl}watch`);
   const dirs = [join(work, "pinned1"), join(work, "pinned2")];
   for (const dir of dirs) await snapshot(page, "watch", { dir });
-  const [first, second] = await Promise.all(
-    dirs.map(async (d) =>
-      Buffer.from(await Bun.file(join(d, "watch/1280x720-light.png")).arrayBuffer()),
-    ),
-  );
-  expect(diffPngs(first!, second!).changed).toBe(false);
+  const [first, second] = dirs.map((d) => join(d, "watch/1280x720-light.png"));
+  expect(await pixelsDiffer(first!, second!)).toBe(false);
 });
 
 /** The stderr lines a worker process prints as it exits, for the ones that name `selector` (PS-241). */
 async function tallyLines(selector: string, bodies: string[], dir: string): Promise<string[]> {
-  const proc = Bun.spawn(
-    [process.execPath, "run", join(import.meta.dirname, "unmatched-child.ts"), selector, ...bodies],
-    { env: { ...process.env, PIXELSLASH_SNAPSHOT_DIR: dir }, stdout: "ignore", stderr: "pipe" },
+  const child = spawn(
+    process.execPath,
+    [join(import.meta.dirname, "unmatched-child.mjs"), selector, ...bodies],
+    { env: { ...process.env, PIXELSLASH_SNAPSHOT_DIR: dir }, stdio: ["ignore", "ignore", "pipe"] },
   );
-  const err = await new Response(proc.stderr).text();
-  expect(await proc.exited).toBe(0);
+  let err = "";
+  child.stderr.on("data", (c: Buffer) => (err += c.toString()));
+  const code = await new Promise((done) => child.on("close", done));
+  expect(code).toBe(0);
   return err.split("\n").filter((line) => line.includes(selector));
 }
 
@@ -221,4 +232,27 @@ test("a selector that matches some shots is one summary line at exit, not a line
 test("a selector that matches no shot is one warning at exit, naming it as matching no shot", async () => {
   const lines = await tallyLines(".vdeo", ["<p>a</p>", "<p>b</p>"], join(work, "none"));
   expect(lines).toEqual(['warning: ignore ".vdeo" matched no shot in this run']);
+});
+
+/** What `boxes.mjs` prints for the fixture under `runtime`, with the shots in a fresh dir. */
+async function boxes(runtime: string, dir: string): Promise<unknown> {
+  const out = await run(
+    runtime,
+    [join(import.meta.dirname, "boxes.mjs"), `${siteUrl}watch`],
+    work,
+    {
+      PIXELSLASH_SNAPSHOT_DIR: dir,
+    },
+  );
+  return JSON.parse(out);
+}
+
+test("the ignore and redact boxes are the same under Node and Bun", async () => {
+  const underNode = await boxes("node", join(work, "boxes-node"));
+  const underBun = await boxes("bun", join(work, "boxes-bun"));
+  expect(underNode).toMatchObject({
+    ignore: [{ x: 80, y: 2000, width: 320, height: 180 }],
+    redacted: [255, 0, 255, 255],
+  });
+  expect(underBun).toEqual(underNode);
 });

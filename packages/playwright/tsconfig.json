@@ -1,4 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src", "test", "playwright.config.ts"]
+  "include": ["src", "test", "types", "playwright.config.ts"]
 }

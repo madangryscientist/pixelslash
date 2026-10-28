@@ -113,7 +113,7 @@
       "label": "Component SDK for your own test run",
       "ps": {
         "v": "p",
-        "note": "Playwright only: @pixelslash/playwright snapshot() writes a dir `pixelslash upload` takes; not on npm yet and needs the Bun runtime",
+        "note": "Playwright only: @hackcove/pixelslash-playwright snapshot() writes a dir `pixelslash upload` takes, on plain Node; packed with npm pack, not published yet",
         "commit": "645a80d"
       },
       "t": {
@@ -124,7 +124,7 @@
         "lost": "p"
       },
       "plan": "",
-      "gap": "a helper for teams whose own tests call us: the Playwright one exists but is not on npm yet and needs the Bun runtime"
+      "gap": "a helper for teams whose own tests call us: the Playwright one runs on Node but is not on npm yet, and there is none for Cypress or Vitest"
     },
     {
       "g": "capture",
@@ -132,7 +132,7 @@
       "label": "First-class Playwright helper",
       "ps": {
         "v": "p",
-        "note": "snapshot(page, name, { ignore, redact }) settles, shoots and measures ignore boxes in image px; unpublished, runs under bun --bun playwright test",
+        "note": "snapshot(page, name, { ignore, redact }) settles, shoots and measures ignore boxes in image px; runs under plain `npx playwright test` on Node (the gate runs it there, and a CI-style check with no bun on PATH uploads its dir); packed with npm pack, not published yet",
         "commit": "645a80d"
       },
       "t": {
@@ -143,7 +143,7 @@
         "lost": "?"
       },
       "plan": "",
-      "gap": "publish @pixelslash/playwright and let it run under plain Node"
+      "gap": "publish @hackcove/pixelslash-playwright to npm"
     },
     {
       "g": "capture",

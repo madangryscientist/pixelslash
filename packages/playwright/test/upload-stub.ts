@@ -1,3 +1,5 @@
+import { createServer, type Server } from "node:http";
+
 /**
  * A stand-in for the upload API (`/api/v1`) of a project that diffs in CI: it opens builds, names
  * the last upload of each shot as its baseline, serves that PNG, and keeps every shot's meta. The
@@ -22,6 +24,13 @@ const pick = (s: Stored | undefined) =>
     ? { id: s.id, image_url: `/images/${s.id}.png`, fingerprint: s.fingerprint, ignore: s.ignore }
     : null;
 const notFound = () => Response.json({ error: "not found" }, { status: 404 });
+
+/** The port a listening server got. */
+export function portOf(server: Server): number {
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new Error("server is not listening");
+  return address.port;
+}
 
 export function uploadStub() {
   const shots = new Map<string, Stored>();
@@ -67,19 +76,50 @@ export function uploadStub() {
     return Response.json({ id });
   }
 
-  const server = Bun.serve({
-    port: 0,
-    fetch(req) {
-      const path = new URL(req.url).pathname;
-      const route = `${req.method} ${path.replace(/^\/api\/v1\/builds\/[^/]+/, "/build")}`;
-      if (route === "POST /api/v1/builds")
-        return Response.json({ id: `b${++builds}`, diffLocation: "ci" }, { status: 201 });
-      if (route === "POST /build/baselines") return baselines(req);
-      if (route === "PUT /build/snapshots") return upload(req);
-      if (route === "POST /build/finalize") return Response.json({ status: "completed" });
-      if (req.method === "GET" && path.startsWith("/images/")) return image(path);
-      return notFound();
-    },
+  async function handle(req: Request): Promise<Response> {
+    const path = new URL(req.url).pathname;
+    const route = `${req.method} ${path.replace(/^\/api\/v1\/builds\/[^/]+/, "/build")}`;
+    if (route === "POST /api/v1/builds")
+      return Response.json({ id: `b${++builds}`, diffLocation: "ci" }, { status: 201 });
+    if (route === "POST /build/baselines") return baselines(req);
+    if (route === "PUT /build/snapshots") return upload(req);
+    if (route === "POST /build/finalize") return Response.json({ status: "completed" });
+    if (req.method === "GET" && path.startsWith("/images/")) return image(path);
+    return notFound();
+  }
+
+  // node:http, so the stub runs under the Node that runs the spec.
+  const server = createServer((incoming, outgoing) => {
+    const chunks: Buffer[] = [];
+    incoming.on("data", (c: Buffer) => chunks.push(c));
+    incoming.on("end", () => {
+      const hasBody = incoming.method !== "GET" && incoming.method !== "HEAD";
+      const headers = Object.entries(incoming.headers).flatMap(([k, v]) =>
+        v === undefined ? [] : [[k, Array.isArray(v) ? v.join(", ") : v] as [string, string]],
+      );
+      const req = new Request(`http://127.0.0.1${incoming.url ?? "/"}`, {
+        method: incoming.method ?? "GET",
+        headers,
+        ...(hasBody ? { body: new Uint8Array(Buffer.concat(chunks)) } : {}),
+      });
+      void handle(req).then(async (res) => {
+        outgoing.writeHead(res.status, Object.fromEntries(res.headers));
+        outgoing.end(Buffer.from(await res.arrayBuffer()));
+      });
+    });
   });
-  return { url: `http://127.0.0.1:${server.port}`, metas, stop: () => server.stop(true) };
+  const listening = new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return {
+    /** Resolves once the stub is listening. */
+    ready: async () => {
+      await listening;
+      return `http://127.0.0.1:${portOf(server)}`;
+    },
+    metas,
+    stop: () =>
+      new Promise<void>((done) => {
+        server.close(() => done());
+        server.closeAllConnections();
+      }),
+  };
 }

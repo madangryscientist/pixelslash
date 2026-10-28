@@ -238,11 +238,11 @@ A project that builds its pages only from one design-system library's components
 
 ## Snapshots from your own Playwright tests
 
-`@pixelslash/playwright` (`packages/playwright`, not on npm yet) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a snapshot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
+`@hackcove/pixelslash-playwright` (`packages/playwright`; packed with `bun scripts/pack-npm.ts`, not published yet) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a snapshot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
 
 ```ts
 import { test } from "@playwright/test";
-import { snapshot } from "@pixelslash/playwright";
+import { snapshot } from "@hackcove/pixelslash-playwright";
 
 test("watch page", async ({ page }) => {
   await page.goto("/watch/42");
@@ -251,7 +251,7 @@ test("watch page", async ({ page }) => {
 ```
 
 ```
-bun --bun playwright test
+npx playwright test
 pixelslash upload pixelslash-snapshots --server URL
 ```
 
@@ -264,7 +264,7 @@ pixelslash upload pixelslash-snapshots --server URL
 - What it cannot do from inside your test, and `capture` does: launch chromium with `--force-color-profile=srgb --font-render-hinting=none`, pin the clock and stop page timers, and fix the fonts. The flags go in your config's `launchOptions.args`; the fonts are the image's job. To pin the clock as `capture` does, before `goto`:
 
   ```ts
-  import { keepNativeRaf } from "@pixelslash/playwright";
+  import { keepNativeRaf } from "@hackcove/pixelslash-playwright";
 
   await page.addInitScript(keepNativeRaf); // the settle waits on real frames; a paused clock has none
   await page.clock.install({ time });
@@ -272,7 +272,7 @@ pixelslash upload pixelslash-snapshots --server URL
   ```
 
   Skip `keepNativeRaf` and a paused clock fails every `snapshot` on its settle. `page.clock.setFixedTime(time)` instead pins only `Date` and leaves timers running.
-- It needs the Bun runtime (`bun --bun playwright test`): the engine it imports reads files and hashes fonts through Bun.
+- It runs on plain Node (20 or newer) under `npx playwright test`: the shipped bundle has the few engine pieces it needs inlined and calls no Bun API (a test builds it and fails if one appears, and runs it under Node and Bun to check the ignore and redact boxes come out the same). `@playwright/test` (1.40 or newer) is its only peer. `pixelslash upload` is the CLI's, and the CLI is a Bun program, so Bun is needed on the machine that uploads, not on the one that runs the tests. `examples/playwright-node` is a project outside the workspace that installs the packed tarballs of both; `bun scripts/check-example.ts` runs it as CI does, with no `bun` on `PATH` for the test step, then uploads the dir it wrote to a stub server.
 
 ## Snapshots from PNGs you already have
 

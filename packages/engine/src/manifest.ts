@@ -1,4 +1,4 @@
-import { join, resolve, sep } from "node:path";
+import { join } from "node:path";
 import { IMAGE_BROWSERS, isBrowserName } from "./config.ts";
 import { type FlakyPolicy, parseFlaky } from "./config-flake.ts";
 import { type MaskRect, parseArea } from "./config-areas.ts";
@@ -6,8 +6,11 @@ import { parseA11yEntry } from "./a11y-entry.ts";
 import { parseCompositionEntry } from "./composition-entry.ts";
 import { parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
+import { identity, pngPath } from "./snapshot-paths.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
 import { isObj } from "./upload-client.ts";
+
+export { identity, pngPath };
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -95,12 +98,6 @@ function entry(v: unknown, i: number): SnapshotEntry {
   };
 }
 
-/** The identity the server keeps a snapshot under; two entries sharing it would overwrite each other. */
-export function identity(e: SnapshotEntry): string {
-  const { width, height } = e.variant.viewport;
-  return [e.name, e.variant.browser, `${width}x${height}`, e.variant.theme].join(" / ");
-}
-
 function parseManifest(raw: unknown): SnapshotManifest {
   if (!isObj(raw) || raw.version !== 1) bad("version", "must be 1");
   if (!Array.isArray(raw.snapshots)) bad("snapshots", "must be an array");
@@ -137,12 +134,4 @@ export async function readManifest(dir: string): Promise<SnapshotManifest> {
   const manifest = parseManifest(raw);
   for (const e of manifest.snapshots) await checkPng(dir, e);
   return manifest;
-}
-
-/** A manifest names files relative to its dir; one that climbs out of it is refused. */
-export function pngPath(dir: string, e: SnapshotEntry): string {
-  const root = resolve(dir);
-  const path = resolve(root, e.file);
-  if (!path.startsWith(root + sep)) throw new UsageError(`manifest: ${e.file} is outside ${dir}`);
-  return path;
 }
