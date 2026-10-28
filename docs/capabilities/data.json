@@ -511,8 +511,8 @@
       "label": "PR status blocked on review",
       "ps": {
         "v": "y",
-        "note": "a PixelSlash check run on each build's commit in the project's connected repo: failure while changes await review or one is rejected, success once all are accepted or nothing changed, updated in place on each decision (PS-23; needs the GitHub App registered, apps/web/github-app). A CI job can also block by exit code with `pixelslash status --wait`",
-        "commit": "6048674"
+        "note": "a PixelSlash check run on each build's commit in the project's connected repo: failure while changes await review or one is rejected, success once all are accepted or nothing changed, updated in place on each decision (PS-23; needs the GitHub App registered, apps/web/github-app). A self-host without the App posts the same states as a `PixelSlash` commit status with a fine-grained token (PS-235). A CI job can also block by exit code with `pixelslash status --wait`",
+        "commit": "d6f8388"
       },
       "t": {
         "argos": "y",
