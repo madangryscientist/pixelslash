@@ -1,15 +1,105 @@
-import { type ReactNode, useState } from "react";
+import { Caption, Pill, ToggleChip } from "@hackcove/ui";
+import {
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+  useCallback,
+  useRef,
+  useState,
+} from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
 import { useHydrated } from "#/components/ui";
 import type { DiffResult } from "#/db/schema";
 
+/** Where the divider sits (0 is all Branch, 100 all Main), or Branch's opacity in onion skin. */
+type SliderState = {
+  position: number;
+  onion: boolean;
+  setPosition: (position: number) => void;
+  setOnion: (onion: boolean) => void;
+};
+
+const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
+
+/** Held by the viewer: the toolbar's range and the handle on the image move the same divider. */
+export function useSlider(): SliderState {
+  const [position, setRaw] = useState(50);
+  const [onion, setOnion] = useState(false);
+  const setPosition = useCallback((n: number) => setRaw(clamp(n)), []);
+  return { position, onion, setPosition, setOnion };
+}
+
+/** The handle's keys: arrows step 1 (10 with Shift), Page Up/Down 10, Home and End the ends. */
+function keyStep(event: KeyboardEvent, position: number): number | null {
+  const step = event.shiftKey ? 10 : 1;
+  if (event.key === "ArrowLeft" || event.key === "ArrowDown") return position - step;
+  if (event.key === "ArrowRight" || event.key === "ArrowUp") return position + step;
+  if (event.key === "PageDown") return position - 10;
+  if (event.key === "PageUp") return position + 10;
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return 100;
+  return null;
+}
+
+/** The divider line and its grip: a focusable `role=slider`, so the wipe works without a pointer. */
+function Handle({ slider }: { slider: SliderState }) {
+  const { position, setPosition } = slider;
+  return (
+    <div
+      className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-violet-600"
+      style={{ left: `${position}%` }}
+    >
+      <div
+        role="slider"
+        tabIndex={0}
+        aria-label="Divider"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={position}
+        aria-valuetext={`Main to ${position}%, Branch after`}
+        onKeyDown={(event) => {
+          const next = keyStep(event, position);
+          if (next === null) return;
+          event.preventDefault();
+          setPosition(next);
+        }}
+        className="pointer-events-auto absolute top-1/2 touch-none left-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white bg-violet-600 shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+      />
+    </div>
+  );
+}
+
+/** A pointer pressed anywhere on the image moves the divider there and drags it until released. */
+function useDrag(setPosition: (n: number) => void) {
+  const frame = useRef<HTMLDivElement>(null);
+  const moveTo = (event: PointerEvent) => {
+    const box = frame.current?.getBoundingClientRect();
+    if (box && box.width > 0) setPosition(((event.clientX - box.left) / box.width) * 100);
+  };
+  const handlers = {
+    onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      moveTo(event);
+    },
+    onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) moveTo(event);
+    },
+  };
+  return { frame, handlers };
+}
+
+/**
+ * Main underneath, Branch on top over the same frame: both images are sized as a share of the
+ * frame (the wider shot), so a pixel of one sits on the same pixel of the other. The wipe clips
+ * Branch from the divider rightwards; onion skin fades it instead.
+ */
 function ShotLayers({
   name,
   mainUrl,
   branchUrl,
-  position,
-  onion,
+  slider,
   mains,
   branches,
   boxes,
@@ -17,85 +107,96 @@ function ShotLayers({
   name: string;
   mainUrl: string | null;
   branchUrl: string | null;
-  position: number;
-  onion: boolean;
+  slider: SliderState;
   mains: string;
   branches: string;
   boxes: ReactNode;
 }) {
+  const { position, onion } = slider;
+  const wipe = !onion && branchUrl !== null;
+  const { frame, handlers } = useDrag(slider.setPosition);
   return (
-    <div className="relative overflow-hidden border border-slate-200 bg-white">
+    <div
+      ref={frame}
+      data-testid="slider-frame"
+      className={`relative overflow-hidden border border-slate-200 bg-white ${wipe ? "cursor-ew-resize select-none" : ""}`}
+      {...(wipe ? handlers : {})}
+    >
       {mainUrl ? (
-        <img src={mainUrl} alt={`${name} on main`} className="block" style={{ width: mains }} />
+        <img
+          src={mainUrl}
+          alt={`${name} on main`}
+          className="block"
+          draggable={false}
+          style={{ width: mains }}
+          data-testid="slider-main"
+        />
       ) : (
         <div style={{ paddingBottom: "40%" }} />
       )}
       {branchUrl && (
         <div
           className="absolute inset-0"
-          style={
-            onion ? { opacity: position / 100 } : { overflow: "hidden", width: `${position}%` }
-          }
+          style={onion ? { opacity: position / 100 } : { clipPath: `inset(0 0 0 ${position}%)` }}
         >
           <img
             src={branchUrl}
             alt={`${name} on the branch`}
-            className="absolute top-0 left-0 w-auto max-w-none"
+            className="absolute top-0 left-0 max-w-none"
+            draggable={false}
             style={{ width: branches }}
+            data-testid="slider-branch"
           />
         </div>
       )}
-      {!onion && (
-        <div
-          aria-hidden
-          className="absolute inset-y-0 w-0.5 bg-violet-600"
-          style={{ left: `${position}%` }}
-        />
-      )}
+      {wipe && <Handle slider={slider} />}
       {boxes}
+      {wipe && (
+        <div className="pointer-events-none absolute inset-x-2 top-2 flex justify-between">
+          <Pill>Main</Pill>
+          <Pill>Branch</Pill>
+        </div>
+      )}
     </div>
   );
 }
 
-function Controls({
-  position,
-  onion,
+/** The toolbar's half of the slider: Main to Branch on a compact range, and the onion skin toggle. */
+export function SliderControls({
+  slider,
   branchUrl,
-  onPosition,
-  onOnion,
 }: {
-  position: number;
-  onion: boolean;
+  slider: SliderState;
   branchUrl: string | null;
-  onPosition: (position: number) => void;
-  onOnion: (onion: boolean) => void;
 }) {
   const hydrated = useHydrated();
+  const { position, onion, setPosition, setOnion } = slider;
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-      <input
-        type="range"
-        aria-label="Compare position"
-        min={0}
-        max={100}
-        value={position}
-        disabled={!hydrated || !branchUrl}
-        onChange={(e) => onPosition(Number(e.target.value))}
-        className="w-64"
-      />
+    <>
       <label className="flex items-center gap-2">
+        <Caption>Main</Caption>
         <input
-          type="checkbox"
-          checked={onion}
-          disabled={!hydrated}
-          onChange={(e) => onOnion(e.target.checked)}
+          type="range"
+          aria-label="Compare position"
+          title={onion ? `Branch at ${position}% opacity` : `Main to ${position}%, Branch after`}
+          min={0}
+          max={100}
+          value={position}
+          disabled={!hydrated || !branchUrl}
+          onChange={(e) => setPosition(Number(e.target.value))}
+          className="w-32 accent-violet-600"
         />
-        Onion skin
+        <Caption>Branch</Caption>
       </label>
-      <span className="text-slate-500">
-        {onion ? `branch at ${position}% opacity` : `branch from ${position}%`}
-      </span>
-    </div>
+      <ToggleChip
+        pressed={onion}
+        disabled={!hydrated}
+        title="Fade Branch over Main instead of wiping"
+        onClick={() => setOnion(!onion)}
+      >
+        Onion skin
+      </ToggleChip>
+    </>
   );
 }
 
@@ -107,7 +208,8 @@ function FrameBoxes({ result, frameW }: { result: DiffResult | null; frameW: num
 
 /**
  * A wipe between the two shots (or the branch faded over the main). Both render at one scale:
- * each width as a share of the wider frame, so the pixels line up.
+ * each width as a share of the wider frame, so the pixels line up. The range and onion toggle
+ * are in the toolbar (`SliderControls`); the state is the viewer's.
  */
 export function SnapshotSlider({
   name,
@@ -117,6 +219,7 @@ export function SnapshotSlider({
   highlight,
   scale,
   crop,
+  slider,
 }: {
   name: string;
   mainUrl: string | null;
@@ -125,34 +228,23 @@ export function SnapshotSlider({
   highlight: boolean;
   scale: Scale;
   crop: Crop | null;
+  slider: SliderState;
 }) {
-  const [position, setPosition] = useState(50);
-  const [onion, setOnion] = useState(false);
   const mainW = result?.mainWidth ?? 0;
   const branchW = result?.branchWidth ?? 0;
   const frameW = Math.max(mainW, branchW);
   const share = (px: number) => (frameW ? `${(px / frameW) * 100}%` : "100%");
   return (
-    <div>
-      <Viewport width={frameW || null} scale={scale} crop={crop}>
-        <ShotLayers
-          name={name}
-          mainUrl={mainUrl}
-          branchUrl={branchUrl}
-          position={position}
-          onion={onion}
-          mains={share(mainW || 1)}
-          branches={share(branchW || 1)}
-          boxes={highlight && mainUrl ? <FrameBoxes result={result} frameW={frameW} /> : null}
-        />
-      </Viewport>
-      <Controls
-        position={position}
-        onion={onion}
+    <Viewport width={frameW || null} scale={scale} crop={crop}>
+      <ShotLayers
+        name={name}
+        mainUrl={mainUrl}
         branchUrl={branchUrl}
-        onPosition={setPosition}
-        onOnion={setOnion}
+        slider={slider}
+        mains={share(mainW || 1)}
+        branches={share(branchW || 1)}
+        boxes={highlight && mainUrl ? <FrameBoxes result={result} frameW={frameW} /> : null}
       />
-    </div>
+    </Viewport>
   );
 }

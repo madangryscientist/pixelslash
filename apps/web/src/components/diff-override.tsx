@@ -256,8 +256,7 @@ function OverrideForm({
           />
         ))}
         <Caption as="p">
-          Saving re-diffs this build now, and every later build reads it. Leave a field empty for
-          the config's value.
+          Saving re-diffs this build and later ones; an empty field takes the config's value.
         </Caption>
         <Actions waiting={!hydrated} busy={busy} onClear={held ? () => save(scope, {}) : null} />
       </Stack>

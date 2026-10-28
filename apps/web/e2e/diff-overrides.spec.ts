@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { openSection } from "./snapshot-viewer";
 
 /**
  * Diff thresholds set in the review UI (ob 1495): an override saved from the snapshot screen
@@ -23,8 +24,9 @@ test("an override set on the snapshot screen flips the verdict and exports as co
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await expect(page.getByTestId("build-status")).toHaveText("changes");
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
-  await expect(page.getByTestId("diff-override")).toBeVisible();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await openSection(page, "Tools");
+  await expect(page.getByTestId("diff-override")).toBeVisible();
   await expect(page.getByTestId("option-minChangedPixels")).toHaveText("engine default");
 
   // The change is 10x10 = 100 px: a floor of 200 makes it unchanged, and the build passes.

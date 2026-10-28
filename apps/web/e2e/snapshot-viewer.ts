@@ -1,5 +1,11 @@
 import { expect, type Page } from "@playwright/test";
 
+/** Opens one of the side panel's disclosures ("Details" or "Tools") unless it is open already. */
+export async function openSection(page: Page, name: "Details" | "Tools") {
+  const toggle = page.getByRole("button", { name, exact: true });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+}
+
 const BOXES = 'svg[aria-label="Measured regions"] rect[data-kind="change"]';
 
 /**

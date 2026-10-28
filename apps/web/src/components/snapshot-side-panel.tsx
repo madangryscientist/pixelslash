@@ -13,21 +13,12 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { AiExplanation } from "#/components/ai-notes";
+import { Options } from "#/components/diff-options-list";
 import { Provenance } from "#/components/provenance";
 import type { SnapshotView } from "#/db/review";
-import type { DiffOptions, OptionSource } from "#/db/schema";
+import type { DiffOptions } from "#/db/schema";
 import { formatDateTime, formatNumber } from "#/lib/format";
 import { awaitsDecision } from "#/lib/snapshot-groups";
-
-const OPTION_KEYS: (keyof DiffOptions)[] = [
-  "threshold",
-  "minChangedPixels",
-  "minChangedRatio",
-  "mergeDistance",
-  "minRegionArea",
-  "noiseAmplitude",
-  "maxShift",
-];
 
 function sizeLine(result: NonNullable<SnapshotView["diffResult"]>, main: string, branch: string) {
   if (result.settledBy) return `${IDENTICAL_NOTE}; both shots are ${main}.`;
@@ -58,59 +49,77 @@ function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
   );
 }
 
-/** What the diff measured, or that it measured nothing: an unmeasured shot is never "0 changed". */
-function Measured({ snapshot }: { snapshot: SnapshotView }) {
+/**
+ * The top of the panel: what the diff measured, or that it measured nothing (an unmeasured shot is
+ * never "0 changed"). The size line is here whenever the sizes differ, so the overlap note is never
+ * behind a disclosure (invariant 1).
+ */
+function Summary({ snapshot }: { snapshot: SnapshotView }) {
   const result = snapshot.diffResult;
+  let body: ReactNode;
   if (!result) {
-    return (
-      <Stack as="section" gap="xs">
-        <Overline as="h2" tone="muted">
-          Measured
-        </Overline>
+    body = (
+      <>
         <BodyStrong as="p">Not measured</BodyStrong>
         {snapshot.diffError && (
           <Body as="p" data-testid="diff-error" tone="danger">
             {snapshot.diffError}
           </Body>
         )}
-        {snapshot.measuredBy && (
-          <KeyValueList>
-            <Provenance snapshot={snapshot} />
-          </KeyValueList>
-        )}
-        <SizeLine snapshot={snapshot} />
-      </Stack>
+      </>
+    );
+  } else if (result.settledBy) {
+    body = <BodyStrong as="p">Not measured: identical bytes</BodyStrong>;
+  } else {
+    const boxes = result.regions.filter((region) => region.kind === "change").length;
+    body = (
+      <KeyValueList>
+        <KeyValue label="Changed px">{formatNumber(result.changedPixels)}</KeyValue>
+        <KeyValue label="Changed regions">{boxes}</KeyValue>
+      </KeyValueList>
     );
   }
-  if (result.settledBy) {
-    return (
-      <Stack as="section" gap="xs">
-        <Overline as="h2" tone="muted">
-          Measured
-        </Overline>
-        <BodyStrong as="p">Not measured: identical bytes</BodyStrong>
-        <SizeLine snapshot={snapshot} />
-      </Stack>
-    );
-  }
-  const boxes = result.regions.filter((region) => region.kind === "change").length;
+  return (
+    <Stack as="section" gap="xs">
+      <Overline as="h2" tone="muted">
+        Measured
+      </Overline>
+      {body}
+      {topSize(snapshot) && <SizeLine snapshot={snapshot} />}
+    </Stack>
+  );
+}
+
+/** The size line sits in the summary unless it only restates matching sizes of a measured diff. */
+const topSize = (snapshot: SnapshotView) => {
+  const result = snapshot.diffResult;
+  return !result || result.sizeChanged || Boolean(result.settledBy);
+};
+
+/** The rest of what the diff measured, and who measured it: in Details. */
+function MeasuredDetails({ snapshot }: { snapshot: SnapshotView }) {
+  const result = snapshot.diffResult;
+  const counts = result && !result.settledBy;
+  if (!counts && !snapshot.measuredBy) return null;
   return (
     <Stack as="section" gap="xs">
       <Overline as="h2" tone="muted">
         Measured
       </Overline>
       <KeyValueList>
-        <KeyValue label="Changed px">{formatNumber(result.changedPixels)}</KeyValue>
-        <KeyValue label="Changed regions">{boxes}</KeyValue>
-        <KeyValue label="Anti-aliased px">{formatNumber(result.antialiasedPixels)}</KeyValue>
-        <KeyValue label="Ignored px">{formatNumber(result.ignoredPixels)}</KeyValue>
-        <KeyValue label="Specks dropped">
-          {result.specks.count} ({formatNumber(result.specks.pixels)} px)
-        </KeyValue>
-        <KeyValue label="Compared at">{`${result.width}×${result.height}`}</KeyValue>
+        {counts && (
+          <>
+            <KeyValue label="Anti-aliased px">{formatNumber(result.antialiasedPixels)}</KeyValue>
+            <KeyValue label="Ignored px">{formatNumber(result.ignoredPixels)}</KeyValue>
+            <KeyValue label="Specks dropped">
+              {result.specks.count} ({formatNumber(result.specks.pixels)} px)
+            </KeyValue>
+            <KeyValue label="Compared at">{`${result.width}×${result.height}`}</KeyValue>
+          </>
+        )}
         <Provenance snapshot={snapshot} />
       </KeyValueList>
-      <SizeLine snapshot={snapshot} />
+      {!topSize(snapshot) && <SizeLine snapshot={snapshot} />}
     </Stack>
   );
 }
@@ -132,80 +141,6 @@ function Environment({ snapshot }: { snapshot: SnapshotView }) {
           </Caption>
         </KeyValue>
       </KeyValueList>
-    </Stack>
-  );
-}
-
-/** Where a value came from, in the words the ticket asked for (ob 1495). */
-function sourceText(source: OptionSource | undefined, config: number | undefined): string | null {
-  if (!source) return null;
-  if (source.from === "config") return "set in the config";
-  const scope = source.scope === "variant" ? "this test, this variant" : "this test";
-  const was = config === undefined ? "engine default" : String(config);
-  return `set in the UI by @${source.by} on ${formatDateTime(new Date(source.at))} (${scope}); config says ${was}`;
-}
-
-/**
- * The options the diff ran with, and the source of each: one line when every one is the engine's
- * default. A server-measured shot carries what it was measured with (overrides included); a CI
- * shot only the config's.
- */
-function ignoreLine(snapshot: SnapshotView): string {
-  const n = snapshot.ignore.length;
-  if (n > 0) return `${n} ignore area${n === 1 ? "" : "s"} skipped.`;
-  return snapshot.diffResult?.settledBy
-    ? "No ignore areas."
-    : "No ignore areas: every pixel was measured.";
-}
-
-function Options({ snapshot, options }: { snapshot: SnapshotView; options: DiffOptions }) {
-  const resolved = snapshot.resolvedDiff;
-  const used = resolved?.options ?? options;
-  const sourceOf = (key: keyof DiffOptions) => {
-    if (resolved) return sourceText(resolved.sources[key], options[key]);
-    return used[key] === undefined ? null : "set in the config";
-  };
-  const allDefault = OPTION_KEYS.every((key) => used[key] === undefined);
-  const list = (
-    <KeyValueList data-testid="diff-options">
-      {OPTION_KEYS.map((key) => {
-        const source = sourceOf(key);
-        return (
-          <div key={key}>
-            <KeyValue label={key}>
-              <span data-testid={`option-${key}`}>{used[key] ?? "engine default"}</span>
-            </KeyValue>
-            {source && (
-              <Caption as="p" data-testid={`source-${key}`} tone="muted">
-                {source}
-              </Caption>
-            )}
-          </div>
-        );
-      })}
-    </KeyValueList>
-  );
-  return (
-    <Stack as="section" gap="xs">
-      <Overline as="h2" tone="muted">
-        Diff options
-      </Overline>
-      {allDefault ? (
-        <Disclosure
-          summary={
-            <Body as="span" tone="muted">
-              All engine defaults
-            </Body>
-          }
-        >
-          {list}
-        </Disclosure>
-      ) : (
-        list
-      )}
-      <Body as="p" tone="muted">
-        {ignoreLine(snapshot)}
-      </Body>
     </Stack>
   );
 }
@@ -292,7 +227,7 @@ export function SidePanel({
   options,
   reviewable,
   status,
-  after,
+  tools,
   children,
 }: {
   projectId: string;
@@ -300,9 +235,9 @@ export function SidePanel({
   options: DiffOptions;
   reviewable: boolean;
   status: string;
-  /** Below the options: the override form, which edits them (ob 1495), and the ignore boxes (ob 1499). */
-  after?: ReactNode;
-  /** The detection flags and the flake, first: a second reviewer reads them before deciding. */
+  /** Re-run, mark flaky, thresholds and ignore areas: collapsed under Tools; null when none apply. */
+  tools?: ReactNode;
+  /** The detection flags and an open flake, above the fold: a second reviewer reads them before deciding. */
   children?: ReactNode;
 }) {
   return (
@@ -312,14 +247,25 @@ export function SidePanel({
           This build is {status}; a new build is needed to review it.
         </Body>
       )}
-      {children}
+      <AiExplanation snapshot={snapshot} />
+      <Summary snapshot={snapshot} />
       <Carried projectId={projectId} snapshot={snapshot} />
       <ApprovedEarlier projectId={projectId} snapshot={snapshot} />
-      <AiExplanation snapshot={snapshot} />
-      <Measured snapshot={snapshot} />
-      <Environment snapshot={snapshot} />
-      <Options snapshot={snapshot} options={options} />
-      {after}
+      {children}
+      <Stack gap="xs">
+        <Disclosure summary={<BodyStrong as="span">Details</BodyStrong>}>
+          <Stack gap="md">
+            <MeasuredDetails snapshot={snapshot} />
+            <Environment snapshot={snapshot} />
+            <Options snapshot={snapshot} options={options} />
+          </Stack>
+        </Disclosure>
+        {tools && (
+          <Disclosure summary={<BodyStrong as="span">Tools</BodyStrong>}>
+            <Stack gap="md">{tools}</Stack>
+          </Disclosure>
+        )}
+      </Stack>
     </Stack>
   );
 }
