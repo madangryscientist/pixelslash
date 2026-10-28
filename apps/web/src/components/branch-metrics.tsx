@@ -1,4 +1,4 @@
-import { Body, Card, Cluster, KeyValue, KeyValueList, Overline, Stack } from "@hackcove/ui";
+import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui";
 import { type BranchMetrics as Metrics, sparkPoints } from "#/lib/branch-metrics";
 import { formatDuration, formatNumber } from "#/lib/format";
 import { statsText } from "#/lib/run-card";
@@ -18,9 +18,9 @@ function Trend({ trend }: { trend: Metrics["trend"] }) {
   if (trend.length < 2) return null;
   if (trend.length === 2)
     return (
-      <Body mono numeric data-testid="branch-metrics-pair">
+      <Text mono numeric data-testid="branch-metrics-pair">
         {trend.map((p) => formatDuration(p.ms)).join(" → ")}
-      </Body>
+      </Text>
     );
   return (
     <svg
@@ -50,9 +50,9 @@ export function BranchMetrics({ metrics }: { metrics: Metrics }) {
         <Overline as="h2" tone="muted">
           Last {metrics.window} builds
         </Overline>
-        <Body as="p" tone="muted" data-testid="branch-metrics-window">
+        <Text as="p" tone="muted" data-testid="branch-metrics-window">
           {`Over the branch's last ${metrics.window} builds: ${builds(metrics.builds)} here. Derived from times and shots the server stored.`}
-        </Body>
+        </Text>
         <KeyValueList align="start">
           <KeyValue label="Builds">
             <span data-testid="branch-metrics-builds">{formatNumber(metrics.builds)}</span>
@@ -60,9 +60,9 @@ export function BranchMetrics({ metrics }: { metrics: Metrics }) {
           {wall && (
             <KeyValue label="Build wall time">
               <Cluster gap="sm" align="baseline" wrap>
-                <Body mono numeric data-testid="branch-metrics-wall">
+                <Text mono numeric data-testid="branch-metrics-wall">
                   {statsText(wall, wall.n === 1 ? "finished build" : "finished builds")}
-                </Body>
+                </Text>
                 <Trend trend={metrics.trend} />
               </Cluster>
             </KeyValue>
@@ -72,9 +72,9 @@ export function BranchMetrics({ metrics }: { metrics: Metrics }) {
           </KeyValue>
           {compareTime && (
             <KeyValue label="Per-compare time">
-              <Body mono numeric data-testid="branch-metrics-compare-time">
+              <Text mono numeric data-testid="branch-metrics-compare-time">
                 {statsText(compareTime, compareTime.n === 1 ? "shot" : "shots")}
-              </Body>
+              </Text>
             </KeyValue>
           )}
         </KeyValueList>

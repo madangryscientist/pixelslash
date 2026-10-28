@@ -1,5 +1,5 @@
 import { type ReactNode, createContext, useContext } from "react";
-import { Body, BodyStrong, Caption, Overline, Stack } from "@hackcove/ui";
+import { Caption, Overline, Stack, Text } from "@hackcove/ui";
 import type { SnapshotView } from "#/db/review";
 import type { AiRegionNote, DiffRegion } from "#/db/schema";
 
@@ -58,14 +58,14 @@ export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
           AI explanation
         </Overline>
         {snapshot.aiPending ? (
-          <Body as="p" tone="muted" data-testid="ai-pending">
+          <Text as="p" tone="muted" data-testid="ai-pending">
             explaining…
-          </Body>
+          </Text>
         ) : (
           <>
-            <Body as="p" tone="muted" data-testid="ai-skip">
+            <Text as="p" tone="muted" data-testid="ai-skip">
               skip: no judge. Review the pixels.
-            </Body>
+            </Text>
             {snapshot.aiError && (
               <Caption as="p" tone="muted" data-testid="ai-error">
                 {snapshot.aiError}
@@ -82,19 +82,21 @@ export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
         AI explanation
       </Overline>
       {aiFiltered(snapshot) && (
-        <BodyStrong as="p" data-testid="ai-auto-passed">
+        <Text strong as="p" data-testid="ai-auto-passed">
           Auto-passed: every changed region was labelled noise.
-        </BodyStrong>
+        </Text>
       )}
       <Stack as="ul" gap="xs">
         {review.regions.map((note) => (
           <li key={`${note.x},${note.y},${note.w},${note.h}`} data-testid="ai-region-note">
-            <BodyStrong data-testid="ai-label">{note.label}</BodyStrong>
-            <Body tone="muted">
+            <Text strong data-testid="ai-label">
+              {note.label}
+            </Text>
+            <Text tone="muted">
               {" "}
               at {note.x},{note.y} ({note.w}×{note.h})
-            </Body>
-            <Body as="p">{note.explanation}</Body>
+            </Text>
+            <Text as="p">{note.explanation}</Text>
           </li>
         ))}
       </Stack>

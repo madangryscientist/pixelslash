@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Body,
-  ButtonLink,
+  Button,
   Callout,
   Caption,
   Cluster,
@@ -16,7 +15,7 @@ import {
   TableHeaderCell,
   TableRow,
   TextLink,
-  rowLinkClass,
+  Text,
 } from "@hackcove/ui";
 import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { StatusBadge } from "#/components/ui";
@@ -34,7 +33,7 @@ function BuildCell({ project }: { project: ProjectOverview }) {
   if (!latest) {
     return (
       <Stack gap="xs">
-        <Body tone="muted">no builds</Body>
+        <Text tone="muted">no builds</Text>
         <TextLink
           size="sm"
           render={(props) => (
@@ -55,7 +54,7 @@ function BuildCell({ project }: { project: ProjectOverview }) {
       <Cluster gap="sm">
         <StatusBadge status={latest.status} />
         <ClusterGrow>
-          <Body truncate>{latest.branch}</Body>
+          <Text truncate>{latest.branch}</Text>
         </ClusterGrow>
         <Caption mono>{latest.commitSha.slice(0, 7)}</Caption>
       </Cluster>
@@ -82,15 +81,20 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
   return (
     <TableRow data-testid="project-row" stripe={stripeToneOf(latest)}>
       <TableCell secondary={latest ? plural(shots, "shot") : "no builds yet"}>
-        <Link to="/projects/$projectId" params={{ projectId: project.id }} className={rowLinkClass}>
+        <TextLink
+          stretch
+          render={(props) => (
+            <Link to="/projects/$projectId" params={{ projectId: project.id }} {...props} />
+          )}
+        >
           {project.name}
-        </Link>
+        </TextLink>
       </TableCell>
       <TableCell>
         <BuildCell project={project} />
       </TableCell>
       <TableCell>
-        {latest ? <MixBar counts={latest.counts} /> : <Body tone="muted">—</Body>}
+        {latest ? <MixBar counts={latest.counts} /> : <Text tone="muted">—</Text>}
       </TableCell>
       <TableCell>
         <ToReview build={latest} defaultBranch={project.defaultBranch} />
@@ -135,7 +139,7 @@ export function WaitingStrip({ org }: { org: OrgOverview }) {
       data-testid="waiting-strip"
       tone="warn"
       actions={
-        <ButtonLink
+        <Button
           variant="outline"
           size="sm"
           render={(props) => (
@@ -147,13 +151,13 @@ export function WaitingStrip({ org }: { org: OrgOverview }) {
           )}
         >
           Review next
-        </ButtonLink>
+        </Button>
       }
     >
       <Cluster gap="sm" wrap>
         {waiting.map((project, index) => (
           <Cluster key={project.id} gap="sm">
-            {index > 0 && <Body tone="muted">·</Body>}
+            {index > 0 && <Text tone="muted">·</Text>}
             <TextLink
               render={(props) => (
                 <Link
@@ -165,7 +169,7 @@ export function WaitingStrip({ org }: { org: OrgOverview }) {
             >
               {project.name} · {project.latest.branch}
             </TextLink>
-            <Body tone="muted">{project.latest.counts.toReview} to review</Body>
+            <Text tone="muted">{project.latest.counts.toReview} to review</Text>
           </Cluster>
         ))}
       </Cluster>

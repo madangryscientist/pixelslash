@@ -1,6 +1,5 @@
 import { type ReactNode } from "react";
 import {
-  Body,
   Button,
   ButtonGroup,
   Cluster,
@@ -12,6 +11,7 @@ import {
   Pill,
   Stack,
   SubsectionHeading,
+  Text,
 } from "@hackcove/ui";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
@@ -68,7 +68,7 @@ function ShotMeta({
       {/* The date is the first thing a narrow row gives up: below xl the title keeps the room. */}
       {snapshot.reviewedAt && (
         <div className="hidden xl:block">
-          <Body tone="muted">{formatDateTime(snapshot.reviewedAt)}</Body>
+          <Text tone="muted">{formatDateTime(snapshot.reviewedAt)}</Text>
         </div>
       )}
     </>
@@ -207,12 +207,12 @@ export function ViewerBar({
         <div className="shrink-0 whitespace-nowrap">
           <Cluster gap="sm">
             <ShotMeta build={build} snapshot={snapshot} label={label} />
-            <Body data-testid="review-position" tone="muted" numeric>
+            <Text data-testid="review-position" tone="muted" numeric>
               {reviewText(review)}
-            </Body>
-            <Body data-testid="position" tone="muted" numeric>
+            </Text>
+            <Text data-testid="position" tone="muted" numeric>
               {position} of {total}
-            </Body>
+            </Text>
           </Cluster>
         </div>
       </Cluster>

@@ -1,4 +1,4 @@
-import { AppShell, Body, Button, Caption, Cluster, Input, Pill, Stack } from "@hackcove/ui";
+import { AppShell, Button, Caption, Cluster, Input, Pill, Stack, Text } from "@hackcove/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
 import { AppBrand, AppControls } from "./shell";
@@ -114,9 +114,9 @@ export function InlineForm({
         </Button>
       </Cluster>
       {error ? (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {error}
-        </Body>
+        </Text>
       ) : (
         empty && hydrated && <Caption as="p">{emptyReason}</Caption>
       )}

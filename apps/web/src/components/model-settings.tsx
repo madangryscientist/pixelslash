@@ -1,8 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import {
-  Body,
-  BodyStrong,
   Button,
   Caption,
   Card,
@@ -14,6 +12,7 @@ import {
   SectionHeading,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import type { ModelView, ModelSource } from "#/db/models";
 import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
@@ -51,13 +50,13 @@ export function ModelSettings({
       <Stack>
         <SectionHeading>AI explanations</SectionHeading>
         {source && <ModelInUse source={source} orgSettingsHref={orgSettingsHref} />}
-        <Body as="p">
+        <Text as="p">
           Any OpenAI-compatible vision endpoint. For each changed region of a branch build, the
           server sends that region&apos;s baseline, new and diff crops to this model only, and shows
           its label (intended, unintended or noise) and one sentence next to the region. With no
           model, or when a call fails, the shot is reviewed as plain pixels. Nothing is sent until
           this is saved.
-        </Body>
+        </Text>
         <Stack as="form" onSubmit={save}>
           <ModelFields
             fields={fields}
@@ -75,9 +74,9 @@ export function ModelSettings({
             label={removeLabel(scope, source)}
           />
           {error && (
-            <Body as="p" role="alert" tone="danger">
+            <Text as="p" role="alert" tone="danger">
               {error}
-            </Body>
+            </Text>
           )}
         </Stack>
       </Stack>
@@ -147,7 +146,7 @@ function ModelInUse({
     "org settings"
   );
   return (
-    <BodyStrong as="p" data-testid="model-in-use" data-source={source.source}>
+    <Text strong as="p" data-testid="model-in-use" data-source={source.source}>
       {source.source === "org" && (
         <>
           Using the org&apos;s model ({source.model.model}). Set a model below to override it for
@@ -158,7 +157,7 @@ function ModelInUse({
       {source.source === "none" && (
         <>No model. Set one below, or once for every project in its {orgLink}.</>
       )}
-    </BodyStrong>
+    </Text>
   );
 }
 
@@ -228,7 +227,7 @@ function ModelFields({
         disabled={!hydrated}
         onChange={(e) => set({ autoPassNoise: e.target.checked })}
         data-testid="model-auto-pass"
-        label={<BodyStrong>Auto-pass noise</BodyStrong>}
+        label={<Text strong>Auto-pass noise</Text>}
         description="Accept a shot when the model labels every changed region noise. Off, noise is only labelled and a person still decides."
       />
     </>

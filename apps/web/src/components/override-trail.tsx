@@ -1,5 +1,4 @@
 import {
-  Body,
   Button,
   Caption,
   Card,
@@ -8,7 +7,6 @@ import {
   CodeBlock,
   CopyButton,
   Disclosure,
-  Empty,
   Overline,
   SectionHeading,
   Stack,
@@ -19,6 +17,7 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
+  Text,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -63,9 +62,9 @@ function optionsText(options: DiffOptions | null): string {
 function OverrideChanges({ changes }: { changes: Change[] }) {
   if (changes.length === 0)
     return (
-      <Empty data-testid="no-override-changes">
+      <Text as="p" color="muted" data-testid="no-override-changes">
         No thresholds were changed in the review screen.
-      </Empty>
+      </Text>
     );
   return (
     <Table variant="plain" caption="Thresholds changed in review" data-testid="override-changes">
@@ -153,14 +152,14 @@ function ExportAsConfig({ exported, hydrated }: { exported: string; hydrated: bo
   return (
     <Disclosure summary="Export as config" data-testid="override-export">
       <Stack gap="sm">
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           Merge each route&apos;s <Code>diff</Code>, <Code>ignore</Code> and <Code>variants</Code>{" "}
           into the route of that name in <Code>pixelslash.config.json</Code>, then clear the
           overrides and ignore boxes here: the builds measure the same. A key the config already
           sets on that variant beats a route&apos;s; move it to the variant. Ignore boxes are in
           image px, the config&apos;s in CSS px: the same at a deviceScaleFactor of 1, otherwise
           divide by it.
-        </Body>
+        </Text>
         <Cluster justify="end">
           <CopyButton text={exported} disabled={!hydrated} />
         </Cluster>
@@ -188,13 +187,15 @@ export function OverrideSettings({
       <Stack>
         <Stack gap="xs">
           <SectionHeading>Diff thresholds set in review</SectionHeading>
-          <Body as="p">
+          <Text as="p">
             Set from a shot&apos;s screen, for a test or one variant of it; they beat the
             config&apos;s values. Clearing one applies the config&apos;s again from the next build.
-          </Body>
+          </Text>
         </Stack>
         {overrides.list.length === 0 ? (
-          <Empty data-testid="no-overrides">None. Set one from a shot&apos;s screen.</Empty>
+          <Text as="p" color="muted" data-testid="no-overrides">
+            None. Set one from a shot&apos;s screen.
+          </Text>
         ) : (
           <Table variant="plain" caption="Diff thresholds set in review">
             <TableHead>

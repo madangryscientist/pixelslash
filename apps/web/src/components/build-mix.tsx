@@ -1,4 +1,4 @@
-import { Body, BodyStrong, Caption, Stack, type TextTone } from "@hackcove/ui";
+import { Caption, Stack, type TextTone, Text } from "@hackcove/ui";
 import type { BuildSummary } from "#/db/build-list";
 import type { BuildCounts } from "#/db/review";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
@@ -76,17 +76,17 @@ const UNMEASURED = new Set<MixBuild["status"]>(["uploading", "processing", "erro
 function ToReviewCount({ build, defaultBranch }: { build: MixBuild; defaultBranch: string }) {
   if (build.counts.toReview > 0) {
     return (
-      <BodyStrong tone="warn" data-testid="to-review">
+      <Text strong tone="warn" data-testid="to-review">
         {build.counts.toReview} to review
-      </BodyStrong>
+      </Text>
     );
   }
   return (
-    <Body tone="muted" data-testid="to-review">
+    <Text tone="muted" data-testid="to-review">
       {build.branch === defaultBranch && build.status === "passed"
         ? "auto-accepted"
         : "nothing to review"}
-    </Body>
+    </Text>
   );
 }
 
@@ -98,12 +98,12 @@ export function ToReview({
   build: MixBuild | null;
   defaultBranch: string;
 }) {
-  if (!build) return <Body tone="muted">—</Body>;
+  if (!build) return <Text tone="muted">—</Text>;
   if (UNMEASURED.has(build.status)) {
     return (
-      <Body tone="muted" data-testid="to-review">
+      <Text tone="muted" data-testid="to-review">
         not measured
-      </Body>
+      </Text>
     );
   }
   return (

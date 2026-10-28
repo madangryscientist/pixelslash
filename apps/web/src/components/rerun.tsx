@@ -1,4 +1,4 @@
-import { Body, Button, ButtonGroup, Caption, Overline, Stack } from "@hackcove/ui";
+import { Button, ButtonGroup, Caption, Overline, Stack, Text } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";
@@ -31,9 +31,9 @@ function useRerun(projectId: string, buildId: string) {
 function RerunError({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <Body as="p" role="alert" tone="danger">
+    <Text as="p" role="alert" tone="danger">
       {error}
-    </Body>
+    </Text>
   );
 }
 

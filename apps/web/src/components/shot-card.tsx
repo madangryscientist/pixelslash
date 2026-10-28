@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Body, BodyStrong, Caption, Card, Cluster, ClusterGrow, Pill, Stack } from "@hackcove/ui";
+import { Caption, Card, Cluster, ClusterGrow, Pill, Stack, Text } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { a11yLine } from "#/components/a11y";
@@ -148,9 +148,9 @@ export function findingsLine({ library, gaps, special }: Composition): string {
 function GapsLine({ composition }: { composition: Composition | null | undefined }) {
   if (!composition) return null;
   return (
-    <Body as="p" tone="muted" data-testid="shot-gaps">
+    <Text as="p" tone="muted" data-testid="shot-gaps">
       {findingsLine(composition)}
-    </Body>
+    </Text>
   );
 }
 
@@ -158,9 +158,9 @@ function A11yLine({ diff }: { diff: SnapshotView["a11yDiff"] }) {
   const line = a11yLine(diff);
   if (!line) return null;
   return (
-    <Body as="p" tone="muted" data-testid="shot-a11y">
+    <Text as="p" tone="muted" data-testid="shot-a11y">
       {line}
-    </Body>
+    </Text>
   );
 }
 
@@ -169,21 +169,21 @@ function ShotNotes({ shot }: { shot: SnapshotView }) {
   return (
     <>
       {shot.changeNote && (
-        <Body as="p" data-testid="shot-change-note">
-          <Body tone="muted">Judge (local model): </Body>
+        <Text as="p" data-testid="shot-change-note">
+          <Text tone="muted">Judge (local model): </Text>
           {shot.changeNote}.
-        </Body>
+        </Text>
       )}
       {shot.aiReview && (
-        <Body as="p" data-testid="shot-ai-labels">
-          <Body tone="muted">AI: </Body>
+        <Text as="p" data-testid="shot-ai-labels">
+          <Text tone="muted">AI: </Text>
           {labelSummary(shot.aiReview.regions)}
-        </Body>
+        </Text>
       )}
       {!shot.aiReview && shot.aiPending && (
-        <Body as="p" tone="muted" data-testid="shot-ai-pending">
+        <Text as="p" tone="muted" data-testid="shot-ai-pending">
           AI: explaining…
-        </Body>
+        </Text>
       )}
     </>
   );
@@ -234,9 +234,9 @@ export function ShotCard({
                     {label.component}
                   </Caption>
                 )}
-                <BodyStrong as="p" truncate title={shot.name} data-testid="shot-story">
+                <Text strong as="p" truncate title={shot.name} data-testid="shot-story">
                   {label.story}
-                </BodyStrong>
+                </Text>
               </Stack>
             </ClusterGrow>
             {!baseline && (holdsChange(shot) || shot.reviewState !== "pending") && (
@@ -251,9 +251,9 @@ export function ShotCard({
             ))}
           </Cluster>
           <ShotNotes shot={shot} />
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             {line}
-          </Body>
+          </Text>
           <GapsLine composition={shot.composition} />
           <A11yLine diff={shot.a11yDiff} />
         </Stack>

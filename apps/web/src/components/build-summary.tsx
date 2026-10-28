@@ -1,16 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import {
-  Body,
-  BodyStrong,
-  Button,
-  Caption,
-  Cluster,
-  Divider,
-  Overline,
-  Pill,
-  Stack,
-} from "@hackcove/ui";
+import { Button, Caption, Cluster, Divider, Overline, Pill, Stack, Text } from "@hackcove/ui";
 import { useHydrated } from "#/components/ui";
 import type { AiSummarySentence } from "#/db/diff-json";
 import type { BuildView, SnapshotView } from "#/db/review";
@@ -73,8 +63,8 @@ function Sentence({
   lead?: string;
 }) {
   return (
-    <Body as="p" data-testid={testId}>
-      {lead && <BodyStrong>{lead} </BodyStrong>}
+    <Text as="p" data-testid={testId}>
+      {lead && <Text strong>{lead} </Text>}
       {sentence.text}{" "}
       {sentence.shots.flatMap((id, _, ids) => {
         const shot = byId.get(id);
@@ -97,7 +87,7 @@ function Sentence({
           " ",
         ];
       })}
-    </Body>
+    </Text>
   );
 }
 
@@ -214,21 +204,21 @@ function SummaryBody({
   if (!describable) return null;
   if (modelConfigured && tooManyChanges(changed))
     return (
-      <Body as="p" tone="muted" data-testid="summary-too-many">
+      <Text as="p" tone="muted" data-testid="summary-too-many">
         {noSummaryReason(changed)}
-      </Body>
+      </Text>
     );
   // Written once every shot is explained (ob 1875); a big build gets none.
   if (pending)
     return (
-      <Body as="p" tone="muted" data-testid="summary-pending">
+      <Text as="p" tone="muted" data-testid="summary-pending">
         explaining…
-      </Body>
+      </Text>
     );
   return (
-    <Body as="p" tone="muted" data-testid="summary-skip">
+    <Text as="p" tone="muted" data-testid="summary-skip">
       skip: no judge.
-    </Body>
+    </Text>
   );
 }
 
@@ -276,10 +266,10 @@ export function BuildSummary({
         describable={describable}
         pending={pending}
       />
-      <Body as="p" tone="muted" data-testid="summary-counts">
+      <Text as="p" tone="muted" data-testid="summary-counts">
         {describable ? "" : nothingChanged(build.brief)}
         {measuredCounts(snapshots).join(" · ")}.
-      </Body>
+      </Text>
       <Footer
         projectId={projectId}
         build={build}

@@ -1,6 +1,4 @@
 import {
-  Body,
-  BodyStrong,
   Caption,
   Disclosure,
   KeyValue,
@@ -8,6 +6,7 @@ import {
   Overline,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -43,9 +42,9 @@ function SizeLine({ snapshot }: { snapshot: SnapshotView }) {
     line = sizeLine(result, main, branch);
   }
   return (
-    <Body as="p" data-testid="sizes" tone="muted">
+    <Text as="p" data-testid="sizes" tone="muted">
       {line}
-    </Body>
+    </Text>
   );
 }
 
@@ -60,16 +59,22 @@ function Summary({ snapshot }: { snapshot: SnapshotView }) {
   if (!result) {
     body = (
       <>
-        <BodyStrong as="p">Not measured</BodyStrong>
+        <Text strong as="p">
+          Not measured
+        </Text>
         {snapshot.diffError && (
-          <Body as="p" data-testid="diff-error" tone="danger">
+          <Text as="p" data-testid="diff-error" tone="danger">
             {snapshot.diffError}
-          </Body>
+          </Text>
         )}
       </>
     );
   } else if (result.settledBy) {
-    body = <BodyStrong as="p">Not measured: identical bytes</BodyStrong>;
+    body = (
+      <Text strong as="p">
+        Not measured: identical bytes
+      </Text>
+    );
   } else {
     const boxes = result.regions.filter((region) => region.kind === "change").length;
     body = (
@@ -162,10 +167,10 @@ function Carried({ projectId, snapshot }: { projectId: string; snapshot: Snapsho
       <Overline as="h2" tone="muted">
         Carried change
       </Overline>
-      <Body as="p">
+      <Text as="p">
         No change since the branch's last build, whose change against the accepted baseline is still
         open. Accepting or rejecting here decides it on both builds.
-      </Body>
+      </Text>
       {carriedFromBuild && (
         <TextLink
           render={(p) => (
@@ -199,12 +204,12 @@ function ApprovedEarlier({ projectId, snapshot }: { projectId: string; snapshot:
       <Overline as="h2" tone="muted">
         Approved earlier
       </Overline>
-      <Body as="p">
+      <Text as="p">
         Approved on build <Caption mono>{approved.commitSha.slice(0, 7)}</Caption>
         {approved.reviewedBy && <> by {approved.reviewedBy}</>}
         {approved.reviewedAt && <>, {formatDateTime(approved.reviewedAt)}</>}. No change since, but
         this shot still differs from {approved.defaultBranch}.
-      </Body>
+      </Text>
       <TextLink
         data-testid="approved-earlier-link"
         render={(p) => (
@@ -243,9 +248,9 @@ export function SidePanel({
   return (
     <Stack gap="md">
       {!reviewable && (
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           This build is {status}; a new build is needed to review it.
-        </Body>
+        </Text>
       )}
       <AiExplanation snapshot={snapshot} />
       <Summary snapshot={snapshot} />
@@ -253,7 +258,13 @@ export function SidePanel({
       <ApprovedEarlier projectId={projectId} snapshot={snapshot} />
       {children}
       <Stack gap="xs">
-        <Disclosure summary={<BodyStrong as="span">Details</BodyStrong>}>
+        <Disclosure
+          summary={
+            <Text strong as="span">
+              Details
+            </Text>
+          }
+        >
           <Stack gap="md">
             <MeasuredDetails snapshot={snapshot} />
             <Environment snapshot={snapshot} />
@@ -261,7 +272,13 @@ export function SidePanel({
           </Stack>
         </Disclosure>
         {tools && (
-          <Disclosure summary={<BodyStrong as="span">Tools</BodyStrong>}>
+          <Disclosure
+            summary={
+              <Text strong as="span">
+                Tools
+              </Text>
+            }
+          >
             <Stack gap="md">{tools}</Stack>
           </Disclosure>
         )}

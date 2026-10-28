@@ -1,4 +1,4 @@
-import { Body, BodyStrong, Breadcrumbs, Callout, ListLayout, Stack } from "@hackcove/ui";
+import { Breadcrumbs, Callout, ListLayout, Stack, Text } from "@hackcove/ui";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { BuildBrief } from "#/components/build-brief";
@@ -35,9 +35,9 @@ function BuildError({ project, build }: Pick<Loaded, "project" | "build">) {
       <Stack gap="xs">
         <span>{build.error}</span>
         {project.diffLocation === "ci" && build.status === "errored" && (
-          <BodyStrong as="p" tone="danger" data-testid="rerun-ci">
+          <Text strong as="p" tone="danger" data-testid="rerun-ci">
             This project diffs in CI, so the server cannot measure it again: re-run the CI job.
-          </BodyStrong>
+          </Text>
         )}
         {project.diffLocation === "server" && build.status === "errored" && (
           <RerunErrored projectId={project.id} buildId={build.id} />
@@ -66,10 +66,10 @@ function useAcceptAll(projectId: string, buildId: string) {
 /** What a decision does to the build, under the shots. */
 function RejectionNote() {
   return (
-    <Body as="p" tone="muted">
+    <Text as="p" tone="muted">
       A rejection keeps the build failed until a new build arrives. New and removed shots are listed
       for review and never block a build.
-    </Body>
+    </Text>
   );
 }
 
@@ -145,9 +145,9 @@ function BuildPage() {
           </Callout>
         )}
         {snapshots.length === 0 ? (
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             This build holds no snapshots yet.
-          </Body>
+          </Text>
         ) : (
           <>
             <BuildTabs projectId={project.id} buildId={build.id} active={active} counts={counts} />

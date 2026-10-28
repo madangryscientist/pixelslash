@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Body, Button, Caption, Divider, Overline, Stack } from "@hackcove/ui";
+import { Button, Caption, Divider, Overline, Stack, Text } from "@hackcove/ui";
 
 /** Past this many lines, or this many characters, the brief opens collapsed. */
 const SHOWN_LINES = 4;
@@ -28,7 +28,7 @@ export function BuildBrief({ brief }: { brief: string | null }) {
         data-testid="brief-text"
         data-collapsed={clamped ? "" : undefined}
       >
-        <Body>{brief}</Body>
+        <Text>{brief}</Text>
       </div>
       {collapsible && (
         <div>

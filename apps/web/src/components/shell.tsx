@@ -1,13 +1,5 @@
 import { Link, getRouteApi } from "@tanstack/react-router";
-import {
-  AppShellBrand,
-  Avatar,
-  Body,
-  Button,
-  ButtonLink,
-  Cluster,
-  ColourSchemeToggle,
-} from "@hackcove/ui";
+import { AppShellBrand, Avatar, Button, Cluster, ColourSchemeToggle, Text } from "@hackcove/ui";
 import { rememberTheme } from "#/lib/theme";
 import { useHydrated } from "#/lib/use-hydrated";
 
@@ -54,11 +46,11 @@ function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }
         className="hidden items-center gap-2 sm:flex"
       >
         <Avatar name={viewer.login} size="sm" />
-        <Body>{viewer.login}</Body>
+        <Text>{viewer.login}</Text>
       </span>
-      <ButtonLink variant="link" render={(props) => <Link to="/settings" {...props} />}>
+      <Button variant="link" render={(props) => <Link to="/settings" {...props} />}>
         Settings
-      </ButtonLink>
+      </Button>
       <form method="post" action="/auth/sign-out">
         <Button type="submit" variant="link">
           Sign out

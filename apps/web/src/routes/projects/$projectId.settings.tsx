@@ -1,14 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  Body,
   Breadcrumbs,
   Button,
   ButtonGroup,
   Callout,
   Card,
   CopyLine,
-  Empty,
   ListLayout,
   Pill,
   Radio,
@@ -21,6 +19,7 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
+  Text,
 } from "@hackcove/ui";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
@@ -57,10 +56,10 @@ function ProjectSettings() {
           <Stack>
             <Stack gap="xs">
               <SectionHeading>CI tokens</SectionHeading>
-              <Body as="p">
+              <Text as="p">
                 CI uploads builds with a token. It is shown once, when issued; store it as a CI
                 secret.
-              </Body>
+              </Text>
             </Stack>
             {issued && (
               <Callout
@@ -145,11 +144,11 @@ function DiffLocationForm({
       <Stack>
         <Stack gap="xs">
           <SectionHeading>Diff location</SectionHeading>
-          <Body as="p">
+          <Text as="p">
             Where this project&apos;s shots are compared with their baselines. Every shot of a build
             is measured in the same place; a CI build whose result is missing or wrong errors, and
             is never diffed on the server instead.
-          </Body>
+          </Text>
         </Stack>
         <RadioGroup
           name="diff-location"
@@ -198,7 +197,9 @@ function TokenTable({ tokens, hydrated }: { tokens: Token[]; hydrated: boolean }
   };
   if (tokens.length === 0) {
     return (
-      <Empty data-testid="no-tokens">No tokens yet. Issue one above, then upload with it.</Empty>
+      <Text as="p" color="muted" data-testid="no-tokens">
+        No tokens yet. Issue one above, then upload with it.
+      </Text>
     );
   }
   return (

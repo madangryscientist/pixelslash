@@ -1,4 +1,4 @@
-import { Body, Card, Cluster, KeyValue, KeyValueList, Overline, Stack } from "@hackcove/ui";
+import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui";
 import type { BuildView } from "#/db/review";
 import { formatDuration } from "#/lib/format";
 import { type CardLine, NO_TIMINGS, type RunCardInput, runCard } from "#/lib/run-card";
@@ -31,22 +31,22 @@ function Line({
       <Cluster gap="sm" align="baseline" wrap>
         {steps.map((step) => (
           <span key={step.key} data-testid={`timing-${scope}-${step.key}`}>
-            <Body tone="muted">{step.label}</Body>{" "}
-            <Body mono numeric>
+            <Text tone="muted">{step.label}</Text>{" "}
+            <Text mono numeric>
               {formatDuration(step.ms)}
-            </Body>
+            </Text>
             {step.note && (
-              <Body tone="muted" data-testid={`timing-${scope}-${step.key}-note`}>
+              <Text tone="muted" data-testid={`timing-${scope}-${step.key}-note`}>
                 {" "}
                 ({step.note})
-              </Body>
+              </Text>
             )}
           </span>
         ))}
         {note && (
-          <Body tone="muted" data-testid={`timings-${scope}-note`}>
+          <Text tone="muted" data-testid={`timings-${scope}-note`}>
             {note}
-          </Body>
+          </Text>
         )}
       </Cluster>
     </KeyValue>
@@ -57,13 +57,13 @@ function Figure({ line }: { line: CardLine }) {
   return (
     <KeyValue label={line.label} data-testid={`run-${line.key}`}>
       <Cluster gap="sm" align="baseline" wrap>
-        <Body mono numeric data-testid={`run-${line.key}-value`}>
+        <Text mono numeric data-testid={`run-${line.key}-value`}>
           {line.value}
-        </Body>
-        {line.note && <Body tone="muted">{line.note}</Body>}
-        <Body tone="muted" data-testid={`run-${line.key}-source`}>
+        </Text>
+        {line.note && <Text tone="muted">{line.note}</Text>}
+        <Text tone="muted" data-testid={`run-${line.key}-source`}>
           ({line.source})
-        </Body>
+        </Text>
       </Cluster>
     </KeyValue>
   );
@@ -87,9 +87,9 @@ export function BuildTimings(input: RunCardInput & { build: BuildView["build"] }
           This run
         </Overline>
         {!timed && (
-          <Body as="p" tone="muted" data-testid="run-no-timings">
+          <Text as="p" tone="muted" data-testid="run-no-timings">
             {NO_TIMINGS}
-          </Body>
+          </Text>
         )}
         <KeyValueList align="start">
           {card.wall && <Figure line={card.wall} />}

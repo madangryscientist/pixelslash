@@ -1,5 +1,4 @@
 import {
-  Body,
   Button,
   ButtonGroup,
   Caption,
@@ -12,6 +11,7 @@ import {
   Radio,
   RadioGroup,
   Stack,
+  Text,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -261,14 +261,14 @@ function OverrideForm({
         <Actions waiting={!hydrated} busy={busy} onClear={held ? () => save(scope, {}) : null} />
       </Stack>
       {error && (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {error}
-        </Body>
+        </Text>
       )}
       {note && (
-        <Body as="p" tone="muted" data-testid="override-note">
+        <Text as="p" tone="muted" data-testid="override-note">
           {note}
-        </Body>
+        </Text>
       )}
       {held && <Snippet o={held} hydrated={hydrated} />}
     </Stack>

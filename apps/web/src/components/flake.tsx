@@ -1,5 +1,4 @@
 import {
-  Body,
   Button,
   ButtonGroup,
   Caption,
@@ -12,6 +11,7 @@ import {
   Radio,
   RadioGroup,
   Stack,
+  Text,
 } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
@@ -103,10 +103,10 @@ export function FlakyPolicyControl({ policy }: { policy: FlakyPolicy }) {
 export function FlakeRuns({ evidence }: { evidence: FlakeView["evidence"][number] }) {
   return (
     <Stack gap="xs">
-      <Body as="p" data-testid="flake-differed">
+      <Text as="p" data-testid="flake-differed">
         {evidence.differed.length} of {evidence.runs} runs differed (run
         {evidence.differed.length === 1 ? "" : "s"} {evidence.differed.join(", ")})
-      </Body>
+      </Text>
       <ul className="grid grid-cols-3 gap-2">
         {evidence.images.map((image) => {
           const differed = evidence.differed.includes(image.run);
@@ -143,17 +143,17 @@ export function FlakeHistory({ flake }: { flake: FlakeView }) {
   return (
     <Stack as="ul" gap="xs">
       {flake.createdBy && (
-        <Body as="li">
+        <Text as="li">
           Marked flaky by {flake.createdBy}
           {flake.note && <>: {flake.note}</>}
-        </Body>
+        </Text>
       )}
       {resolved && (
-        <Body as="li" data-testid="flake-resolution">
+        <Text as="li" data-testid="flake-resolution">
           Resolved{flake.resolvedBy && <> by {flake.resolvedBy}</>}
           {flake.resolvedAt && <>, {formatDateTime(flake.resolvedAt)}</>}
           {flake.resolutionNote && <>: {flake.resolutionNote}</>}
-        </Body>
+        </Text>
       )}
     </Stack>
   );
@@ -177,9 +177,9 @@ function MarkFlakyForm({
   return (
     <Card tone="warn" size="sm">
       <Stack as="form" gap="sm" onSubmit={save} aria-label="Mark flaky">
-        <Body as="p">
+        <Text as="p">
           Opens a flake for this name and variant; its config's policy applies (review if none).
-        </Body>
+        </Text>
         <Input
           aria-label="Note (optional)"
           placeholder="Note (optional)"
@@ -188,9 +188,9 @@ function MarkFlakyForm({
           onChange={(e) => setNote(e.target.value)}
         />
         {error && (
-          <Body as="p" role="alert" tone="danger">
+          <Text as="p" role="alert" tone="danger">
             {error}
-          </Body>
+          </Text>
         )}
         <ButtonGroup>
           <Button type="submit" busy={busy} busyLabel="Marking…" size="sm">
@@ -248,7 +248,7 @@ export function FlakePanel({
       <Overline as="h2">Flaky</Overline>
       <Cluster gap="xs" wrap>
         <FlakyBadge projectId={projectId} flakeId={flake.id} skipped={skipped} />
-        <Body tone="muted">{flake.status}</Body>
+        <Text tone="muted">{flake.status}</Text>
       </Cluster>
       {evidence ? (
         <>
@@ -258,15 +258,15 @@ export function FlakePanel({
           <FlakeRuns evidence={evidence} />
         </>
       ) : (
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           No re-captures: marked by hand.
-        </Body>
+        </Text>
       )}
       <FlakeHistory flake={flake} />
-      <Body as="p" data-testid="flaky-policy">
+      <Text as="p" data-testid="flaky-policy">
         Policy in effect: {POLICY_TEXT[policy]}
         {snapshot.flakyPolicy === null && " (none sent; review is the default)"}
-      </Body>
+      </Text>
       <FlakyPolicyControl policy={policy} />
     </Stack>
   );

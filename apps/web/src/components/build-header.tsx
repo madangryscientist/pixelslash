@@ -1,10 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
-  Body,
-  BodyStrong,
   Button,
-  ButtonLink,
   Card,
   Cluster,
   ClusterGrow,
@@ -13,6 +10,7 @@ import {
   ProgressBar,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
@@ -28,9 +26,9 @@ function toReviewText(baseline: boolean, toReview: number): string {
 function Progress({ reviewed, total }: { reviewed: number; total: number }) {
   return (
     <Stack gap="xs" data-testid="review-progress">
-      <Body as="p" tone="muted">
+      <Text as="p" tone="muted">
         {total === 0 ? "No changed shots to review" : `${reviewed} of ${total} reviewed`}
-      </Body>
+      </Text>
       <ProgressBar value={reviewed} max={total} label="Changed shots reviewed" tone="positive" />
     </Stack>
   );
@@ -116,7 +114,7 @@ function ReviewActions({
   return (
     <Cluster gap="xs">
       {next ? (
-        <ButtonLink
+        <Button
           size="sm"
           data-testid="review-next"
           render={(props) => (
@@ -128,7 +126,7 @@ function ReviewActions({
           )}
         >
           Review next
-        </ButtonLink>
+        </Button>
       ) : (
         <Button disabled size="sm" data-testid="review-next">
           Review next
@@ -176,7 +174,9 @@ export function BuildHeader({
       <Stack>
         <Cluster gap="sm" wrap>
           <MetaList>
-            <BodyStrong data-testid="build-branch">{build.branch}</BodyStrong>
+            <Text strong data-testid="build-branch">
+              {build.branch}
+            </Text>
             {build.branch !== defaultBranch && (
               <BranchLink projectId={projectId} branch={build.branch} />
             )}
@@ -186,20 +186,22 @@ export function BuildHeader({
             {expiry && <span data-testid="build-expiry">{expiry}</span>}
           </MetaList>
           <StatusBadge status={build.status} />
-          <BodyStrong data-testid="to-review">{toReviewText(baseline, toReview)}</BodyStrong>
+          <Text strong data-testid="to-review">
+            {toReviewText(baseline, toReview)}
+          </Text>
           <SkippedFlaky projectId={projectId} count={skipped} />
           {approvedEarlier > 0 && (
-            <Body tone="muted" data-testid="approved-earlier-count">
+            <Text tone="muted" data-testid="approved-earlier-count">
               {approvedEarlier} approved earlier on this branch
-            </Body>
+            </Text>
           )}
         </Cluster>
         {baseline ? (
-          <Body as="p" data-testid="build-baseline">
+          <Text as="p" data-testid="build-baseline">
             This build is the baseline. It is the first build that can be a baseline for this
             project, so its {snapshots.length} shot{snapshots.length === 1 ? "" : "s"} have nothing
             to be compared with and need no review. Later builds are compared against it.
-          </Body>
+          </Text>
         ) : (
           <Cluster gap="sm" align="end" wrap>
             <ClusterGrow>
