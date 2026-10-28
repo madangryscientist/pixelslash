@@ -1,5 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { openSection } from "./snapshot-viewer";
 import { sql } from "./d1";
 
 /**
@@ -18,6 +19,8 @@ async function openShot(page: Page, name: string) {
     .first()
     .click();
   await expect(page).toHaveURL(/\/snapshots\//);
+  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await openSection(page, "Details");
   await expect(page.getByTestId("measured-by")).toBeVisible();
 }
 

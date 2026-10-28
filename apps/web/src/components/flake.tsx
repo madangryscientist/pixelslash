@@ -178,8 +178,7 @@ function MarkFlakyForm({
     <Card tone="warn" size="sm">
       <Stack as="form" gap="sm" onSubmit={save} aria-label="Mark flaky">
         <Body as="p">
-          Opens a flake for this shot's name and variant. Its config's policy then applies; with
-          none, it is review.
+          Opens a flake for this name and variant; its config's policy applies (review if none).
         </Body>
         <Input
           aria-label="Note (optional)"

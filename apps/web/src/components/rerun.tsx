@@ -1,4 +1,4 @@
-import { Body, Button, ButtonGroup, Overline, Stack } from "@hackcove/ui";
+import { Body, Button, ButtonGroup, Caption, Overline, Stack } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";
@@ -92,9 +92,9 @@ function RerunShotButton({
   return (
     <Stack as="section" gap="xs">
       <Overline as="h2">Re-run</Overline>
-      <Body as="p" tone="muted">
-        Measure this shot again from the uploaded image. A review stays if the result is the same.
-      </Body>
+      <Caption as="p">
+        Measures the uploaded image again; a review stays if the result does.
+      </Caption>
       <ButtonGroup>
         <Button
           variant="outline"

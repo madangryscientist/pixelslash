@@ -1,5 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { openSection } from "./snapshot-viewer";
 import { rivalContext, rivalSession } from "./rival";
 
 /**
@@ -41,8 +42,9 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await expect(page.getByTestId("build-status")).toHaveText("changes");
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
-  await expect(page.getByTestId("ignore-boxes")).toBeVisible();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await openSection(page, "Tools");
+  await expect(page.getByTestId("ignore-boxes")).toBeVisible();
   await expect(page.getByTestId("ignore-box")).toHaveCount(0);
   const snapshotPath = new URL(page.url()).pathname;
 

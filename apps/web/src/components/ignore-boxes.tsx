@@ -292,9 +292,7 @@ export function IgnoreBoxes({
       ) : (
         <DrawButton draft={draft} hydrated={hydrated} />
       )}
-      <Caption as="p">
-        In image px. Saving re-diffs this build now, and every later build reads it.
-      </Caption>
+      <Caption as="p">In image px; saving re-diffs this build and later ones.</Caption>
       {boxes.error && (
         <Body as="p" role="alert" tone="danger">
           {boxes.error}

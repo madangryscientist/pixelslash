@@ -5,7 +5,7 @@ import { type Mode, ViewerControls } from "#/components/snapshot-controls";
 import type { Scale } from "#/components/snapshot-frame";
 import { type Marking, Pane } from "#/components/snapshot-pane";
 import { SnapshotOverlay } from "#/components/snapshot-overlay";
-import { SnapshotSlider } from "#/components/snapshot-slider";
+import { SliderControls, SnapshotSlider, useSlider } from "#/components/snapshot-slider";
 import type { DiffResult, IgnoreRect } from "#/db/schema";
 
 /** One side's measured size, and its caption; all null when nothing measured it. */
@@ -117,6 +117,7 @@ export function SnapshotViewer({
   const [scale, setScale] = useState<Scale>("fit");
   const [highlight, setHighlight] = useState(true);
   const [showFindings, setShowFindings] = useState(true);
+  const slider = useSlider();
   const { result } = shots;
   const crop = cropOf(result);
   const view = { highlight, scale, crop };
@@ -135,6 +136,7 @@ export function SnapshotViewer({
         composition={shots.composition}
         showFindings={showFindings}
         onShowFindings={setShowFindings}
+        slider={<SliderControls slider={slider} branchUrl={shots.branchUrl} />}
       />
       {mode === "side" && (
         <SideBySide
@@ -147,7 +149,7 @@ export function SnapshotViewer({
         />
       )}
       {mode === "overlay" && <SnapshotOverlay {...shots} {...view} />}
-      {mode === "slider" && <SnapshotSlider {...shots} {...view} />}
+      {mode === "slider" && <SnapshotSlider {...shots} {...view} slider={slider} />}
     </section>
   );
 }

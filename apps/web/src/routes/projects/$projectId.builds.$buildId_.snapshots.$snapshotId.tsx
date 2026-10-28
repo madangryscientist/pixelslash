@@ -106,30 +106,44 @@ function DecisionError({ error }: { error: string | null }) {
   );
 }
 
-/** The flag, flake and re-run panels under the side panel's options. */
-function ShotPanels({
+/**
+ * Mark flaky shows while no flake is open; the others need a server diff of a shot still there
+ * (the guards at the top of RerunShot, DiffOverride and IgnoreBoxes: keep this in step with them).
+ */
+const hasTools = ({ flake, project, snapshot }: ReturnType<typeof Route.useLoaderData>) =>
+  !flake || (project.diffLocation === "server" && snapshot.diffStatus !== "removed");
+
+/** The side panel's tools: re-run, mark flaky (when no flake is open), thresholds and ignore areas. */
+function ShotTools({
   data,
-  flag,
+  ignore,
 }: {
   data: ReturnType<typeof Route.useLoaderData>;
-  flag: ReturnType<typeof useFlagDraft>;
+  ignore: ReturnType<typeof useIgnoreDraft>;
 }) {
   const { project, build, snapshot } = data;
   return (
     <>
-      <FlagPanel projectId={project.id} snapshotId={snapshot.id} flags={data.flags} draft={flag} />
-      <FlakePanel
-        projectId={project.id}
-        snapshot={snapshot}
-        flake={data.flake}
-        skipped={skippedFlaky(snapshot)}
-      />
       <RerunShot project={project} build={build} snapshot={snapshot} />
+      {!data.flake && <Flake data={data} />}
+      <DiffOverride {...data} />
+      <IgnoreBoxes {...data} draft={ignore} />
     </>
   );
 }
 
-/** The right-hand column: the side panel with its override, ignore-box and per-shot panels. */
+function Flake({ data }: { data: ReturnType<typeof Route.useLoaderData> }) {
+  return (
+    <FlakePanel
+      projectId={data.project.id}
+      snapshot={data.snapshot}
+      flake={data.flake}
+      skipped={skippedFlaky(data.snapshot)}
+    />
+  );
+}
+
+/** The right-hand column: the side panel, the flag and an open flake on top, the rest under Tools. */
 function SideColumn({
   data,
   flag,
@@ -149,14 +163,10 @@ function SideColumn({
       options={data.diffOptions}
       reviewable={reviewable}
       status={build.status}
-      after={
-        <>
-          <DiffOverride {...data} />
-          <IgnoreBoxes {...data} draft={ignore} />
-        </>
-      }
+      tools={hasTools(data) ? <ShotTools data={data} ignore={ignore} /> : null}
     >
-      <ShotPanels data={data} flag={flag} />
+      <FlagPanel projectId={project.id} snapshotId={snapshot.id} flags={data.flags} draft={flag} />
+      {data.flake && <Flake data={data} />}
     </SidePanel>
   );
 }
