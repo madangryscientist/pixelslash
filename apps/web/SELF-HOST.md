@@ -1,7 +1,10 @@
 # Self-hosting PixelSlash
 
-Two ways to run the review app (`apps/web`) yourself:
+Three ways to run the review app (`apps/web`) yourself:
 
+- **In Docker**: one image and one volume, with real GitHub sign-in and no Cloudflare account. `docker
+  compose up` in `docker/self-host/`; the steps are in [README.md, "Self-host in 5
+  minutes"](README.md#self-host-in-5-minutes).
 - **[On your own Cloudflare account](#on-your-own-cloudflare-account)**: a Worker, D1, R2 and a Queue. This is
   how the hosted app runs, and the way to get real GitHub sign-in.
 - **[On your own box](#on-your-own-box)**: a Proxmox container on your network, served by Miniflare. LAN only, with
