@@ -5,7 +5,7 @@ operating agreement for people and coding agents working here. Read it before a 
 
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). A security problem goes to
 [`SECURITY.md`](SECURITY.md), not to a public issue. Your contribution is licensed under
-Apache-2.0, as the rest of the repo is (see [`LICENSE`](LICENSE)); there is no CLA.
+MIT, as the rest of the repo is (see [`LICENSE`](LICENSE)); there is no CLA.
 
 ## Start with an issue
 

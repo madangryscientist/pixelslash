@@ -102,5 +102,5 @@ compares what PixelSlash does with other tools, including where it is behind.
 
 ## Licence
 
-Apache-2.0; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). PixelSlash is a name of Jacobus
-Langner; the Apache-2.0 licence does not grant it.
+MIT; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). PixelSlash is a name of Jacobus
+Langner; the MIT licence does not grant it.

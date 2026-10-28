@@ -732,7 +732,7 @@
       "label": "Open source",
       "ps": {
         "v": "p",
-        "note": "Apache-2.0 licence and NOTICE are in the tree; the repo is private until the go-public step",
+        "note": "MIT licence and NOTICE are in the tree; the repo is private until the go-public step",
         "commit": "e121a33"
       },
       "t": {
@@ -743,7 +743,7 @@
         "lost": "y"
       },
       "plan": "PS-243",
-      "gap": "the repo is still private; Apache-2.0 is in the tree and the go-public step flips it"
+      "gap": "the repo is still private; MIT is in the tree and the go-public step flips it"
     }
   ],
   "notes": {
