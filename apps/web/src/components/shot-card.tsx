@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Body, BodyStrong, Caption, Card, Cluster, ClusterGrow, Pill, Stack } from "@hackcove/ui";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
+import { a11yLine } from "#/components/a11y";
 import type { Composition } from "#/components/composition";
 import type { SnapshotView } from "#/db/review";
 import { labelSummary } from "#/components/ai-notes";
@@ -153,6 +154,16 @@ function GapsLine({ composition }: { composition: Composition | null | undefined
   );
 }
 
+function A11yLine({ diff }: { diff: SnapshotView["a11yDiff"] }) {
+  const line = a11yLine(diff);
+  if (!line) return null;
+  return (
+    <Body as="p" tone="muted" data-testid="shot-a11y">
+      {line}
+    </Body>
+  );
+}
+
 /** The judge's sentence (ob 1745) and the AI's labels, above the measured line, which always follows them. */
 function ShotNotes({ shot }: { shot: SnapshotView }) {
   return (
@@ -244,6 +255,7 @@ export function ShotCard({
             {line}
           </Body>
           <GapsLine composition={shot.composition} />
+          <A11yLine diff={shot.a11yDiff} />
         </Stack>
       </Card>
     </div>

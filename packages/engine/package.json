@@ -19,10 +19,12 @@
     "./ci-diff": "./src/ci-diff.ts",
     "./region-crops": "./src/region-crops.ts",
     "./composition-entry": "./src/composition-entry.ts",
+    "./a11y-entry": "./src/a11y-entry.ts",
     "./sentry-scrub": "./src/sentry-scrub.ts",
     "./brief": "./src/brief.ts"
   },
   "dependencies": {
+    "axe-core": "^4.14.0",
     "playwright": "1.64.1",
     "pngjs": "^7.0.0"
   },

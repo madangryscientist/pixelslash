@@ -1,5 +1,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { diffA11y } from "./a11y-entry.ts";
 import { diffPngs } from "./diff.ts";
 import { UsageError } from "./errors.ts";
 import type { Fingerprint } from "./fingerprint.ts";
@@ -90,6 +91,16 @@ async function readPng(dir: string, e: SnapshotEntry): Promise<Buffer> {
   return Buffer.from(await Bun.file(join(dir, e.file)).arrayBuffer());
 }
 
+/** `row` with Branch's accessibility findings against Main's (PS-238); a shot that was not scanned gains nothing. */
+function withA11y<R extends CompareRow>(
+  row: R,
+  main: SnapshotEntry | undefined,
+  branch: SnapshotEntry,
+): R {
+  const a11y = diffA11y(main?.a11y, branch.a11y);
+  return a11y.state === "off" ? row : { ...row, a11y };
+}
+
 /**
  * Both sides' ignore areas, like the server: an element that moved is covered at its old and its
  * new place. The diff options are the Branch entry's, also like the server.
@@ -100,10 +111,14 @@ async function diffMatch(
   branch: SnapshotEntry,
   dir: string,
 ): Promise<{ row: CompareRow; changed: boolean; diffMs: number }> {
-  const row = {
-    ...rowOf(branch, paths.varied),
-    mismatch: fingerprintDiff(main.fingerprint, branch.fingerprint),
-  };
+  const row = withA11y(
+    {
+      ...rowOf(branch, paths.varied),
+      mismatch: fingerprintDiff(main.fingerprint, branch.fingerprint),
+    },
+    main,
+    branch,
+  );
   const mainPng = await readPng(paths.main, main);
   const branchPng = await readPng(paths.branch, branch);
   let diff;
@@ -206,7 +221,7 @@ export async function compareSnapshots(
   for (const e of branch.snapshots) {
     const before = mainBy.get(identity(e));
     if (!before) {
-      result.added.push(rowOf(e, varied));
+      result.added.push(withA11y(rowOf(e, varied), undefined, e));
       continue;
     }
     const paths = { main: opts.mainDir, branch: opts.branchDir, out, varied };

@@ -1,3 +1,4 @@
+import type { A11y } from "@pixelslash/engine/a11y-entry";
 import type { Composition } from "@pixelslash/engine/composition-entry";
 import { readPngSize } from "@pixelslash/engine/diff";
 import { and, count, eq } from "drizzle-orm";
@@ -45,6 +46,8 @@ export type SnapshotInput = {
   changeNote?: string | null;
   /** A composition-only project's findings (ob 1850); shown, never used to decide anything. */
   composition?: Composition | null;
+  /** The page's accessibility scan (PS-238); null or absent is not scanned. Shown only. */
+  a11y?: A11y | null;
 };
 
 /** The build exists but can no longer change. */
@@ -111,10 +114,11 @@ export type SentSnapshot = {
   flake?: SentFlake | null;
 };
 
-/** What a shot carries only to be shown: the judge's note and the composition findings. */
+/** What a shot carries only to be shown: the judge's note, the composition findings and the a11y scan. */
 const shown = (input: SnapshotInput) => ({
   changeNote: input.changeNote ?? null,
   composition: input.composition ?? null,
+  a11y: input.a11y ?? null,
 });
 
 /**

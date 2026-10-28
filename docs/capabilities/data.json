@@ -656,8 +656,8 @@
       "k": "a11y",
       "label": "Accessibility checks",
       "ps": {
-        "v": "n",
-        "note": "no WCAG surface; true since before the omnibus extraction",
+        "v": "y",
+        "note": "opt-in (`a11y: true`): axe-core runs on each settled page after the screenshot, WCAG 2.x A and AA violations are stored with the shot, and the compare report and the review app list the ones new on Branch against the baseline's; never changes an exit code (PS-238)",
         "commit": "06a2472"
       },
       "t": {
@@ -667,8 +667,7 @@
         "applitools": "y",
         "lost": "?"
       },
-      "plan": "not planned",
-      "gap": "no accessibility checks; deliberately unbuilt until there is a product to sell"
+      "plan": ""
     },
     {
       "g": "platform",

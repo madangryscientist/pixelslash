@@ -2,6 +2,7 @@ import { Breadcrumbs, Callout, FullBleedLayout, Stack } from "@hackcove/ui";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
+import { A11yPanel } from "#/components/a11y";
 import { CompositionFocus, CompositionPanel } from "#/components/composition";
 import { DiffOverride } from "#/components/diff-override";
 import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
@@ -247,6 +248,7 @@ function SnapshotPage() {
               />
             </RegionNotesProvider>
             <CompositionPanel composition={snapshot.composition} />
+            <A11yPanel diff={snapshot.a11yDiff} />
           </CompositionFocus>
         </Stack>
       </FullBleedLayout>

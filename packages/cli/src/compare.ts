@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import {
   UsageError,
+  a11yLines,
   changeLines,
   compareSnapshots,
   type SnapshotCompareResult,
@@ -47,8 +48,8 @@ export async function runCompare(argv: string[], io: Io): Promise<number> {
   );
   io.stderr.write(`${timingLine(r.timings)}\n`);
   io.stdout.write(`${countsLine(r)}\n`);
-  for (const line of changeLines(r)) io.stdout.write(`${line}\n`);
-  for (const line of notComparedLines(r)) io.stdout.write(`${line}\n`);
+  for (const line of [...changeLines(r), ...notComparedLines(r), ...a11yLines(r)])
+    io.stdout.write(`${line}\n`);
   if (r.mismatched.length > 0)
     io.stdout.write(`fingerprint: ${r.mismatched.length} differ (diffed anyway)\n`);
   io.stdout.write(`report: file://${r.indexPath}\n`);

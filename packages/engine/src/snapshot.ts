@@ -1,6 +1,9 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { PNG } from "pngjs";
-import { keepNativeRaf, launchChromium, settleCapture } from "./capture.ts";
+import { scanA11y } from "./a11y.ts";
+import type { A11y } from "./a11y-entry.ts";
+import { keepNativeRaf, launchChromium } from "./capture.ts";
+import { openPage } from "./capture-open.ts";
 import {
   loadLibrary,
   measureComposition,
@@ -41,8 +44,8 @@ import { captureInto } from "./capture-into.ts";
 import { signIn, type Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
 import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
-import { elapsed, type CaptureSteps, type SettleSteps, type ShotTiming } from "./timings.ts";
-import { awaitStory, storybookRoutes } from "./storybook.ts";
+import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
+import { storybookRoutes } from "./storybook.ts";
 
 /** Masked regions are painted this colour, by Playwright for selectors and by us for rectangles. */
 export const MASK_COLOR = "#FF00FF";
@@ -80,6 +83,12 @@ export type SnapshotEntry = {
    * written before the field existed.
    */
   composition?: Composition;
+  /**
+   * This shot's accessibility violations (PS-238). Present only when the config scans; a shot that
+   * was not scanned has no field, and nothing is claimed about it. Manifests written before the
+   * field existed have none.
+   */
+  a11y?: A11y;
 };
 
 /** `manifest.json` in the snapshot dir. No timestamps: two runs of the same build write the same bytes. */
@@ -141,28 +150,6 @@ export function paintRects(png: Buffer, rects: MaskRect[], scale: number): Buffe
   return PNG.sync.write(img);
 }
 
-type Opened = { navigateMs: number; settleMs: number; settle: SettleSteps };
-
-/** Load the page and wait for it to settle; returns how long each took, the page's own time. */
-async function open(page: Page, url: string, route: Route, timeoutMs: number): Promise<Opened> {
-  page.setDefaultNavigationTimeout(timeoutMs);
-  const loading = performance.now();
-  const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
-  const settling = performance.now();
-  if (!resp) throw new CaptureError(`capture failed for ${url}: no response`);
-  if (resp.status() >= 400)
-    throw new CaptureError(`capture failed for ${url}: HTTP ${resp.status()}`);
-  // A story's own render signal and the generic settle share one budget.
-  const started = Date.now();
-  if (route.storybook) await awaitStory(page, route.name, timeoutMs);
-  const settle = await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
-  return {
-    navigateMs: settling - loading,
-    settleMs: performance.now() - settling,
-    settle,
-  };
-}
-
 type Shot = {
   url: string;
   route: Route;
@@ -174,6 +161,8 @@ type Shot = {
   session: Session | undefined;
   /** The library a composition-only project is measured against; undefined for any other project. */
   library: CompositionLibrary | undefined;
+  /** Scan the settled page for accessibility violations (PS-238). */
+  a11y: boolean;
   warn: (m: string) => void;
   unmatched: UnmatchedTally;
 };
@@ -196,6 +185,7 @@ export type Shoot = {
    */
   media: MediaBox[];
   composition?: Composition;
+  a11y?: A11y;
 };
 
 /**
@@ -212,6 +202,27 @@ async function pinClock(context: BrowserContext, { clock, timers }: Stabilise): 
   await context.clock.pauseAt(clock);
 }
 
+/** What is read off the settled page once it is shot: the ignore boxes, media, composition and a11y scan. */
+async function measure(page: Page, shot: Shot, png: Buffer) {
+  const { stabilise } = shot;
+  // The PNG's size from its IHDR chunk, without decoding the image.
+  const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+  const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
+  const media = unexcluded(await measureMedia(page), ignore, stabilise.deviceScaleFactor, size);
+  const composition =
+    shot.library &&
+    (await measureComposition(page, shot.library, {
+      scale: stabilise.deviceScaleFactor,
+      image: size,
+      warn: shot.warn,
+    }));
+  // After the screenshot and the measurements, so nothing the scan lets run can reach the PNG.
+  // axe waits on timers, which `timers` has paused for good: let the page clock run again first.
+  if (shot.a11y && stabilise.timers) await page.clock.resume();
+  const a11y = shot.a11y ? await scanA11y(page) : undefined;
+  return { ignore, media, composition, a11y };
+}
+
 async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   const { variant, stabilise, route, url } = shot;
   const context = await browser.newContext({
@@ -223,7 +234,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
   try {
     await pinClock(context, stabilise);
     const page = await context.newPage();
-    const opened = await open(page, url, route, stabilise.timeoutMs);
+    const opened = await openPage(page, url, route, stabilise.timeoutMs);
     const selectors = route.masks.filter((m) => typeof m === "string");
     const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
     const shooting = performance.now();
@@ -240,17 +251,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
       screenshotMs: elapsed(shooting),
       settle: opened.settle,
     };
-    // The PNG's size from its IHDR chunk, without decoding the image.
-    const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
-    const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
-    const media = unexcluded(await measureMedia(page), ignore, stabilise.deviceScaleFactor, size);
-    const composition =
-      shot.library &&
-      (await measureComposition(page, shot.library, {
-        scale: stabilise.deviceScaleFactor,
-        image: size,
-        warn: shot.warn,
-      }));
+    const { ignore, media, composition, a11y } = await measure(page, shot, png);
     return {
       png: paintRects(
         png,
@@ -262,6 +263,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
       loadMs: opened.navigateMs + opened.settleMs,
       steps,
       ...(composition && { composition }),
+      ...(a11y && { a11y }),
     };
   } catch (e) {
     if (e instanceof CaptureError) throw e;
@@ -284,7 +286,8 @@ export type CaptureSession = {
   fingerprint: Fingerprint;
   /** How long the browser took to launch (PS-195). */
   browserLaunchMs: number;
-  shoot: (route: Route, variant: Variant) => Promise<Shoot>;
+  /** `scan` asks for the accessibility scan (PS-238); only `captureInto` keeps its result, so a flake re-capture or a dev loop skips it. */
+  shoot: (route: Route, variant: Variant, scan?: { a11y?: boolean }) => Promise<Shoot>;
   /** Print the selectors that matched nothing since the last flush (PS-241); `close` does too. */
   flush: () => void;
   close: () => Promise<void>;
@@ -336,7 +339,7 @@ export async function openCaptureSession(
       routes,
       fingerprint,
       browserLaunchMs,
-      shoot: async (route, variant) => {
+      shoot: async (route, variant, scan) => {
         const taken = await shoot(launched, {
           url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
           route,
@@ -345,6 +348,7 @@ export async function openCaptureSession(
           ignore: resolveIgnore(config, route, variant),
           session,
           library,
+          a11y: config.a11y && scan?.a11y === true,
           warn,
           unmatched,
         });

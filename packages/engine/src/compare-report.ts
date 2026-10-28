@@ -1,3 +1,4 @@
+import { violationLine, type A11yDiff, type A11yViolation } from "./a11y-entry.ts";
 import type { Region } from "./regions.ts";
 import { esc } from "./report.ts";
 
@@ -19,6 +20,8 @@ export type CompareRow = {
   flaky?: { runs: number; differed: number } | undefined;
   /** Set when the diff threw on this shot (PS-223): it was not measured, and is neither changed nor unchanged. */
   error?: string | undefined;
+  /** Branch's accessibility findings against Main's (PS-238); absent when Branch was not scanned. */
+  a11y?: A11yDiff | undefined;
 };
 
 type Rows = {
@@ -77,6 +80,77 @@ function changeGroups(input: Rows): ChangeGroup[] {
     { group: "removed", names: named(input.removed) },
   ];
   return groups.filter((g) => g.names.length > 0);
+}
+
+/** The rows whose Branch shot was scanned for accessibility, in report order. */
+function scanned(input: Rows): CompareRow[] {
+  return [...input.changed, ...input.added, ...input.unchanged].filter(
+    (r) => r.a11y !== undefined && r.a11y.state !== "off",
+  );
+}
+
+/**
+ * The accessibility lines after the counts (PS-238): how many violations are new on Branch, which
+ * shots were scanned with no Main scan to compare against, and each new violation. Empty when no
+ * shot was scanned, so a run without the scan prints nothing about it.
+ */
+export function a11yLines(input: Rows): string[] {
+  const rows = scanned(input);
+  if (rows.length === 0) return [];
+  const fresh = rows.flatMap((r) =>
+    r.a11y?.state === "compared" ? r.a11y.fresh.map((v) => ({ row: r, v })) : [],
+  );
+  const shotsWith = new Set(fresh.map((f) => f.row)).size;
+  const unbaselined = rows.filter((r) => r.a11y?.state === "unbaselined").length;
+  const omitted = rows.some(
+    (r) => r.a11y?.state !== undefined && r.a11y.state !== "off" && r.a11y.omitted > 0,
+  );
+  const cap = NAMES_PER_GROUP;
+  return [
+    `a11y: ${fresh.length} new on Branch in ${shotsWith} of ${rows.length} scanned shots`,
+    ...fresh.slice(0, cap).map((f) => `  ${rowLabel(f.row)}: ${violationLine(f.v)}`),
+    ...(fresh.length > cap ? [`  +${fresh.length - cap} more`] : []),
+    ...(unbaselined > 0
+      ? [`a11y: ${unbaselined} shots have no Main scan, so none of their violations is called new`]
+      : []),
+    ...(omitted ? ["a11y: a scan kept only its first violations; the rest are not counted"] : []),
+  ];
+}
+
+function a11yItems(vs: A11yViolation[]): string {
+  return `<ul>\n${vs.map((v) => `          <li>${esc(violationLine(v))}</li>`).join("\n")}\n        </ul>`;
+}
+
+/** One scanned shot's `<li>`: its new violations, the ones already on Main, and what the scan could not keep. */
+function a11yItem(r: CompareRow, id: string): string {
+  const d = r.a11y;
+  if (!d || d.state === "off") return "";
+  const head = `<li id="${esc(`${id}-a11y`)}">${esc(r.name)} <span class="shot">${esc(r.shot)}</span>`;
+  if (d.state === "unbaselined") {
+    const found = d.found.length > 0 ? a11yItems(d.found) : "";
+    return `${head} — <span class="warn">no Main scan to compare against: ${d.found.length} found, none called new</span>${found}</li>`;
+  }
+  const fresh =
+    d.fresh.length > 0 ? `<h3>New on Branch (${d.fresh.length})</h3>${a11yItems(d.fresh)}` : "";
+  const already =
+    d.already.length > 0
+      ? `<details><summary>Already on Main (${d.already.length})</summary>${a11yItems(d.already)}</details>`
+      : "";
+  const cut =
+    d.omitted > 0
+      ? ` <span class="warn">(${d.omitted} past the cap were not kept, so a new one may be hidden)</span>`
+      : "";
+  const none = d.fresh.length === 0 && d.already.length === 0 ? " — no violations" : "";
+  return `${head}${none}${cut}${fresh}${already}</li>`;
+}
+
+/** The index's accessibility section: per scanned shot, New on Branch and Already on Main, like the DS report. */
+function a11ySection(input: Rows): string {
+  const rows = scanned(input);
+  if (rows.length === 0) return "";
+  const anchors = anchorsOf(input);
+  const items = rows.map((r) => a11yItem(r, anchors.get(r) ?? "")).join("\n");
+  return `<section><h2>Accessibility (${rows.length} scanned)</h2>\n    <ul>\n      ${items}\n    </ul></section>`;
 }
 
 /** How many names a group prints in the terminal before `+N more`. */
@@ -166,6 +240,7 @@ export function renderCompareIndex(input: {
       (r) => ` — <span class="warn">${esc(r.error ?? "")}</span>`,
     ),
     compareList("Unchanged", unchanged, anchors, () => ""),
+    a11ySection(input),
   ].join("\n  ");
   return `<!doctype html>
 <html lang="en">
