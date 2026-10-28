@@ -28,6 +28,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@pixelslash/engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
+| `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, every page prerendered from the repo's own docs and `data.json`; no D1, R2 or sign-in. The planner deploys it after a merge (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
 | `PixelSlash.Diff`, `PixelSlash.Diff.Tests` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract, and its xunit tests. Inferred by `@nx/dotnet` (named after the `.csproj`); `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
@@ -114,6 +115,15 @@ bunx nx build web
 bunx nx test:e2e web              # Playwright: a local build on a fresh local D1, GitHub stubbed
 (cd apps/web && bun run test:e2e:dev)   # the same specs against `vite dev` (after the build run: same ports)
 (cd apps/web && bunx wrangler deploy --dry-run --outdir /tmp/ps-web-dry)
+```
+
+A change to `apps/site`, or to a file it renders (`docs/cli.md`, `apps/web/SELF-HOST.md`,
+`SECURITY.md`, `docs/capabilities/data.json`, the README's trademark line), runs:
+
+```bash
+bunx nx build site
+bunx nx test:e2e site             # Playwright on the build, desktop and phone: nav, footer, no dead links
+(cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-site-dry")
 ```
 
 `apps/web` keeps its schema in `src/db/schema.ts`; `bun run db:generate` (in
