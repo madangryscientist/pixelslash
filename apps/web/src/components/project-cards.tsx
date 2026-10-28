@@ -1,5 +1,4 @@
 import {
-  Body,
   Button,
   ButtonGroup,
   Card,
@@ -7,6 +6,7 @@ import {
   CopyLine,
   SectionHeading,
   Stack,
+  Text,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -22,10 +22,10 @@ export function DefaultBranch({ projectId, branch }: { projectId: string; branch
       <Stack>
         <Stack gap="xs">
           <SectionHeading>Default branch</SectionHeading>
-          <Body as="p">
+          <Text as="p">
             Builds on this branch are accepted without review and become the baseline for branch
             builds. Builds on other branches wait for review.
-          </Body>
+          </Text>
         </Stack>
         <InlineForm
           label="Default branch, e.g. main"
@@ -73,13 +73,13 @@ export function GithubRepo({
       <Stack>
         <Stack gap="xs">
           <SectionHeading>GitHub repo</SectionHeading>
-          <Body as="p">
+          <Text as="p">
             Each build posts a PixelSlash check run on its commit: failing while changes wait for
             review or one is rejected, passing once they are accepted. The check carries counts and
             a link, never a screenshot.
-          </Body>
+          </Text>
           {!appConfigured && (
-            <Body as="p">This server has no GitHub App set up, so no check runs are sent yet.</Body>
+            <Text as="p">This server has no GitHub App set up, so no check runs are sent yet.</Text>
           )}
         </Stack>
         <InlineForm
@@ -117,9 +117,9 @@ export function UploadCommand({ serverUrl }: { serverUrl: string }) {
       <Stack>
         <Stack gap="xs">
           <SectionHeading>Upload a build</SectionHeading>
-          <Body as="p">
+          <Text as="p">
             From CI or your machine, with the token in <Code>PIXELSLASH_TOKEN</Code>:
-          </Body>
+          </Text>
         </Stack>
         <CopyLine
           text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}

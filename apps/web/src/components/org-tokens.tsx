@@ -1,7 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import {
-  Body,
   Button,
   Callout,
   Caption,
@@ -18,6 +17,7 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
+  Text,
 } from "@hackcove/ui";
 import { formatDateTime } from "#/lib/format";
 import { issueOrgTokenFn, revokeOrgTokenFn } from "#/server/org-token-fns";
@@ -50,12 +50,12 @@ export function OrgTokensPanel({
   return (
     <Card>
       <Stack>
-        <Body as="p">
+        <Text as="p">
           An org token lets CI reach every project in {orgName}: it creates a project by name with{" "}
           <Code>pixelslash project create</Code> and uploads to one with <Code>--project NAME</Code>
           . It is shown once, when issued. A project's own CI token, in its settings, still reaches
           only that project.
-        </Body>
+        </Text>
         {issued && (
           <Callout
             tone="warn"
@@ -113,9 +113,9 @@ function IssueForm({ orgId, onIssued }: { orgId: string; onIssued: (token: strin
         </Button>
       </Cluster>
       {error ? (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {error}
-        </Body>
+        </Text>
       ) : (
         empty && <Caption as="p">{emptyReason}</Caption>
       )}
@@ -138,9 +138,9 @@ function TokenTable({ tokens, hydrated }: { tokens: OrgToken[]; hydrated: boolea
   };
   if (tokens.length === 0) {
     return (
-      <Body as="p" tone="muted" data-testid="no-org-tokens">
+      <Text as="p" tone="muted" data-testid="no-org-tokens">
         No org tokens yet. Issue one above to use a single secret across a monorepo's CI.
-      </Body>
+      </Text>
     );
   }
   return (

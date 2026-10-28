@@ -1,4 +1,4 @@
-import { Caption, Pill, ToggleChip } from "@hackcove/ui";
+import { Button, Caption, Pill } from "@hackcove/ui";
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -191,14 +191,16 @@ export function SliderControls({
         />
         <Caption>Branch</Caption>
       </label>
-      <ToggleChip
+      <Button
+        variant="outline"
+        size="sm"
         pressed={onion}
         disabled={!hydrated}
         title="Fade Branch over Main instead of wiping"
         onClick={() => setOnion(!onion)}
       >
         Onion skin
-      </ToggleChip>
+      </Button>
     </>
   );
 }

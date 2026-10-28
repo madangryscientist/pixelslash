@@ -1,4 +1,4 @@
-import { Body, BodyStrong, Button, Card, CopyLine, EmptyState, Step, Steps } from "@hackcove/ui";
+import { Button, Card, CopyLine, EmptyState, Step, Steps, Text } from "@hackcove/ui";
 
 /** An org with no projects: what a project is, and the two steps to a first build. */
 export function EmptyOrg({
@@ -21,15 +21,15 @@ export function EmptyOrg({
           </Button>
         }
       >
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           A project holds one app's builds. Make one, issue a token in its settings, then upload
           from CI or your machine.
-        </Body>
+        </Text>
         <Steps>
           <Step
             title={
               <>
-                Create a project and open <BodyStrong>Settings → Issue token</BodyStrong>.
+                Create a project and open <Text strong>Settings → Issue token</Text>.
               </>
             }
           />

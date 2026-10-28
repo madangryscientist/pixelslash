@@ -1,4 +1,4 @@
-import { Body, Card } from "@hackcove/ui";
+import { Card, Text } from "@hackcove/ui";
 import { type ReactNode, type SyntheticEvent, useCallback, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionBoxes } from "#/components/composition";
@@ -140,7 +140,7 @@ export function Pane({
         {caption && (
           <>
             {" "}
-            <Body tone="muted">{caption}</Body>
+            <Text tone="muted">{caption}</Text>
           </>
         )}
       </figcaption>

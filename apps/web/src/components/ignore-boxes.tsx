@@ -1,5 +1,4 @@
 import {
-  Body,
   Button,
   ButtonGroup,
   Callout,
@@ -11,6 +10,7 @@ import {
   Overline,
   Pill,
   Stack,
+  Text,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -209,10 +209,10 @@ function BoxRow({
       <Card as="div" size="sm" data-testid="ignore-box-row">
         <Stack gap="xs">
           <Cluster justify="between" gap="sm">
-            <Body>
+            <Text>
               <Pill tone="sky">UI</Pill> {box.variant ? "This variant" : "This test"} ·{" "}
               {box.rect.width}×{box.rect.height}
-            </Body>
+            </Text>
             <Button
               variant="outline"
               disabled={!hydrated}
@@ -294,14 +294,14 @@ export function IgnoreBoxes({
       )}
       <Caption as="p">In image px; saving re-diffs this build and later ones.</Caption>
       {boxes.error && (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {boxes.error}
-        </Body>
+        </Text>
       )}
       {boxes.note && (
-        <Body as="p" tone="muted" data-testid="ignore-note">
+        <Text as="p" tone="muted" data-testid="ignore-note">
           {boxes.note}
-        </Body>
+        </Text>
       )}
     </Stack>
   );

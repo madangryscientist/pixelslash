@@ -1,9 +1,6 @@
 import {
-  Body,
-  BodyStrong,
   Button,
   ButtonGroup,
-  ButtonLink,
   Caption,
   Card,
   Cluster,
@@ -16,6 +13,7 @@ import {
   Section,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
@@ -98,8 +96,8 @@ function FlagList({ flags }: { flags: SnapshotFlag[] }) {
         {flags.map((flag) => (
           <li key={flag.id} data-testid="detection-flag" data-kind={flag.kind}>
             <Pill tone={flag.kind === "missed" ? "amber" : "blue"}>{FLAG_LABELS[flag.kind]}</Pill>{" "}
-            <Body tone="muted">by {flag.mine ? "you" : flag.by}</Body>
-            {flag.note && <Body as="p">{flag.note}</Body>}
+            <Text tone="muted">by {flag.mine ? "you" : flag.by}</Text>
+            {flag.note && <Text as="p">{flag.note}</Text>}
             {flag.rect && (
               <Caption as="p" tone="muted">
                 {rectText(flag.rect)}
@@ -209,7 +207,7 @@ function FlagForm({
       <Stack as="form" gap="sm" onSubmit={save} aria-label="Flag detection">
         <fieldset>
           <legend>
-            <BodyStrong>{mine ? "Edit your flag" : "Flag detection"}</BodyStrong>
+            <Text strong>{mine ? "Edit your flag" : "Flag detection"}</Text>
           </legend>
           <KindPicker kind={kind} onKind={setKind} />
         </fieldset>
@@ -222,9 +220,9 @@ function FlagForm({
         />
         <AreaPicker draft={draft} />
         {error && (
-          <Body as="p" role="alert" tone="danger">
+          <Text as="p" role="alert" tone="danger">
             {error}
-          </Body>
+          </Text>
         )}
         <ButtonGroup>
           <Button
@@ -286,13 +284,13 @@ export function ProjectFlags({ projectId, flags }: { projectId: string; flags: P
     <Section
       title={
         <>
-          Detection flags <Body tone="muted">{flags.length}</Body>
+          Detection flags <Text tone="muted">{flags.length}</Text>
         </>
       }
       actions={
-        <ButtonLink variant="outline" href={`/projects/${projectId}/flags.json`} download>
+        <Button variant="outline" href={`/projects/${projectId}/flags.json`} download>
           Export JSON
-        </ButtonLink>
+        </Button>
       }
     >
       <Card flush>
@@ -318,10 +316,10 @@ export function ProjectFlags({ projectId, flags }: { projectId: string; flags: P
               >
                 {flag.snapshot.name}
               </TextLink>
-              <Body tone="muted">on {flag.build.branch}</Body>
+              <Text tone="muted">on {flag.build.branch}</Text>
               <Caption tone="muted">by {flag.by}</Caption>
             </Cluster>
-            {flag.note && <Body as="p">{flag.note}</Body>}
+            {flag.note && <Text as="p">{flag.note}</Text>}
           </ListRow>
         ))}
       </Card>

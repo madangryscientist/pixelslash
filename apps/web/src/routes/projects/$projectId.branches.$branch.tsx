@@ -1,5 +1,4 @@
 import {
-  Body,
   Breadcrumbs,
   Callout,
   Cluster,
@@ -9,6 +8,7 @@ import {
   SectionHeading,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -55,7 +55,7 @@ function BranchMeta({
 }: Pick<Loaded, "project" | "build" | "buildCount">) {
   return (
     <Cluster gap="xs" wrap data-testid="branch-meta">
-      <Body tone="muted">newest build</Body>
+      <Text tone="muted">newest build</Text>
       <TextLink
         mono
         data-testid="branch-head"
@@ -69,7 +69,7 @@ function BranchMeta({
       >
         {short(build.commitSha)}
       </TextLink>
-      {build.prNumber !== null && <Body>PR #{build.prNumber}</Body>}
+      {build.prNumber !== null && <Text>PR #{build.prNumber}</Text>}
       <StatusBadge status={build.status} />
       <MetaList>
         {formatDateTime(build.createdAt)}
@@ -158,10 +158,10 @@ function AgainstMain({
 }: Parameters<typeof MainGroups>[0] & { defaultBranch: string; summary: MainSummary }) {
   return (
     <Stack as="section" data-testid="mode-body-main">
-      <Body as="p" tone="muted">
+      <Text as="p" tone="muted">
         Everything this branch changes, measured from the accepted shot at the merge-base. This is
         the final review before merging.
-      </Body>
+      </Text>
       <ChangeSummary
         title="What this branch changes"
         detail={`${summary.changed} shot${summary.changed === 1 ? "" : "s"} · ${
@@ -178,11 +178,11 @@ function AgainstMain({
         reviewable={reviewable}
         onReview={onReview}
       />
-      <Body as="p" tone="muted">
+      <Text as="p" tone="muted">
         Older builds made before against-main measuring show &ldquo;not measured against main&rdquo;
         and are not counted. &ldquo;Ready to merge&rdquo; only reads the review states above; it is
         not an approval of its own.
-      </Body>
+      </Text>
     </Stack>
   );
 }
@@ -209,11 +209,11 @@ function SinceLastBuild({
   const lines = sinceLastBuildLines(snapshots);
   return (
     <Stack as="section" data-testid="mode-body-since">
-      <Body as="p" tone="muted">
+      <Text as="p" tone="muted">
         {previous
           ? `What build ${head} changed compared with build ${previous} on this branch. The same view as the build page.`
           : `Build ${head} is the branch's first build, so it is compared with the accepted shots it started from. The same view as the build page.`}
-      </Body>
+      </Text>
       <ChangeSummary
         title={`What build ${head} changes`}
         detail={`${lines.length} shot${lines.length === 1 ? "" : "s"}${previous ? ` since build ${previous}` : ""}`}
@@ -225,7 +225,7 @@ function SinceLastBuild({
           {/* The removed and not-measured lists head themselves, by group. */}
           {(tab.id === "changed" || tab.id === "new" || tab.id === "unchanged") && (
             <SectionHeading>
-              {tab.label} <Body tone="muted">({counts[tab.id]})</Body>
+              {tab.label} <Text tone="muted">({counts[tab.id]})</Text>
             </SectionHeading>
           )}
           <TabBody

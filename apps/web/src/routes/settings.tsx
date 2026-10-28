@@ -1,7 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import {
-  Body,
   Breadcrumbs,
   Button,
   Callout,
@@ -21,6 +20,7 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
+  Text,
 } from "@hackcove/ui";
 import { Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
@@ -44,11 +44,11 @@ function AccountSettings() {
           <Stack>
             <Stack gap="xs">
               <SectionHeading>API tokens</SectionHeading>
-              <Body as="p">
+              <Text as="p">
                 The CLI and MCP server act as you with a personal token: they see the organizations
                 and projects you see here. It is shown once, when issued. For CI, issue a project's
                 CI token in its settings instead.
-              </Body>
+              </Text>
             </Stack>
             {issued && (
               <Callout
@@ -62,7 +62,7 @@ function AccountSettings() {
             <IssueForm onIssued={setIssued} />
             <TokenTable tokens={tokens} now={now} hydrated={hydrated} />
             <Stack gap="sm">
-              <Body as="p">Check a token from your machine with:</Body>
+              <Text as="p">Check a token from your machine with:</Text>
               <CopyLine
                 text={`curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" ${serverUrl}/api/v1/me`}
                 disabled={!hydrated}
@@ -138,9 +138,9 @@ function IssueForm({ onIssued }: { onIssued: (token: string) => void }) {
         </Button>
       </Cluster>
       {error ? (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {error}
-        </Body>
+        </Text>
       ) : (
         empty && hydrated && <Caption as="p">{emptyReason}</Caption>
       )}
@@ -171,9 +171,9 @@ function TokenTable({ tokens, now, hydrated }: { tokens: Token[]; now: Date; hyd
   };
   if (tokens.length === 0) {
     return (
-      <Body as="p" tone="muted" data-testid="no-tokens">
+      <Text as="p" tone="muted" data-testid="no-tokens">
         No tokens yet. Issue one above to use the CLI or MCP server as yourself.
-      </Body>
+      </Text>
     );
   }
   return (

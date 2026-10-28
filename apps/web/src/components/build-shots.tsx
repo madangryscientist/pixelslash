@@ -1,8 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo, useState } from "react";
 import {
-  Body,
-  BodyStrong,
   Button,
   Card,
   CardGrid,
@@ -13,6 +11,7 @@ import {
   Section,
   Stack,
   Tabs,
+  Text,
 } from "@hackcove/ui";
 import { aiFiltered } from "#/components/ai-notes";
 import { ShotCard, measured } from "#/components/shot-card";
@@ -91,14 +90,14 @@ function ShotRows({
               )}
             >
               <Cluster gap="sm" wrap>
-                <BodyStrong>{shot.name}</BodyStrong>
+                <Text strong>{shot.name}</Text>
                 <MetaList>
                   {shot.platform}
                   {shot.browser}
                   {shot.viewport}
                   {shot.theme}
                 </MetaList>
-                <Body tone="muted">{measured(shot, baseline)}</Body>
+                <Text tone="muted">{measured(shot, baseline)}</Text>
               </Cluster>
             </ListRow>
           </li>
@@ -127,7 +126,7 @@ function GroupSection({
       title={
         heading && (
           <>
-            {GROUP_LABEL[group]} <Body tone="muted">({count})</Body>
+            {GROUP_LABEL[group]} <Text tone="muted">({count})</Text>
           </>
         )
       }
@@ -185,9 +184,9 @@ export function TabBody({
 
   if (groups.every((group) => inGroup(group).length === 0)) {
     return (
-      <Body as="p" tone="muted" data-testid="tab-empty">
+      <Text as="p" tone="muted" data-testid="tab-empty">
         Nothing in {definition?.label ?? "this tab"}.
-      </Body>
+      </Text>
     );
   }
   if (tab === "changed" || tab === "new") {
@@ -274,14 +273,14 @@ function CardGroups({
           gap="xs"
           title={
             <>
-              AI-filtered <Body tone="muted">({filtered.length})</Body>
+              AI-filtered <Text tone="muted">({filtered.length})</Text>
             </>
           }
         >
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             Accepted without a person: the project&apos;s model labelled every changed region noise.
             Open one to reject it.
-          </Body>
+          </Text>
           {cards(filtered)}
         </Section>
       )}

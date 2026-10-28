@@ -1,4 +1,4 @@
-import { Body, Button, Card, EmptyState, FieldDialog, SidebarLayout, Stack } from "@hackcove/ui";
+import { Button, Card, EmptyState, FieldDialog, SidebarLayout, Stack, Text } from "@hackcove/ui";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ModelSettings } from "#/components/model-settings";
@@ -188,10 +188,10 @@ function NoOrgs({ hydrated, onNew }: { hydrated: boolean; onNew: () => void }) {
             </Button>
           }
         >
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             An organization owns your projects and the people who review them. Create one to add
             projects.
-          </Body>
+          </Text>
         </EmptyState>
       </Card>
     </Stack>

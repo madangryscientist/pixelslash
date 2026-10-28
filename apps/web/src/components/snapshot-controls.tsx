@@ -1,4 +1,4 @@
-import { Cluster, ClusterGrow, SegmentedControl, ToggleChip } from "@hackcove/ui";
+import { Button, Cluster, ClusterGrow, SegmentedControl } from "@hackcove/ui";
 import type { ReactNode } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionLegend } from "#/components/composition";
@@ -72,7 +72,9 @@ function CompositionToggle({
   const hydrated = useHydrated();
   return (
     <>
-      <ToggleChip
+      <Button
+        variant="outline"
+        size="sm"
         pressed={on}
         disabled={!hydrated || !side}
         title={
@@ -81,7 +83,7 @@ function CompositionToggle({
         onClick={() => onChange(!on)}
       >
         Composition
-      </ToggleChip>
+      </Button>
       {on && side && <CompositionLegend composition={composition} />}
     </>
   );
@@ -131,7 +133,9 @@ export function ViewerControls({
         {mode === "slider" && slider}
       </Cluster>
       <Cluster gap="xs" wrap>
-        <ToggleChip
+        <Button
+          variant="outline"
+          size="sm"
           pressed={highlight}
           disabled={!hydrated || !measured}
           title={
@@ -140,7 +144,7 @@ export function ViewerControls({
           onClick={() => onHighlight(!highlight)}
         >
           Highlight
-        </ToggleChip>
+        </Button>
         {hasFindings(composition) && (
           <CompositionToggle
             composition={composition}

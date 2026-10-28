@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Body, Caption, Stack, SubsectionHeading } from "@hackcove/ui";
+import { Caption, Stack, SubsectionHeading, Text } from "@hackcove/ui";
 import {
   GAP_COLOUR,
   MAX_FINDINGS,
@@ -149,7 +149,7 @@ function GapItem({ gap, index, library }: { gap: Gap; index: number; library: st
       <Caption as="code" mono>
         {gap.selector}
       </Caption>
-      <Body as="p">{gapReason(gap, library)}</Body>
+      <Text as="p">{gapReason(gap, library)}</Text>
     </Row>
   );
 }
@@ -160,7 +160,7 @@ function SpecialItem({ special, index }: { special: SpecialCase; index: number }
       <Caption as="code" mono>
         {special.selector}
       </Caption>
-      <Body as="p">{special.reason}</Body>
+      <Text as="p">{special.reason}</Text>
     </Row>
   );
 }
@@ -175,18 +175,18 @@ export function CompositionPanel({ composition }: { composition: Composition | n
   return (
     <Stack as="section" gap="sm" aria-label="Composition">
       {omitted ? (
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           {omitted} more past the cap of {MAX_FINDINGS} a shot were not kept.
-        </Body>
+        </Text>
       ) : null}
       <div>
         <SubsectionHeading as="h2" size="sm">
           {library} gaps on Branch ({gaps.length})
         </SubsectionHeading>
         {gaps.length === 0 ? (
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             Everything styled here comes from {library}.
-          </Body>
+          </Text>
         ) : (
           <ul aria-label={`${library} gaps`} className="divide-y divide-slate-200">
             {gaps.map((gap, i) => (
@@ -201,9 +201,9 @@ export function CompositionPanel({ composition }: { composition: Composition | n
           Special cases on Branch ({special.length})
         </SubsectionHeading>
         {special.length === 0 ? (
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             Nothing on this shot is declared custom.
-          </Body>
+          </Text>
         ) : (
           <ul aria-label="Special cases" className="divide-y divide-slate-200">
             {special.map((s, i) => (

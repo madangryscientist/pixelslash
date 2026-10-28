@@ -1,8 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
-  Body,
   Breadcrumbs,
-  ButtonLink,
+  Button,
   Caption,
   Card,
   Cluster,
@@ -10,7 +9,6 @@ import {
   CopyLine,
   EmptyState,
   ListLayout,
-  rowLinkClass,
   Step,
   Steps,
   Table,
@@ -20,6 +18,7 @@ import {
   TableHeaderCell,
   TableRow,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { orgCrumb } from "#/components/crumbs";
@@ -48,7 +47,7 @@ function ProjectPage() {
         }
         actions={
           <>
-            <ButtonLink
+            <Button
               variant="outline"
               render={(props) => (
                 <Link
@@ -59,8 +58,8 @@ function ProjectPage() {
               )}
             >
               Flakes
-            </ButtonLink>
-            <ButtonLink
+            </Button>
+            <Button
               variant="outline"
               render={(props) => (
                 <Link
@@ -71,7 +70,7 @@ function ProjectPage() {
               )}
             >
               Settings
-            </ButtonLink>
+            </Button>
           </>
         }
       >
@@ -144,13 +143,18 @@ function BuildRow({
           </Cluster>
         }
       >
-        <Link
-          to="/projects/$projectId/builds/$buildId"
-          params={{ projectId, buildId: build.id }}
-          className={rowLinkClass}
+        <TextLink
+          stretch
+          render={(props) => (
+            <Link
+              to="/projects/$projectId/builds/$buildId"
+              params={{ projectId, buildId: build.id }}
+              {...props}
+            />
+          )}
         >
           {build.branch}
-        </Link>
+        </TextLink>
       </TableCell>
       <TableCell>
         <StatusBadge status={build.status} />
@@ -177,10 +181,10 @@ function EmptyProject({ projectId, serverUrl }: { projectId: string; serverUrl: 
   return (
     <Card as="div" dashed="filled" data-testid="empty-project">
       <EmptyState title="No builds yet">
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           A build is one upload of snapshots from CI or your machine. Builds on <Code>main</Code>{" "}
           are accepted as they land; a branch's builds are compared against them.
-        </Body>
+        </Text>
         <Steps>
           <Step
             title={

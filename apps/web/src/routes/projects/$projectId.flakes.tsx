@@ -1,6 +1,4 @@
 import {
-  Body,
-  BodyStrong,
   Breadcrumbs,
   Button,
   ButtonGroup,
@@ -14,6 +12,7 @@ import {
   Pill,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
@@ -58,9 +57,9 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
           Reopen
         </Button>
         {error && (
-          <Body as="p" role="alert" tone="danger">
+          <Text as="p" role="alert" tone="danger">
             {error}
-          </Body>
+          </Text>
         )}
       </Stack>
     );
@@ -82,9 +81,9 @@ function StatusControl({ projectId, flake }: { projectId: string; flake: FlakeVi
         onChange={(e) => setNote(e.target.value)}
       />
       {error && (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {error}
-        </Body>
+        </Text>
       )}
       <ButtonGroup>
         <Button type="submit" busy={busy} busyLabel="Resolving…" size="sm">
@@ -110,9 +109,9 @@ function FlakeItem({ projectId, flake, now }: { projectId: string; flake: FlakeV
             <ClusterGrow>
               <Cluster gap="xs">
                 <Pill tone={flake.status === "open" ? "amber" : "slate"}>{flake.status}</Pill>
-                <BodyStrong truncate data-testid="flake-name">
+                <Text strong truncate data-testid="flake-name">
                   {flake.name}
-                </BodyStrong>
+                </Text>
               </Cluster>
               <Caption as="p">
                 {variantOf(flake)} · {flake.evidence.length} detection
@@ -141,9 +140,9 @@ function FlakeItem({ projectId, flake, now }: { projectId: string; flake: FlakeV
           )}
           <Disclosure
             summary={
-              <Body as="span" tone="muted">
+              <Text as="span" tone="muted">
                 Policy: {policy}. Change it in config
-              </Body>
+              </Text>
             }
           >
             <FlakyPolicyControl policy={policy} />

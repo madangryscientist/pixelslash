@@ -1,7 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Body,
-  BodyStrong,
   BulletList,
   Caption,
   Card,
@@ -11,6 +9,7 @@ import {
   Stack,
   SubsectionHeading,
   Tabs,
+  Text,
 } from "@hackcove/ui";
 import type { ChangeLine, MainSummary } from "#/lib/branch-review";
 
@@ -40,9 +39,12 @@ export function MainSummaryBox({ summary, status }: { summary: MainSummary; stat
       <Cluster gap="sm" justify="between" wrap>
         <Cluster gap="md" wrap>
           {counts.map(([id, n, label]) => (
-            <Body key={id} tone="muted" data-testid={`summary-${id}`}>
-              <BodyStrong numeric>{n}</BodyStrong> {label}
-            </Body>
+            <Text key={id} tone="muted" data-testid={`summary-${id}`}>
+              <Text strong numeric>
+                {n}
+              </Text>{" "}
+              {label}
+            </Text>
           ))}
         </Cluster>
         <Pill tone={summary.ready ? "emerald" : "amber"} data-testid="merge-verdict">
@@ -113,17 +115,17 @@ export function ChangeSummary({
           {title} <Caption>{detail}</Caption>
         </SubsectionHeading>
         {lines.length === 0 ? (
-          <Body as="p" tone="muted">
+          <Text as="p" tone="muted">
             {empty}
-          </Body>
+          </Text>
         ) : (
           <BulletList>
             {lines.map((line) => (
-              <Body as="li" key={line.id} data-testid="change-line">
-                <BodyStrong>{line.name}</BodyStrong> <Body tone="muted">{line.variant}</Body>:{" "}
+              <Text as="li" key={line.id} data-testid="change-line">
+                <Text strong>{line.name}</Text> <Text tone="muted">{line.variant}</Text>:{" "}
                 {line.note && <span data-testid="change-note">{line.note}. </span>}
-                {line.facts}. <Body tone="muted">{line.state}</Body>
-              </Body>
+                {line.facts}. <Text tone="muted">{line.state}</Text>
+              </Text>
             ))}
           </BulletList>
         )}

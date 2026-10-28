@@ -1,12 +1,4 @@
-import {
-  Body,
-  BodyStrong,
-  Caption,
-  Disclosure,
-  Empty,
-  Stack,
-  SubsectionHeading,
-} from "@hackcove/ui";
+import { Caption, Disclosure, Stack, SubsectionHeading, Text } from "@hackcove/ui";
 import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/engine/a11y-entry";
 
 /**
@@ -22,10 +14,10 @@ function ViolationList({ label, violations }: { label: string; violations: A11yV
         // Scan order, fixed for one page load.
         <li key={i}>
           <Stack gap="xs">
-            <Body as="p">
-              <BodyStrong>{v.rule}</BodyStrong>
+            <Text as="p">
+              <Text strong>{v.rule}</Text>
               {v.impact ? ` (${v.impact})` : ""}: {v.help}
-            </Body>
+            </Text>
             <Caption as="p" mono truncate title={v.selector}>
               {v.selector}
             </Caption>
@@ -49,10 +41,10 @@ export function a11yLine(diff: A11yDiff): string | null {
 export function A11yPanel({ diff }: { diff: A11yDiff }) {
   if (diff.state === "off") return null;
   const omitted = diff.omitted > 0 && (
-    <Body as="p" tone="muted">
+    <Text as="p" tone="muted">
       {diff.omitted} more past the cap of {MAX_VIOLATIONS} a shot were not kept, so this list may be
       incomplete.
-    </Body>
+    </Text>
   );
   if (diff.state === "unbaselined") {
     return (
@@ -60,9 +52,9 @@ export function A11yPanel({ diff }: { diff: A11yDiff }) {
         <SubsectionHeading as="h2" size="sm">
           Accessibility on Branch ({diff.found.length})
         </SubsectionHeading>
-        <Body as="p" tone="muted">
+        <Text as="p" tone="muted">
           There is no scan on the baseline (or no baseline), so nothing here can be called new.
-        </Body>
+        </Text>
         {diff.found.length > 0 && <ViolationList label="Violations" violations={diff.found} />}
         {omitted}
       </Stack>
@@ -75,7 +67,9 @@ export function A11yPanel({ diff }: { diff: A11yDiff }) {
         Accessibility: new on Branch ({diff.fresh.length})
       </SubsectionHeading>
       {diff.fresh.length === 0 ? (
-        <Empty>Nothing new on Branch.</Empty>
+        <Text as="p" color="muted">
+          Nothing new on Branch.
+        </Text>
       ) : (
         <ViolationList label="New violations" violations={diff.fresh} />
       )}

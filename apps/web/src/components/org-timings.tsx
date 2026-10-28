@@ -1,7 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Body,
-  BodyStrong,
   Stack,
   Table,
   TableBody,
@@ -9,7 +7,8 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
-  rowLinkClass,
+  Text,
+  TextLink,
 } from "@hackcove/ui";
 import type { ProjectTimings } from "#/db/timings-stats";
 import { formatDuration } from "#/lib/format";
@@ -47,14 +46,14 @@ function Cell({
       }
     >
       <span data-testid={`timings-${step}`}>
-        {formatDuration(stats.p50)} <Body tone="muted">/</Body>{" "}
+        {formatDuration(stats.p50)} <Text tone="muted">/</Text>{" "}
         {formatDuration(stats.tail === "max" ? stats.max : stats.p95)}
         {stats.tail === "max" && (
           <>
             {" "}
-            <Body tone="muted" data-testid={`timings-${step}-tail`}>
+            <Text tone="muted" data-testid={`timings-${step}-tail`}>
               max
-            </Body>
+            </Text>
           </>
         )}
       </span>
@@ -75,13 +74,14 @@ function Row({ project }: { project: ProjectTimings }) {
   return (
     <TableRow data-testid="timings-row">
       <TableCell>
-        <Link
-          to="/projects/$projectId"
-          params={{ projectId: project.projectId }}
-          className={rowLinkClass}
+        <TextLink
+          stretch
+          render={(props) => (
+            <Link to="/projects/$projectId" params={{ projectId: project.projectId }} {...props} />
+          )}
         >
           {project.name}
-        </Link>
+        </TextLink>
       </TableCell>
       <TableCell tone="muted" data-testid="timings-builds">
         {project.builds}
@@ -102,19 +102,19 @@ function Row({ project }: { project: ProjectTimings }) {
 export function TimingsPanel({ projects }: { projects: ProjectTimings[] }) {
   if (projects.length === 0)
     return (
-      <Body as="p" tone="muted">
+      <Text as="p" tone="muted">
         No timings for this organization.
-      </Body>
+      </Text>
     );
   const explained = (
-    <Body as="p" tone="muted">
+    <Text as="p" tone="muted">
       Median / 95th percentile of each server step, over builds that finished in the last 30 days.
       With under {P95_MIN_BUILDS} builds the second figure is the slowest, and says max. A step a
       build did not run is left out, and so is a build that took more than one run. A step's own
       build count shows when it differs from Builds. Before diff is the time from opening the build
       to the diff starting, uploads included. {TOTAL_EXPLAINED} A build without a start and an end
       in order has no Total.
-    </Body>
+    </Text>
   );
   if (projects.every((project) => project.builds === 0))
     return (
@@ -122,10 +122,10 @@ export function TimingsPanel({ projects }: { projects: ProjectTimings[] }) {
         {explained}
         <Stack as="ul" gap="xs">
           {projects.map((project) => (
-            <Body as="li" key={project.projectId} tone="muted" data-testid="timings-empty">
-              {projects.length > 1 && <BodyStrong>{project.name}: </BodyStrong>}
+            <Text as="li" key={project.projectId} tone="muted" data-testid="timings-empty">
+              {projects.length > 1 && <Text strong>{project.name}: </Text>}
               {emptyReason(project)}
-            </Body>
+            </Text>
           ))}
         </Stack>
       </Stack>

@@ -1,4 +1,4 @@
-import { Body, Caption, Disclosure, KeyValue, KeyValueList, Overline, Stack } from "@hackcove/ui";
+import { Caption, Disclosure, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions, OptionSource } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";
@@ -71,9 +71,9 @@ export function Options({ snapshot, options }: { snapshot: SnapshotView; options
       {allDefault ? (
         <Disclosure
           summary={
-            <Body as="span" tone="muted">
+            <Text as="span" tone="muted">
               All engine defaults
-            </Body>
+            </Text>
           }
         >
           {list}
@@ -81,9 +81,9 @@ export function Options({ snapshot, options }: { snapshot: SnapshotView; options
       ) : (
         list
       )}
-      <Body as="p" tone="muted">
+      <Text as="p" tone="muted">
         {ignoreLine(snapshot)}
-      </Body>
+      </Text>
     </Stack>
   );
 }

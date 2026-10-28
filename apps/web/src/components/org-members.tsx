@@ -1,7 +1,5 @@
 import {
   Avatar,
-  Body,
-  BodyStrong,
   Button,
   Caption,
   Card,
@@ -10,6 +8,7 @@ import {
   ListRow,
   Pill,
   Stack,
+  Text,
 } from "@hackcove/ui";
 import { useState } from "react";
 import type { OrgInvite, OrgMember, OrgOverview } from "#/db/orgs";
@@ -30,9 +29,11 @@ function MemberRow({
       data-testid="member-row"
       divided={divided}
       leading={<Avatar name={member.login} />}
-      trailing={<Body tone="muted">joined {formatDay(member.joinedAt)}</Body>}
+      trailing={<Text tone="muted">joined {formatDay(member.joinedAt)}</Text>}
     >
-      <BodyStrong as="b">{member.login}</BodyStrong>
+      <Text strong as="b">
+        {member.login}
+      </Text>
       <Caption as="p">
         {[member.name, isViewer ? "you" : null].filter(Boolean).join(" · ") || " "}
       </Caption>
@@ -88,7 +89,9 @@ function InviteRow({
         </Button>
       }
     >
-      <BodyStrong as="b">{invite.githubLogin}</BodyStrong>
+      <Text strong as="b">
+        {invite.githubLogin}
+      </Text>
       <Caption as="p">signs in with GitHub to join</Caption>
     </ListRow>
   );
@@ -148,9 +151,9 @@ function InviteForm({
         </Button>
       </Cluster>
       {error ? (
-        <Body as="p" role="alert" tone="danger">
+        <Text as="p" role="alert" tone="danger">
           {error}
-        </Body>
+        </Text>
       ) : (
         <Caption as="p">
           {empty ? "Type a GitHub login first." : "They join when they sign in with that login."}

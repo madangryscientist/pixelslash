@@ -1,10 +1,8 @@
 import {
-  Body,
   Button,
   Caption,
   Card,
   CopyButton,
-  Empty,
   SectionHeading,
   Stack,
   SubsectionHeading,
@@ -14,6 +12,7 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
+  Text,
 } from "@hackcove/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -89,7 +88,11 @@ function TestCell({ box }: { box: Box }) {
 /** Every box ever drawn, newest first: who drew it, and who cleared it. */
 function BoxTrail({ trail }: { trail: Box[] }) {
   if (trail.length === 0)
-    return <Empty data-testid="no-ignore-trail">No boxes were drawn in the review screen.</Empty>;
+    return (
+      <Text as="p" color="muted" data-testid="no-ignore-trail">
+        No boxes were drawn in the review screen.
+      </Text>
+    );
   return (
     <Table variant="plain" caption="Ignore boxes drawn in review" data-testid="ignore-trail">
       <TableHead>
@@ -134,14 +137,16 @@ export function IgnoreBoxSettings({
       <Stack>
         <Stack gap="xs">
           <SectionHeading>Ignore boxes drawn in review</SectionHeading>
-          <Body as="p">
+          <Text as="p">
             Drawn on a shot&apos;s screen, for a test or one variant of it, in image px; the server
             diff skips them along with the config&apos;s and manifest&apos;s areas. The export above
             carries them. Clearing one measures those pixels again from the next build.
-          </Body>
+          </Text>
         </Stack>
         {boxes.length === 0 ? (
-          <Empty data-testid="no-ignore-boxes">None. Draw one from a shot&apos;s screen.</Empty>
+          <Text as="p" color="muted" data-testid="no-ignore-boxes">
+            None. Draw one from a shot&apos;s screen.
+          </Text>
         ) : (
           <Table variant="plain" caption="Ignore boxes">
             <TableHead>

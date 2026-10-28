@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
-  Body,
   Button,
   Card,
   Cluster,
@@ -10,6 +9,7 @@ import {
   SectionHeading,
   Stack,
   TextLink,
+  Text,
 } from "@hackcove/ui";
 import { ShotThumb } from "#/components/shot-card";
 import { ReviewChip, useHydrated } from "#/components/ui";
@@ -131,13 +131,13 @@ function MainRow({
             {shot.theme}
           </MetaList>
         </Cluster>
-        <Body as="p" data-testid="main-row-what">
+        <Text as="p" data-testid="main-row-what">
           {againstMainText(shot)}
-        </Body>
+        </Text>
         {shot.decision && (
-          <Body as="p" tone="muted" data-testid="main-row-who">
+          <Text as="p" tone="muted" data-testid="main-row-who">
             {decisionText(shot)}
-          </Body>
+          </Text>
         )}
       </Stack>
     </ListRow>
@@ -200,7 +200,7 @@ export function MainGroups({
         return (
           <Stack as="section" key={group} gap="xs" data-testid={`main-group-${group}`}>
             <SectionHeading>
-              {MAIN_HEADING[group]} <Body tone="muted">({rows.length})</Body>
+              {MAIN_HEADING[group]} <Text tone="muted">({rows.length})</Text>
             </SectionHeading>
             {folded ? (
               <Fold count={rows.length} noun={folded}>
