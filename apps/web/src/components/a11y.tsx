@@ -1,4 +1,4 @@
-import { Body, Caption, Stack, SubsectionHeading } from "@hackcove/ui";
+import { Body, Caption, ListRow, Stack, SubsectionHeading } from "@hackcove/ui";
 import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/engine/a11y-entry";
 
 /**
@@ -9,17 +9,21 @@ import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/e
 
 function ViolationList({ label, violations }: { label: string; violations: A11yViolation[] }) {
   return (
-    <ul aria-label={label} className="divide-y divide-slate-200">
+    <ul aria-label={label}>
       {violations.map((v, i) => (
         // Scan order, fixed for one page load.
-        <li key={i} className="py-1.5">
-          <Body as="p">
-            <strong>{v.rule}</strong>
-            {v.impact ? ` (${v.impact})` : ""}: {v.help}
-          </Body>
-          <Caption as="p" mono className="break-all">
-            {v.selector}
-          </Caption>
+        <li key={i}>
+          <ListRow static divided={i > 0}>
+            <Body as="p">
+              <strong>{v.rule}</strong>
+              {v.impact ? ` (${v.impact})` : ""}: {v.help}
+            </Body>
+            <div className="break-all">
+              <Caption as="p" mono>
+                {v.selector}
+              </Caption>
+            </div>
+          </ListRow>
         </li>
       ))}
     </ul>
