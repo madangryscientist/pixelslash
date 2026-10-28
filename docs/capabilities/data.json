@@ -693,7 +693,7 @@
       "ps": {
         "v": "p",
         "note": "PIXELSLASH_RETENTION_DAYS turns on an hourly sweep that deletes non-default-branch builds past the window, with their blobs and rows, but never a baseline a surviving build points at; a dry run (the default) lists the builds and bytes, and the build page shows 'expires in N days'. Off unless set: no deployment runs with it on, so nothing expires yet",
-        "commit": "853940f"
+        "commit": "a2c84de"
       },
       "t": {
         "argos": "y",
