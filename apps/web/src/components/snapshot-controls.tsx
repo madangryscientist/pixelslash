@@ -92,8 +92,8 @@ const hasFindings = (composition: Composition | null | undefined): composition i
   !!composition && composition.gaps.length + composition.special.length > 0;
 
 /**
- * The mode (and the slider's own controls beside it), then the toggles that draw on the shot, then
- * the scale: one row above the stage.
+ * The mode (and the slider's own controls beside it), then, a wider gap apart, the toggles that draw
+ * on the shot, then the scale: one row above the stage.
  */
 export function ViewerControls({
   mode,
@@ -125,27 +125,31 @@ export function ViewerControls({
 }) {
   const hydrated = useHydrated();
   return (
-    <Cluster gap="xs" wrap>
-      <Segmented label="View mode" options={MODES} value={mode} onChange={onMode} />
-      {mode === "slider" && slider}
-      {/* Gap: hackcove has no vertical divider; this sets Highlight apart from the mode switcher. */}
-      <span aria-hidden className="h-5 border-l border-slate-200" />
-      <ToggleChip
-        pressed={highlight}
-        disabled={!hydrated || !measured}
-        title={measured ? "Draw the measured regions" : "Nothing was measured, so nothing to draw"}
-        onClick={() => onHighlight(!highlight)}
-      >
-        Highlight
-      </ToggleChip>
-      {hasFindings(composition) && (
-        <CompositionToggle
-          composition={composition}
-          side={mode === "side"}
-          on={showFindings}
-          onChange={onShowFindings}
-        />
-      )}
+    <Cluster gap="md" wrap>
+      <Cluster gap="xs" wrap>
+        <Segmented label="View mode" options={MODES} value={mode} onChange={onMode} />
+        {mode === "slider" && slider}
+      </Cluster>
+      <Cluster gap="xs" wrap>
+        <ToggleChip
+          pressed={highlight}
+          disabled={!hydrated || !measured}
+          title={
+            measured ? "Draw the measured regions" : "Nothing was measured, so nothing to draw"
+          }
+          onClick={() => onHighlight(!highlight)}
+        >
+          Highlight
+        </ToggleChip>
+        {hasFindings(composition) && (
+          <CompositionToggle
+            composition={composition}
+            side={mode === "side"}
+            on={showFindings}
+            onChange={onShowFindings}
+          />
+        )}
+      </Cluster>
       <ClusterGrow />
       <Segmented
         label="Scale"

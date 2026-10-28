@@ -42,30 +42,33 @@ function keyStep(event: KeyboardEvent, position: number): number | null {
   return null;
 }
 
-/** The divider line and its grip: a focusable `role=slider`, so the wipe works without a pointer. */
+/**
+ * The divider's grip: a focusable `role=slider`, so the wipe works without a pointer. A Pill marks
+ * where the wipe sits; hackcove has no Slider, so there is no coloured divider line of our own.
+ */
 function Handle({ slider }: { slider: SliderState }) {
   const { position, setPosition } = slider;
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-violet-600"
+      role="slider"
+      tabIndex={0}
+      aria-label="Divider"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={position}
+      aria-valuetext={`Main to ${position}%, Branch after`}
+      onKeyDown={(event) => {
+        const next = keyStep(event, position);
+        if (next === null) return;
+        event.preventDefault();
+        setPosition(next);
+      }}
+      className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none"
       style={{ left: `${position}%` }}
     >
-      <div
-        role="slider"
-        tabIndex={0}
-        aria-label="Divider"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={position}
-        aria-valuetext={`Main to ${position}%, Branch after`}
-        onKeyDown={(event) => {
-          const next = keyStep(event, position);
-          if (next === null) return;
-          event.preventDefault();
-          setPosition(next);
-        }}
-        className="pointer-events-auto absolute top-1/2 touch-none left-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white bg-violet-600 shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-      />
+      <Pill tone="violet" round>
+        ↔
+      </Pill>
     </div>
   );
 }
@@ -119,7 +122,7 @@ function ShotLayers({
     <div
       ref={frame}
       data-testid="slider-frame"
-      className={`relative overflow-hidden border border-slate-200 bg-white ${wipe ? "cursor-ew-resize select-none" : ""}`}
+      className={`relative overflow-hidden ${wipe ? "cursor-ew-resize select-none" : ""}`}
       {...(wipe ? handlers : {})}
     >
       {mainUrl ? (
@@ -184,7 +187,7 @@ export function SliderControls({
           value={position}
           disabled={!hydrated || !branchUrl}
           onChange={(e) => setPosition(Number(e.target.value))}
-          className="w-32 accent-violet-600"
+          className="w-32"
         />
         <Caption>Branch</Caption>
       </label>
