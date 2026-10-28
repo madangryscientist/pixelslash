@@ -11,7 +11,8 @@ import { diffLocationOf } from "#/db/orgs";
 import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import type { DiffLocation } from "#/db/schema";
-import { type BlobStore, r2BlobStore } from "#/storage/blobs";
+import { retentionDaysOf } from "#/lib/retention";
+import { type BlobStore, type SweepBlobStore, r2BlobStore, r2SweepStore } from "#/storage/blobs";
 import type { RateLimiter } from "./rate-limit";
 import { type SentryConfig, sentryConfigOf } from "./sentry-config";
 
@@ -22,6 +23,16 @@ import { type SentryConfig, sentryConfigOf } from "./sentry-config";
 export const database = (): Db => drizzle(retryBusy(env.DB));
 
 export const blobStore = (): BlobStore => r2BlobStore(env.BLOBS);
+
+/** The store with the listing and bulk delete the retention sweep needs (PS-239). */
+export const sweepStore = (): SweepBlobStore => r2SweepStore(env.BLOBS);
+
+/** How many days a PR build lives (PS-239); undefined is retention off, the default. */
+export const retentionDays = (): number | undefined =>
+  retentionDaysOf(env.PIXELSLASH_RETENTION_DAYS);
+
+/** Whether the scheduled sweep deletes; anything but `true` only logs what it would delete. */
+export const retentionDelete = (): boolean => env.PIXELSLASH_RETENTION_DELETE === "true";
 
 /** The queue a run's changed shots are explained from (ob 1875); its consumer is `src/server.ts`. */
 export const explainQueue = (): ExplainQueue => env.EXPLAIN;

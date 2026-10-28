@@ -148,6 +148,7 @@ export function BuildHeader({
   reviewable,
   onAccept,
   baseline,
+  expiry,
   children,
 }: {
   projectId: string;
@@ -159,6 +160,8 @@ export function BuildHeader({
   onAccept: () => Promise<void>;
   /** The project's first build: it sets the baseline, so there is nothing to review or accept. */
   baseline: boolean;
+  /** `expires in 12 days` where retention is on and this is a PR build (PS-239); null otherwise. */
+  expiry: string | null;
   /** Shown last in the header: the build's AI summary (ob 1668). */
   children?: ReactNode;
 }) {
@@ -180,6 +183,7 @@ export function BuildHeader({
             <Code>{build.commitSha.slice(0, 7)}</Code>
             {build.prNumber !== null && `PR #${build.prNumber}`}
             {formatDateTime(build.createdAt)}
+            {expiry && <span data-testid="build-expiry">{expiry}</span>}
           </MetaList>
           <StatusBadge status={build.status} />
           <BodyStrong data-testid="to-review">{toReviewText(baseline, toReview)}</BodyStrong>

@@ -2,7 +2,7 @@ import { createOrg, createProject } from "#/db/orgs";
 import { TEST_MODEL_KEY_SECRET, testDb } from "#/db/test-db";
 import { issueCiToken } from "#/db/tokens";
 import { signInGithubUser } from "#/db/users";
-import type { BlobStore } from "#/storage/blobs";
+import type { SweepBlobStore } from "#/storage/blobs";
 import { type ApiDeps, handleApi } from "./handler";
 
 export const SHA = "a".repeat(40);
@@ -21,7 +21,7 @@ export const META = {
 
 export function memoryStore(failPuts = false) {
   const data = new Map<string, ArrayBuffer>();
-  const store: BlobStore = {
+  const store: SweepBlobStore = {
     put: async (key, body) => {
       if (failPuts) throw new Error("r2 down");
       if (body instanceof ArrayBuffer) data.set(key, body);
@@ -31,6 +31,13 @@ export function memoryStore(failPuts = false) {
       return held ? new Blob([held]).stream() : null;
     },
     delete: async (key) => void data.delete(key),
+    list: async (dir) =>
+      [...data]
+        .filter(([key]) => key.startsWith(`${dir}/`))
+        .map(([key, v]) => ({ key, size: v.byteLength })),
+    deleteMany: async (keys) => {
+      for (const key of keys) data.delete(key);
+    },
   };
   return { store, data };
 }

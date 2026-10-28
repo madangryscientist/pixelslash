@@ -691,8 +691,8 @@
       "k": "retention",
       "label": "Documented retention",
       "ps": {
-        "v": "n",
-        "note": "the review app keeps every build and shot: nothing expires; the map decides PR builds and diffs keep 30 days, and no code does it yet",
+        "v": "p",
+        "note": "PIXELSLASH_RETENTION_DAYS turns on an hourly sweep that deletes non-default-branch builds past the window, with their blobs and rows, but never a baseline a surviving build points at; a dry run (the default) lists the builds and bytes, and the build page shows 'expires in N days'. Off unless set: no deployment runs with it on, so nothing expires yet",
         "commit": "853940f"
       },
       "t": {
@@ -703,7 +703,7 @@
         "lost": "?"
       },
       "plan": "",
-      "gap": "a documented retention period; the app keeps every build and shot today"
+      "gap": "a retention period in force: the sweep exists but is off, so the app still keeps every build and shot"
     },
     {
       "g": "platform",

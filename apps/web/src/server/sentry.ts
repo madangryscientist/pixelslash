@@ -26,17 +26,18 @@ function sentryOptions(env: SentryEnv): Sentry.CloudflareOptions {
   };
 }
 
-type Handler = Required<Pick<ExportedHandler<Env>, "fetch">> & Pick<ExportedHandler<Env>, "queue">;
+type Handler = Required<Pick<ExportedHandler<Env>, "fetch">> &
+  Pick<ExportedHandler<Env>, "queue" | "scheduled">;
 
 /**
- * `handler` with Sentry's request and queue instrumentation, used only for a request whose env has
+ * `handler` with Sentry's request, queue and scheduled instrumentation, used only for a request whose env has
  * a DSN. `withSentry` calls `init` per request even with no DSN, so the gate is here: a deployment
  * without one runs the original handler untouched. `withSentry` mutates what it is given, so it
  * gets a copy.
  */
 export function withOptionalSentry(handler: Handler): Handler {
   const instrumented = Sentry.withSentry(sentryOptions, { ...handler });
-  const { queue } = handler;
+  const { queue, scheduled } = handler;
   return {
     fetch: (request, env, ctx) => {
       const live = sentryConfigOf(env) ? instrumented : handler;
@@ -46,6 +47,14 @@ export function withOptionalSentry(handler: Handler): Handler {
       queue: (batch, env, ctx) => {
         const live = sentryConfigOf(env) ? instrumented : handler;
         return live.queue ? live.queue(batch, env, ctx) : queue(batch, env, ctx);
+      },
+    }),
+    ...(scheduled && {
+      scheduled: (controller, env, ctx) => {
+        const live = sentryConfigOf(env) ? instrumented : handler;
+        return live.scheduled
+          ? live.scheduled(controller, env, ctx)
+          : scheduled(controller, env, ctx);
       },
     }),
   };

@@ -27,12 +27,14 @@ import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
 import { BadRequest, parseRect } from "#/api/validate";
 import { nextToReviewId } from "#/lib/build-tabs";
+import { buildExpiry } from "#/lib/retention";
 import { holdsChange } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import {
   database,
   defaultDiffLocation,
   githubAppConfigured,
+  retentionDays,
   sentryConfig,
   syncChecks,
 } from "./env";
@@ -199,10 +201,12 @@ export const getBuildPage = createServerFn()
     const thresholdChanges = await overrideChanges(db, user.id, project.id, names);
     const modelConfigured = (await projectModelSource(db, user.id, project.id)).source !== "none";
     const recaptures = await flakeRecaptures(db, view.build.id, view.snapshots);
+    const expiry = buildExpiry(view.build, project.defaultBranch, retentionDays(), new Date());
     return {
       org,
       project,
       ...view,
+      expiry,
       thumbs,
       firstBuild,
       thresholdChanges,

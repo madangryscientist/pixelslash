@@ -71,7 +71,15 @@
     // CGNAT, `.local`/`.internal`. Off, such a base URL is refused at save and at call time. Only for a
     // self-host that runs its own model; never on a deployment strangers can sign in to.
     "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "",
+    // Retention (PS-239), off while empty: a whole number of days after which a PR build and its diffs
+    // expire. Default-branch builds and any baseline a live build still points at are never swept.
+    "PIXELSLASH_RETENTION_DAYS": "",
+    // `true` lets the scheduled sweep delete. Anything else, with the days set, only logs what it would
+    // delete (a dry run). Turn it on after reading `bun deploy/retention.ts`'s listing.
+    "PIXELSLASH_RETENTION_DELETE": "",
   },
+  // The retention sweep (PS-239): hourly, and a no-op while PIXELSLASH_RETENTION_DAYS is empty.
+  "triggers": { "crons": ["17 * * * *"] },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
   "env": {
@@ -118,6 +126,9 @@
         "PIXELSLASH_PUBLIC_URL": "",
         // The Playwright run's model is a stub on localhost, and the LAN self-host's helper is on loopback.
         "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "1",
+        // Retention is off in the e2e build; the LAN self-host's `.dev.vars` does not set it either.
+        "PIXELSLASH_RETENTION_DAYS": "",
+        "PIXELSLASH_RETENTION_DELETE": "",
       },
     },
   },

@@ -249,9 +249,11 @@ export type FlakyPolicy = (typeof FLAKY_POLICIES)[number];
  * (`isMarker`, `heldShot`); every query that counts, bills or picks a baseline goes through it
  * rather than testing `diff_status` itself (ob 1558).
  *
- * Retention: no cleanup deletes blobs yet. One that deletes a build's blobs must keep every key a
- * row of another build still names as its `baseline_key` (which covers every marker), and every
- * key of a shot a later build could still pick as a baseline.
+ * Retention: the sweep in `retention.ts` (PS-239) deletes a build's blobs and rows only when no
+ * row of another build still names its keys or ids (`baseline_key`, which covers every marker,
+ * `main_baseline_key`, `baseline_snapshot_id`, `carried_from`) and it is not on the default
+ * branch, so a later build can still pick it as a baseline. A cleanup of any other kind keeps
+ * the same rule.
  */
 export const snapshots = sqliteTable(
   "snapshots",
