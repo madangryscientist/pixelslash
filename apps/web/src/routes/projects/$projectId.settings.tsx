@@ -37,7 +37,7 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
 });
 
 function ProjectSettings() {
-  const { project, org, tokens, overrides, model, githubApp, serverUrl } = Route.useLoaderData();
+  const { project, org, tokens, overrides, model, checks, serverUrl } = Route.useLoaderData();
   const router = useRouter();
   const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
@@ -82,7 +82,7 @@ function ProjectSettings() {
         </Card>
         <DefaultBranch projectId={project.id} branch={project.defaultBranch} />
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
-        <GithubRepo projectId={project.id} repo={project.githubRepo} appConfigured={githubApp} />
+        <GithubRepo projectId={project.id} repo={project.githubRepo} configured={checks} />
         <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
         <IgnoreBoxSettings
           projectId={project.id}

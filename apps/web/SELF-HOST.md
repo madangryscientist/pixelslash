@@ -195,6 +195,7 @@ are needed.
 | `MIN_CLI_VERSION` | var | no | The oldest CLI the API takes (`x.y.z`). Empty takes any. |
 | `GITHUB_APP_ID` | var | no | Check runs: the App's id. With the key, below. |
 | `GITHUB_APP_PRIVATE_KEY` | secret | no | Check runs: the App's PEM. Both App values must be set or nothing calls GitHub. |
+| `GITHUB_STATUS_TOKEN` | secret | no | Without the App: a fine-grained token (commit statuses: write) posts the build verdict as a `PixelSlash` commit status. Ignored when the App is set. See `README.md`. |
 | `PIXELSLASH_PUBLIC_URL` | var | no | Your server's URL, no trailing slash. A check run's "Details" link. |
 | `SENTRY_DSN` | secret | no | Error reporting; off while empty. |
 | `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | var | no | Labels on those reports. |

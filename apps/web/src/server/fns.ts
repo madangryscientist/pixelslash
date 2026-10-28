@@ -33,7 +33,7 @@ import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import {
   database,
   defaultDiffLocation,
-  githubAppConfigured,
+  githubChecksConfigured,
   retentionDays,
   sentryConfig,
   syncChecks,
@@ -125,8 +125,8 @@ export const getProjectSettings = createServerFn()
     const tokens = await listCiTokens(db, user.id, project.id);
     const overrides = await settingsOverrides(db, user.id, project.id);
     const model = await projectModelSource(db, user.id, project.id);
-    const githubApp = githubAppConfigured();
-    return { org, project, tokens, overrides, model, githubApp, serverUrl: getRequestUrl().origin };
+    const checks = githubChecksConfigured();
+    return { org, project, tokens, overrides, model, checks, serverUrl: getRequestUrl().origin };
   });
 
 export const saveDefaultBranch = createServerFn({ method: "POST" })
