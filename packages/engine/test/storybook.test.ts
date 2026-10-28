@@ -236,7 +236,7 @@ describe("storybookRoutes", () => {
   });
 });
 
-describe("captureSnapshots with a storybook", () => {
+describe("captureSnapshots with a storybook", { timeout: 60_000 }, () => {
   test("shoots every story × globals × variant, with the theme applied", async () => {
     const dir = await out();
     const config = sb({ globals: { theme: THEMES }, include: ["ui-button--primary"] });

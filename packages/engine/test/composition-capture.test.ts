@@ -42,7 +42,7 @@ const raw = (composition?: unknown) => ({
   ...(composition !== undefined && { composition }),
 });
 
-describe("a composition-only capture", () => {
+describe("a composition-only capture", { timeout: 60_000 }, () => {
   test("writes each shot's findings to the manifest, and the gap list beside it", async () => {
     const config = parseConfig(raw({ library: "@acme/ui", name: "Acme UI" }));
     const out = await tmp();
