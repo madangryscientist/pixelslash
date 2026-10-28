@@ -3,7 +3,7 @@ Copyright 2026 Jacobus Langner and the PixelSlash contributors
 
 PixelSlash is MIT-licensed; see LICENSE.
 
-This product contains code ported from, and calibration data taken from, the works below. Each
+This product contains code ported from, calibration data taken from, and depends on, the works below. Each
 entry says where its code is used and gives the licence, reproduced in full at the end.
 
 1. pixelmatch (ISC)
@@ -41,6 +41,12 @@ entry says where its code is used and gives the licence, reproduced in full at t
    Pinned at 21e8520c28129d501b22028a5499546b03336e38 (ops/argos-bench/Dockerfile).
    bench/src/calibration.ts copies the case names, thresholds and expected verdicts of Argos's
    own __fixtures__ table. No image from that set is stored in this repository.
+
+5. axe-core (MPL-2.0)
+   Copyright (c) Deque Systems, Inc.; https://github.com/dequelabs/axe-core
+   Used, unmodified, as an npm dependency of packages/engine (packages/engine/src/a11y.ts reads
+   its axe.min.js from node_modules and runs it in the page under test). Nothing of it is copied
+   into this repository, and no file of it is changed. Its source and licence are at the URL above.
 
 Licence texts
 =============

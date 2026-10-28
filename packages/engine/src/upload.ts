@@ -375,5 +375,6 @@ function snapshotMeta(e: SnapshotEntry) {
     fingerprint: e.fingerprint,
     flaky: e.flaky,
     ...(e.composition && { composition: e.composition }),
+    ...(e.a11y && { a11y: e.a11y }),
   };
 }

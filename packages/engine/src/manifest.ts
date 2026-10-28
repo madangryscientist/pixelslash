@@ -1,6 +1,7 @@
 import { join, resolve, sep } from "node:path";
 import { type FlakyPolicy, parseFlaky } from "./config-flake.ts";
 import { type MaskRect, parseArea } from "./config-areas.ts";
+import { parseA11yEntry } from "./a11y-entry.ts";
 import { parseCompositionEntry } from "./composition-entry.ts";
 import { parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
@@ -42,6 +43,12 @@ function policy(v: unknown, where: string): FlakyPolicy {
   return parseFlaky(v, where, bad) ?? "review";
 }
 
+/** A scanned shot's accessibility violations; an entry that was not scanned (or an older manifest) has no field. */
+function a11yOf(v: unknown, where: string): Pick<SnapshotEntry, "a11y"> {
+  const a11y = parseA11yEntry(v, where, bad);
+  return a11y ? { a11y } : {};
+}
+
 /** A composition-only project's findings; an entry without them (any other project, an older manifest) has no field. */
 function compositionOf(v: unknown, where: string): Pick<SnapshotEntry, "composition"> {
   const composition = parseCompositionEntry(v, where, bad);
@@ -81,6 +88,7 @@ function entry(v: unknown, i: number): SnapshotEntry {
       fonts: str(fingerprint.fonts, `${where}.fingerprint.fonts`),
     },
     ...compositionOf(v.composition, `${where}.composition`),
+    ...a11yOf(v.a11y, `${where}.a11y`),
   };
 }
 

@@ -1,3 +1,4 @@
+import type { A11yDiff } from "@pixelslash/engine/a11y-entry";
 import type { Composition } from "@pixelslash/engine/composition-entry";
 import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import {
@@ -11,6 +12,7 @@ import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { inChunks } from "./chunks";
 import { notSkippedFlaky } from "./markers";
+import { a11yDiffsOf } from "./review-a11y";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
@@ -124,6 +126,11 @@ export type SnapshotView = {
   changeNote: string | null;
   /** A composition-only project's gaps and special cases (ob 1850); null for any other project. */
   composition: Composition | null;
+  /**
+   * The scan against the baseline's, split into new and already there. `off` when this shot was
+   * not scanned, `unbaselined` when the baseline was not (or there is none), so nothing is called new.
+   */
+  a11yDiff: A11yDiff;
   /** The project model's label and sentence per changed region (ob 1473); null when none was given. */
   aiReview: AiReview | null;
   /** Queued for the model and not yet answered (ob 1875). */
@@ -184,6 +191,8 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       mainDiffResult: snapshots.mainDiffResult,
       changeNote: snapshots.changeNote,
       composition: snapshots.composition,
+      a11y: snapshots.a11y,
+      baselineSnapshotId: snapshots.baselineSnapshotId,
       aiReview: snapshots.aiReview,
       aiQueuedAt: snapshots.aiQueuedAt,
       aiError: snapshots.aiError,
@@ -194,10 +203,12 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
     .where(eq(snapshots.buildId, buildId));
   const approved = await approvedEarlier(db, build);
   const roots = await carriedRootBuilds(db, buildId);
+  const a11yDiffs = await a11yDiffsOf(db, rows);
   const now = Date.now();
   const ordered = rows
-    .map(({ reviewer, aiQueuedAt, ...row }) => ({
+    .map(({ reviewer, aiQueuedAt, a11y: _scan, baselineSnapshotId: _baseline, ...row }) => ({
       ...row,
+      a11yDiff: a11yDiffs.get(row.id) ?? { state: "off" as const },
       aiPending: explaining(aiQueuedAt, now),
       // Queued so long ago that its consumer died: named, not left explaining.
       aiError: row.aiError ?? (aiQueuedAt && !explaining(aiQueuedAt, now) ? STALE_FAILURE : null),

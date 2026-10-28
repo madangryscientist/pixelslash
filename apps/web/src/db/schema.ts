@@ -10,6 +10,7 @@ import type {
   IgnoreRect,
   ResolvedDiff,
 } from "./diff-json";
+import type { A11y } from "@pixelslash/engine/a11y-entry";
 import type { Composition } from "@pixelslash/engine/composition-entry";
 import { serverTimingColumns, snapshotTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
@@ -376,6 +377,12 @@ export const snapshots = sqliteTable(
      * image px. Shown only; nothing reads it for a review state. Null for any other project.
      */
     composition: text("composition", { mode: "json" }).$type<Composition>(),
+    /**
+     * The accessibility scan of the page at settle time (PS-238), as its manifest carries it. Null
+     * is "not scanned" (the scan is opt-in), never "nothing found"; a scan that found nothing is
+     * `{ violations: [] }`. Shown only; nothing reads it for a review state or an exit code.
+     */
+    a11y: text("a11y", { mode: "json" }).$type<A11y>(),
     ...snapshotTimingColumns,
     createdAt: createdAt(),
   },

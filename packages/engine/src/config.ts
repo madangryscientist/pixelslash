@@ -9,6 +9,7 @@ import {
 } from "./config-feature.ts";
 import { type CompositionConfig, parseComposition } from "./config-composition.ts";
 import { type FlakyPolicy, parseFlake, parseFlaky } from "./config-flake.ts";
+import { flag } from "./config-flag.ts";
 import { type Stabilise, parseStabilise } from "./config-stabilise.ts";
 import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
 import type { DiffOptions } from "./diff.ts";
@@ -87,6 +88,8 @@ export type CaptureConfig = {
   features: Record<string, Feature>;
   /** Composition-only (ob 1850): every element styled outside this library is reported at capture. */
   composition: CompositionConfig | undefined;
+  /** Scan every settled page with axe-core and keep the WCAG A and AA violations with the shot (PS-238). Off unless set. */
+  a11y: boolean;
 };
 
 export const CONFIG_NAMES = [
@@ -293,6 +296,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
       bad,
     ),
     composition: parseComposition(raw.composition, bad),
+    a11y: flag(raw.a11y, "a11y", bad),
   };
 }
 

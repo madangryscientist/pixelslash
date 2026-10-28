@@ -91,7 +91,7 @@ async function timedMs(fn: () => Promise<unknown>): Promise<number> {
   return elapsed(started);
 }
 
-async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+export async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([

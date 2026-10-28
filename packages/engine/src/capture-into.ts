@@ -66,7 +66,9 @@ export async function captureInto(
   const taken = await mapLimit(pairs, concurrency, async ({ route, variant }) => {
     const file = `${route.name}/${variant.name}.png`;
     const started = performance.now();
-    const { png, ignore, media, composition, steps } = await session.shoot(route, variant);
+    const { png, ignore, media, composition, a11y, steps } = await session.shoot(route, variant, {
+      a11y: true,
+    });
     const captureMs = elapsed(started);
     await mkdir(join(out, route.name), { recursive: true });
     await Bun.write(join(out, file), png);
@@ -81,6 +83,7 @@ export async function captureInto(
       file,
       fingerprint,
       ...(composition && { composition }),
+      ...(a11y && { a11y }),
     };
     const shot: ShotTiming = { name: identity(entry), captureMs, ...steps };
     return { entry, shot, media };

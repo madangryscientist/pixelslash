@@ -1,4 +1,5 @@
 import { brief } from "#/api/validate-brief";
+import { a11y } from "#/api/validate-a11y";
 import { composition } from "#/api/validate-composition";
 import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
@@ -176,6 +177,7 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
     },
     changeNote: changeNote(m.changeNote),
     composition: composition(m.composition, bad),
+    a11y: a11y(m.a11y, bad),
   };
 }
 
