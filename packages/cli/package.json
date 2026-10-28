@@ -29,13 +29,13 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@sentry/bun": "11.9.0",
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
     "@pixelslash/engine": "workspace:*",
-    "@types/bun": "1.4.3",
+    "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
     "vitest": "5.0.5"
   },
