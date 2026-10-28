@@ -25,6 +25,13 @@ const white = shot();
 const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
 const every = (png: typeof white) => names.map((name) => ({ name, png }));
 
+/**
+ * The diff stops itself at a wall-clock budget (`DIFF_BUDGET_MS`). This test measures D1's
+ * parameter limit, not diff speed, so its clock never moves and a slow runner cannot run the budget
+ * out: a build that ends `errored`, or a main build that does not finish, would fail it on timing.
+ */
+const frozen = { now: () => 0 };
+
 let held: { db: Db; dispose: () => Promise<void> };
 let ctx: Uploads & { userId: string };
 
@@ -47,25 +54,23 @@ afterAll(() => held?.dispose());
 
 describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
   test("the build page, its snapshot pages and a re-diff load without error", async () => {
-    await upload(ctx, { branch: "main", commit: sha(1), shots: every(white) });
-    const first = await upload(ctx, {
-      branch: "feat",
-      commit: sha(2),
-      mergeBase: sha(1),
-      shots: every(red),
-    });
+    await upload(ctx, { branch: "main", commit: sha(1), shots: every(white) }, frozen);
+    const first = await upload(
+      ctx,
+      { branch: "feat", commit: sha(2), mergeBase: sha(1), shots: every(red) },
+      frozen,
+    );
     expect(first.status).toBe("changes");
     await acceptAllSnapshots(ctx.db, {
       projectId: ctx.projectId,
       buildId: first.id,
       userId: ctx.userId,
     });
-    const second = await upload(ctx, {
-      branch: "feat",
-      commit: sha(3),
-      mergeBase: sha(1),
-      shots: every(red),
-    });
+    const second = await upload(
+      ctx,
+      { branch: "feat", commit: sha(3), mergeBase: sha(1), shots: every(red) },
+      frozen,
+    );
     expect(second.status).toBe("passed");
 
     // The build page.
@@ -89,7 +94,7 @@ describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
 
     // A re-diff of every shot, as a review-UI override that applies to all of them does.
     const ids = (await rows(ctx, second)).map((row) => row.id);
-    const result = await rediffShots({ db: ctx.db, blobs: ctx.scoped }, second, ids);
+    const result = await rediffShots({ db: ctx.db, blobs: ctx.scoped, ...frozen }, second, ids);
     expect(result).toMatchObject({ status: "passed", error: null });
     const after = await buildView(ctx.db, ctx.projectId, second.id);
     expect(after.snapshots.every((s) => s.diffStatus === "unchanged")).toBe(true);
