@@ -47,11 +47,11 @@ export function DefaultBranch({ projectId, branch }: { projectId: string; branch
 export function GithubRepo({
   projectId,
   repo,
-  appConfigured,
+  configured,
 }: {
   projectId: string;
   repo: string | null;
-  appConfigured: boolean;
+  configured: boolean;
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -78,8 +78,10 @@ export function GithubRepo({
             review or one is rejected, passing once they are accepted. The check carries counts and
             a link, never a screenshot.
           </Text>
-          {!appConfigured && (
-            <Text as="p">This server has no GitHub App set up, so no check runs are sent yet.</Text>
+          {!configured && (
+            <Text as="p">
+              This server has no GitHub App or token set up, so no check runs are sent yet.
+            </Text>
           )}
         </Stack>
         <InlineForm

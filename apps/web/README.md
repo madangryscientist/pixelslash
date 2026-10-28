@@ -163,6 +163,28 @@ is reviewed. It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` 
 `PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. Registering the
 App, its permissions and deploying its key: [`github-app/README.md`](github-app/README.md).
 
+### Without the App: a commit status with a token (PS-235)
+
+A self-host that has not registered the App can post the same verdict as a **commit status**,
+context `PixelSlash`, with a fine-grained personal access token. The states are the check run's:
+`pending` while the build is diffed, `failure` while a change awaits review, a shot is rejected or
+the build errored, `success` once every change is accepted or nothing changed. A status has no
+body, so it carries only the one-line title and the link to the build page; each state change is a
+new status on the commit and GitHub shows the latest.
+
+- **Token scope.** Create a fine-grained token (GitHub → Settings → Developer settings → Personal
+  access tokens), resource owner = the account or org that owns the repos, repositories = only the
+  ones whose projects you will connect, repository permission **Commit statuses: Read and write**
+  (GitHub adds the read-only Metadata permission itself). Nothing else.
+- **Where the secret lives.** `GITHUB_STATUS_TOKEN`, a secret and never a var: `wrangler secret put
+  GITHUB_STATUS_TOKEN` on Cloudflare, `.dev.vars` for `vite dev`, and the CT's `.dev.vars.e2e` on the
+  LAN self-host (`release.sh` does not carry it; a release keeps the lines it did not write). The
+  Docker self-host reads it from the container's environment.
+  `PIXELSLASH_PUBLIC_URL` sets the link, as above.
+- **Precedence.** The App is used when it is configured; the token only when it is not. With
+  neither, nothing calls GitHub. Connect each project to its repo as for the App (project settings
+  → GitHub repo).
+
 ## Run it locally as a project's server
 
 A local server is a real PixelSlash server: a CLI pointed at it uploads, the server diffs, and the

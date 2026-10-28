@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
+import { type GithubTokenConfig, createGithubToken } from "./token";
 import { type GithubAppConfig, type GithubAppDeps, type GithubFetch, createGithubApp } from "./app";
 
 /** A stand-in for GitHub's REST API, for the App's tests: no network. Tests only. */
@@ -7,6 +8,12 @@ const TEST_APP_KEY = generateKeyPairSync("rsa", { modulusLength: 2048 }).private
   type: "pkcs1",
   format: "pem",
 });
+
+export const TEST_TOKEN = "github_pat_stub";
+const TEST_TOKEN_CONFIG: GithubTokenConfig = {
+  token: TEST_TOKEN,
+  apiBase: "https://api.github.test",
+};
 
 const TEST_APP_CONFIG: GithubAppConfig = {
   appId: "123456",
@@ -43,6 +50,7 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
   let mode: Mode = "ok";
   let minted = 0;
   let nextRun = 100;
+  let nextStatus = 500;
 
   /** GitHub's answer to a call that gets one. */
   function route(method: string, path: string): Response {
@@ -53,8 +61,15 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
       const expiresAt = new Date(now() + 60 * 60_000).toISOString();
       return reply(201, { token: `ghs_token${minted}`, expires_at: expiresAt });
     }
+    return routeChecks(method, path);
+  }
+
+  /** The check-run and commit-status endpoints. */
+  function routeChecks(method: string, path: string): Response {
     if (method === "POST" && path.endsWith("/check-runs")) return reply(201, { id: nextRun++ });
     if (method === "PATCH" && /\/check-runs\/\d+$/.test(path)) return reply(200, {});
+    if (method === "POST" && /^\/repos\/[^/]+\/[^/]+\/statuses\/[0-9a-f]+$/.test(path))
+      return reply(201, { id: nextStatus++ });
     return reply(404, { message: "Not Found" });
   }
 
@@ -74,6 +89,9 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
     },
     /** The calls on check runs, without the token traffic. */
     checkRunCalls: () => calls.filter((c) => c.path.includes("/check-runs")),
+    /** The calls on commit statuses (PS-235). */
+    statusCalls: () => calls.filter((c) => c.path.includes("/statuses/")),
+    token: (deps: GithubAppDeps = {}) => createGithubToken(TEST_TOKEN_CONFIG, { fetch, ...deps }),
     app: (deps: GithubAppDeps = {}) => createGithubApp(TEST_APP_CONFIG, { fetch, now, ...deps }),
   };
 }

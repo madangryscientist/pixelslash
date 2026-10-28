@@ -10,6 +10,7 @@ import { retryBusy } from "#/db/busy";
 import { diffLocationOf } from "#/db/orgs";
 import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
+import { createGithubToken, githubTokenConfigOf } from "#/github/token";
 import type { DiffLocation } from "#/db/schema";
 import { retentionDaysOf } from "#/lib/retention";
 import { type BlobStore, type SweepBlobStore, r2BlobStore, r2SweepStore } from "#/storage/blobs";
@@ -114,15 +115,29 @@ function githubApp(): GithubApp | null {
   return app;
 }
 
-/** What a build's check run is synced with: the App and the public URL its link points at. */
+/**
+ * The deployment's token for commit statuses (PS-235), or null without `GITHUB_STATUS_TOKEN`.
+ * Only used when there is no App.
+ */
+let statusToken: GithubApp | undefined;
+
+function githubToken(): GithubApp | null {
+  const config = githubTokenConfigOf(env);
+  if (!config) return null;
+  statusToken ??= createGithubToken(config);
+  return statusToken;
+}
+
+/** What a build's check is synced with: the App, else the token, and the public URL its link points at. */
 export const checkRunDeps = (db: Db): CheckRunDeps => ({
   db,
   app: githubApp(),
+  token: githubToken(),
   publicUrl: env.PIXELSLASH_PUBLIC_URL || undefined,
 });
 
-/** Whether the deployment has a GitHub App, for the project settings' note. */
-export const githubAppConfigured = (): boolean => githubApp() !== null;
+/** Whether the deployment can post a build's verdict to GitHub (App or token), for the settings' note. */
+export const githubChecksConfigured = (): boolean => githubApp() !== null || githubToken() !== null;
 
 /** Bring the builds' check runs up to their state (PS-23); never throws. */
 export const syncChecks = (db: Db, buildIds: Iterable<string>): Promise<void> =>
