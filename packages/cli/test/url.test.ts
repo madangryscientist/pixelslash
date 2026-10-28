@@ -131,6 +131,44 @@ describe("capture", () => {
   }, 30_000);
 });
 
+const firefoxLaunches = await (await import("playwright")).firefox.launch().then(
+  (b) => b.close().then(() => true),
+  () => false,
+);
+
+describe("--browser", () => {
+  // This machine may have no Firefox: the capture image proves it.
+  test.skipIf(!firefoxLaunches)(
+    "firefox shoots the pair and the report names the browser",
+    async () => {
+      const pages = await servePages();
+      const out = join(await tmp(), "out");
+      const code = await run(
+        [
+          "--live",
+          pages.url("live.html"),
+          "--local",
+          pages.url("live.html"),
+          "--out",
+          out,
+          "--browser",
+          "firefox",
+          "--width",
+          "640",
+        ],
+        capture().io,
+        { which: () => null },
+      );
+      expect(code).toBe(0);
+      expect(pngWidth(new Uint8Array(await Bun.file(join(out, "live.png")).arrayBuffer()))).toBe(
+        640,
+      );
+      expect(await Bun.file(join(out, "report.html")).text()).toContain("firefox · Main 640x");
+    },
+    60_000,
+  );
+});
+
 describe("capture settle", () => {
   test("end-to-end: content that arrives after domcontentloaded is in the shot", async () => {
     const pages = await servePages();

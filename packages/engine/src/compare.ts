@@ -2,6 +2,7 @@ import { copyFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser } from "playwright";
+import type { BrowserName } from "./config.ts";
 import {
   capturePair,
   launchBrowser,
@@ -47,6 +48,8 @@ export type CompareOptions = {
   ds: string | undefined;
   out: string;
   width: number;
+  /** The browser a `--live`/`--local` pair is shot in; Chromium when left out. PNG inputs are not captured, so it does not apply to them. */
+  browser?: BrowserName;
   label: string | undefined;
   /** Diff options for this run; keys left out take the engine default. */
   diff: DiffOptions;
@@ -107,7 +110,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
 }
 
 function routeBrowser(opts: CompareOptions, deps: Deps): Promise<Browser | undefined> | undefined {
-  return opts.live && opts.local && !deps.capture ? launchBrowser() : undefined;
+  return opts.live && opts.local && !deps.capture ? launchBrowser(opts.browser) : undefined;
 }
 
 function routeRow(path: string, slug: string, one: CompareResult): RouteRow {
@@ -160,7 +163,7 @@ async function takeShots(
   if (!opts.live || !opts.local) throw new UsageError("need --live URL --local URL");
   const pair = { liveUrl: opts.live, localUrl: opts.local, liveDest, localDest };
   if (browser) return { steps: await shotPair(browser, pair, opts.width) };
-  return capturePair(pair, opts.width, deps.capture);
+  return capturePair(pair, opts.width, deps.capture, opts.browser);
 }
 
 async function judgePair(
@@ -196,6 +199,11 @@ function pairShot(
   // Existing PNGs are only copied: no capture happened, so no capture timing.
   if (!(opts.livePng && opts.localPng)) shot.captureMs = captured.ms;
   return shot;
+}
+
+/** The browser a pair was shot in, for the report; PNG inputs were shot elsewhere, so none. */
+function shotIn(opts: CompareOptions): BrowserName | undefined {
+  return opts.live && opts.local ? (opts.browser ?? "chromium") : undefined;
 }
 
 export async function compare(
@@ -236,6 +244,7 @@ export async function compare(
       ignoredPixels: manifest.ignoredPixels,
       ignored: manifest.ignored,
       settledBy: manifest.settledBy,
+      browser: shotIn(opts),
       main: written.main,
       branch: written.branch,
     });

@@ -148,7 +148,9 @@ async function configRecapture(
     recapture: async (e) => {
       sameMachine(e, { image: imageId(env), fonts: await (local ??= fontSetHash()) });
       const session = await (opening ??= openCaptureSession(config, { warn }));
-      sameMachine(e, session.fingerprint);
+      // A browser the config no longer names has no fingerprint; `recapture` skips it by name.
+      if (session.config.variants.some((v) => v.browser === e.variant.browser))
+        sameMachine(e, session.fingerprintFor(e.variant.browser));
       return recapture(session, e);
     },
     close: async () => {

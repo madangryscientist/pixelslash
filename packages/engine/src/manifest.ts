@@ -1,4 +1,5 @@
 import { join, resolve, sep } from "node:path";
+import { IMAGE_BROWSERS, isBrowserName } from "./config.ts";
 import { type FlakyPolicy, parseFlaky } from "./config-flake.ts";
 import { type MaskRect, parseArea } from "./config-areas.ts";
 import { parseA11yEntry } from "./a11y-entry.ts";
@@ -64,13 +65,15 @@ function entry(v: unknown, i: number): SnapshotEntry {
   if (!Array.isArray(tags)) bad(`${where}.tags`, "must be an array of strings");
   if (variant.theme !== "light" && variant.theme !== "dark")
     bad(`${where}.variant.theme`, 'must be "light" or "dark"');
-  if (variant.browser !== "chromium") bad(`${where}.variant.browser`, 'must be "chromium"');
+  const { browser } = variant;
+  if (!isBrowserName(browser))
+    bad(`${where}.variant.browser`, `must be one of ${IMAGE_BROWSERS.join(", ")}`);
   return {
     name: str(v.name, `${where}.name`),
     path: str(v.path, `${where}.path`),
     variant: {
       name: str(variant.name, `${where}.variant.name`),
-      browser: "chromium",
+      browser,
       viewport: {
         width: posInt(variant.viewport.width, `${where}.variant.viewport.width`),
         height: posInt(variant.viewport.height, `${where}.variant.viewport.height`),

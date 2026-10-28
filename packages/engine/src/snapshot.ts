@@ -2,7 +2,8 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { PNG } from "pngjs";
 import { scanA11y } from "./a11y.ts";
 import type { A11y } from "./a11y-entry.ts";
-import { keepNativeRaf, launchChromium } from "./capture.ts";
+import { keepNativeRaf } from "./capture.ts";
+import { launchSessionBrowsers } from "./capture-browsers.ts";
 import { openPage } from "./capture-open.ts";
 import {
   loadLibrary,
@@ -12,6 +13,7 @@ import {
 } from "./composition.ts";
 import {
   resolveIgnore,
+  type BrowserName,
   type CaptureConfig,
   type FlakyPolicy,
   type Ignore,
@@ -41,7 +43,7 @@ import {
 import { mediaWarner } from "./media.ts";
 import { joinOrigin } from "./routes.ts";
 import { captureInto } from "./capture-into.ts";
-import { signIn, type Session } from "./setup.ts";
+import type { Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
 import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
 import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
@@ -283,8 +285,9 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
 export type CaptureSession = {
   config: CaptureConfig;
   routes: Route[];
-  fingerprint: Fingerprint;
-  /** How long the browser took to launch (PS-195). */
+  /** The fingerprint of a shot taken in `browser`; one of the config's variants' browsers. */
+  fingerprintFor: (browser: BrowserName) => Fingerprint;
+  /** How long the browsers took to launch, together (PS-195). */
   browserLaunchMs: number;
   /** `scan` asks for the accessibility scan (PS-238); only `captureInto` keeps its result, so a flake re-capture or a dev loop skips it. */
   shoot: (route: Route, variant: Variant, scan?: { a11y?: boolean }) => Promise<Shoot>;
@@ -310,19 +313,15 @@ export async function openCaptureSession(
   // Read before the app starts, so a library that is not installed fails first.
   const library = config.composition && (await loadLibrary(config.composition));
   let stopApp: StopApp | undefined;
-  let browser: Browser | undefined;
+  const browsers = new Map<BrowserName, Browser>();
   const close = async () => {
     unmatched.flush();
-    await browser?.close();
+    await Promise.all([...browsers.values()].map((b) => b.close()));
     await stopApp?.();
   };
   try {
     if (config.start) stopApp = await startApp(config.start);
-    const launching = performance.now();
-    const launched = await launchChromium(LAUNCH_ARGS);
-    const browserLaunchMs = elapsed(launching);
-    browser = launched;
-    const fingerprint: Fingerprint = { image, browser: `chromium ${launched.version()}`, fonts };
+    const held = await launchSessionBrowsers(config, browsers, LAUNCH_ARGS);
     // The app is up now, so the Storybook's index can be read.
     const routes = config.storybook
       ? [
@@ -333,20 +332,23 @@ export async function openCaptureSession(
           )),
         ]
       : config.routes;
-    const session = await signIn(launched, config);
     return {
       config,
       routes,
-      fingerprint,
-      browserLaunchMs,
+      fingerprintFor: (name) => ({
+        image,
+        browser: `${name} ${held.of(name).version()}`,
+        fonts,
+      }),
+      browserLaunchMs: held.launchMs,
       shoot: async (route, variant, scan) => {
-        const taken = await shoot(launched, {
+        const taken = await shoot(held.of(variant.browser), {
           url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
           route,
           variant,
           stabilise: config.stabilise,
           ignore: resolveIgnore(config, route, variant),
-          session,
+          session: held.session,
           library,
           a11y: config.a11y && scan?.a11y === true,
           warn,
@@ -370,7 +372,10 @@ export function recapture(
   entry: Pick<SnapshotEntry, "name" | "variant">,
 ): Promise<Shoot | undefined> {
   const route = session.routes.find((r) => r.name === entry.name);
-  const variant = session.config.variants.find((v) => v.name === entry.variant.name);
+  // A baseline is only ever matched in its own browser: the same name in another is another shot.
+  const variant = session.config.variants.find(
+    (v) => v.name === entry.variant.name && v.browser === entry.variant.browser,
+  );
   return route && variant ? session.shoot(route, variant) : Promise.resolve(undefined);
 }
 

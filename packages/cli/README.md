@@ -19,7 +19,7 @@ npx @hackcove/pixelslash install-browser   # once per machine, for URL capture
   Bun first (`engines.bun` is `>=1.4.0`).
 - **Playwright is a peer dependency.** npm installs `playwright` next to the package. It is a peer
   because the browser it launches is yours: `pixelslash install-browser` runs that same Playwright
-  to install `chromium-headless-shell`, **once per machine**. Without it, URL capture fails; PNG
+  to install `chromium-headless-shell`, **once per machine** (`install-browser firefox`, `webkit` or `all` add the others, for `--browser`). Without it, URL capture fails; PNG
   mode needs no browser.
 
 ## Use

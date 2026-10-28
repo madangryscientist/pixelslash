@@ -15,7 +15,7 @@ export {
   type SnapshotCompareResult,
 } from "./compare-snapshots.ts";
 export {
-  CAPTURE_BROWSER,
+  INSTALL_NAMES,
   keepNativeRaf,
   playwrightCli,
   settleCapture,
@@ -38,11 +38,14 @@ export type { CaptureSetup, SetupArgs } from "./setup.ts";
 export {
   CONFIG_NAMES,
   DEFAULT_FLAKE_RETRIES,
+  IMAGE_BROWSERS,
+  isBrowserName,
   findConfig,
   findConfigIfAny,
   loadConfig,
   parseConfig,
   resolveDiff,
+  type BrowserName,
   type CaptureConfig,
   type CompositionConfig,
   type FlakyPolicy,

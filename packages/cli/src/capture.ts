@@ -105,9 +105,10 @@ export async function captureLocal(
 }
 
 function printCaptured(result: SnapshotResult, io: Io): void {
-  const [first] = result.manifest.snapshots;
   io.stdout.write(`pixelslash: ${result.manifest.snapshots.length} snapshots\n`);
-  if (first) io.stdout.write(`fingerprint: ${JSON.stringify(first.fingerprint)}\n`);
+  // One line per distinct fingerprint: a run in three browsers has three.
+  const lines = new Set(result.manifest.snapshots.map((e) => JSON.stringify(e.fingerprint)));
+  for (const line of lines) io.stdout.write(`fingerprint: ${line}\n`);
   io.stdout.write(`manifest: ${result.manifestPath}\n`);
   if (result.gapsPath) io.stdout.write(`${gapsLine(result)}\n`);
 }

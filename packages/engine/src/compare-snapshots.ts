@@ -153,6 +153,7 @@ async function diffMatch(
       specks: diff.specks,
       ignoredPixels: diff.ignoredPixels,
       ignored: diff.ignored,
+      browser: branch.variant.browser,
       main: { width: diff.mainWidth, height: diff.mainHeight },
       branch: { width: diff.branchWidth, height: diff.branchHeight },
     }),

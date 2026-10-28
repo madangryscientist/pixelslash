@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
+import { IMAGE_BROWSERS, isBrowserName, type BrowserName } from "./browser-names.ts";
 import { parseArea, type Ignore, type Mask } from "./config-areas.ts";
 import {
   type Feature,
@@ -17,9 +18,7 @@ import { mergeDiffOptions, parseDiffOptions } from "./diff-options.ts";
 import { UsageError } from "./errors.ts";
 import { isHttpUrl, routeSlug } from "./routes.ts";
 
-/** The browsers the pinned capture image ships. A variant naming another is a usage error. */
-export const IMAGE_BROWSERS = ["chromium"] as const;
-export type BrowserName = (typeof IMAGE_BROWSERS)[number];
+export { IMAGE_BROWSERS, isBrowserName, type BrowserName };
 export type Theme = "light" | "dark";
 
 export type { Ignore, Mask, MaskRect } from "./config-areas.ts";
@@ -212,12 +211,12 @@ function variant(v: unknown, i: number): Variant {
   const theme = v.theme ?? "light";
   if (theme !== "light" && theme !== "dark") bad(`${where}.theme`, 'must be "light" or "dark"');
   const browser = v.browser ?? "chromium";
-  if (!IMAGE_BROWSERS.some((b) => b === browser))
+  if (!isBrowserName(browser))
     bad(`${where}.browser`, `must be one the image ships: ${IMAGE_BROWSERS.join(", ")}`);
-  const fallback = `chromium-${viewport.width}x${viewport.height}-${theme}`;
+  const fallback = `${browser}-${viewport.width}x${viewport.height}-${theme}`;
   return {
     name: fileName(v.name, `${where}.name`, fallback),
-    browser: "chromium",
+    browser,
     viewport,
     theme,
   };

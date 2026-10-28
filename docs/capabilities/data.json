@@ -150,8 +150,8 @@
       "k": "browsers",
       "label": "More than one browser engine",
       "ps": {
-        "v": "n",
-        "note": "chromium only: a variant naming another browser is a config error, because the image ships one",
+        "v": "y",
+        "note": "chromium, firefox and webkit: a variant names its browser (default chromium) and the capture image ships all three; a baseline is matched per browser, never across; the report and the review app show it; --browser on the local pair mode",
         "commit": "f358669"
       },
       "t": {
@@ -161,8 +161,7 @@
         "applitools": "y",
         "lost": "y"
       },
-      "plan": "capture image",
-      "gap": "Firefox and WebKit captures; the capture image ships Chromium only"
+      "plan": ""
     },
     {
       "g": "capture",

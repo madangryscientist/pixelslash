@@ -128,4 +128,25 @@ describe("--version and install-browser", () => {
     expect(await run(["install-browser"], failed.io, { spawn: spawn(1) })).toBe(3);
     expect(failed.stderr).toContain("installing chromium-headless-shell failed");
   });
+
+  test("install-browser names firefox, webkit or all, and refuses anything else", async () => {
+    const calls: string[][] = [];
+    const spawn = (cmd: string[]) => {
+      calls.push(cmd);
+      return proc(0);
+    };
+    expect(await run(["install-browser", "firefox"], capture().io, { spawn })).toBe(0);
+    expect(calls[0]?.slice(-2)).toEqual(["install", "firefox"]);
+    expect(await run(["install-browser", "all"], capture().io, { spawn })).toBe(0);
+    expect(calls[1]?.slice(-4)).toEqual([
+      "install",
+      "chromium-headless-shell",
+      "firefox",
+      "webkit",
+    ]);
+    const bad = capture();
+    expect(await run(["install-browser", "edge"], bad.io, { spawn })).toBe(2);
+    expect(bad.stderr).toContain("install-browser: unknown browser edge");
+    expect(calls).toHaveLength(2);
+  });
 });

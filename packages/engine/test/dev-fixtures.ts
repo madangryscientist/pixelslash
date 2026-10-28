@@ -46,7 +46,7 @@ export function fakeSession(settleMs = 40) {
   const session: CaptureSession = {
     config,
     routes: config.routes,
-    fingerprint: { image: "version:test", browser: "chromium 1", fonts: "sha256:f" },
+    fingerprintFor: () => ({ image: "version:test", browser: "chromium 1", fonts: "sha256:f" }),
     browserLaunchMs: 0,
     shoot: async () => {
       page.shots++;
