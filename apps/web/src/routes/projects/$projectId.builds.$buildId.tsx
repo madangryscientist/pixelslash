@@ -97,16 +97,15 @@ function BuildPage() {
     firstBuild,
     thresholdChanges,
     modelConfigured,
+    expiry,
   } = Route.useLoaderData();
-  const search = Route.useSearch();
   const counts = tabCounts(snapshots);
   const baseline = setsBaseline(firstBuild, snapshots);
-  const active = search.tab ?? defaultTab(counts);
+  const active = Route.useSearch().tab ?? defaultTab(counts);
   // Only a shot holding a change blocks a build (verdictOf); new, removed and unchanged ones do not
   // need a decision, unless an unchanged one carries the branch's open change (ob 1712).
   const toReview = snapshots.filter(awaitsDecision).length;
   useRefreshWhile(summaryPending || snapshots.some((shot) => shot.aiPending));
-  const reviewable = build.status === "changes" || build.status === "passed";
   const { error, acceptAll } = useAcceptAll(project.id, build.id);
   return (
     <Page>
@@ -122,9 +121,10 @@ function BuildPage() {
           build={build}
           snapshots={snapshots}
           toReview={toReview}
-          reviewable={reviewable}
+          reviewable={build.status === "changes" || build.status === "passed"}
           onAccept={acceptAll}
           baseline={baseline}
+          expiry={expiry}
         >
           <BuildBrief brief={build.brief} />
           {build.branch !== project.defaultBranch && (

@@ -123,6 +123,37 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
    `apps/web/.dev.vars.e2e` and deploy the current sha again.
 4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see "Error reporting" in [`docs/cli.md`](../../docs/cli.md).
 
+## Retention (PS-239)
+
+Off unless you set it. `PIXELSLASH_RETENTION_DAYS=30` (a whole number above 0; anything else is off)
+makes the review app expire PR builds: a build older than that window, on a branch that is not the
+project's default branch, is deleted with its blobs (R2, or the self-host's bucket) and its rows.
+Default-branch builds are never deleted. Neither is a build a surviving build still points at as its
+baseline (`baselineKey`, `mainBaselineKey`, `baselineSnapshotId`, `carriedFrom`, and a removed marker's
+`image_key` / `baseline_key`), followed through the builds that are kept, so a chain only goes once
+nothing live reaches it. Flake evidence of a deleted build goes too; the flake itself stays. Usage
+counts drop with the builds. With retention on, a PR build's page says "expires in N days".
+
+- **Dry run first.** The Worker's hourly cron (`triggers.crons` in `wrangler.jsonc`) does nothing
+  without the window, and with it only logs `retention dry run: would delete ...` until
+  `PIXELSLASH_RETENTION_DELETE=true` is also set. Each sweep takes the oldest 100 builds, so a backlog
+  clears over several runs.
+- **From the command line, for a self-host** (reads the Miniflare state on disk, a dry run unless
+  `--apply`):
+
+  ```bash
+  bun deploy/retention.ts --days 30                  # list the builds and bytes; deletes nothing
+  bun deploy/retention.ts --days 30 --limit 100      # the oldest 100 only
+  bun deploy/retention.ts --days 30 --apply          # delete them
+  ```
+
+  `--days` defaults to `PIXELSLASH_RETENTION_DAYS`, and with neither it refuses. `--persist-to` is the
+  state directory (`.../state/v3`), by default `$PIXELSLASH_DATA_DIR/state/v3` or
+  `.wrangler/state/v3`. Stop the server before `--apply`: a build uploaded while the sweep runs can
+  point at a baseline the sweep has just chosen to delete, which no lock prevents.
+- Deletion is permanent; read a dry-run listing before turning it on. Enabling it on a server with real
+  data is the operator's decision.
+
 ## GitHub check runs (PS-23)
 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a

@@ -55,3 +55,16 @@ export function formatDuration(ms: number): string {
   if (seconds < 60) return `${seconds}\u00a0s`;
   return `${Math.floor(seconds / 60)}\u00a0min\u00a0${seconds % 60}\u00a0s`;
 }
+
+/** `0 B`, `812 B`, `4.2 KiB`, `31 MiB`, `1.3 GiB`: one decimal below ten of a unit, none above. */
+export function formatBytes(bytes: number): string {
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const text = unit === 0 || value >= 10 ? String(Math.round(value)) : value.toFixed(1);
+  return `${text} ${units[unit]}`;
+}
