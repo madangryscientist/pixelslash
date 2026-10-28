@@ -114,7 +114,7 @@
       "ps": {
         "v": "p",
         "note": "Playwright only: @hackcove/pixelslash-playwright snapshot() writes a dir `pixelslash upload` takes, on plain Node; packed with npm pack, not published yet",
-        "commit": "645a80d"
+        "commit": "32be607"
       },
       "t": {
         "argos": "y",
@@ -133,7 +133,7 @@
       "ps": {
         "v": "p",
         "note": "snapshot(page, name, { ignore, redact }) settles, shoots and measures ignore boxes in image px; runs under plain `npx playwright test` on Node (the gate runs it there, and a CI-style check with no bun on PATH uploads its dir); packed with npm pack, not published yet",
-        "commit": "645a80d"
+        "commit": "32be607"
       },
       "t": {
         "argos": "y",
