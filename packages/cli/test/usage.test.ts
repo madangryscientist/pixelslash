@@ -75,6 +75,28 @@ describe("usage", () => {
     expect(code).toBe(2);
     expect(cap.stderr).toMatch(/--width/);
   });
+
+  test("--browser must be one the image ships", async () => {
+    const cap = capture();
+    const code = await run(
+      ["--live", "http://127.0.0.1:1/", "--local", "http://127.0.0.1:1/", "--browser", "edge"],
+      cap.io,
+      { spawn: identicalSpawn() },
+    );
+    expect(code).toBe(2);
+    expect(cap.stderr).toMatch(/--browser.*chromium, firefox, webkit/);
+  });
+
+  test("--browser applies to --live / --local, not PNG inputs", async () => {
+    const cap = capture();
+    const code = await run(
+      ["--live-png", "a.png", "--local-png", "b.png", "--browser", "firefox"],
+      cap.io,
+      { spawn: identicalSpawn() },
+    );
+    expect(code).toBe(2);
+    expect(cap.stderr).toMatch(/--browser applies to --live \/ --local/);
+  });
 });
 
 const leftovers = () => readdirSync(tmpdir()).filter((n) => n.startsWith("pixelslash-ds-"));

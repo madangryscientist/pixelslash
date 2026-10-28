@@ -198,7 +198,10 @@ describe("parseConfig", () => {
     [{ routes: ["/"] }, /baseUrl must be a non-empty string/],
     [{ ...base, routes: ["pricing"] }, /must start with \//],
     [{ ...base, routes: ["/a", { path: "/b", name: "a" }] }, /two entries named "a"/],
-    [{ ...base, variants: [{ browser: "firefox" }] }, /must be one the image ships: chromium/],
+    [
+      { ...base, variants: [{ browser: "edge" }] },
+      /must be one the image ships: chromium, firefox, webkit/,
+    ],
     [{ ...base, variants: [{ theme: "sepia" }] }, /"light" or "dark"/],
     [
       { ...base, masks: [{ x: 0, y: 0, width: 0, height: 1 }] },

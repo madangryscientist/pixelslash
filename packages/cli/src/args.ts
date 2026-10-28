@@ -1,7 +1,10 @@
 import { resolve } from "node:path";
 import {
+  IMAGE_BROWSERS,
   UsageError,
+  isBrowserName,
   parseDiffOption,
+  type BrowserName,
   type CompareOptions,
   type DiffOptions,
   type IgnoreRect,
@@ -9,7 +12,7 @@ import {
 import { ESCALATE } from "./failure.ts";
 
 export const USAGE =
-  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.\n" +
+  "pixelslash (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--browser chromium|firefox|webkit] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...\nURL origins may omit --ds and --file, including --routes. PNG route dirs still need --ds or --file.\n" +
   ESCALATE;
 const DEFAULT_WIDTH = 1280;
 
@@ -146,6 +149,15 @@ function resolved(flags: Map<string, string>, key: string): string | undefined {
   return raw ? resolve(raw) : undefined;
 }
 
+/** `--browser` names the engine a `--live`/`--local` pair is shot in; PNG inputs are not captured, so it has nothing to say there. */
+function parseBrowser(raw: string | undefined, mode: Mode): { browser?: BrowserName } {
+  if (raw === undefined) return {};
+  if (!isBrowserName(raw))
+    throw new UsageError(`--browser must be one of ${IMAGE_BROWSERS.join(", ")} (got "${raw}")`);
+  if (mode !== "url") throw new UsageError("--browser applies to --live / --local, not PNG inputs");
+  return { browser: raw };
+}
+
 export function parseArgs(argv: string[]): Cli {
   const { rects: ignore, rest } = takeIgnore(argv);
   const flags = readFlags(rest);
@@ -172,6 +184,7 @@ export function parseArgs(argv: string[]): Cli {
     tokenPath: resolved(flags, "token-path"),
     out: resolve(flags.get("out") ?? ".pixelslash"),
     width,
+    ...parseBrowser(flags.get("browser"), mode),
     label: flags.get("label"),
     diff: parseDiff(flags),
     ignore,

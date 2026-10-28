@@ -167,6 +167,8 @@ export function renderPixelReport(input: {
   ignored?: IgnoreRect[];
   /** `identical-bytes`: both shots were the same file, nothing was decoded or diffed (ob 1948). */
   settledBy?: "identical-bytes" | undefined;
+  /** The browser both shots were taken in; left out for PNGs given as files, whose browser is not known. */
+  browser?: string | undefined;
   main: { width: number; height: number };
   branch: { width: number; height: number };
 }): string {
@@ -176,7 +178,7 @@ export function renderPixelReport(input: {
   const count = input.path ? `${esc(input.path)} · ${result}` : result;
   const ignored = input.ignored ?? [];
   const notes = headerNotes(input);
-  const sizes = `Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
+  const sizes = `${input.browser ? `${esc(input.browser)} · ` : ""}Main ${input.main.width}x${input.main.height} · Branch ${input.branch.width}x${input.branch.height}`;
   const body = identical ? identicalBody() : reportBody(input, ignored);
   const summary = identical ? "" : `<p>${esc(regionSummary(input.regions, input.specks))}</p>`;
   return `<!doctype html>

@@ -99,7 +99,7 @@ describe("pixelslash capture", () => {
     const config = join(dir, "c.json");
     await Bun.write(
       config,
-      JSON.stringify({ baseUrl: "http://x", routes: ["/"], variants: [{ browser: "webkit" }] }),
+      JSON.stringify({ baseUrl: "http://x", routes: ["/"], variants: [{ browser: "edge" }] }),
     );
     const bad = capture();
     expect(await run(["capture", "--config", config], bad.io, pinned)).toBe(2);

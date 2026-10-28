@@ -1,14 +1,22 @@
 import { statfs } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Browser } from "playwright";
+import { chromium, firefox, webkit, type Browser } from "playwright";
+import type { BrowserName } from "./config.ts";
 import { CaptureError } from "./errors.ts";
 import { addSteps, elapsed, type CaptureSteps, type SettleSteps } from "./timings.ts";
 
 const CAPTURE_TIMEOUT_MS = 8_000;
 
-/** The browser `capture` launches: what `pixelslash install-browser` installs. */
+/** The browser `capture` launches by default: what `pixelslash install-browser` installs. */
 export const CAPTURE_BROWSER = "chromium-headless-shell";
+
+/** What `playwright install` calls each browser a variant can name. */
+export const INSTALL_NAMES: Record<BrowserName, string> = {
+  chromium: CAPTURE_BROWSER,
+  firefox: "firefox",
+  webkit: "webkit",
+};
 
 /** The `playwright` CLI of the Playwright this package captures with, so the browser it installs is the one it launches. */
 export function playwrightCli(): string {
@@ -142,8 +150,21 @@ export async function launchChromium(args: string[] = []): Promise<Browser> {
   });
 }
 
-export function launchBrowser(): Promise<Browser> {
-  return launchChromium();
+/**
+ * Launch headless Firefox or WebKit. Neither takes Chromium's flags or its /dev/shm choice; the
+ * signal handlers are off for the reason `launchChromium` gives.
+ */
+function launchOther(name: Exclude<BrowserName, "chromium">): Promise<Browser> {
+  const type = name === "firefox" ? firefox : webkit;
+  return type.launch({ headless: true, handleSIGTERM: false, handleSIGHUP: false });
+}
+
+/** The browser a variant names, launched; `chromiumArgs` apply to Chromium only. */
+export function launchBrowser(
+  name: BrowserName = "chromium",
+  chromiumArgs: string[] = [],
+): Promise<Browser> {
+  return name === "chromium" ? launchChromium(chromiumArgs) : launchOther(name);
 }
 
 async function shot(
@@ -189,6 +210,7 @@ export async function capturePair(
   pair: ShotPair,
   width: number,
   capture?: CapturePage,
+  name?: BrowserName,
 ): Promise<PairSteps | undefined> {
   if (capture) {
     await capture(pair.liveUrl, pair.liveDest, width);
@@ -196,7 +218,7 @@ export async function capturePair(
     return undefined;
   }
   const launching = performance.now();
-  const browser = await launchBrowser();
+  const browser = await launchBrowser(name);
   const browserLaunchMs = elapsed(launching);
   try {
     return { steps: await shotPair(browser, pair, width), browserLaunchMs };

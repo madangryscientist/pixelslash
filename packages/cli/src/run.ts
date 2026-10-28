@@ -2,8 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  CAPTURE_BROWSER,
   CLIENT_VERSION,
+  INSTALL_NAMES,
+  IMAGE_BROWSERS,
   CaptureError,
   FigmaError,
   UploadError,
@@ -11,10 +12,12 @@ import {
   compare,
   compareRoutes,
   fetchFigmaRasters,
+  isBrowserName,
   loadRoutes,
   playwrightCli,
   resolveToken,
   timingLine,
+  type BrowserName,
   type CompareResult,
   type Deps,
   type SnapshotDeps,
@@ -113,10 +116,21 @@ export type CliDeps = Deps &
     ask?: (question: string) => Promise<string>;
   };
 
-/** `pixelslash install-browser`: the Chromium `capture` launches, by the Playwright it launches it with. */
-async function installBrowser(io: Io, deps: CliDeps): Promise<number> {
+/** The browsers named on `install-browser`'s line (`all` is the three); none named is Chromium. */
+function installNames(argv: string[]): BrowserName[] {
+  if (argv.includes("all")) return [...IMAGE_BROWSERS];
+  const names = argv.map((a) => {
+    if (!isBrowserName(a)) throw new UsageError(`install-browser: unknown browser ${a}`);
+    return a;
+  });
+  return names.length === 0 ? ["chromium"] : [...new Set(names)];
+}
+
+/** `pixelslash install-browser [chromium|firefox|webkit|all]`: the browsers `capture` launches, by the Playwright it launches them with. */
+async function installBrowser(argv: string[], io: Io, deps: CliDeps): Promise<number> {
+  const targets = installNames(argv).map((n) => INSTALL_NAMES[n]);
   const spawn: SpawnProc = deps.spawn ?? ((cmd, opts) => Bun.spawn(cmd, opts));
-  const proc = spawn([process.execPath, playwrightCli(), "install", CAPTURE_BROWSER], {
+  const proc = spawn([process.execPath, playwrightCli(), "install", ...targets], {
     stdout: "pipe",
     stderr: "pipe",
     timeout: INSTALL_TIMEOUT_MS,
@@ -127,7 +141,7 @@ async function installBrowser(io: Io, deps: CliDeps): Promise<number> {
     proc.exited,
   ]);
   if (code === 0) return 0;
-  io.stderr.write(`pixelslash: installing ${CAPTURE_BROWSER} failed (exit ${code})\n`);
+  io.stderr.write(`pixelslash: installing ${targets.join(" ")} failed (exit ${code})\n`);
   return REMOTE_EXIT;
 }
 
@@ -160,8 +174,8 @@ const COMMANDS: Record<
   check: { usage: CHECK_USAGE, run: runCheck },
   dev: { usage: DEV_USAGE, run: runDev },
   "install-browser": {
-    usage: "pixelslash install-browser",
-    run: (_, io, deps) => installBrowser(io, deps),
+    usage: "pixelslash install-browser [chromium|firefox|webkit|all]",
+    run: installBrowser,
   },
   login: { usage: LOGIN_USAGE, run: runLogin },
   logout: { usage: LOGOUT_USAGE, run: runLogout },

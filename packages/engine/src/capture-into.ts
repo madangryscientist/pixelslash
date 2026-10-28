@@ -59,7 +59,7 @@ export async function captureInto(
   out: string,
   concurrency = CAPTURE_CONCURRENCY,
 ): Promise<SnapshotResult> {
-  const { config, routes, fingerprint } = session;
+  const { config, routes } = session;
   await mkdir(out, { recursive: true });
   await clearFlakeOutput(out);
   const pairs = config.variants.flatMap((variant) => routes.map((route) => ({ route, variant })));
@@ -81,7 +81,7 @@ export async function captureInto(
       ignore,
       flaky: resolveFlaky(config, route),
       file,
-      fingerprint,
+      fingerprint: session.fingerprintFor(variant.browser),
       ...(composition && { composition }),
       ...(a11y && { a11y }),
     };

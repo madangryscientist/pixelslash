@@ -23,7 +23,7 @@ function session(ms: (name: string) => number, fail?: string) {
   const fake: CaptureSession = {
     config,
     routes: config.routes,
-    fingerprint: { image: "version:test", browser: "chromium 1", fonts: "sha256:f" },
+    fingerprintFor: () => ({ image: "version:test", browser: "chromium 1", fonts: "sha256:f" }),
     browserLaunchMs: 0,
     shoot: async (route, variant) => {
       const name = `${route.name}/${variant.name}`;

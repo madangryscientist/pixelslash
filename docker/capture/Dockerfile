@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
 # The pinned PixelSlash capture image. Everything that changes how a page
-# renders is fixed here: Bun, Playwright (and so Chromium) from bun.lock, and a
+# renders is fixed here: Bun, Playwright (and so Chromium, Firefox and WebKit) from bun.lock, and a
 # bundled font set downloaded by checksum. No other fonts are left in the image.
 #
 #   docker build -f docker/capture/Dockerfile -t pixelslash-capture:dev .
@@ -64,12 +64,17 @@ COPY package.json bun.lock ./
 COPY packages/engine/package.json packages/engine/
 COPY packages/cli/package.json packages/cli/
 RUN bun install --frozen-lockfile --production
+# The CLI lists the engine under devDependencies (it is bundled for npm), which --production
+# skips, so link the workspace package by hand: src/run.ts imports `@pixelslash/engine`.
+RUN mkdir -p packages/cli/node_modules/@pixelslash \
+ && ln -s ../../../engine packages/cli/node_modules/@pixelslash/engine
 
-# Chromium at the version this Playwright pins, with its system libraries. The
-# distro fonts that come with them are removed below.
+# Chromium, Firefox and WebKit at the versions this Playwright pins (PS-236), with their system
+# libraries. A variant names one of the three (`browser:`, Chromium by default). The distro fonts
+# that come with them are removed below, so every engine renders with the same font set.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends fontconfig \
- && bun packages/engine/node_modules/playwright/cli.js install --with-deps chromium-headless-shell \
+ && bun packages/engine/node_modules/playwright/cli.js install --with-deps chromium-headless-shell firefox webkit \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=fonts /fonts/ /usr/share/fonts/pixelslash/
