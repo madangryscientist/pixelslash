@@ -115,6 +115,7 @@ bunx nx build web
 bunx nx test:e2e web              # Playwright: a local build on a fresh local D1, GitHub stubbed
 (cd apps/web && bun run test:e2e:dev)   # the same specs against `vite dev` (after the build run: same ports)
 (cd apps/web && bunx wrangler deploy --dry-run --outdir /tmp/ps-web-dry)
+(cd apps/web && CLOUDFLARE_ENV=production bun run build && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry-production")   # env.production, app.pixelslash.dev (PS-277)
 ```
 
 A change to `apps/site`, or to a file it renders (`docs/cli.md`, `apps/web/SELF-HOST.md`,

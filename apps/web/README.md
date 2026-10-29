@@ -68,7 +68,7 @@ in `.dev.vars.example`). Never in git.
 | `IMAGE_SIGNING_SECRET` | Signs the short-lived image URLs. |
 | `MODEL_KEY_SECRET` | Base64 of 32 random bytes (`openssl rand -base64 32`). Seals each project's model API key at rest with AES-256-GCM (stored as `v1:<iv>:<ciphertext>`). Unset, saving a model key fails with "MODEL_KEY_SECRET is not set" and a stored key is not read, so builds are reviewed as plain pixels. A key saved before this existed is plain text until the project's model settings are next saved. Changing the secret makes the keys sealed under the old one unreadable: enter each key again. |
 
-The `e2e` env in `wrangler.jsonc` carries fixed test values for these; they are not secrets.
+The `e2e` env in `wrangler.jsonc` carries fixed test values for these; they are not secrets. `env.production` lists none of them: [Deploy to Cloudflare](#deploy-to-cloudflare-apppixelslashdev) sets each with `wrangler secret put`.
 
 ## Hardening for a deployment strangers sign in to (PS-250)
 
@@ -260,6 +260,62 @@ PIXELSLASH_TOKEN_PATH=~/.config/pixelslash/hackcove-local.token \
 ```
 
 To start over, stop the server and remove `.wrangler/state`.
+
+## Deploy to Cloudflare (app.pixelslash.dev)
+
+The hosted app (PS-277) is `env.production` in `wrangler.jsonc`: the Worker `pixelslash-web-production` on the
+custom domain `app.pixelslash.dev`, D1 `pixelslash` (WEUR), R2 `pixelslash-blobs` and the queue
+`pixelslash-explain`, all in the maintainer's account. It is a named env, built with
+`CLOUDFLARE_ENV=production`, so the top level keeps its placeholder D1 id and no route: `vite dev`, the
+unnamed build, the e2e build and the LAN CT read the same config as before. The Worker's name is
+the top level's plus the env, so forgetting `CLOUDFLARE_ENV=production` publishes a different Worker
+(`pixelslash-web`) and never overwrites the live one. (For your own account, use
+[`SELF-HOST.md`](SELF-HOST.md).) It is still a production build to the stub guard: it refuses to start
+pointed at anything but github.com.
+
+Credentials come from `ob`, never `wrangler login`. From `apps/web`:
+
+```bash
+export CLOUDFLARE_API_TOKEN="$(ob secret get cloudflare-api-token)"
+export CLOUDFLARE_ACCOUNT_ID="$(ob secret get cloudflare-account-id)"
+# R2 admin (creating or deleting the bucket) needs a different token: ob secret get cloudflare-r2-token
+
+CLOUDFLARE_ENV=production bun run build                          # writes dist/ for env.production
+bunx wrangler d1 migrations apply pixelslash --remote --env production
+bunx wrangler deploy --var SENTRY_RELEASE:"$(git rev-parse --short HEAD)"
+```
+
+Build first: `wrangler deploy` ships what `dist/` holds, and a build made without
+`CLOUDFLARE_ENV=production` is the top level's (placeholder D1 id, no route, no `app.pixelslash.dev`).
+Apply migrations before the deploy that needs them; the migration step is the only one that changes
+the database. `wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry"` after the build prints the
+bindings (the D1 id, the bucket, the queue, the vars) and exits without deploying; the route is in
+`dist/server/wrangler.json`.
+
+Wrangler warns that `IMAGE_SIGNING_SECRET` and `SENTRY_DSN` exist at the top level but not in
+`env.production.vars`. That is on purpose: a var and a secret of one name clash, and an empty var
+would shadow the secret, so `env.production` lists no secret at all. Set each once, from `apps/web`:
+
+```bash
+openssl rand -base64 32 | bunx wrangler secret put IMAGE_SIGNING_SECRET --env production
+openssl rand -base64 32 | bunx wrangler secret put MODEL_KEY_SECRET --env production
+bunx wrangler secret put SENTRY_DSN --env production            # optional: off while unset
+bunx wrangler secret put GITHUB_CLIENT_SECRET --env production  # with GITHUB_CLIENT_ID
+bunx wrangler secret put GOOGLE_CLIENT_SECRET --env production  # with GOOGLE_CLIENT_ID
+bunx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production # with GITHUB_APP_ID
+```
+
+`IMAGE_SIGNING_SECRET` is required (without it every signed image URL fails); `MODEL_KEY_SECRET` is
+base64 of 32 bytes and, once projects have sealed keys, must not change (see [Secrets](#secrets)).
+`GITHUB_CLIENT_ID`, `GOOGLE_CLIENT_ID` and `GITHUB_APP_ID` are vars, empty until the apps are
+registered: put the ids in `env.production.vars`, then deploy. While either half of a sign-in is
+empty it is off (no button, `/auth/<provider>` a 404).
+
+**Do not make a DNS record for `app.pixelslash.dev` by hand** (not a CNAME, not an A record, not
+in the dashboard). `custom_domain: true` makes Cloudflare create the record and the certificate during
+`wrangler deploy`; a record that already exists makes that deploy fail ("hostname already has
+DNS record"), and deleting it is a step on a live zone. The route names only `app.pixelslash.dev`, so
+a deploy never touches the apex (the marketing site) or any other record.
 
 ## Run it on the Proxmox server
 

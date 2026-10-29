@@ -87,6 +87,75 @@
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
   "env": {
+    // `CLOUDFLARE_ENV=production`: app.pixelslash.dev (PS-277). A named env, so the top level above keeps
+    // the placeholder D1 id (and the local state `vite dev` and the unnamed build key on) and `vite dev`,
+    // the e2e build and the LAN self-host never see a real id or a route. Bindings and vars are not
+    // inherited by an env, so they repeat here; `main`, the flags, the cron and observability are.
+    // It is still a production build to `src/auth/stub-guard.ts` (only `e2e` is the test build).
+    // Build and deploy it as `apps/web/README.md`, "Deploy to Cloudflare", says.
+    "production": {
+      // The Worker is `pixelslash-web-production` (the top level's name plus the env, not overridden), so a
+      // deploy that forgets `CLOUDFLARE_ENV=production` publishes a different Worker, never over this one.
+      // A Worker custom domain: Cloudflare creates the DNS record and the certificate itself. The
+      // hostname must have no DNS record before the first deploy, and the apex is not named here.
+      "routes": [{ "pattern": "app.pixelslash.dev", "custom_domain": true }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pixelslash",
+          "database_id": "d01057df-95e1-45ef-a54c-e2fd78c4e1cf",
+          "migrations_dir": "drizzle",
+        },
+      ],
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "pixelslash-blobs" }],
+      "queues": {
+        "producers": [{ "binding": "EXPLAIN", "queue": "pixelslash-explain" }],
+        "consumers": [
+          {
+            "queue": "pixelslash-explain",
+            "max_batch_size": 1,
+            "max_batch_timeout": 1,
+            "max_retries": 4,
+          },
+        ],
+      },
+      "ratelimits": [
+        {
+          "name": "API_RATE_LIMIT",
+          "namespace_id": "2501",
+          "simple": { "limit": 3000, "period": 60 },
+        },
+        {
+          "name": "SIGNIN_RATE_LIMIT",
+          "namespace_id": "2502",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
+      // The secrets are NOT listed here, not even empty: a var and a secret of one name clash, and
+      // an empty var would shadow the secret. Set them with `wrangler secret put --env production`:
+      // IMAGE_SIGNING_SECRET, MODEL_KEY_SECRET, SENTRY_DSN, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_SECRET
+      // and GITHUB_APP_PRIVATE_KEY. Sign-in stays off while GITHUB_CLIENT_ID and GOOGLE_CLIENT_ID are
+      // empty (register the apps, then fill them in here); GITHUB_APP_ID likewise, for the check run.
+      "vars": {
+        "GITHUB_CLIENT_ID": "",
+        "GITHUB_OAUTH_BASE": "https://github.com",
+        "GITHUB_API_BASE": "https://api.github.com",
+        "GOOGLE_CLIENT_ID": "",
+        "GOOGLE_OAUTH_BASE": "",
+        "MIN_CLI_VERSION": "",
+        "DEFAULT_DIFF_LOCATION": "ci",
+        // Stamp the deployed commit on the deploy: `--var SENTRY_RELEASE:$(git rev-parse --short HEAD)`.
+        "SENTRY_RELEASE": "",
+        "SENTRY_ENVIRONMENT": "production",
+        "GITHUB_APP_ID": "",
+        "PIXELSLASH_PUBLIC_URL": "https://app.pixelslash.dev",
+        // Strangers sign in here, so a project's model is never on a private network. The LAN's
+        // DIFF_SIDECAR_URL is not set either: the diff here is in the Worker or in CI.
+        "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "",
+        "PIXELSLASH_RETENTION_DAYS": "",
+        "PIXELSLASH_RETENTION_DELETE": "",
+      },
+    },
     "e2e": {
       "d1_databases": [
         {
