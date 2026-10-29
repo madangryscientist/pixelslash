@@ -308,8 +308,8 @@ bunx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production # with GITHUB_A
 `IMAGE_SIGNING_SECRET` is required (without it every signed image URL fails); `MODEL_KEY_SECRET` is
 base64 of 32 bytes and, once projects have sealed keys, must not change (see [Secrets](#secrets)).
 `GITHUB_CLIENT_ID` and `GOOGLE_CLIENT_ID` are vars, set in `env.production.vars` (both are public OAuth
-client ids; the secrets above are the other half). `GITHUB_APP_ID` is a var too, empty until the check
-run's App is registered. While either half of a sign-in is empty it is off (no button, `/auth/<provider>` a 404).
+client ids; the secrets above are the other half). `GITHUB_APP_ID` is a var too: `5528217`, the App "PixelSlash Review"
+(PS-234, slug `pixelslash-review`), whose key is the `GITHUB_APP_PRIVATE_KEY` secret. While either half of a sign-in is empty it is off (no button, `/auth/<provider>` a 404).
 
 **Do not make a DNS record for `app.pixelslash.dev` by hand** (not a CNAME, not an A record, not
 in the dashboard). `custom_domain: true` makes Cloudflare create the record and the certificate during

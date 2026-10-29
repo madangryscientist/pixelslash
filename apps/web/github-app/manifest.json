@@ -1,5 +1,5 @@
 {
-  "name": "PixelSlash",
+  "name": "PixelSlash Review",
   "url": "https://github.com/madangryscientist/pixelslash",
   "description": "Posts a PixelSlash check run on each build's commit: the counts and a link to the build page.",
   "public": false,

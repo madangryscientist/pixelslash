@@ -1,5 +1,9 @@
 # The PixelSlash GitHub App (PS-23)
 
+The App is named **PixelSlash Review** (slug `pixelslash-review`, id `5528217` in production). The name
+"PixelSlash" is reserved on GitHub, so the manifest's `name` field carries "PixelSlash Review" too; a
+manifest that says "PixelSlash" will not register.
+
 The App posts one check run, named **PixelSlash**, on each build's commit in the repo a project is
 connected to (project settings → GitHub repo):
 

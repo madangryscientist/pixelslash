@@ -136,7 +136,8 @@
       // IMAGE_SIGNING_SECRET, MODEL_KEY_SECRET, SENTRY_DSN, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_SECRET
       // and GITHUB_APP_PRIVATE_KEY. Both sign-ins are on: GITHUB_CLIENT_ID and GOOGLE_CLIENT_ID are the public
       // OAuth clients' ids (PS-278, PS-279), and each needs its client secret set as a secret to work.
-      // GITHUB_APP_ID is empty until the check run's App is set up.
+      // GITHUB_APP_ID is the App "PixelSlash Review" (PS-234, slug pixelslash-review); its key is the
+      // GITHUB_APP_PRIVATE_KEY secret above. The check run is on in production (PS-280).
       "vars": {
         "GITHUB_CLIENT_ID": "Ov23litkmu8AzbpJsKRu",
         "GITHUB_OAUTH_BASE": "https://github.com",
@@ -148,7 +149,7 @@
         // Stamp the deployed commit on the deploy: `--var SENTRY_RELEASE:$(git rev-parse --short HEAD)`.
         "SENTRY_RELEASE": "",
         "SENTRY_ENVIRONMENT": "production",
-        "GITHUB_APP_ID": "",
+        "GITHUB_APP_ID": "5528217",
         "PIXELSLASH_PUBLIC_URL": "https://app.pixelslash.dev",
         // Strangers sign in here, so a project's model is never on a private network. The LAN's
         // DIFF_SIDECAR_URL is not set either: the diff here is in the Worker or in CI.

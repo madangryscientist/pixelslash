@@ -33,6 +33,7 @@ describe("env.production", () => {
     expect(prod.vars["GOOGLE_CLIENT_ID"]).toBe(
       "154874965124-f14rub4dp41bq0bks3n53clg44kuffga.apps.googleusercontent.com",
     );
+    expect(prod.vars["GITHUB_APP_ID"]).toBe("5528217");
     expect(prod.vars["PIXELSLASH_PUBLIC_URL"]).toBe("https://app.pixelslash.dev");
     expect(prod.vars["SENTRY_ENVIRONMENT"]).toBe("production");
     expect(prod.vars["DEFAULT_DIFF_LOCATION"]).toBe("ci");
