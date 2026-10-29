@@ -14,13 +14,13 @@ export function authorizeUrl(cfg: GithubConfig, state: string, redirectUri: stri
     client_id: cfg.clientId,
     redirect_uri: redirectUri,
     state,
-    scope: "read:user",
+    scope: "read:user user:email",
     allow_signup: "true",
   }).toString();
   return url.toString();
 }
 
-/** Trade the callback's code for a token, then read the signed-in user's profile. */
+/** Trade the callback's code for a token, then read the signed-in user's profile and verified email. */
 export async function fetchGithubProfile(
   cfg: GithubConfig,
   code: string,
@@ -39,14 +39,27 @@ export async function fetchGithubProfile(
   const token: unknown = await tokenRes.json();
   if (!isRecord(token) || typeof token["access_token"] !== "string")
     throw new Error(`GitHub token exchange failed (${tokenRes.status})`);
-  const userRes = await fetch(new URL("/user", cfg.apiBase), {
-    headers: {
-      accept: "application/vnd.github+json",
-      authorization: `Bearer ${token["access_token"]}`,
-      "user-agent": "pixelslash",
-    },
-  });
-  return toProfile(await userRes.json());
+  const headers = {
+    accept: "application/vnd.github+json",
+    authorization: `Bearer ${token["access_token"]}`,
+    "user-agent": "pixelslash",
+  };
+  const userRes = await fetch(new URL("/user", cfg.apiBase), { headers });
+  const emailsRes = await fetch(new URL("/user/emails", cfg.apiBase), { headers });
+  // No email is no link to a Google sign-in, not a failed sign-in (PS-274).
+  const email = emailsRes.ok ? primaryVerifiedEmail(await emailsRes.json()) : null;
+  return { ...toProfile(await userRes.json()), email };
+}
+
+/** The primary address, and only when GitHub has verified it; lowercased. */
+export function primaryVerifiedEmail(body: unknown): string | null {
+  if (!Array.isArray(body)) return null;
+  const primary = body.find(
+    (e: unknown) => isRecord(e) && e["primary"] === true && e["verified"] === true,
+  );
+  return isRecord(primary) && typeof primary["email"] === "string"
+    ? primary["email"].toLowerCase()
+    : null;
 }
 
 function toProfile(body: unknown): GithubProfile {

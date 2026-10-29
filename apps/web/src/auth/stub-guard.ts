@@ -18,13 +18,24 @@ export function buildKind(): BuildKind {
 const GITHUB_OAUTH_BASE = "https://github.com";
 const GITHUB_API_BASE = "https://api.github.com";
 
-type GithubBases = { GITHUB_OAUTH_BASE?: string; GITHUB_API_BASE?: string };
+type GithubBases = {
+  GITHUB_OAUTH_BASE?: string;
+  GITHUB_API_BASE?: string;
+  /** Empty is Google itself (PS-274); anything else is the stand-in's Google half. */
+  GOOGLE_OAUTH_BASE?: string;
+};
 
 /** Why this build may not start with these vars, or null when it may. */
 export function githubStubRefusal(kind: BuildKind, vars: GithubBases): string | null {
   if (kind !== "production") return null;
   const oauth = (vars.GITHUB_OAUTH_BASE ?? "").replace(/\/+$/, "");
   const api = (vars.GITHUB_API_BASE ?? "").replace(/\/+$/, "");
+  const google = vars.GOOGLE_OAUTH_BASE ?? "";
+  if (google)
+    return [
+      `refusing to start: GOOGLE_OAUTH_BASE is ${google}, but a production build signs in with Google`,
+      "itself (leave it empty). Another base is the e2e stand-in, which lets anyone sign in as anyone.",
+    ].join(" ");
   if (oauth === GITHUB_OAUTH_BASE && api === GITHUB_API_BASE) return null;
   return [
     `refusing to start: GITHUB_OAUTH_BASE is ${oauth || "unset"} and GITHUB_API_BASE is ${api || "unset"},`,

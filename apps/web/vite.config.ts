@@ -45,6 +45,10 @@ function pointAtStub(config: { vars?: Record<string, unknown> }) {
       ...config.vars,
       GITHUB_OAUTH_BASE: base,
       GITHUB_API_BASE: base,
+      // Sign in with Google (PS-274) against the same stand-in; fixed test values, never real ones.
+      GOOGLE_CLIENT_ID: "e2e-google-client",
+      GOOGLE_CLIENT_SECRET: "e2e-google-secret",
+      GOOGLE_OAUTH_BASE: base,
       DIFF_SIDECAR_URL: sidecar,
       // The run's own Sentry ingest stand-in (PS-227), so the e2e reports to a sink it can read.
       ...(sentryPort ? { SENTRY_DSN: `http://e2ekey@localhost:${sentryPort}/1` } : {}),

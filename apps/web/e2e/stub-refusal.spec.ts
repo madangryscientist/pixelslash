@@ -8,7 +8,8 @@ import { Log, LogLevel, Miniflare, convertV4MiniflareOptions } from "miniflare";
  * A production build pointed at the GitHub stand-in does not start (PS-250): the stand-in lets
  * anyone sign in as anyone, so only `vite dev` and the `CLOUDFLARE_ENV=e2e` build may use it. This
  * builds the Worker as a stranger's deployment would (no `CLOUDFLARE_ENV`), then loads it in
- * workerd once with the stand-in's bases and once with GitHub's.
+ * workerd once with the stand-in's bases and once with GitHub's. The second load is also the
+ * deployment with no Google client (PS-274): no Google button, and `/auth/google` is a 404.
  */
 
 const WEB_ROOT = resolve(import.meta.dirname, "..");
@@ -39,8 +40,16 @@ function modules(dir: string, main: string) {
   return [{ type: "ESModule" as const, path: main }, ...found];
 }
 
-/** Load the built Worker with these GitHub bases: null when it starts, else why it did not. */
-async function start(bases: { GITHUB_OAUTH_BASE: string; GITHUB_API_BASE: string }) {
+type Page = { status: number; body: string };
+
+/**
+ * Load the built Worker with these GitHub bases: `why` is null when it starts, else why it did not;
+ * `pages` is what it answered at each of `paths`.
+ */
+async function start(
+  bases: { GITHUB_OAUTH_BASE: string; GITHUB_API_BASE: string },
+  paths: string[] = [],
+): Promise<{ why: string | null; pages: Record<string, Page> }> {
   const serverDir = join(OUT, "server");
   const config: BuiltConfig = JSON.parse(readFileSync(join(serverDir, "wrangler.json"), "utf8"));
   const logged: string[] = [];
@@ -67,13 +76,19 @@ async function start(bases: { GITHUB_OAUTH_BASE: string; GITHUB_API_BASE: string
     }),
     log,
   });
+  const pages: Record<string, Page> = {};
   try {
     await mf.ready;
     const res = await mf.dispatchFetch("http://localhost/");
     await res.arrayBuffer();
-    return res.status >= 500 ? `answered ${res.status}: ${logged.join("\n")}` : null;
+    if (res.status >= 500) return { why: `answered ${res.status}: ${logged.join("\n")}`, pages };
+    for (const path of paths) {
+      const page = await mf.dispatchFetch(`http://localhost${path}`, { redirect: "manual" });
+      pages[path] = { status: page.status, body: await page.text() };
+    }
+    return { why: null, pages };
   } catch (e) {
-    return `${e instanceof Error ? e.message : String(e)}\n${logged.join("\n")}`;
+    return { why: `${e instanceof Error ? e.message : String(e)}\n${logged.join("\n")}`, pages };
   } finally {
     await mf.dispose().catch(() => {});
   }
@@ -105,15 +120,19 @@ test.describe("a production build and the GitHub stand-in", () => {
 
   test("pointed at the stand-in, it does not start, and says why", async () => {
     const stub = "http://localhost:4174";
-    const why = await start({ GITHUB_OAUTH_BASE: stub, GITHUB_API_BASE: stub });
+    const { why } = await start({ GITHUB_OAUTH_BASE: stub, GITHUB_API_BASE: stub });
     expect(why).toContain("refusing to start: GITHUB_OAUTH_BASE is http://localhost:4174");
   });
 
-  test("pointed at GitHub, the same build starts", async () => {
-    const why = await start({
-      GITHUB_OAUTH_BASE: "https://github.com",
-      GITHUB_API_BASE: "https://api.github.com",
-    });
+  test("pointed at GitHub, the same build starts; with no Google client, no Google sign-in", async () => {
+    const { why, pages } = await start(
+      { GITHUB_OAUTH_BASE: "https://github.com", GITHUB_API_BASE: "https://api.github.com" },
+      ["/", "/auth/google", "/auth/google/callback"],
+    );
     expect(why).toBeNull();
+    expect(pages["/"]?.body).toContain("Sign in with GitHub");
+    expect(pages["/"]?.body).not.toContain("Sign in with Google");
+    expect(pages["/auth/google"]?.status).toBe(404);
+    expect(pages["/auth/google/callback"]?.status).toBe(404);
   });
 });

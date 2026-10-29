@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import type { GithubConfig } from "#/auth/github";
+import { type GoogleConfig, googleConfigOf } from "#/auth/google";
 import { buildKind, githubStubRefusal } from "#/auth/stub-guard";
 import type { Db } from "#/db/db";
 import type { ExplainQueue } from "#/ai/explain-queue";
@@ -100,6 +101,12 @@ export function githubConfig(): GithubConfig {
     apiBase: env.GITHUB_API_BASE,
   };
 }
+
+/**
+ * Sign in with Google (PS-274), or null without `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: then
+ * the sign-in page shows no Google button and `/auth/google` is a 404.
+ */
+export const googleConfig = (): GoogleConfig | null => googleConfigOf(env);
 
 /**
  * The deployment's GitHub App (PS-23), or null without `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY`.

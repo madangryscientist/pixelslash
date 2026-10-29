@@ -45,12 +45,16 @@
       "simple": { "limit": 30, "period": 60 },
     },
   ],
-  // GITHUB_CLIENT_SECRET and MODEL_KEY_SECRET are secrets (`wrangler secret put`, or `.dev.vars` locally).
+  // GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_SECRET and MODEL_KEY_SECRET are secrets (`wrangler secret put`, or `.dev.vars` locally).
   // MODEL_KEY_SECRET (ob 1786) is base64 of 32 random bytes and seals each project's model API key at rest.
   "vars": {
     "GITHUB_CLIENT_ID": "",
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
+    // Sign in with Google (PS-274), off (no button, `/auth/google` a 404) while it or GOOGLE_CLIENT_SECRET is
+    // empty. GOOGLE_OAUTH_BASE stays empty (Google itself); only the e2e run points it at its stand-in.
+    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_OAUTH_BASE": "",
     // Signs the short-lived image URLs. Set it with `wrangler secret put IMAGE_SIGNING_SECRET`.
     "IMAGE_SIGNING_SECRET": "",
     // The oldest `pixelslash` CLI the API takes (`x.y.z`); empty takes any. A CLI below it gets 426 `cli_outdated`.
@@ -109,6 +113,9 @@
         "GITHUB_CLIENT_SECRET": "e2e-secret",
         "GITHUB_OAUTH_BASE": "http://localhost:4174",
         "GITHUB_API_BASE": "http://localhost:4174",
+        // Google is off here; the Playwright run turns it on against its stand-in (vite.config.ts).
+        "GOOGLE_CLIENT_ID": "",
+        "GOOGLE_OAUTH_BASE": "",
         "IMAGE_SIGNING_SECRET": "e2e-image-secret",
         // A fixed test value (base64 of 32 zero bytes), never a real secret.
         "MODEL_KEY_SECRET": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

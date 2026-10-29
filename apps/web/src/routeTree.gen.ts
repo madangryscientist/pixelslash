@@ -13,10 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrgsRouteImport } from './routes/orgs'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthGithubRouteImport } from './routes/auth/github'
+import { Route as AuthGoogleRouteImport } from './routes/auth/google'
 import { Route as AuthSignOutRouteImport } from './routes/auth/sign-out'
 import { Route as ImagesSplatRouteImport } from './routes/images/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AuthGithubCallbackRouteImport } from './routes/auth/github.callback'
+import { Route as AuthGoogleCallbackRouteImport } from './routes/auth/google.callback'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId.index'
 import { Route as ProjectsProjectIdFlagsDotjsonRouteImport } from './routes/projects/$projectId.flags[.]json'
 import { Route as ProjectsProjectIdFlakesRouteImport } from './routes/projects/$projectId.flakes'
@@ -45,6 +47,11 @@ const AuthGithubRoute = AuthGithubRouteImport.update({
   path: '/auth/github',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthGoogleRoute = AuthGoogleRouteImport.update({
+  id: '/auth/google',
+  path: '/auth/google',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthSignOutRoute = AuthSignOutRouteImport.update({
   id: '/auth/sign-out',
   path: '/auth/sign-out',
@@ -64,6 +71,11 @@ const AuthGithubCallbackRoute = AuthGithubCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
   getParentRoute: () => AuthGithubRoute,
+} as any)
+const AuthGoogleCallbackRoute = AuthGoogleCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthGoogleRoute,
 } as any)
 const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   id: '/projects/$projectId/',
@@ -111,10 +123,12 @@ export interface FileRoutesByFullPath {
   '/orgs': typeof OrgsRoute
   '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
+  '/auth/google': typeof AuthGoogleRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
   '/images/$': typeof ImagesSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
+  '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/projects/$projectId/flags.json': typeof ProjectsProjectIdFlagsDotjsonRoute
   '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
@@ -128,10 +142,12 @@ export interface FileRoutesByTo {
   '/orgs': typeof OrgsRoute
   '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
+  '/auth/google': typeof AuthGoogleRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
   '/images/$': typeof ImagesSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
+  '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/projects/$projectId/flags.json': typeof ProjectsProjectIdFlagsDotjsonRoute
   '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
@@ -146,10 +162,12 @@ export interface FileRoutesById {
   '/orgs': typeof OrgsRoute
   '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
+  '/auth/google': typeof AuthGoogleRouteWithChildren
   '/auth/sign-out': typeof AuthSignOutRoute
   '/images/$': typeof ImagesSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
+  '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/projects/$projectId/flags.json': typeof ProjectsProjectIdFlagsDotjsonRoute
   '/projects/$projectId/flakes': typeof ProjectsProjectIdFlakesRoute
   '/projects/$projectId/settings': typeof ProjectsProjectIdSettingsRoute
@@ -165,10 +183,12 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/settings'
     | '/auth/github'
+    | '/auth/google'
     | '/auth/sign-out'
     | '/images/$'
     | '/api/v1/$'
     | '/auth/github/callback'
+    | '/auth/google/callback'
     | '/projects/$projectId/flags.json'
     | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
@@ -182,10 +202,12 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/settings'
     | '/auth/github'
+    | '/auth/google'
     | '/auth/sign-out'
     | '/images/$'
     | '/api/v1/$'
     | '/auth/github/callback'
+    | '/auth/google/callback'
     | '/projects/$projectId/flags.json'
     | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
@@ -199,10 +221,12 @@ export interface FileRouteTypes {
     | '/orgs'
     | '/settings'
     | '/auth/github'
+    | '/auth/google'
     | '/auth/sign-out'
     | '/images/$'
     | '/api/v1/$'
     | '/auth/github/callback'
+    | '/auth/google/callback'
     | '/projects/$projectId/flags.json'
     | '/projects/$projectId/flakes'
     | '/projects/$projectId/settings'
@@ -217,6 +241,7 @@ export interface RootRouteChildren {
   OrgsRoute: typeof OrgsRoute
   SettingsRoute: typeof SettingsRoute
   AuthGithubRoute: typeof AuthGithubRouteWithChildren
+  AuthGoogleRoute: typeof AuthGoogleRouteWithChildren
   AuthSignOutRoute: typeof AuthSignOutRoute
   ImagesSplatRoute: typeof ImagesSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
@@ -259,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthGithubRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/google': {
+      id: '/auth/google'
+      path: '/auth/google'
+      fullPath: '/auth/google'
+      preLoaderRoute: typeof AuthGoogleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/sign-out': {
       id: '/auth/sign-out'
       path: '/auth/sign-out'
@@ -286,6 +318,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/github/callback'
       preLoaderRoute: typeof AuthGithubCallbackRouteImport
       parentRoute: typeof AuthGithubRoute
+    }
+    '/auth/google/callback': {
+      id: '/auth/google/callback'
+      path: '/callback'
+      fullPath: '/auth/google/callback'
+      preLoaderRoute: typeof AuthGoogleCallbackRouteImport
+      parentRoute: typeof AuthGoogleRoute
     }
     '/projects/$projectId/': {
       id: '/projects/$projectId/'
@@ -351,11 +390,24 @@ const AuthGithubRouteWithChildren = AuthGithubRoute._addFileChildren(
   AuthGithubRouteChildren,
 )
 
+interface AuthGoogleRouteChildren {
+  AuthGoogleCallbackRoute: typeof AuthGoogleCallbackRoute
+}
+
+const AuthGoogleRouteChildren: AuthGoogleRouteChildren = {
+  AuthGoogleCallbackRoute: AuthGoogleCallbackRoute,
+}
+
+const AuthGoogleRouteWithChildren = AuthGoogleRoute._addFileChildren(
+  AuthGoogleRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OrgsRoute: OrgsRoute,
   SettingsRoute: SettingsRoute,
   AuthGithubRoute: AuthGithubRouteWithChildren,
+  AuthGoogleRoute: AuthGoogleRouteWithChildren,
   AuthSignOutRoute: AuthSignOutRoute,
   ImagesSplatRoute: ImagesSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,

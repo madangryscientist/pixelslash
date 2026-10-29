@@ -74,7 +74,7 @@ function InviteRow({
           disabled={!hydrated}
           busy={busy}
           busyLabel="Withdrawing…"
-          aria-label={`Withdraw invite for ${invite.githubLogin}`}
+          aria-label={`Withdraw invite for ${inviteName(invite)}`}
           onClick={() => {
             setBusy(true);
             setError(null);
@@ -90,12 +90,19 @@ function InviteRow({
       }
     >
       <Text strong as="b">
-        {invite.githubLogin}
+        {inviteName(invite)}
       </Text>
-      <Caption as="p">signs in with GitHub to join</Caption>
+      <Caption as="p">
+        {invite.githubLogin === null
+          ? "signs in with that email to join"
+          : "signs in with GitHub to join"}
+      </Caption>
     </ListRow>
   );
 }
+
+/** Who an invite names: a GitHub login or an email (PS-274). */
+const inviteName = (invite: OrgInvite): string => invite.githubLogin ?? invite.email ?? "";
 
 /** One field that sends an invite, with why it is grey or what happens next under it. */
 function InviteForm({
@@ -132,8 +139,8 @@ function InviteForm({
     >
       <Cluster gap="sm" wrap>
         <Input
-          aria-label="Invite a member by GitHub login"
-          placeholder="GitHub login to invite, e.g. octo-dev"
+          aria-label="Invite a member by GitHub login or email"
+          placeholder="GitHub login or email, e.g. octo-dev"
           value={login}
           disabled={!hydrated}
           autoComplete="off"
@@ -143,7 +150,7 @@ function InviteForm({
         <Button
           type="submit"
           disabled={!hydrated}
-          disabledReason={empty ? "Type a GitHub login first." : undefined}
+          disabledReason={empty ? "Type a GitHub login or an email first." : undefined}
           busy={busy}
           busyLabel="Inviting…"
         >
@@ -156,7 +163,9 @@ function InviteForm({
         </Text>
       ) : (
         <Caption as="p">
-          {empty ? "Type a GitHub login first." : "They join when they sign in with that login."}
+          {empty
+            ? "Type a GitHub login or an email first."
+            : "They join when they sign in with that login or email."}
         </Caption>
       )}
     </Stack>

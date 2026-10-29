@@ -160,12 +160,12 @@ function OrgDialogs({
       {kind === "invite" && selected && (
         <FieldDialog
           title="Invite to this organization"
-          description={`They join ${selected.name} when they sign in with that GitHub login.`}
-          label="GitHub login"
-          inputLabel="Invite by GitHub login"
-          placeholder="e.g. octo-dev"
-          hint="Their GitHub username, not their email."
-          emptyReason="Type a GitHub login first."
+          description={`They join ${selected.name} when they sign in with that GitHub login or email.`}
+          label="GitHub login or email"
+          inputLabel="Invite by GitHub login or email"
+          placeholder="e.g. octo-dev or ada@example.com"
+          hint="An email joins them whether they sign in with Google or with a GitHub account that has it."
+          emptyReason="Type a GitHub login or an email first."
           submit="Invite"
           busyLabel="Inviting…"
           onSubmit={onInvite}
