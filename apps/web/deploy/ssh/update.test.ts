@@ -225,6 +225,7 @@ describe("update.sh", () => {
       const carried = {
         ".github-app-id": "123456",
         ".github-app-key": KEY,
+        ".github-app-api-base": "https://api.github.com",
         ".public-url": "http://pixelslash.lan:3000",
       };
       const { status, stderr, commands } = deploy(s, pack("aaaaaaa", { carried }));
@@ -233,6 +234,7 @@ describe("update.sh", () => {
       const shared = readFileSync(join(s.legacyWeb, ".dev.vars.e2e"), "utf8");
       expect(shared).toContain("GITHUB_APP_ID=123456");
       expect(shared).toContain(`GITHUB_APP_PRIVATE_KEY=${KEY}`);
+      expect(shared).toContain("GITHUB_APP_API_BASE=https://api.github.com");
       expect(shared).toContain("PIXELSLASH_PUBLIC_URL=http://pixelslash.lan:3000");
       expect(statSync(join(s.legacyWeb, ".dev.vars.e2e")).mode & 0o777).toBe(0o600);
       for (const file of Object.keys(carried))

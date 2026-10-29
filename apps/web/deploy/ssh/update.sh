@@ -22,7 +22,9 @@
 #
 # The GitHub App (PS-23) is carried the same way: `.github-app-id`, `.github-app-key` (the PEM,
 # base64) and `.public-url` become GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY and PIXELSLASH_PUBLIC_URL
-# in .dev.vars.e2e. Without both App vars the server sends GitHub nothing.
+# in .dev.vars.e2e. Without both App vars the server sends GitHub nothing. `.github-app-api-base`
+# (written whenever release.sh had an App id) becomes GITHUB_APP_API_BASE=https://api.github.com
+# (PS-281): the CT is an e2e build whose GITHUB_API_BASE is the sign-in stub, and the App must not use it.
 #
 # A deploy under a live build (PS-228): the restart kills the Worker mid-diff, and the migration
 # can hold the database's write lock, so a build that is `processing` errors. update.sh refuses,
@@ -190,7 +192,7 @@ upsert_var() {
 
 # The secrets release.sh can carry, as `<file in the release>:<var in .dev.vars.e2e>`.
 CARRIED=(.sentry-dsn:SENTRY_DSN .github-app-id:GITHUB_APP_ID .github-app-key:GITHUB_APP_PRIVATE_KEY
-  .public-url:PIXELSLASH_PUBLIC_URL)
+  .github-app-api-base:GITHUB_APP_API_BASE .public-url:PIXELSLASH_PUBLIC_URL)
 
 # Each secret release.sh carried in release $1 is saved with the CT's secrets, where every later
 # release finds it, and the carried copy is removed.

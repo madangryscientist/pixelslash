@@ -162,7 +162,9 @@ Optional. A project connected to a GitHub repo (project settings → GitHub repo
 **PixelSlash** check run on each build's commit: failing while changes await review or one is
 rejected, passing once every change is accepted or nothing changed, updated in place as the build
 is reviewed. It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
-`PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. Registering the
+`PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. `GITHUB_APP_API_BASE`
+(PS-281) is the App's own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
+`https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub. Registering the
 App, its permissions and deploying its key: [`github-app/README.md`](github-app/README.md).
 
 ### Without the App: a commit status with a token (PS-235)

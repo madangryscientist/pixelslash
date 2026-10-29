@@ -14,6 +14,8 @@ export type GithubAppEnv = {
   GITHUB_APP_ID?: string;
   GITHUB_APP_PRIVATE_KEY?: string;
   GITHUB_API_BASE?: string;
+  /** The App's own API base (PS-281); empty or unset falls back to `GITHUB_API_BASE`. */
+  GITHUB_APP_API_BASE?: string;
 };
 
 /** The App's config, or null when either the id or the key is unset: then nothing calls GitHub. */
@@ -21,7 +23,9 @@ export function githubAppConfigOf(env: GithubAppEnv): GithubAppConfig | null {
   const appId = env.GITHUB_APP_ID?.trim();
   const privateKey = env.GITHUB_APP_PRIVATE_KEY?.trim();
   if (!appId || !privateKey) return null;
-  return { appId, privateKey, apiBase: env.GITHUB_API_BASE?.trim() || "https://api.github.com" };
+  const apiBase =
+    env.GITHUB_APP_API_BASE?.trim() || env.GITHUB_API_BASE?.trim() || "https://api.github.com";
+  return { appId, privateKey, apiBase };
 }
 
 /** An installation token is minted again this long before GitHub says it expires. */
