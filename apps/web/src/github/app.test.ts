@@ -88,6 +88,24 @@ describe("the App's config", () => {
       apiBase: "https://api.github.com",
     });
   });
+
+  test("uses GITHUB_APP_API_BASE when set, and GITHUB_API_BASE when it is empty", () => {
+    const app = {
+      GITHUB_APP_ID: "1",
+      GITHUB_APP_PRIVATE_KEY: "k",
+      GITHUB_API_BASE: "http://localhost:4174",
+    };
+    expect(
+      githubAppConfigOf({ ...app, GITHUB_APP_API_BASE: "https://api.github.com" })?.apiBase,
+    ).toBe("https://api.github.com");
+    expect(githubAppConfigOf({ ...app, GITHUB_APP_API_BASE: "" })?.apiBase).toBe(
+      "http://localhost:4174",
+    );
+    expect(githubAppConfigOf({ ...app, GITHUB_APP_API_BASE: "  " })?.apiBase).toBe(
+      "http://localhost:4174",
+    );
+    expect(githubAppConfigOf(app)?.apiBase).toBe("http://localhost:4174");
+  });
 });
 
 describe("a repo name", () => {

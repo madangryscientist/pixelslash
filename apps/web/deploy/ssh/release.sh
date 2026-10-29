@@ -24,6 +24,10 @@
 # become GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY, the key base64'd onto one line so it fits one
 # .dev.vars line. PIXELSLASH_PUBLIC_URL is the URL a check run links its build page on. Each one left
 # unset keeps what the CT has. See apps/web/github-app/README.md.
+#
+# The CT is built with CLOUDFLARE_ENV=e2e, so GITHUB_API_BASE is the sign-in stand-in. Whenever
+# PIXELSLASH_GITHUB_APP_ID is set, release.sh also carries GITHUB_APP_API_BASE=https://api.github.com
+# (PS-281), so the App's check runs reach GitHub while sign-in stays on the stand-in.
 set -Eeuo pipefail
 
 # Writes value $2 to the private file $1 in the release, for update.sh to save with the CT's
@@ -65,6 +69,7 @@ main() {
   carry "$stage/$short/.sentry-dsn" "${PIXELSLASH_SENTRY_DSN:-}"
   carry "$stage/$short/.github-app-id" "${PIXELSLASH_GITHUB_APP_ID:-}"
   carry "$stage/$short/.github-app-key" "$(printf '%s' "${PIXELSLASH_GITHUB_APP_KEY:-}" | base64 -w0)"
+  [[ -z ${PIXELSLASH_GITHUB_APP_ID:-} ]] || carry "$stage/$short/.github-app-api-base" "https://api.github.com"
   carry "$stage/$short/.public-url" "${PIXELSLASH_PUBLIC_URL:-}"
   tar -czf "$stage/$short.tar.gz" -C "$stage/$short" .
   echo "release $short: $(du -h "$stage/$short.tar.gz" | cut -f1)" >&2
