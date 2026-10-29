@@ -102,6 +102,14 @@ const acceptedRow = (row: Candidate) =>
 const openRow = (row: Candidate) =>
   row.reviewState === "pending" && (row.diffStatus === "changed" || row.carriedFrom !== null);
 
+/**
+ * A shot its own build measured, or one accepted as it is (PS-282): a row with no result that
+ * nobody accepted (a branch shot from another environment, or a run that lost its write) was
+ * compared with nothing, so it would hand the next build a baseline that hides what was open.
+ * The default branch accepts its re-baseline shots, so a new environment still becomes the baseline.
+ */
+const measuredRow = (row: Candidate) => row.diffStatus !== null || row.reviewState === "accepted";
+
 const baselineOf = ({
   id,
   name,
@@ -134,7 +142,7 @@ const OTHER_PARAMS = 12;
 /**
  * Every shot that may be a baseline: an accepted one (see `acceptedRow`; the default branch
  * auto-accepts, so a squash-merged build there counts), or any shot of this branch. Only from a
- * build that was not rejected. The commit list can outgrow D1's parameter cap, so it is read in
+ * build that was not rejected, and never one with no result (see `measuredRow`). The commit list can outgrow D1's parameter cap, so it is read in
  * parts and merged; `order` then puts the rows in the order the picks walk them.
  */
 async function queryCandidates(db: Db, build: PickFor): Promise<Candidate[]> {
@@ -191,7 +199,7 @@ async function queryCandidates(db: Db, build: PickFor): Promise<Candidate[]> {
   const others = await inChunks(commits, OTHER_PARAMS, (part) =>
     read(and(ne(builds.branch, build.branch), inArray(builds.commitSha, part))),
   );
-  return order([...own, ...others], build, commits);
+  return order([...own, ...others].filter(measuredRow), build, commits);
 }
 
 /**
@@ -281,6 +289,26 @@ async function removedSince(
     .from(snapshots)
     .where(and(eq(snapshots.buildId, baselineBuildId), heldShot()));
   return rows.filter((row) => !keys.has(snapshotKeyOf(row)));
+}
+
+/**
+ * What one shot is compared against: the pick, unless that was rendered in another environment and
+ * main's accepted shot was rendered in the shot's own (PS-282). A branch whose previous build came
+ * from an old environment is then measured once main is captured in the new one, rather than
+ * asking for a re-baseline, and having no verdict, on every build after. An undecided change in
+ * the old environment cannot be carried by a shot from the new one, so main's shot is measured
+ * against plainly: a change still there is shown again.
+ */
+export function baselineFor(
+  baselines: Baselines,
+  shot: SnapshotKey & { envFingerprint: string },
+): Baseline | undefined {
+  const key = snapshotKeyOf(shot);
+  const picked = baselines.byKey.get(key);
+  if (!picked || picked.shot.envFingerprint === shot.envFingerprint) return picked;
+  const main = baselines.main.get(key);
+  if (main?.envFingerprint !== shot.envFingerprint) return picked;
+  return { shot: main, carry: null, accepted: main };
 }
 
 export async function selectBaselines(

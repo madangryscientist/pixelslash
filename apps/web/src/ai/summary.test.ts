@@ -156,13 +156,17 @@ describe("a build's AI summary (ob 1668)", () => {
       png: white,
       fingerprint: { ...FINGERPRINT, fonts: "sha256:other" },
     };
-    const build = await themedBuild(ctx, stub.modelFetch, [regrown]);
-    const settings = (await rows(ctx, build)).find((r) => r.name === "settings");
+    // A branch build with a shot it could not compare has no verdict (PS-282), so no summary.
+    const unmeasured = await themedBuild(ctx, stub.modelFetch, [regrown]);
+    const settings = (await rows(ctx, unmeasured)).find((r) => r.name === "settings");
     expect(settings).toMatchObject({ diffStatus: null, rebaselineNeeded: true });
+    expect(unmeasured.status).toBe("errored");
+    expect(stub.summaries()).toHaveLength(0);
 
-    const prompt = promptOf(stub.summaries()[0] ?? "");
-    expect(prompt).not.toContain("Settings");
-    const stored = (await getBuild(ctx.db, ctx.projectId, build.id)).aiSummary;
+    const other = await context();
+    await withModel(other);
+    const measured = await themedBuild(other, stub.modelFetch);
+    const stored = (await getBuild(other.db, other.projectId, measured.id)).aiSummary;
     // The sentence calling a shot unchanged, and the one naming no shot, are dropped.
     expect(stored?.sentences.map((s) => s.text)).toEqual(["The card changed."]);
   });

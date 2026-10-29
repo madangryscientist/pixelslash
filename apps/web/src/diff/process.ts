@@ -4,6 +4,7 @@ import {
   type Baseline,
   type Baselines,
   type BaselineSnapshot,
+  baselineFor,
   selectBaselines,
   snapshotKeyOf,
 } from "#/db/baselines";
@@ -36,6 +37,7 @@ import {
   markRemoved,
   projectOf,
 } from "./build-writes";
+import { UnmeasuredError, assertMeasured } from "./measured";
 import { withOverrides } from "./with-overrides";
 import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
 import { reportError } from "#/server/sentry";
@@ -83,7 +85,8 @@ async function storeSnapshot(
 /**
  * A shot with nothing to compare against. No baseline is `new`; a baseline rendered by a
  * different environment needs a re-baseline and is measured against nothing, so it never shows
- * a wall of false diffs and never blocks.
+ * a wall of false diffs. On the default branch it is accepted as the new baseline; a branch build
+ * holding one has no verdict (`assertMeasured`, PS-282).
  */
 async function storeUncompared(
   deps: ProcessDeps,
@@ -224,7 +227,7 @@ async function measure(
   const failed: string[] = [];
   let done = 0;
   for (const shot of rows) {
-    const baseline = baselines.byKey.get(snapshotKeyOf(shot));
+    const baseline = baselineFor(baselines, shot);
     if (!stands(shot, baseline)) {
       if (!budget.fits())
         throw new DiffCeilingError(done, rows.length, budget.used(), budget.slowest);
@@ -281,6 +284,7 @@ async function diffOrRecord(
 async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baselines) {
   const refused: string[] = [];
   for (const shot of rows) {
+    // The pick `POST /baselines` told the CLI, which knows no fingerprint: not `baselineFor`.
     const baseline = baselines.byKey.get(snapshotKeyOf(shot));
     if (stands(shot, baseline)) continue;
     try {
@@ -331,9 +335,13 @@ async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<Process
   return { status: current.status, error: current.error, unmeasured: 0 };
 }
 
-/** The ceiling is the budget working as designed, not a failure: the next finalise resumes. */
+/**
+ * The ceiling is the budget working as designed, not a failure: the next finalise resumes. An
+ * unmeasured build is what the upload held, not a fault.
+ */
 function reportBuildFailure(e: unknown): void {
-  if (!(e instanceof DiffCeilingError)) reportError(e, { area: "diff", step: "build" });
+  if (e instanceof DiffCeilingError || e instanceof UnmeasuredError) return;
+  reportError(e, { area: "diff", step: "build" });
 }
 
 /**
@@ -375,6 +383,7 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     );
     await timer.diff(() => measureAll(deps, { build, project }, rows, baselines));
     await markRemoved(deps, build, baselines.removed);
+    await assertMeasured(deps.db, build, project);
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
     await recordRun(deps.db, build.id, timer.ended());
