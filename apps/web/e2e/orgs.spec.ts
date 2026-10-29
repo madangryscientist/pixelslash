@@ -43,7 +43,7 @@ test("an empty org says what a project is, and a pending invite can be withdrawn
   await expect(page.getByTestId("project-row")).toHaveCount(1);
 
   await page.getByRole("link", { name: /^Members/ }).click();
-  await page.getByLabel("Invite a member by GitHub login").fill("octo-dev");
+  await page.getByLabel("Invite a member by GitHub login or email").fill("octo-dev");
   await page.getByRole("button", { name: "Invite", exact: true }).last().click();
   const pending = page.getByTestId("invite-row");
   await expect(pending).toContainText("octo-dev");

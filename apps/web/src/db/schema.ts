@@ -20,9 +20,16 @@ export const createdAt = () =>
     .notNull()
     .default(sql`(unixepoch() * 1000)`);
 
+/**
+ * A user signs in with GitHub, Google or both (PS-274); each provider's subject is unique, and the
+ * two meet on a verified, lowercased `email`. `login` is the GitHub login, or the email for a user
+ * with no GitHub identity: it is the handle every page shows.
+ */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
-  githubId: integer("github_id").notNull().unique(),
+  githubId: integer("github_id").unique(),
+  googleSub: text("google_sub").unique(),
+  email: text("email").unique(),
   login: text("login").notNull().unique(),
   name: text("name"),
   avatarUrl: text("avatar_url"),

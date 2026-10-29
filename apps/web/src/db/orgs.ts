@@ -41,7 +41,13 @@ export type OrgMember = {
   joinedAt: Date;
 };
 
-export type OrgInvite = { id: string; githubLogin: string; createdAt: Date };
+/** Names a GitHub login or an email, never both (PS-274). */
+export type OrgInvite = {
+  id: string;
+  githubLogin: string | null;
+  email: string | null;
+  createdAt: Date;
+};
 
 export type OrgOverview = Org & {
   projects: ProjectOverview[];
@@ -136,11 +142,12 @@ export async function listOrgs(db: Db, userId: string): Promise<OrgOverview[]> {
           id: invites.id,
           orgId: invites.orgId,
           githubLogin: invites.githubLogin,
+          email: invites.email,
           createdAt: invites.createdAt,
         })
         .from(invites)
         .where(inArray(invites.orgId, part))
-        .orderBy(asc(invites.createdAt), asc(invites.githubLogin)),
+        .orderBy(asc(invites.createdAt), asc(invites.githubLogin), asc(invites.email)),
     ),
   ]);
   return assemble(rows, latest, memberRows, inviteRows);
@@ -185,19 +192,21 @@ export async function requireMember(db: Db, userId: string, orgId: string): Prom
   if (!row) throw new NotFoundError("org");
 }
 
+/** `who` is a GitHub login, or an email when it holds an `@` (no GitHub login can, PS-274). */
 export async function inviteMember(
   db: Db,
   inviter: User,
   orgId: string,
-  githubLogin: string,
+  who: string,
 ): Promise<void> {
   await requireMember(db, inviter.id, orgId);
+  const name = who.trim().toLowerCase();
   await db
     .insert(invites)
     .values({
       id: crypto.randomUUID(),
       orgId,
-      githubLogin: githubLogin.toLowerCase(),
+      ...(name.includes("@") ? { email: name } : { githubLogin: name }),
       invitedBy: inviter.id,
     })
     .onConflictDoNothing();

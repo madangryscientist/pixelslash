@@ -94,10 +94,20 @@ Generate a client secret. Put the **client id** in `wrangler.jsonc` as `vars.GIT
 in the next step. Leave `GITHUB_OAUTH_BASE` and `GITHUB_API_BASE` alone: a production build refuses to start
 on anything but GitHub's.
 
+Optionally, Sign in with Google beside it (PS-274). In Google Cloud console → APIs & Services →
+Credentials → Create credentials → OAuth client ID, type **Web application**, with the authorized redirect
+URI `https://<host>/auth/google/callback`. Put its client id in `wrangler.jsonc` as `vars.GOOGLE_CLIENT_ID`
+and its secret in the next step. Leave `GOOGLE_OAUTH_BASE` empty: a production build refuses to start when
+it is set. Skip this and the sign-in page has only the GitHub button.
+
+People are one account however they sign in: a Google sign-in and a GitHub sign-in with the same verified
+email are the same user, and an invite can name a GitHub login or an email.
+
 ### 6. Set the secrets
 
 ```bash
 bunx wrangler secret put GITHUB_CLIENT_SECRET                 # paste the OAuth app's secret
+bunx wrangler secret put GOOGLE_CLIENT_SECRET                 # only with Google sign-in
 openssl rand -hex 32    | bunx wrangler secret put IMAGE_SIGNING_SECRET
 openssl rand -base64 32 | bunx wrangler secret put MODEL_KEY_SECRET
 ```
@@ -188,6 +198,9 @@ are needed.
 | --- | --- | --- | --- |
 | `GITHUB_CLIENT_ID` | var | **yes** | The OAuth app's client id. Empty, nobody can sign in. |
 | `GITHUB_CLIENT_SECRET` | secret | **yes** | The OAuth app's client secret. |
+| `GOOGLE_CLIENT_ID` | var | no | Sign in with Google: the OAuth client's id. Both Google values set, the sign-in page shows the button; either empty, there is none and `/auth/google` is a 404. Redirect URI `https://<host>/auth/google/callback`. |
+| `GOOGLE_CLIENT_SECRET` | secret | no | Sign in with Google: the OAuth client's secret. |
+| `GOOGLE_OAUTH_BASE` | var | no | Leave empty. Set, a production build stops. |
 | `IMAGE_SIGNING_SECRET` | secret | **yes** | Signs the short-lived image URLs. Unset, image URLs fail. |
 | `MODEL_KEY_SECRET` | secret | for AI notes | Base64 of 32 random bytes. Seals each project's model API key. Unset, a model key cannot be saved and builds are reviewed as plain pixels. Set it anyway. |
 | `GITHUB_OAUTH_BASE`, `GITHUB_API_BASE` | var | no | Leave as shipped (`https://github.com`, `https://api.github.com`). Anything else stops a production build. |

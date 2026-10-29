@@ -64,6 +64,7 @@ in `.dev.vars.example`). Never in git.
 | Secret | What it is |
 | --- | --- |
 | `GITHUB_CLIENT_SECRET` | The GitHub OAuth app's secret, for sign-in. |
+| `GOOGLE_CLIENT_SECRET` | Optional (PS-274): the Google OAuth client's secret. With `GOOGLE_CLIENT_ID` (a var in `wrangler.jsonc`), the sign-in page shows "Sign in with Google"; with either unset there is no button and `/auth/google` is a 404. The client is a Google Cloud "OAuth client ID" of type Web application, with the redirect URI `https://<host>/auth/google/callback` (and `http://localhost:3000/auth/google/callback` for `vite dev`). |
 | `IMAGE_SIGNING_SECRET` | Signs the short-lived image URLs. |
 | `MODEL_KEY_SECRET` | Base64 of 32 random bytes (`openssl rand -base64 32`). Seals each project's model API key at rest with AES-256-GCM (stored as `v1:<iv>:<ciphertext>`). Unset, saving a model key fails with "MODEL_KEY_SECRET is not set" and a stored key is not read, so builds are reviewed as plain pixels. A key saved before this existed is plain text until the project's model settings are next saved. Changing the secret makes the keys sealed under the old one unreadable: enter each key again. |
 
@@ -77,7 +78,8 @@ On by default; `SECURITY.md` says why each exists.
 | --- | --- | --- |
 | `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS` | `wrangler.jsonc` vars (`1` under `env.e2e`) | Empty (the default): a project's or org's model base URL on loopback, RFC 1918, link-local, CGNAT, their IPv6 forms, or a `.local`/`.internal`/single-label name is refused at save and before each call, after resolving the name (`src/ai/model-host.ts`). `1` lets them through, for a self-host running its own model; the LAN CT's helper on loopback needs it. Never set it on a deployment strangers can sign in to. |
 | `GITHUB_OAUTH_BASE`, `GITHUB_API_BASE` | `wrangler.jsonc` vars | A production build refuses to start unless they are `https://github.com` and `https://api.github.com` (`src/auth/stub-guard.ts`). Only `vite dev` and the `CLOUDFLARE_ENV=e2e` build may point at the GitHub stand-in. |
-| `API_RATE_LIMIT`, `SIGNIN_RATE_LIMIT` | `wrangler.jsonc` `ratelimits` | Cloudflare rate-limit bindings: `/api/v1/*` per token (a refused token per client IP), 3000 a minute; `/auth/github` and its callback per client IP, 30 a minute. Over the limit is a 429. Not under `env.e2e`, so the e2e build and the LAN CT run with the no-op seam in `src/server/rate-limit.ts` and are never limited. |
+| `GOOGLE_OAUTH_BASE` | `wrangler.jsonc` vars | Empty, Google's own endpoints. A production build refuses to start when it is set; only the Playwright run points it at the stand-in, which answers as a Google account too. |
+| `API_RATE_LIMIT`, `SIGNIN_RATE_LIMIT` | `wrangler.jsonc` `ratelimits` | Cloudflare rate-limit bindings: `/api/v1/*` per token (a refused token per client IP), 3000 a minute; `/auth/github`, `/auth/google` and their callbacks per client IP, 30 a minute. Over the limit is a 429. Not under `env.e2e`, so the e2e build and the LAN CT run with the no-op seam in `src/server/rate-limit.ts` and are never limited. |
 
 ## Error reporting to Sentry (PS-227)
 

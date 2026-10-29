@@ -23,6 +23,16 @@ describe("githubStubRefusal", () => {
     expect(githubStubRefusal("production", {})).toMatch(/is unset/);
   });
 
+  test("a production build pointed at a Google stand-in is refused (PS-274)", () => {
+    expect(
+      githubStubRefusal("production", { ...github, GOOGLE_OAUTH_BASE: "http://localhost:4174" }),
+    ).toMatch(/refusing to start: GOOGLE_OAUTH_BASE is http:\/\/localhost:4174/);
+    expect(githubStubRefusal("production", { ...github, GOOGLE_OAUTH_BASE: "" })).toBeNull();
+    expect(
+      githubStubRefusal("test", { ...stub, GOOGLE_OAUTH_BASE: "http://localhost:4174" }),
+    ).toBeNull();
+  });
+
   test("a production build pointed at GitHub starts, a trailing slash or not", () => {
     expect(githubStubRefusal("production", github)).toBeNull();
     expect(
