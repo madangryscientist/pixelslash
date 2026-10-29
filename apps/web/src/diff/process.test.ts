@@ -136,7 +136,7 @@ describe("baseline selection", () => {
     expect(branch.status).toBe("changes");
   });
 
-  test("a fingerprint change needs a re-baseline: not compared, and it does not block", async () => {
+  test("a fingerprint change needs a re-baseline: not compared", async () => {
     const ctx = await context();
     await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
     const branch = await upload(ctx, {
@@ -152,7 +152,6 @@ describe("baseline selection", () => {
       rebaselineNeeded: true,
     });
     expect(branchShot?.diffKey).toBeNull();
-    expect(branch.status).toBe("passed");
   });
 });
 

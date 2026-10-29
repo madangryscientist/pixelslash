@@ -10,6 +10,7 @@ import { recordRun, runFields } from "#/db/server-timings";
 import { NoRecoveryError, claimForRerun } from "./claim";
 import type { SnapshotRow } from "./compare";
 import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
+import { assertMeasured } from "./measured";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
 import { RunTimer } from "./run-timer";
 import { queueExplain } from "#/ai/explain-queue";
@@ -169,6 +170,7 @@ export async function rediffShots(
       measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines),
     );
     await settleReviews(deps.db, { build, project }, targets);
+    await assertMeasured(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
     await recordRun(deps.db, build.id, timer.ended());
     // The moved shots are explained again, and the summary written, off the request (ob 1875).
