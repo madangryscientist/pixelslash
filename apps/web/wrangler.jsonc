@@ -134,13 +134,14 @@
       // The secrets are NOT listed here, not even empty: a var and a secret of one name clash, and
       // an empty var would shadow the secret. Set them with `wrangler secret put --env production`:
       // IMAGE_SIGNING_SECRET, MODEL_KEY_SECRET, SENTRY_DSN, GITHUB_CLIENT_SECRET, GOOGLE_CLIENT_SECRET
-      // and GITHUB_APP_PRIVATE_KEY. Sign-in stays off while GITHUB_CLIENT_ID and GOOGLE_CLIENT_ID are
-      // empty (register the apps, then fill them in here); GITHUB_APP_ID likewise, for the check run.
+      // and GITHUB_APP_PRIVATE_KEY. Both sign-ins are on: GITHUB_CLIENT_ID and GOOGLE_CLIENT_ID are the public
+      // OAuth clients' ids (PS-278, PS-279), and each needs its client secret set as a secret to work.
+      // GITHUB_APP_ID is empty until the check run's App is set up.
       "vars": {
-        "GITHUB_CLIENT_ID": "",
+        "GITHUB_CLIENT_ID": "Ov23litkmu8AzbpJsKRu",
         "GITHUB_OAUTH_BASE": "https://github.com",
         "GITHUB_API_BASE": "https://api.github.com",
-        "GOOGLE_CLIENT_ID": "",
+        "GOOGLE_CLIENT_ID": "154874965124-f14rub4dp41bq0bks3n53clg44kuffga.apps.googleusercontent.com",
         "GOOGLE_OAUTH_BASE": "",
         "MIN_CLI_VERSION": "",
         "DEFAULT_DIFF_LOCATION": "ci",
