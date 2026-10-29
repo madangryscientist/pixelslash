@@ -35,7 +35,7 @@ export function googleConfigOf(env: GoogleEnv): GoogleConfig | null {
 }
 
 /** Google's endpoints, or a stand-in's under `base` (the same paths, on one host). */
-export function googleEndpoints(base: string): Pick<GoogleConfig, keyof typeof GOOGLE> {
+function googleEndpoints(base: string): Pick<GoogleConfig, keyof typeof GOOGLE> {
   if (!base) return GOOGLE;
   const at = (path: string) => new URL(path, base).toString();
   return {

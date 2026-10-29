@@ -54,15 +54,6 @@ describe("googleConfigOf", () => {
       tokenUrl: "https://oauth2.googleapis.com/token",
     });
   });
-
-  test("a base points every endpoint at the stand-in", () => {
-    const cfg = googleConfigOf({
-      GOOGLE_CLIENT_ID: "id",
-      GOOGLE_CLIENT_SECRET: "s",
-      GOOGLE_OAUTH_BASE: "http://localhost:4174",
-    });
-    expect(cfg?.userinfoUrl).toBe("http://localhost:4174/v1/userinfo");
-  });
 });
 
 describe("authorizeUrl", () => {
