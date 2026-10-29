@@ -87,6 +87,9 @@ contract: changes are additive only.
 Nothing leaves your machine unless you pass `--upload`, and then only to the server you name.
 `SECURITY.md` has the rest of the threat model and how to report a vulnerability.
 
+`apps/site` is the project site at pixelslash.dev: static pages prerendered from this repo's own
+docs, the capability matrix and a real report. See [`apps/site/README.md`](apps/site/README.md).
+
 ## From source
 
 ```bash

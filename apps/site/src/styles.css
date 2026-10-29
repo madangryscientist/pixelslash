@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "@hackcove/theme-catppuccin-mocha/theme.css";
+/* Tailwind skips node_modules: scan the design system for the utilities its components use. */
+@source "../node_modules/@hackcove/ui/dist";
+@import "./home.css";
+
+/*
+ * Catppuccin Mocha palette © 2021 Catppuccin, MIT license (notice in
+ * @hackcove/theme-catppuccin-mocha/NOTICE). Tailwind's build drops the credit comment from the
+ * theme file, so it is repeated here.
+ */
+
+/* A heading anchor (`/docs#exit-codes-...`) lands clear of the sticky header and the nav row. */
+[id] {
+  scroll-margin-top: 7.5rem;
+}
