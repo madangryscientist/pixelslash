@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { buildUrl } from "#/api/read";
 import type { Db } from "#/db/db";
+import { type OpenShot, openShotsOf } from "#/db/open-shots";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/review";
 import { type BuildStatus, builds, projects } from "#/db/schema";
 import { warn } from "#/lib/log";
@@ -58,7 +59,35 @@ function titleOf(build: SyncedBuild, counts: BuildCounts): string {
   return "Diffing the shots";
 }
 
-function summaryOf(build: SyncedBuild, counts: BuildCounts, detailsUrl: string | undefined) {
+/** How many shots the summary names; the build page has the rest. */
+const NAMED_SHOTS = 10;
+
+/** The shots awaiting review, counted and named: a carried change is `unchanged` in the table. */
+function openLines(open: OpenShot[]): string[] {
+  if (open.length === 0) return [];
+  const changed = open.filter((shot) => shot.kind === "changed").length;
+  const added = open.length - changed;
+  const named = open
+    .slice(0, NAMED_SHOTS)
+    .map(
+      (shot) =>
+        `- ${shot.kind === "new" ? "New" : "Changed"}: ${shot.name} (${shot.viewport}, ${shot.theme})`,
+    );
+  const more = open.length - named.length;
+  return [
+    "",
+    `Waiting for review: ${plural(changed, "changed shot")} and ${plural(added, "new shot")}.`,
+    ...named,
+    ...(more > 0 ? [`- and ${more} more`] : []),
+  ];
+}
+
+function summaryOf(
+  build: SyncedBuild,
+  counts: BuildCounts,
+  open: OpenShot[],
+  detailsUrl: string | undefined,
+) {
   const lines =
     build.status === "uploading" || build.status === "processing"
       ? ["The build is being diffed."]
@@ -66,8 +95,9 @@ function summaryOf(build: SyncedBuild, counts: BuildCounts, detailsUrl: string |
           `| Changed | To review | Accepted | Rejected | New | Removed | Unchanged |`,
           `| ---: | ---: | ---: | ---: | ---: | ---: | ---: |`,
           `| ${counts.changed} | ${counts.toReview} | ${counts.accepted} | ${counts.rejected} | ${counts.new} | ${counts.removed} | ${counts.unchanged} |`,
+          ...openLines(open),
           "",
-          "New and removed shots do not fail the check.",
+          "Removed shots do not fail the check.",
         ];
   if (detailsUrl) lines.push("", `[Review the build](${detailsUrl})`);
   return lines.join("\n");
@@ -76,11 +106,13 @@ function summaryOf(build: SyncedBuild, counts: BuildCounts, detailsUrl: string |
 /**
  * What the check run says for a build: `in_progress` while it is diffed; `failure` while a change
  * awaits review, a shot is rejected, or the build errored (the title names the error); `success`
- * when every change is accepted or nothing changed.
+ * when every change is accepted or nothing changed. New shots wait for review like changes do
+ * (PS-284).
  */
 function checkRunOf(
   build: SyncedBuild,
   counts: BuildCounts,
+  open: OpenShot[],
   detailsUrl: string | undefined,
 ): CheckRunBody {
   const done = build.status !== "uploading" && build.status !== "processing";
@@ -90,7 +122,7 @@ function checkRunOf(
     ...(detailsUrl && { details_url: detailsUrl }),
     status: done ? "completed" : "in_progress",
     ...(done && { conclusion: build.status === "passed" ? "success" : "failure" }),
-    output: { title: titleOf(build, counts), summary: summaryOf(build, counts, detailsUrl) },
+    output: { title: titleOf(build, counts), summary: summaryOf(build, counts, open, detailsUrl) },
   };
 }
 
@@ -142,7 +174,8 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
 
 async function bodyOf(deps: CheckRunDeps, row: BuildRow): Promise<CheckRunBody> {
   const counts = (await countBuilds(deps.db, [row.id])).get(row.id) ?? emptyCounts();
-  return checkRunOf(row, counts, detailsUrlOf(deps.publicUrl, row));
+  const open = row.status === "changes" ? await openShotsOf(deps.db, row.id) : [];
+  return checkRunOf(row, counts, open, detailsUrlOf(deps.publicUrl, row));
 }
 
 /** A commit status is a new entry on the commit, newest wins: there is no id to keep. */

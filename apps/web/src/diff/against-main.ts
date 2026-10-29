@@ -10,8 +10,10 @@ import { type Comparer, type SnapshotRow, serverComparer } from "./compare";
 /**
  * A branch shot against main (ob 1723), for the branch page's final review: the newest accepted
  * shot of another branch at the merge-base (`Baselines.main`), measured once by the diff that
- * measured the shot against its own baseline, and stored beside that result. Nothing reads it to
- * decide a build: it is never a review state and never blocks. Only the result is stored, not an
+ * measured the shot against its own baseline, and stored beside that result. It is never a review
+ * state itself, but a shot unchanged against its previous build that still differs from main and
+ * was never accepted carries an open change, and that keeps the build at `changes` (PS-284,
+ * `diff/open-vs-main.ts`). Only the result is stored, not an
  * overlay: the page draws its boxes from `mainDiffResult`.
  */
 
@@ -82,8 +84,9 @@ export async function diffAgainstMain(
 
 /**
  * Measure a branch build's shots against main (ob 1723), after their own diff and from what it
- * stored. It never decides the build, so it never errors it either: what the budget leaves
- * unmeasured stays null, and the branch page says "not measured against main".
+ * stored. It never errors the build: what the budget leaves unmeasured stays null, and the branch
+ * page says "not measured against main". What it does measure decides the verdict only through
+ * `carryOpenFromMain` (PS-284), which reads the stored result afterwards.
  */
 export async function measureAgainstMain(
   deps: {

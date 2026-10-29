@@ -210,7 +210,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText("review");
   await expect(rows.first()).toContainText("2 changed · 1 new · 1 removed · 1 unchanged");
-  await expect(rows.first().getByTestId("to-review")).toHaveText("2 to review");
+  await expect(rows.first().getByTestId("to-review")).toHaveText("3 to review");
   await expect(rows.first().getByTestId("build-status")).toHaveText("changes");
   await capture(page, "01-project");
 
@@ -265,7 +265,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await expect(page.getByTestId("review-state")).toHaveText("accepted by e2e-octocat");
   await expect(page.getByTestId("detection-flag")).toHaveCount(1);
   await open(page, buildUrl);
-  await expect(page.getByText("1 to review")).toBeVisible();
+  await expect(page.getByText("2 to review")).toBeVisible();
 
   // r rejects the size-changed shot and the build fails.
   await group(page, "changed").getByRole("link", { name: /hero/i }).click();
@@ -281,7 +281,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   upload(await snapshotDir(REVIEW), token, "review");
   await open(page, `/projects/${projectId}`);
   await expect(page.getByTestId("build-row").first().getByTestId("to-review")).toHaveText(
-    "2 to review",
+    "3 to review",
   );
   // The flag on the earlier build stays listed, and the export is exactly it.
   await expectProjectFlag(page, projectId);

@@ -32,8 +32,9 @@ import {
 /**
  * Build status after the diff (ob 1470, review model 1422). A changed shot blocks until it is
  * accepted or rejected, and so does an unchanged one that carries a change still open on the
- * branch's previous build (ob 1712); new and removed shots never block; any rejection fails the
- * build until a new build arrives. `passed` therefore means "nothing left to decide", not "no
+ * branch's previous build (ob 1712) or one that differs from main and was never accepted (PS-284). A
+ * new shot waits like a change (PS-284); removed shots never block; any rejection fails the build
+ * until a new build arrives. `passed` therefore means "nothing left to decide", not "no
  * differences".
  */
 export type Verdict = "changes" | "passed" | "failed";

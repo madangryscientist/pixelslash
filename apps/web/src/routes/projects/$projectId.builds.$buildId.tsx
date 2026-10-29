@@ -67,8 +67,8 @@ function useAcceptAll(projectId: string, buildId: string) {
 function RejectionNote() {
   return (
     <Text as="p" tone="muted">
-      A rejection keeps the build failed until a new build arrives. New and removed shots are listed
-      for review and never block a build.
+      A rejection keeps the build failed until a new build arrives. A new shot waits for review like
+      a change; removed shots are listed and never block a build.
     </Text>
   );
 }
@@ -102,8 +102,8 @@ function BuildPage() {
   const counts = tabCounts(snapshots);
   const baseline = setsBaseline(firstBuild, snapshots);
   const active = Route.useSearch().tab ?? defaultTab(counts);
-  // Only a shot holding a change blocks a build (verdictOf); new, removed and unchanged ones do not
-  // need a decision, unless an unchanged one carries the branch's open change (ob 1712).
+  // A changed or new shot blocks a build (verdictOf) until it is decided, and so does an unchanged
+  // one that carries an open change (ob 1712, PS-284); removed ones never do.
   const toReview = snapshots.filter(awaitsDecision).length;
   useRefreshWhile(summaryPending || snapshots.some((shot) => shot.aiPending));
   const { error, acceptAll } = useAcceptAll(project.id, build.id);

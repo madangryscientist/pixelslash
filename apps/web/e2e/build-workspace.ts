@@ -10,8 +10,8 @@ export async function expectBuildWorkspaceOpen(page: Page) {
   await expect(group(page, "changed").getByTestId("snapshot-row")).toHaveCount(2);
   await expect(group(page, "changed").getByTestId("shot-thumb")).toHaveCount(2);
   await expect(group(page, "changed")).toContainText("size changed 40×40 → 48×40");
-  await expect(page.getByTestId("to-review")).toHaveText("2 to review");
-  await expect(page.getByTestId("review-progress")).toContainText("0 of 2 reviewed");
+  await expect(page.getByTestId("to-review")).toHaveText("3 to review");
+  await expect(page.getByTestId("review-progress")).toContainText("0 of 3 reviewed");
   await expect(page.getByTestId("review-next")).toBeVisible();
   await expect(page.getByRole("button", { name: "Accept all" })).toBeVisible();
   await expect(page.getByTestId("build-baseline")).toHaveCount(0);

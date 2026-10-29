@@ -52,7 +52,7 @@ describe("the read API (ob 1729)", () => {
         pending: 4,
         accepted: 0,
         rejected: 0,
-        to_review: 1,
+        to_review: 2,
         skipped_flaky: 0,
       },
       created_at: expect.any(String),
@@ -109,8 +109,9 @@ describe("the read API (ob 1729)", () => {
     const res = await get(w.deps, `/api/v1/builds/${w.feature.id}`, w.acme.token);
     expect(res.status).toBe(200);
     const { build } = res.body;
-    expect(build).toMatchObject({ id: w.feature.id, status: "passed", branch: "feature" });
-    expect(build.counts).toMatchObject({ accepted: 1, pending: 3, to_review: 0 });
+    expect(build).toMatchObject({ id: w.feature.id, status: "changes", branch: "feature" });
+    // The new shot still waits (PS-284), so accepting the change alone does not pass the build.
+    expect(build.counts).toMatchObject({ accepted: 1, pending: 3, to_review: 1 });
     expect(
       build.snapshots.map((s: { name: string; group: string }) => `${s.name}:${s.group}`),
     ).toEqual(["about:changed", "pricing:new", "contact:removed", "home:unchanged"]);

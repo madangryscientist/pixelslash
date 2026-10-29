@@ -140,7 +140,7 @@ describe("the review model reads", () => {
     expect(await isFirstBuild(ctx.db, next)).toBe(false);
   });
 
-  test("accepting the changed shot records the reviewer and passes the build", async () => {
+  test("accepting the changed and the new shot records the reviewer and passes the build", async () => {
     const { ctx, feature } = await twoBuilds();
     const view = await buildView(ctx.db, ctx.projectId, feature.id);
     const about = view.snapshots.find((s) => s.name === "about");
@@ -151,7 +151,18 @@ describe("the review model reads", () => {
       state: "accepted",
       userId: ctx.userId,
     });
-    expect(status).toBe("passed");
+    // The new shot still waits (PS-284).
+    expect(status).toBe("changes");
+    const pricing = view.snapshots.find((s) => s.name === "pricing");
+    if (!pricing) throw new Error("no pricing shot");
+    expect(
+      await reviewSnapshot(ctx.db, {
+        projectId: ctx.projectId,
+        snapshotId: pricing.id,
+        state: "accepted",
+        userId: ctx.userId,
+      }),
+    ).toBe("passed");
     const after = await buildView(ctx.db, ctx.projectId, feature.id);
     const reviewed = after.snapshots.find((s) => s.id === about.id);
     expect(reviewed?.reviewState).toBe("accepted");
