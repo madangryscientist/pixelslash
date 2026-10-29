@@ -38,6 +38,7 @@ import {
   projectOf,
 } from "./build-writes";
 import { UnmeasuredError, assertMeasured } from "./measured";
+import { carryOpenFromMain } from "./open-vs-main";
 import { withOverrides } from "./with-overrides";
 import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
 import { reportError } from "#/server/sentry";
@@ -304,7 +305,8 @@ async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: 
 
 /**
  * Measure every shot against its own baseline, in CI's results or here under the run's budget,
- * then a branch build's against main with what that budget leaves (ob 1723). Only the server diff
+ * then a branch build's against main with what that budget leaves (ob 1723), and what differs from
+ * main without having been accepted is carried as an open change (PS-284). Only the server diff
  * reads the review-UI overrides; a CI project's results are measured with the config alone.
  */
 export async function measureAll(
@@ -317,8 +319,9 @@ export async function measureAll(
   if (budget)
     await measure(deps, await withOverrides(deps.db, build.projectId, rows), baselines, budget);
   else await measureFromCi(deps, rows, baselines);
-  if (build.branch !== project.defaultBranch)
-    await measureAgainstMain(deps, { buildId: build.id, only }, baselines, budget);
+  if (build.branch === project.defaultBranch) return;
+  await measureAgainstMain(deps, { buildId: build.id, only }, baselines, budget);
+  await carryOpenFromMain(deps.db, build);
 }
 
 /**

@@ -22,6 +22,10 @@ import { builds, type IgnoreRect, snapshots } from "./schema";
  * differs from it is measured against rule 2's accepted shot instead, so accepting it never
  * approves a change nobody was shown. A build that was rejected never feeds a baseline. On the
  * project's default branch every shot is accepted, so rule 1 there is the rule it always had.
+ *
+ * Rule 1 compares with the previous shot only, so it cannot see a difference from main that the
+ * previous build did not carry; `diff/open-vs-main.ts` carries that after the fact (PS-284). The
+ * picks here are not changed by it.
  */
 
 /** The fields of a snapshot this module reads; a whole row would drag the blobs' JSON along. */

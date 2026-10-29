@@ -207,7 +207,7 @@ describe("build status", () => {
     expect(store.writes[0]).toMatchObject({ status: "errored", error: "d1 blip" });
   });
 
-  test("new and removed shots do not block", async () => {
+  test("removed shots do not block, a new shot waits for review (PS-284)", async () => {
     const ctx = await context();
     const main = await upload(ctx, {
       branch: "main",
@@ -229,7 +229,7 @@ describe("build status", () => {
       diffStatus: "removed",
       imageKey: gone?.imageKey,
     });
-    expect(branch.status).toBe("passed");
+    expect(branch.status).toBe("changes");
   });
 
   test("any rejection fails the build; the next build is judged on its own", async () => {

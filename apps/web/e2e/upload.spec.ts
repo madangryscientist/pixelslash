@@ -124,7 +124,7 @@ async function checkServerDiff(
     `SELECT b.status, s.diff_status, s.diff_key, s.baseline_key, s.diff_result
      FROM builds b JOIN snapshots s ON s.build_id = b.id WHERE b.id = '${secondId}'`,
   );
-  expect(second).toMatchObject({ status: "passed", diff_status: "unchanged" });
+  expect(second).toMatchObject({ status: "changes", diff_status: "unchanged" });
   expect(second?.baseline_key).toBe(row?.image_key);
   // The second upload is byte-equal to its baseline (ob 1948): settled with no overlay written.
   expect(second?.diff_key).toBeNull();
@@ -164,7 +164,7 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
   expect(row).toMatchObject({
     name: "home",
     viewport: "1x1",
-    status: "passed",
+    status: "changes", // a new shot on a branch waits for review (PS-284)
     branch: "e2e",
     org: "Upload Co",
     project: "ship",
@@ -254,7 +254,7 @@ test("a dir of loose PNGs goes through `import` and `upload`, and the server dif
      FROM builds b JOIN snapshots s ON s.build_id = b.id WHERE b.id = '${secondId}'`,
   );
   expect(row).toMatchObject({
-    status: "passed",
+    status: "changes", // the first upload's new shot is still open, and this one carries it (PS-284)
     name: "billing/invoice",
     viewport: "1x1",
     theme: "light",
@@ -284,7 +284,7 @@ test("a project switched to CI diffs in the CLI: the server stores what it measu
     `SELECT b.status, s.diff_status, s.measured_by, s.engine_version, s.diff_key
      FROM builds b JOIN snapshots s ON s.build_id = b.id WHERE b.id = '${id}'`,
   );
-  expect(row).toMatchObject({ status: "passed", diff_status: "unchanged", measured_by: "ci" });
+  expect(row).toMatchObject({ status: "changes", diff_status: "unchanged", measured_by: "ci" });
   expect(row?.engine_version).toMatch(/^\d+\.\d+\.\d+/);
   expect(row?.diff_key).toMatch(/\.diff\.png$/);
 });

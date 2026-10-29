@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { defaultTab, firstToReview, nextToReviewId, tabCounts } from "./build-tabs";
+import { defaultTab, firstToReview, nextToReviewId, setsBaseline, tabCounts } from "./build-tabs";
 
 const row = (
   diffStatus: "changed" | "new" | "removed" | "unchanged" | null,
@@ -30,14 +30,24 @@ describe("defaultTab", () => {
   });
 });
 
+const newShot = (reviewState: string) => ({ diffStatus: "new" as const, reviewState });
+
+describe("setsBaseline", () => {
+  test("a first build of accepted new shots sets the baseline; one still waiting for review does not (PS-284)", () => {
+    expect(setsBaseline(true, [newShot("accepted")])).toBe(true);
+    expect(setsBaseline(true, [newShot("pending")])).toBe(false);
+    expect(setsBaseline(false, [newShot("accepted")])).toBe(false);
+  });
+});
+
 describe("firstToReview", () => {
   const steady = { flakeId: null, flakyPolicy: null } as const;
 
-  test("skips decided and non-changed shots", () => {
+  test("skips decided and unchanged shots, a pending new shot is to review (PS-284)", () => {
     const rows = [
-      { id: "a", diffStatus: "new", reviewState: "pending", carriedFrom: null, ...steady },
+      { id: "a", diffStatus: "unchanged", reviewState: "pending", carriedFrom: null, ...steady },
       { id: "b", diffStatus: "changed", reviewState: "accepted", carriedFrom: null, ...steady },
-      { id: "c", diffStatus: "changed", reviewState: "pending", carriedFrom: null, ...steady },
+      { id: "c", diffStatus: "new", reviewState: "pending", carriedFrom: null, ...steady },
     ] as const;
     expect(firstToReview(rows)?.id).toBe("c");
     expect(firstToReview(rows.slice(0, 2))).toBeUndefined();

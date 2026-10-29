@@ -26,9 +26,10 @@ type Decidable = { diffStatus: DiffStatus | null; carriedFrom: string | null };
  * A shot a reviewer decides on: a change measured on this build, or one carried from the branch's
  * previous build because this shot is identical to it while that change is undecided (ob 1712). A
  * carried shot is `unchanged` (that is what was measured here), yet the change it carries is open.
+ * A pending new shot is open too (PS-284): on a branch it waits for review like a change.
  */
 export function holdsChange(row: Decidable): boolean {
-  return row.diffStatus === "changed" || row.carriedFrom !== null;
+  return row.diffStatus === "changed" || row.diffStatus === "new" || row.carriedFrom !== null;
 }
 
 type Flaky = { flakeId: string | null; flakyPolicy: FlakyPolicy | null };

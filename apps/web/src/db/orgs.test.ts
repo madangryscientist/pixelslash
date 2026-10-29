@@ -141,7 +141,7 @@ describe("the organizations overview", () => {
       branch: "feat/x",
       prNumber: 7,
       total: 5,
-      counts: { changed: 2, new: 1, unchanged: 1, unmeasured: 1, toReview: 1 },
+      counts: { changed: 2, new: 1, unchanged: 1, unmeasured: 1, toReview: 2 },
     });
     expect(byName["docs"]?.latest?.counts.toReview).toBe(0);
     expect(byName["idle"]?.latest).toBeNull();

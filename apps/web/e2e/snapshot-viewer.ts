@@ -15,7 +15,7 @@ const BOXES = 'svg[aria-label="Measured regions"] rect[data-kind="change"]';
  */
 export async function checkSnapshotViewer(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.getByTestId("review-position")).toHaveText("1 / 2 with a change");
+  await expect(page.getByTestId("review-position")).toHaveText("1 / 3 with a change");
   await expect(page.getByTestId("color-scheme")).toContainText("prefers-color-scheme:");
 
   const accept = page.getByRole("button", { name: "Accept", exact: true });

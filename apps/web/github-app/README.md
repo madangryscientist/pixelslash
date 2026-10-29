@@ -16,7 +16,7 @@ connected to (project settings → GitHub repo):
 
 The summary is the counts and `details_url` is the build page on `PIXELSLASH_PUBLIC_URL`. It is
 updated in place on finalize, on every accept or reject, on accept-all, on rerun, on marking a shot
-flaky and when the model passes a build. New and removed shots never fail it. No image goes to
+flaky and when the model passes a build. A build that ends `changes` (a changed or new shot waits for review) fails it; removed shots never do, and the summary names the shots that wait (PS-284). No image goes to
 GitHub, only the link.
 
 The App is outbound only: it has **no webhook**, and its permissions are `checks: write`,

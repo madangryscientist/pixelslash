@@ -26,9 +26,9 @@ type Build = Pick<typeof builds.$inferSelect, "id" | "projectId" | "branch">;
 const MAX_HOPS = 50;
 
 /** Baseline shot id → the shots of this build whose approval waits on it. */
-type Waiting = Map<string, string[]>;
+export type Waiting = Map<string, string[]>;
 
-const wait = (waiting: Waiting, baselineId: string, ids: string[]) =>
+export const wait = (waiting: Waiting, baselineId: string, ids: string[]) =>
   waiting.set(baselineId, [...(waiting.get(baselineId) ?? []), ...ids]);
 
 /**
@@ -62,7 +62,7 @@ function readLinks(db: Db, build: Build, ids: string[]) {
   );
 }
 
-type Link = Awaited<ReturnType<typeof readLinks>>[number];
+export type Link = Awaited<ReturnType<typeof readLinks>>[number];
 
 /** The shot that measured the change against the default branch, and someone accepted it. */
 const approves = (link: Link) =>
@@ -88,21 +88,33 @@ async function firstHop(db: Db, buildId: string): Promise<Waiting> {
   return waiting;
 }
 
-/** One hop back: an accepted change settles the shots waiting on it; an unchanged shot passes them on. */
-async function hop(
-  db: Db,
-  build: Build,
-  waiting: Waiting,
-  settle: (link: Link, ids: string[]) => void,
-) {
-  const next: Waiting = new Map();
-  for (const link of await readLinks(db, build, [...waiting.keys()])) {
-    const ids = waiting.get(link.id) ?? [];
-    if (approves(link)) settle(link, ids);
-    else if (link.diffStatus === "unchanged" && link.baselineSnapshotId)
-      wait(next, link.baselineSnapshotId, ids);
+/** What ends a walk back through a branch's baselines, and what lets it go on. */
+export type ChainRule = {
+  /** The link decides the shots waiting on it. */
+  settles: (link: Link) => boolean;
+  /** The link is the same pixels as its own baseline, so the shots wait on that one instead. */
+  passes: (link: Link) => boolean;
+  /** Told which shots a settling link decided. */
+  settle: (link: Link, ids: string[]) => void;
+};
+
+/**
+ * Walks each waiting shot back through the same branch's earlier shots, up to `MAX_HOPS` builds:
+ * a link that `settles` ends the walk for the shots on it (the rule's `settle` is told), one that `passes`
+ * hands them to its own baseline, any other ends it with nothing.
+ */
+export async function walkChain(db: Db, build: Build, start: Waiting, rule: ChainRule) {
+  let waiting = start;
+  for (let n = 0; n < MAX_HOPS && waiting.size > 0; n++) {
+    const next: Waiting = new Map();
+    for (const link of await readLinks(db, build, [...waiting.keys()])) {
+      const ids = waiting.get(link.id) ?? [];
+      if (rule.settles(link)) rule.settle(link, ids);
+      else if (rule.passes(link) && link.baselineSnapshotId)
+        wait(next, link.baselineSnapshotId, ids);
+    }
+    waiting = next;
   }
-  return next;
 }
 
 /**
@@ -121,8 +133,11 @@ export async function approvedEarlier(db: Db, build: Build): Promise<Map<string,
     const approval = { snapshotId, buildId, commitSha, reviewedBy, reviewedAt, defaultBranch };
     for (const id of ids) found.set(id, approval);
   };
-  let waiting = await firstHop(db, build.id);
-  for (let n = 0; n < MAX_HOPS && waiting.size > 0; n++)
-    waiting = await hop(db, build, waiting, settle);
+  const rule: ChainRule = {
+    settles: approves,
+    passes: (link) => link.diffStatus === "unchanged",
+    settle,
+  };
+  await walkChain(db, build, await firstHop(db, build.id), rule);
   return found;
 }

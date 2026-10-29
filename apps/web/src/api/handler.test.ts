@@ -42,7 +42,8 @@ describe("upload API", () => {
     );
     expect(await done.json()).toEqual({
       id,
-      status: "passed",
+      // A shot with nothing to compare against waits for a decision on a branch (PS-284).
+      status: "changes",
       error: null,
       unmeasured: 0,
       web_url: `http://app.test/projects/${acme.project.id}/builds/${id}`,
@@ -56,7 +57,7 @@ describe("upload API", () => {
       mergeBaseSha: "b".repeat(40),
       ancestorShas: ["c".repeat(40), "d".repeat(40)],
       prNumber: 7,
-      status: "passed",
+      status: "changes",
     });
     const [snap] = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
     expect(snap).toMatchObject({ name: "pricing", viewport: "1280x720", tags: ["web"] });
