@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";
-import { acceptAllSnapshots, countBuilds, reviewSnapshot } from "#/db/review";
+import { countBuilds } from "#/db/build-counts";
+import { acceptAllSnapshots, reviewSnapshot } from "#/db/review";
 import { type Ctx, context, onlyShot, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 
@@ -56,7 +57,8 @@ describe("a branch build's baseline is the branch's last build", () => {
     expect(secondShot?.diffResult?.changedPixels).toBe(0);
     expect(second.status).toBe("changes");
     const counts = (await countBuilds(ctx.db, [second.id])).get(second.id);
-    expect(counts).toMatchObject({ changed: 0, unchanged: 1, toReview: 1 });
+    // Carried, and different from main: the build page counts it under Changed (PS-285).
+    expect(counts).toMatchObject({ changed: 1, unchanged: 0, toReview: 1 });
 
     // A third run carries from the shot that measured the change, not from the carrier.
     const third = await upload(ctx, onBranch(2, red));

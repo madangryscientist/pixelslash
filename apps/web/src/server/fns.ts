@@ -28,7 +28,7 @@ import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/t
 import { BadRequest, parseRect } from "#/api/validate";
 import { nextToReviewId } from "#/lib/build-tabs";
 import { buildExpiry } from "#/lib/retention";
-import { holdsChange } from "#/lib/snapshot-groups";
+import { holdsChange, reviewGroupOf } from "#/lib/snapshot-groups";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import {
   database,
@@ -187,7 +187,8 @@ export const getBuildPage = createServerFn()
     // one, a removed one only has the baseline's. No blob is made for it.
     const thumbs: Record<string, string> = {};
     for (const shot of view.snapshots) {
-      if (shot.diffStatus !== "changed" && shot.diffStatus !== "new") continue;
+      const group = reviewGroupOf(shot);
+      if (group !== "changed" && group !== "new") continue;
       const { branch } = await imageUrls(project.orgId, {
         main: null,
         branch: shot.imageKey,

@@ -67,3 +67,22 @@ export function groupOf(row: {
   if (row.diffStatus !== null) return row.diffStatus;
   return row.rebaselineNeeded ? "rebaseline" : "unmeasured";
 }
+
+/**
+ * The group a reviewer finds the shot under (PS-285). A shot carried from main is `unchanged`
+ * against the branch's previous build, yet differs from main and waits for a decision (PS-284), so
+ * the page, the check table and the review order file it under its against-main status, `changed`
+ * or `new`. Everything else is `groupOf`. The API keeps `groupOf` (invariant 7).
+ */
+export function reviewGroupOf(row: {
+  diffStatus: DiffStatus | null;
+  rebaselineNeeded: boolean;
+  carriedFrom: string | null;
+  mainDiffStatus: DiffStatus | null;
+}): SnapshotGroup {
+  const group = groupOf(row);
+  if (group !== "unchanged" || row.carriedFrom === null) return group;
+  return row.mainDiffStatus === "changed" || row.mainDiffStatus === "new"
+    ? row.mainDiffStatus
+    : group;
+}

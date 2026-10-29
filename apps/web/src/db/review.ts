@@ -1,16 +1,9 @@
 import type { A11yDiff } from "@pixelslash/engine/a11y-entry";
 import type { Composition } from "@pixelslash/engine/composition-entry";
-import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
-import {
-  SNAPSHOT_GROUPS,
-  type SnapshotGroup,
-  awaitsDecision,
-  groupOf,
-  skippedFlaky,
-} from "#/lib/snapshot-groups";
+import { and, eq, ne } from "drizzle-orm";
+import { SNAPSHOT_GROUPS, awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
-import { inChunks } from "./chunks";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
@@ -219,7 +212,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
     }))
     .toSorted(
       (a, b) =>
-        SNAPSHOT_GROUPS.indexOf(groupOf(a)) - SNAPSHOT_GROUPS.indexOf(groupOf(b)) ||
+        SNAPSHOT_GROUPS.indexOf(reviewGroupOf(a)) - SNAPSHOT_GROUPS.indexOf(reviewGroupOf(b)) ||
         a.name.localeCompare(b.name) ||
         a.platform.localeCompare(b.platform) ||
         a.browser.localeCompare(b.browser) ||
@@ -227,66 +220,6 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
         a.theme.localeCompare(b.theme),
     );
   return { build, snapshots: ordered, summaryPending: explaining(build.aiSummaryQueuedAt, now) };
-}
-
-export type BuildCounts = Record<SnapshotGroup, number> & {
-  pending: number;
-  accepted: number;
-  rejected: number;
-  /** Shots that wait for a decision (`awaitsDecision`): what the build page calls "to review". */
-  toReview: number;
-  /** Flaky shots their config skips (`skippedFlaky`, ob 1724): counted on a line of their own. */
-  skippedFlaky: number;
-};
-
-export const emptyCounts = (): BuildCounts => ({
-  changed: 0,
-  new: 0,
-  removed: 0,
-  unchanged: 0,
-  rebaseline: 0,
-  unmeasured: 0,
-  pending: 0,
-  accepted: 0,
-  rejected: 0,
-  toReview: 0,
-  skippedFlaky: 0,
-});
-
-/** The grouped columns of `countBuilds`: each is selected and grouped by. */
-const statColumns = {
-  buildId: snapshots.buildId,
-  diffStatus: snapshots.diffStatus,
-  rebaselineNeeded: snapshots.rebaselineNeeded,
-  reviewState: snapshots.reviewState,
-  carried: isNotNull(snapshots.carriedFrom),
-  flaky: isNotNull(snapshots.flakeId),
-  flakyPolicy: snapshots.flakyPolicy,
-};
-
-/**
- * The per-group counts of each build's shots, in one grouped read per part of the ids (a project
- * page counts every build of the project). A build with no shots is absent.
- */
-export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<string, BuildCounts>> {
-  const counts = new Map<string, BuildCounts>();
-  const stats = await inChunks(buildIds, 0, (part) =>
-    db
-      .select({ ...statColumns, n: count() })
-      .from(snapshots)
-      .where(inArray(snapshots.buildId, part))
-      .groupBy(...Object.values(statColumns)),
-  );
-  for (const stat of stats) {
-    const held = counts.get(stat.buildId) ?? emptyCounts();
-    held[groupOf(stat)] += stat.n;
-    held[stat.reviewState] += stat.n;
-    const row = { ...stat, carriedFrom: stat.carried ? "" : null, flakeId: stat.flaky ? "" : null };
-    if (awaitsDecision(row)) held.toReview += stat.n;
-    if (skippedFlaky(row)) held.skippedFlaky += stat.n;
-    counts.set(stat.buildId, held);
-  }
-  return counts;
 }
 
 async function reviewableBuildId(db: Db, projectId: string, buildId: string): Promise<string> {

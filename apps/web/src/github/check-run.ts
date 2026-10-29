@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { buildUrl } from "#/api/read";
 import type { Db } from "#/db/db";
 import { type OpenShot, openShotsOf } from "#/db/open-shots";
-import { type BuildCounts, countBuilds, emptyCounts } from "#/db/review";
+import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
 import { type BuildStatus, builds, projects } from "#/db/schema";
 import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";

@@ -5,6 +5,7 @@ import { useHydrated } from "#/components/ui";
 import type { AiSummarySentence } from "#/db/diff-json";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { tabCounts } from "#/lib/build-tabs";
+import { reviewGroupOf } from "#/lib/snapshot-groups";
 import { formatDateTime } from "#/lib/format";
 import { noSummaryReason, tooManyChanges } from "#/lib/summary-limit";
 import { type ShotLabel, shotChips, shotLabeller } from "#/lib/shot-label";
@@ -18,16 +19,31 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  */
 function measuredCounts(snapshots: SnapshotView[]): string[] {
   const counts = tabCounts(snapshots);
+  const carried = carriedFromMain(snapshots);
   const noise = snapshots
     .flatMap((shot) => shot.aiReview?.regions ?? [])
     .filter((note) => note.label === "noise").length;
   const parts = [`${counts.unchanged} unchanged`];
+  if (carried.changed + carried.new > 0)
+    parts.unshift(
+      `${carried.changed} changed and ${carried.new} new carried from main: no change since the previous build, but they still differ from main`,
+    );
   if (counts.unmeasured > 0)
     parts.push(
       `${plural(counts.unmeasured, "shot")} not measured: not compared, so not known to be unchanged`,
     );
   if (noise > 0) parts.push(`${plural(noise, "region")} labelled likely noise`);
   return parts;
+}
+
+/** Shots filed under changed or new only because they differ from main (PS-285), not because this build changed them. */
+function carriedFromMain(snapshots: SnapshotView[]): { changed: number; new: number } {
+  const held = { changed: 0, new: 0 };
+  for (const shot of snapshots) {
+    const group = reviewGroupOf(shot);
+    if (shot.diffStatus === "unchanged" && (group === "changed" || group === "new")) held[group]++;
+  }
+  return held;
 }
 
 const story = (name: string) => name.split("@")[0] ?? name;
@@ -253,6 +269,7 @@ export function BuildSummary({
   if (!VERDICTS.has(build.status)) return null;
   const describable = snapshots.some((shot) => DESCRIBED.has(shot.diffStatus ?? ""));
   const changed = snapshots.filter((shot) => shot.diffStatus === "changed").length;
+  const carried = carriedFromMain(snapshots);
   return (
     <Stack as="section" gap="xs" data-testid="build-summary">
       <Divider />
@@ -267,7 +284,7 @@ export function BuildSummary({
         pending={pending}
       />
       <Text as="p" tone="muted" data-testid="summary-counts">
-        {describable ? "" : nothingChanged(build.brief)}
+        {describable || carried.changed + carried.new > 0 ? "" : nothingChanged(build.brief)}
         {measuredCounts(snapshots).join(" · ")}.
       </Text>
       <Footer
