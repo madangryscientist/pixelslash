@@ -19,7 +19,7 @@ import { ReviewChip } from "#/components/ui";
 import type { SnapshotView } from "#/db/review";
 import { BUILD_TABS, type BuildTab } from "#/lib/build-tabs";
 import { type ShotLabel, shotLabeller } from "#/lib/shot-label";
-import { GROUP_LABEL, type SnapshotGroup, groupOf } from "#/lib/snapshot-groups";
+import { GROUP_LABEL, type SnapshotGroup, reviewGroupOf } from "#/lib/snapshot-groups";
 
 export function BuildTabs({
   projectId,
@@ -180,7 +180,8 @@ export function TabBody({
   const label = useMemo(() => shotLabeller(snapshots.map((shot) => shot.name)), [snapshots]);
   const definition = BUILD_TABS.find((candidate) => candidate.id === tab);
   const groups = definition?.groups ?? [];
-  const inGroup = (group: SnapshotGroup) => snapshots.filter((shot) => groupOf(shot) === group);
+  const inGroup = (group: SnapshotGroup) =>
+    snapshots.filter((shot) => reviewGroupOf(shot) === group);
 
   if (groups.every((group) => inGroup(group).length === 0)) {
     return (

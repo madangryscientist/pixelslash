@@ -5,7 +5,8 @@ import { RED, shot } from "#/diff/test-shots";
 import { awaitsDecision, skippedFlaky } from "#/lib/snapshot-groups";
 import { NotFoundError } from "./db";
 import { type SentFlake, listFlakes, markFlaky, resolveFlake, setFlakeStatus } from "./flakes";
-import { acceptAllSnapshots, countBuilds } from "./review";
+import { countBuilds } from "./build-counts";
+import { acceptAllSnapshots } from "./review";
 import { type FlakyPolicy, flakes } from "./schema";
 import { signInGithubUser } from "./users";
 

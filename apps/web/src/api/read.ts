@@ -2,13 +2,8 @@ import { pageBuilds } from "#/db/build-list";
 import { type Actor, actorBuild, actorProject, actorProjects, actorSnapshot } from "#/db/actor";
 import { type Db, NotFoundError } from "#/db/db";
 import { type ProjectFlag, flagProjectId, markFlagExported, projectFlags } from "#/db/flags";
-import {
-  type BuildCounts,
-  type SnapshotView,
-  buildView,
-  countBuilds,
-  emptyCounts,
-} from "#/db/review";
+import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
+import { type SnapshotView, buildView } from "#/db/review";
 import {
   BUILD_STATUSES,
   type BuildStatus,
@@ -94,12 +89,13 @@ export async function imageUrl(
   return key && `${ctx.origin}${await signedImagePath(`orgs/${orgId}/${key}`, ctx.imageSecret())}`;
 }
 
-function counts(c: BuildCounts) {
+export function counts(c: BuildCounts) {
   return {
-    changed: c.changed,
-    new: c.new,
+    // The measured counts, as `group` on each shot: a shot carried from main stays `unchanged` (PS-285).
+    changed: c.changed - c.carriedFromMain.changed,
+    new: c.new - c.carriedFromMain.new,
     removed: c.removed,
-    unchanged: c.unchanged,
+    unchanged: c.unchanged + c.carriedFromMain.changed + c.carriedFromMain.new,
     rebaseline: c.rebaseline,
     unmeasured: c.unmeasured,
     pending: c.pending,

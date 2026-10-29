@@ -4,15 +4,43 @@ import { defaultTab, firstToReview, nextToReviewId, setsBaseline, tabCounts } fr
 const row = (
   diffStatus: "changed" | "new" | "removed" | "unchanged" | null,
   rebaselineNeeded = false,
+  carried: { carriedFrom: string | null; mainDiffStatus: typeof diffStatus } = {
+    carriedFrom: null,
+    mainDiffStatus: null,
+  },
 ) => ({
   diffStatus,
   rebaselineNeeded,
+  ...carried,
 });
 
 describe("tabCounts", () => {
   test("a shot that was never compared is Not measured, never Unchanged", () => {
     const counts = tabCounts([row("changed"), row(null), row(null, true), row("unchanged")]);
     expect(counts).toEqual({ changed: 1, new: 0, removed: 0, unmeasured: 2, unchanged: 1 });
+  });
+});
+
+const fromMain = (mainDiffStatus: "changed" | "new" | "unchanged") =>
+  row("unchanged", false, { carriedFrom: "root", mainDiffStatus });
+
+describe("tabCounts, a shot carried from main (PS-285)", () => {
+  test("is counted under its against-main status, not Unchanged", () => {
+    const counts = tabCounts([
+      ...Array.from({ length: 5 }, () => fromMain("changed")),
+      ...Array.from({ length: 26 }, () => fromMain("new")),
+      ...Array.from({ length: 1192 }, () => row("unchanged")),
+      // carried, but the same as main: nothing to find in Changed
+      fromMain("unchanged"),
+    ]);
+    expect(counts).toEqual({ changed: 5, new: 26, removed: 0, unmeasured: 0, unchanged: 1193 });
+  });
+
+  test("a shot not carried keeps its own status whatever main says", () => {
+    const counts = tabCounts([
+      row("unchanged", false, { carriedFrom: null, mainDiffStatus: "changed" }),
+    ]);
+    expect(counts.unchanged).toBe(1);
   });
 });
 

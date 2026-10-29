@@ -1,4 +1,4 @@
-import { type SnapshotGroup, awaitsDecision, groupOf } from "./snapshot-groups";
+import { type SnapshotGroup, awaitsDecision, reviewGroupOf } from "./snapshot-groups";
 
 /**
  * The build page's tabs. `Not measured` holds both kinds of shot that were never compared (no
@@ -15,7 +15,7 @@ export const BUILD_TABS: readonly { id: BuildTab; label: string; groups: Snapsho
   { id: "unchanged", label: "Unchanged", groups: ["unchanged"] },
 ];
 
-type Row = Parameters<typeof groupOf>[0];
+type Row = Parameters<typeof reviewGroupOf>[0];
 
 export function tabCounts(rows: Row[]): Record<BuildTab, number> {
   const counts: Record<BuildTab, number> = {
@@ -26,7 +26,7 @@ export function tabCounts(rows: Row[]): Record<BuildTab, number> {
     unchanged: 0,
   };
   for (const row of rows) {
-    const group = groupOf(row);
+    const group = reviewGroupOf(row);
     const tab = BUILD_TABS.find((candidate) => candidate.groups.includes(group));
     if (tab) counts[tab.id] += 1;
   }

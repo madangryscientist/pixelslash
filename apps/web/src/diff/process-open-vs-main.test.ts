@@ -2,7 +2,11 @@ import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { type Build, getBuild } from "#/db/builds";
 import { setGithubRepo } from "#/db/orgs";
-import { reviewSnapshot } from "#/db/review";
+import { countBuilds } from "#/db/build-counts";
+import { buildView, reviewSnapshot } from "#/db/review";
+import { counts as apiCounts } from "#/api/read";
+import { tabCounts } from "#/lib/build-tabs";
+import { reviewGroupOf } from "#/lib/snapshot-groups";
 import { builds, snapshots } from "#/db/schema";
 import { fakeGithub } from "#/github/test-github";
 import { type CheckRunBody, syncCheckRuns } from "#/github/check-run";
@@ -164,6 +168,26 @@ describe("open changes against main (PS-284)", () => {
     expect(run.output.summary).toContain("- Changed: about (1280x720, light)");
     expect(run.output.summary).toContain("- New: pricing (1280x720, light)");
     expect(run.output.summary).not.toContain("home");
+    // Carried from main, they count under their against-main status, not as Unchanged (PS-285).
+    expect(run.output.summary).toContain("| 1 | 2 | 0 | 0 | 1 | 0 | 1 |");
+  });
+
+  test("the build page files the carried shots under Changed and New, and the API keeps them unchanged (PS-285)", async () => {
+    const { ctx } = await theChain();
+    const next = await upload(ctx, onFeat(5));
+    const counts = (await countBuilds(ctx.db, [next.id])).get(next.id);
+    expect(counts).toMatchObject({ changed: 1, new: 1, unchanged: 1, toReview: 2 });
+
+    const view = await buildView(ctx.db, ctx.projectId, next.id);
+    const order = view?.snapshots.map((s) => [s.name, reviewGroupOf(s)]);
+    expect(order).toEqual([
+      ["about", "changed"],
+      ["pricing", "new"],
+      ["home", "unchanged"],
+    ]);
+    expect(tabCounts(view?.snapshots ?? [])).toMatchObject({ changed: 1, new: 1, unchanged: 1 });
+    // The API's counts and each shot's `group` are the measured ones, as before.
+    expect(counts && apiCounts(counts)).toMatchObject({ changed: 0, new: 0, unchanged: 3 });
   });
 
   test("accepting the open shots turns the build and the check run to passed", async () => {

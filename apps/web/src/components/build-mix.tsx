@@ -1,6 +1,6 @@
 import { Caption, Stack, type TextTone, Text } from "@hackcove/ui";
 import type { BuildSummary } from "#/db/build-list";
-import type { BuildCounts } from "#/db/review";
+import type { BuildCounts } from "#/db/build-counts";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
 import { formatNumber } from "#/lib/format";
 
