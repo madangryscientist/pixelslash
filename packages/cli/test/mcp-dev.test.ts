@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { devStore, liveSession } from "@pixelslash/engine";
+import { devStore, liveSession } from "@hackcove/pixelslash-engine";
 import { afterAll, describe, expect, test } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";

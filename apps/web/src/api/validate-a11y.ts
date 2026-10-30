@@ -1,4 +1,4 @@
-import { type A11y, parseA11yEntry } from "@pixelslash/engine/a11y-entry";
+import { type A11y, parseA11yEntry } from "@hackcove/pixelslash-engine/a11y-entry";
 
 /**
  * A shot's accessibility scan (PS-238), checked with the engine's own manifest parser; `bad`

@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import type { DiffIgnore, DiffOptions, PixelDiff } from "@pixelslash/engine/diff";
+import type { DiffIgnore, DiffOptions, PixelDiff } from "@hackcove/pixelslash-engine/diff";
 
 /**
  * The diff sidecar's wire format (PS-203), shared by the Worker's client (`sidecar.ts`) and the

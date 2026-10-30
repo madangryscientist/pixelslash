@@ -5,7 +5,7 @@ const transpiler = new Bun.Transpiler({ loader: "ts" });
 
 /**
  * Every bare specifier the module graph from `entry` loads at startup: static imports only, following
- * relative paths and `@pixelslash/*`. A type-only import is erased and an `import()` waits for its
+ * relative paths and `@hackcove/pixelslash-engine`. A type-only import is erased and an `import()` waits for its
  * command, so neither is followed.
  */
 async function staticDeps(entry: string): Promise<Set<string>> {
@@ -19,7 +19,7 @@ async function staticDeps(entry: string): Promise<Set<string>> {
     const code = (await Bun.file(file).text()).replace(/^#!.*/, "");
     for (const { path, kind } of transpiler.scanImports(code)) {
       if (kind !== "import-statement") continue;
-      if (path.startsWith(".") || path.startsWith("@pixelslash/")) {
+      if (path.startsWith(".") || path.startsWith("@hackcove/pixelslash-engine")) {
         queue.push(Bun.resolveSync(path, dirname(file)));
       } else bare.add(path);
     }

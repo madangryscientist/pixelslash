@@ -1,4 +1,4 @@
-import { type IgnoreRect, parseConfig } from "@pixelslash/engine";
+import { type IgnoreRect, parseConfig } from "@hackcove/pixelslash-engine";
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";

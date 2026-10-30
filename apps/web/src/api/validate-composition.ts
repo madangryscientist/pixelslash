@@ -2,7 +2,7 @@ import {
   type Composition,
   MAX_FINDINGS,
   parseCompositionEntry,
-} from "@pixelslash/engine/composition-entry";
+} from "@hackcove/pixelslash-engine/composition-entry";
 
 export { MAX_FINDINGS };
 

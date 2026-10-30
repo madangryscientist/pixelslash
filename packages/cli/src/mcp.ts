@@ -1,4 +1,4 @@
-import { CLIENT_VERSION, CaptureError, FigmaError, UsageError } from "@pixelslash/engine";
+import { CLIENT_VERSION, CaptureError, FigmaError, UsageError } from "@hackcove/pixelslash-engine";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {

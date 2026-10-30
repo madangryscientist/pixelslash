@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { CONFIG_NAMES, UsageError, isHttpUrl, parseConfig } from "@pixelslash/engine";
+import { CONFIG_NAMES, UsageError, isHttpUrl, parseConfig } from "@hackcove/pixelslash-engine";
 import { RemoteError, apiClient, isObj, type FetchLike } from "./api.ts";
 import { storedToken } from "./credentials.ts";
 import { listProjects, type Project } from "./remote.ts";

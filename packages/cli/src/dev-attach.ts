@@ -1,4 +1,9 @@
-import { DEV_HEADER, type DevIteration, type DevLock, UsageError } from "@pixelslash/engine";
+import {
+  DEV_HEADER,
+  type DevIteration,
+  type DevLock,
+  UsageError,
+} from "@hackcove/pixelslash-engine";
 import { type DevArgs, type DevDeps, jsonOf, lineOf } from "./dev.ts";
 import { onKeys, onceInProgress } from "./dev-loop.ts";
 import type { Io } from "./run.ts";

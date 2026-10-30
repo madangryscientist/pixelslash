@@ -15,7 +15,7 @@ publishing, so it carries a provenance statement; 0.1.0 was published by hand wi
 ## [0.1.0] - 2026-10-30
 
 The first version of the package: a single bundle (`dist/index.js`) with
-`@pixelslash/engine` inlined, plus `diff.wasm`.
+`@hackcove/pixelslash-engine` inlined, plus `diff.wasm`.
 
 ### Added
 

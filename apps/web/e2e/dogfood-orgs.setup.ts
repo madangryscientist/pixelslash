@@ -5,7 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import type { CaptureSetup } from "@pixelslash/engine";
+import type { CaptureSetup } from "@hackcove/pixelslash-engine";
 import { PERSIST, STUB, WEB } from "./dogfood-orgs.config";
 import { getPlatformProxy } from "wrangler";
 import { seedPng } from "./dogfood-images";

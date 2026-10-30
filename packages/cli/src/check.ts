@@ -13,7 +13,7 @@ import {
   onlyRoutes,
   openCaptureSession,
   timingLine,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import { RemoteError } from "./api.ts";
 import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
 import { type Remote, connect, namesProject, resolveProject } from "./remote.ts";

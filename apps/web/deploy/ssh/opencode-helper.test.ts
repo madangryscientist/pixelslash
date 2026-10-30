@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import type { ProcLike, SpawnProc } from "@pixelslash/engine/judge";
+import type { ProcLike, SpawnProc } from "@hackcove/pixelslash-engine/judge";
 import { describe, expect, test } from "vitest";
 import { CHAT_PATH, createHandler } from "./opencode-helper";
 

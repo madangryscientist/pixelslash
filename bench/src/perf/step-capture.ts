@@ -1,4 +1,4 @@
-import { settleCapture } from "@pixelslash/engine";
+import { settleCapture } from "@hackcove/pixelslash-engine";
 import { chromium } from "playwright";
 
 const WARMUP = 1;

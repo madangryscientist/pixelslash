@@ -9,7 +9,7 @@ import {
   readPins,
   unpinIteration,
   worktreeRoot,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import { readFlagPairs, takeJson } from "./args.ts";
 import { attachTo } from "./dev-attach.ts";
 import { devLoop, devOnce } from "./dev-loop.ts";

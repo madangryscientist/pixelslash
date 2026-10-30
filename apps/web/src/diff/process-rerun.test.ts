@@ -1,4 +1,4 @@
-import { diffPngs } from "@pixelslash/engine/diff";
+import { diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";

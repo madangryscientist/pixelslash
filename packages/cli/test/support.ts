@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import type { CapturePage, ProcLike, RunManifest, SpawnProc } from "@pixelslash/engine";
+import type { CapturePage, ProcLike, RunManifest, SpawnProc } from "@hackcove/pixelslash-engine";
 
 export const FIXTURES = fileURLToPath(new URL("../../../fixtures", import.meta.url));
 export const PAGES = join(FIXTURES, "pages");

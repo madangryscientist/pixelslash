@@ -1,4 +1,4 @@
-import type { diffPngs } from "@pixelslash/engine/diff";
+import type { diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { eq } from "drizzle-orm";
 import {
   type Baseline,

@@ -1,4 +1,4 @@
-import { CaptureError, type CaptureSession } from "@pixelslash/engine";
+import { CaptureError, type CaptureSession } from "@hackcove/pixelslash-engine";
 
 /**
  * How a long local run reports to its caller (ob 1735): a progress line per shot, and a signal

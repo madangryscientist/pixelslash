@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { type DiffIgnore, diffPngs } from "@pixelslash/engine/diff";
+import { type DiffIgnore, diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { describe, expect, test } from "vitest";
 import { png } from "../../e2e/png";
 import { RED, shot } from "./test-shots";

@@ -23,7 +23,7 @@ import {
   type SnapshotDeps,
   type SpawnProc,
   type UploadDeps,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import {
   LOGIN_USAGE,
   LOGOUT_USAGE,
