@@ -75,8 +75,10 @@ and keep `pixelslash --help` in step with it.
 - Branch from `main`, keep the change small, and rebase on `origin/main` before you push.
 - Write the commit subject as a [Conventional Commit](https://www.conventionalcommits.org/)
   (`feat(scope): …`, `fix(scope): …`, and so on; `docs`, `chore`, `refactor`, `test`, `perf`,
-  `build`, `ci`, `style`, `revert`), and say in the body why the change exists. The squash keeps
-  your subject.
+  `build`, `ci`, `style`, `revert`), and say in the body why the change exists. The scope is the
+  area (`cli`, `engine`, `playwright`, `web`, `site`, `bench`, `scripts`, `ci`), and the issue goes
+  at the end: `fix(engine): diff only the overlap when sizes differ (#12)`. The squash keeps your
+  subject.
 - Stage files by name. Never commit straight to `main`.
 - Do not merge with a failing PixelSlash check unless your change touches nothing a shot can see
   and the description says so.

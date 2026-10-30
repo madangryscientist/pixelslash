@@ -141,6 +141,29 @@ bunx playwright install chromium-headless-shell   # once per machine
 bun run pixelslash -- --live-png <main.png> --local-png <branch.png> --out /tmp/ps-check
 ```
 
+## Commits: conventional, as in Hack Cove
+
+Every commit is `<type>(<scope>): <subject>`, as in `fix(engine): diff only the overlap when sizes
+differ`: branch commits, PR titles and the squash commit on `main` alike. The squash subject is what
+`main`'s history and the changelog are read from, so merge with `gh pr merge <pr> --squash --subject "…"`
+when the PR title is not already in this form.
+
+- **The scope is the area, never a ticket:** `cli`, `engine`, `playwright`, `web`, `site`, `bench`,
+  `scripts`, `ci`, `release`, `deps`. A change across several areas takes the one it is mostly about;
+  repo-wide docs and config may drop the scope (`docs: …`, `chore: …`).
+- **A ticket goes at the end of the subject**, in parentheses: `feat(web): re-run errored shots
+  (PS-289)`. A contributor cites the GitHub issue the same way, `(#12)`. GitHub appends the PR number
+  on a squash; leave it.
+- **The type is honest:** `feat`, `fix` and `perf` change what a user gets and belong in the
+  changelog; `docs`, `test`, `chore`, `refactor`, `build`, `ci` and `style` do not. A `!` after the
+  type (`feat(cli)!: …`), or a `BREAKING CHANGE:` footer, marks a break in the CLI contract
+  (`docs/cli.md`: flags, stdout, exit codes) or in the upload API.
+- A release is `chore(release): @hackcove/pixelslash <version>`.
+- No commit, PR title or PR body carries a `Co-Authored-By` or any other AI attribution line.
+
+Older subjects on `main` use the ticket as the scope (`feat(PS-289): …`, `feat(ob 1421): …`); leave
+them, and do not copy the form.
+
 ## Landing: through a pull request
 
 Code lands through pull requests: the author runs the gate above on a worktree, rebases on
