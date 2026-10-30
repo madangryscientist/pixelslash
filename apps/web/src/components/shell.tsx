@@ -41,6 +41,7 @@ export function Logo({ size = 24 }: { size?: number }): ReactNode {
 export function Wordmark({ height = 16 }: { height?: number }): ReactNode {
   return (
     <svg
+      className="ps-wordmark"
       viewBox="0 0 108 16"
       width={(height * 108) / 16}
       height={height}
@@ -48,8 +49,9 @@ export function Wordmark({ height = 16 }: { height?: number }): ReactNode {
       aria-label="PixelSlash"
       shapeRendering="crispEdges"
     >
-      <path fill="#cba6f7" d={WORDMARK_LETTERS} />
-      <path fill="#89b4fa" d={WORDMARK_SLASH} />
+      {/* The dark-theme colours are the attributes; styles.css recolours the light theme (the mauve and blue fail on white). */}
+      <path className="ps-wordmark-letters" fill="#cba6f7" d={WORDMARK_LETTERS} />
+      <path className="ps-wordmark-slash" fill="#89b4fa" d={WORDMARK_SLASH} />
     </svg>
   );
 }
