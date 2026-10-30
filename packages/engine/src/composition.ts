@@ -10,6 +10,7 @@ import {
   type SpecialCase,
 } from "./composition-entry.ts";
 import { toImageRects } from "./page-areas.ts";
+import { shiftBoxes, type Crop } from "./story-crop.ts";
 
 /**
  * Composition-only capture (ob 1850): on a project built from one design-system library's
@@ -36,8 +37,13 @@ export {
 export { loadLibrary, type CompositionLibrary } from "./composition-library.ts";
 
 /** One CSS-px box in image px, or null when it is wholly off the image. */
-function imageBox(box: CssBox, scale: number, image: { width: number; height: number }) {
-  return toImageRects([box], scale, image)[0] ?? null;
+function imageBox(
+  box: CssBox,
+  scale: number,
+  image: { width: number; height: number },
+  origin: Crop["origin"] | undefined,
+) {
+  return toImageRects(shiftBoxes([box], origin), scale, image)[0] ?? null;
 }
 
 /** `s` cut to `MAX_TEXT`, so one `data:` URL style does not fill the row. */
@@ -59,7 +65,13 @@ function capped(library: string, gaps: Gap[], special: SpecialCase[]): Compositi
 export async function measureComposition(
   page: Page,
   lib: CompositionLibrary,
-  shot: { scale: number; image: { width: number; height: number }; warn: (m: string) => void },
+  shot: {
+    scale: number;
+    image: { width: number; height: number };
+    /** The crop origin when the shot is cropped (full-page CSS px): boxes are shifted onto the cropped image. */
+    origin?: Crop["origin"] | undefined;
+    warn: (m: string) => void;
+  },
 ): Promise<Composition> {
   const walked = await page.evaluate<Walked>(
     walkSource({
@@ -73,7 +85,7 @@ export async function measureComposition(
     shot.warn(`warning: composition.custom selector "${s}" is not a valid selector`);
   const gaps: Gap[] = [];
   for (const g of walked.gaps) {
-    const box = imageBox(g.box, shot.scale, shot.image);
+    const box = imageBox(g.box, shot.scale, shot.image, shot.origin);
     if (box)
       gaps.push({
         ...g,
@@ -85,7 +97,7 @@ export async function measureComposition(
   }
   const special: SpecialCase[] = [];
   for (const s of walked.special) {
-    const box = imageBox(s.box, shot.scale, shot.image);
+    const box = imageBox(s.box, shot.scale, shot.image, shot.origin);
     if (box) special.push({ selector: clip(s.selector), reason: clip(s.reason), box });
   }
   return capped(lib.name, gaps, special);

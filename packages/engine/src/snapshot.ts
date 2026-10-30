@@ -1,10 +1,9 @@
 import type { Browser, BrowserContext, Page } from "playwright";
-import { PNG } from "pngjs";
 import { scanA11y } from "./a11y.ts";
 import type { A11y } from "./a11y-entry.ts";
 import { keepNativeRaf } from "./capture.ts";
 import { launchSessionBrowsers } from "./capture-browsers.ts";
-import { openPage } from "./capture-open.ts";
+import { openPage, type Opened } from "./capture-open.ts";
 import {
   loadLibrary,
   measureComposition,
@@ -17,7 +16,6 @@ import {
   type CaptureConfig,
   type FlakyPolicy,
   type Ignore,
-  type MaskRect,
   type Route,
   type Stabilise,
   type Variant,
@@ -49,8 +47,8 @@ import { startApp, type StopApp } from "./start.ts";
 import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
 import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
 import { storybookRoutes } from "./storybook.ts";
-
-const MASK_RGBA = [255, 0, 255, 255] as const;
+import { paintRects } from "./paint-rects.ts";
+import { measureStoryBox, shiftBoxes, storyShot, type Crop } from "./story-crop.ts";
 
 /** One snapshot in the manifest: what it is (name + variant + tags), what made it, and its PNG. */
 export type SnapshotEntry = {
@@ -119,6 +117,9 @@ export { captureInto } from "./capture-into.ts";
 /** Launch flags that take host-specific rendering choices out of the picture. */
 const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];
 
+/** The shot as it is kept: its size in image px and, for a cropped story, the crop origin in full-page CSS px. */
+type Frame = { image: { width: number; height: number }; origin?: Crop["origin"] | undefined };
+
 /**
  * Resolve ignore areas on the live page to image-px boxes: every match of every selector, every
  * `[data-pixelslash-ignore]` element, and the fixed rectangles. Nothing is painted. A selector that
@@ -128,27 +129,14 @@ async function resolveIgnoreBoxes(
   page: Page,
   areas: Ignore[],
   shot: Pick<Shot, "stabilise" | "unmatched">,
-  image: { width: number; height: number },
+  frame: Frame,
 ): Promise<IgnoreRect[]> {
   const selectors = areas.filter((a) => typeof a === "string");
   const misses = shot.unmatched.checked("ignore", selectors);
   const boxes = await measureIgnore(page, selectors, true, misses);
   boxes.push(...areas.filter((a) => typeof a !== "string"));
-  return toImageRects(boxes, shot.stabilise.deviceScaleFactor, image);
-}
-
-/** Paint each rectangle (CSS px, scaled by `scale` to image px, clipped to the image) in MASK_COLOR. */
-export function paintRects(png: Buffer, rects: MaskRect[], scale: number): Buffer {
-  if (rects.length === 0) return png;
-  const img = PNG.sync.read(png);
-  for (const r of rects) {
-    const x1 = Math.min(img.width, (r.x + r.width) * scale);
-    const y1 = Math.min(img.height, (r.y + r.height) * scale);
-    for (let y = r.y * scale; y < y1; y++) {
-      for (let x = r.x * scale; x < x1; x++) img.data.set(MASK_RGBA, (y * img.width + x) << 2);
-    }
-  }
-  return PNG.sync.write(img);
+  const scale = shot.stabilise.deviceScaleFactor;
+  return toImageRects(shiftBoxes(boxes, frame.origin), scale, frame.image);
 }
 
 type Shot = {
@@ -203,18 +191,31 @@ async function pinClock(context: BrowserContext, { clock, timers }: Stabilise): 
   await context.clock.pauseAt(clock);
 }
 
-/** What is read off the settled page once it is shot: the ignore boxes, media, composition and a11y scan. */
-async function measure(page: Page, shot: Shot, png: Buffer) {
+/**
+ * What is read off the settled page once it is shot: the ignore boxes, media, composition and a11y
+ * scan. `png` is the shot as it is kept; a story's crop moves its `origin` (full-page CSS px) to the
+ * top left, so every box is shifted to sit on the same pixels.
+ */
+async function measure(page: Page, shot: Shot, png: Buffer, origin?: Crop["origin"]) {
   const { stabilise } = shot;
   // The PNG's size from its IHDR chunk, without decoding the image.
-  const size = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
-  const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, size);
-  const media = unexcluded(await measureMedia(page), ignore, stabilise.deviceScaleFactor, size);
+  const frame = {
+    image: { width: png.readUInt32BE(16), height: png.readUInt32BE(20) },
+    origin,
+  };
+  const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, frame);
+  const media = unexcluded(
+    shiftBoxes(await measureMedia(page), origin),
+    ignore,
+    stabilise.deviceScaleFactor,
+    frame.image,
+  );
   const composition =
     shot.library &&
     (await measureComposition(page, shot.library, {
       scale: stabilise.deviceScaleFactor,
-      image: size,
+      image: frame.image,
+      origin,
       warn: shot.warn,
     }));
   // After the screenshot and the measurements, so nothing the scan lets run can reach the PNG.
@@ -222,6 +223,41 @@ async function measure(page: Page, shot: Shot, png: Buffer) {
   if (shot.a11y && stabilise.timers) await page.clock.resume();
   const a11y = shot.a11y ? await scanA11y(page) : undefined;
   return { ignore, media, composition, a11y };
+}
+
+/** The settled page shot: cropped to its story when it is one, then measured in the frame it is kept in. */
+async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
+  const { stabilise, route } = shot;
+  const selectors = route.masks.filter((m) => typeof m === "string");
+  const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
+  // Measured before the shot, on the settled page, in the frame the shot is taken in.
+  const story = route.storybook ? await measureStoryBox(page, stabilise.animations) : null;
+  const shooting = performance.now();
+  const full = await page.screenshot({
+    fullPage: true,
+    animations: stabilise.animations ? "disabled" : "allow",
+    caret: stabilise.caret ? "hide" : "initial",
+    mask: locators,
+    maskColor: MASK_COLOR,
+  });
+  const steps: CaptureSteps = {
+    navigateMs: Math.round(opened.navigateMs),
+    settleMs: Math.round(opened.settleMs),
+    screenshotMs: elapsed(shooting),
+    settle: opened.settle,
+  };
+  const { png, origin } = storyShot(full, story, stabilise.deviceScaleFactor);
+  const { ignore, media, composition, a11y } = await measure(page, shot, png, origin);
+  const rects = route.masks.filter((m) => typeof m !== "string");
+  return {
+    png: paintRects(png, shiftBoxes(rects, origin), stabilise.deviceScaleFactor),
+    ignore,
+    media,
+    loadMs: opened.navigateMs + opened.settleMs,
+    steps,
+    ...(composition && { composition }),
+    ...(a11y && { a11y }),
+  };
 }
 
 async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
@@ -236,36 +272,7 @@ async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
     await pinClock(context, stabilise);
     const page = await context.newPage();
     const opened = await openPage(page, url, route, stabilise.timeoutMs);
-    const selectors = route.masks.filter((m) => typeof m === "string");
-    const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
-    const shooting = performance.now();
-    const png = await page.screenshot({
-      fullPage: true,
-      animations: stabilise.animations ? "disabled" : "allow",
-      caret: stabilise.caret ? "hide" : "initial",
-      mask: locators,
-      maskColor: MASK_COLOR,
-    });
-    const steps: CaptureSteps = {
-      navigateMs: Math.round(opened.navigateMs),
-      settleMs: Math.round(opened.settleMs),
-      screenshotMs: elapsed(shooting),
-      settle: opened.settle,
-    };
-    const { ignore, media, composition, a11y } = await measure(page, shot, png);
-    return {
-      png: paintRects(
-        png,
-        route.masks.filter((m) => typeof m !== "string"),
-        stabilise.deviceScaleFactor,
-      ),
-      ignore,
-      media,
-      loadMs: opened.navigateMs + opened.settleMs,
-      steps,
-      ...(composition && { composition }),
-      ...(a11y && { a11y }),
-    };
+    return await capture(page, shot, opened);
   } catch (e) {
     if (e instanceof CaptureError) throw e;
     throw new CaptureError(

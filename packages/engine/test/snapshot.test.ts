@@ -5,12 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { parseConfig } from "../src/config.ts";
-import {
-  captureSnapshots,
-  paintRects,
-  toImageRects,
-  type SnapshotManifest,
-} from "../src/snapshot.ts";
+import { paintRects } from "../src/paint-rects.ts";
+import { captureSnapshots, toImageRects, type SnapshotManifest } from "../src/snapshot.ts";
 
 const SITE = fileURLToPath(new URL("../../../fixtures/capture/site", import.meta.url));
 const dirs: string[] = [];
