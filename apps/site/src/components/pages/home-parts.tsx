@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Logo } from "#/components/logo";
+import { Wordmark } from "#/components/logo";
 import { TRADEMARK } from "#/content/docs";
 import hero from "#/content/hero.json";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
@@ -19,9 +19,8 @@ export function Header(): ReactNode {
   return (
     <header className="home-header sticky top-0 z-30">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
-        <a href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <Logo size={26} />
-          PixelSlash
+        <a href="/" className="flex items-center">
+          <Wordmark />
         </a>
         <nav
           aria-label="Site"
@@ -108,9 +107,8 @@ export function Footer(): ReactNode {
     <footer data-testid="footer" className="home-footer px-5 py-12 text-sm">
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <a href="/" className="flex items-center gap-2 font-semibold text-(--home-text)">
-            <Logo size={20} />
-            PixelSlash
+          <a href="/" className="flex items-center">
+            <Wordmark />
           </a>
           <span>MIT licence</span>
           <a href={`mailto:${CONTACT}`} className="home-link">

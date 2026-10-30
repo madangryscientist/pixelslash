@@ -21,6 +21,13 @@
   --ps-unmeasured: #cbd5e1;
   --ps-same: #e2e8f0;
 }
+/* The wordmark on the light theme: Catppuccin Latte's darker mauve and blue, which pass 3:1 on white (the dark ones do not). */
+:root:not(.dark) .ps-wordmark-letters {
+  fill: #8839ef;
+}
+:root:not(.dark) .ps-wordmark-slash {
+  fill: #1e66f5;
+}
 .dark {
   --ps-changed: #fab387;
   --ps-new: #89b4fa;
