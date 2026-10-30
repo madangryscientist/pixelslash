@@ -35,24 +35,18 @@ export function Logo({ size = 24 }: { size?: number }): ReactNode {
 }
 
 /**
- * The wordmark: PIXEL / SLASH, sized by height (the 108:16 art sets the width, so keep height a whole multiple of 16).
- * It is named "PixelSlash" for assistive tech; `decorative` hides it where a visible label already names the link.
+ * The wordmark: PIXEL / SLASH, sized by height. The 108:16 art sets the width, so keep height a whole multiple of 16
+ * (16 is one CSS pixel per art pixel). It is named "PixelSlash" for assistive tech.
  */
-export function Wordmark({
-  height = 16,
-  decorative = false,
-}: {
-  height?: number;
-  decorative?: boolean;
-}): ReactNode {
-  const name = decorative ? { "aria-hidden": true } : { role: "img", "aria-label": "PixelSlash" };
+export function Wordmark({ height = 16 }: { height?: number }): ReactNode {
   return (
     <svg
       viewBox="0 0 108 16"
       width={(height * 108) / 16}
       height={height}
+      role="img"
+      aria-label="PixelSlash"
       shapeRendering="crispEdges"
-      {...name}
     >
       <path fill="#cba6f7" d={WORDMARK_LETTERS} />
       <path fill="#89b4fa" d={WORDMARK_SLASH} />
@@ -104,9 +98,7 @@ export function AppBrand() {
   const { viewer } = rootRoute.useLoaderData();
   return (
     <AppShellBrand
-      logo={<Wordmark decorative />}
-      logoSize="sm"
-      label={<span className="sr-only">PixelSlash</span>}
+      label={<Wordmark />}
       render={(props) => <Link to={viewer ? "/orgs" : "/"} {...props} />}
     />
   );
