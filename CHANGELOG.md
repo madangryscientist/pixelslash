@@ -22,7 +22,7 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 ## [0.1.0] - unreleased
 
 The first version of the package: a single bundle (`dist/index.js`) with
-`@pixelslash/engine` inlined, plus `diff.wasm`.
+`@hackcove/pixelslash-engine` inlined, plus `diff.wasm`.
 
 ### Added
 

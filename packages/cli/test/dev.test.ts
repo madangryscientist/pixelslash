@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { devStore, latestIteration, liveSession } from "@pixelslash/engine";
+import { devStore, latestIteration, liveSession } from "@hackcove/pixelslash-engine";
 import { afterAll, describe, expect, test } from "vitest";
 import type { KeyInput } from "../src/dev-loop.ts";
 import { run } from "../src/run.ts";

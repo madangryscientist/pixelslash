@@ -1,4 +1,4 @@
-import { diffPngs } from "@pixelslash/engine/diff";
+import { diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { describe, expect, test } from "vitest";
 import { stubModel, twoChanges, withModel } from "#/ai/explain-test-kit";
 import { getBuild } from "#/db/builds";

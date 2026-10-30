@@ -4,7 +4,7 @@ import {
   UsageError,
   inlinePng,
   liveSession,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { RemoteError } from "./api.ts";
 import { REMOTE_FLAGS } from "./remote.ts";

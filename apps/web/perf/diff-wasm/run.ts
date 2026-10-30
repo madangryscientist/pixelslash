@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { wasmDiff } from "@pixelslash/engine/diff-wasm";
+import { wasmDiff } from "@hackcove/pixelslash-engine/diff-wasm";
 import { DIFF_SIZES, page } from "../../../../bench/src/perf/fixtures.ts";
 
 const here = import.meta.dirname;

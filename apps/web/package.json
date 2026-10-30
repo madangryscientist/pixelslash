@@ -22,9 +22,9 @@
     "cf-typegen": "wrangler types --strict-vars=false"
   },
   "dependencies": {
+    "@hackcove/pixelslash-engine": "workspace:*",
     "@hackcove/theme-catppuccin-mocha": "0.2.12",
     "@hackcove/ui": "^0.6.3",
-    "@pixelslash/engine": "workspace:*",
     "@sentry/cloudflare": "11.9.0",
     "@sentry/react": "11.9.0",
     "@tailwindcss/vite": "^4.1.18",

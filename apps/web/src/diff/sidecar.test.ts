@@ -7,7 +7,7 @@ import {
   type DiffOptions,
   type PixelDiff,
   diffPngs,
-} from "@pixelslash/engine/diff";
+} from "@hackcove/pixelslash-engine/diff";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { png } from "../../e2e/png";
 import { resetFallbackLog, sidecarDiff, sidecarEndpoint } from "./sidecar";

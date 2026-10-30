@@ -1,5 +1,5 @@
-import { CLIENT_VERSION } from "@pixelslash/engine";
-import { scrubEvent } from "@pixelslash/engine/sentry-scrub";
+import { CLIENT_VERSION } from "@hackcove/pixelslash-engine";
+import { scrubEvent } from "@hackcove/pixelslash-engine/sentry-scrub";
 
 /** The CLI reports errors to Sentry only when this names a DSN (PS-227); unset, it does nothing. */
 const SENTRY_DSN_VAR = "PIXELSLASH_SENTRY_DSN";

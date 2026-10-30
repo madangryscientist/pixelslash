@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
-import { type Box, regionCrops } from "@pixelslash/engine/region-crops";
-import { release } from "@pixelslash/engine/release";
+import { type Box, regionCrops } from "@hackcove/pixelslash-engine/region-crops";
+import { release } from "@hackcove/pixelslash-engine/release";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { inChunks } from "#/db/chunks";
 import type { Db } from "#/db/db";

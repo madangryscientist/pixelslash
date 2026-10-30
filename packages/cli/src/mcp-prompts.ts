@@ -3,7 +3,7 @@ import {
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { UsageError } from "@pixelslash/engine";
+import { UsageError } from "@hackcove/pixelslash-engine";
 import { buildToSpec } from "./mcp-dev.ts";
 
 /**

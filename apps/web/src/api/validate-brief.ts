@@ -1,4 +1,4 @@
-import { BRIEF_LIMIT, briefTooLong, trimBrief } from "@pixelslash/engine/brief";
+import { BRIEF_LIMIT, briefTooLong, trimBrief } from "@hackcove/pixelslash-engine/brief";
 import { bad, Unprocessable } from "./errors";
 
 /** The uploader's brief (PS-232): absent or blank is none; trimmed; over `BRIEF_LIMIT` is a 422. */

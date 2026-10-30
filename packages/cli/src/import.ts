@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { UsageError, importPngs } from "@pixelslash/engine";
+import { UsageError, importPngs } from "@hackcove/pixelslash-engine";
 import type { Io } from "./run.ts";
 import { readFlagPairs } from "./args.ts";
 

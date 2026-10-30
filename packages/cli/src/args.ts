@@ -8,7 +8,7 @@ import {
   type CompareOptions,
   type DiffOptions,
   type IgnoreRect,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import { ESCALATE } from "./failure.ts";
 
 export const USAGE =

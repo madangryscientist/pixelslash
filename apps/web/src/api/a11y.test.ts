@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { builds, snapshots } from "#/db/schema";
 import { buildView } from "#/db/review";
-import { MAX_VIOLATIONS } from "@pixelslash/engine/a11y-entry";
+import { MAX_VIOLATIONS } from "@hackcove/pixelslash-engine/a11y-entry";
 import { META, call, openBuild, setup, snapshotForm } from "./test-support";
 
 const CONTRAST = {
