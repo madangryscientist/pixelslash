@@ -275,13 +275,30 @@ the top level's plus the env, so forgetting `CLOUDFLARE_ENV=production` publishe
 [`SELF-HOST.md`](SELF-HOST.md).) It is still a production build to the stub guard: it refuses to start
 pointed at anything but github.com.
 
-Credentials come from `ob`, never `wrangler login`. From `apps/web`:
+Deploy with an API token, not `wrangler login`, so the credentials are scoped and the commands are repeatable.
+Create the token in your Cloudflare dashboard under **My Profile → API Tokens → Create Token** (a custom
+token), with these permissions:
+
+- **Account** · Workers Scripts: Edit (publish the Worker)
+- **Account** · D1: Edit (apply the migrations)
+- **Account** · Queues: Edit (bind `pixelslash-explain`)
+- **Account** · Account Settings: Read
+- **Zone** · Workers Routes: Edit and DNS: Edit on the zone that holds your custom domain (the deploy
+  creates that hostname's record; see below)
+
+Scope it to the one account and, for the zone rows, to that one zone. Then set both variables in the shell
+you deploy from. The account ID is on the right-hand side of any zone's Overview page in the dashboard:
 
 ```bash
-export CLOUDFLARE_API_TOKEN="$(ob secret get cloudflare-api-token)"
-export CLOUDFLARE_ACCOUNT_ID="$(ob secret get cloudflare-account-id)"
-# R2 admin (creating or deleting the bucket) needs a different token: ob secret get cloudflare-r2-token
+export CLOUDFLARE_API_TOKEN='<the token you just created>'
+export CLOUDFLARE_ACCOUNT_ID='<your account ID>'
+```
 
+R2 bucket admin (creating or deleting `pixelslash-blobs`) is a separate job and needs a token with
+**Account** · Workers R2 Storage: Edit. The deploy only binds the bucket, so keep that token out of the deploy shell.
+From `apps/web`:
+
+```bash
 CLOUDFLARE_ENV=production bun run build                          # writes dist/ for env.production
 bunx wrangler d1 migrations apply pixelslash --remote --env production
 bunx wrangler deploy --var SENTRY_RELEASE:"$(git rev-parse --short HEAD)"
