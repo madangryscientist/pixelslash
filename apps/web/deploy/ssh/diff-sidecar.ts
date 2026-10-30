@@ -12,8 +12,8 @@
  * apps/web/README.md, "The diff sidecar".
  */
 import { Buffer } from "node:buffer";
-import { diffPngs } from "@pixelslash/engine/diff";
-import { release } from "@pixelslash/engine/release";
+import { diffPngs } from "@hackcove/pixelslash-engine/diff";
+import { release } from "@hackcove/pixelslash-engine/release";
 import { SIDECAR_PATH, decodeRequest, encodeResponse } from "../../src/diff/sidecar-wire.ts";
 
 /** wrangler.jsonc's `env.e2e` `DIFF_SIDECAR_URL` names this port. */

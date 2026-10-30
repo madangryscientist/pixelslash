@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { UsageError } from "@pixelslash/engine";
+import { UsageError } from "@hackcove/pixelslash-engine";
 import type {
   CallToolResult,
   ServerNotification,

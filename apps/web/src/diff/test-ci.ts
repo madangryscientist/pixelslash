@@ -3,8 +3,8 @@ import {
   type CiResult,
   ENGINE_VERSION,
   measureShot,
-} from "@pixelslash/engine/ci-diff";
-import type { DiffSummary } from "@pixelslash/engine/diff";
+} from "@hackcove/pixelslash-engine/ci-diff";
+import type { DiffSummary } from "@hackcove/pixelslash-engine/diff";
 import { eq } from "drizzle-orm";
 import { expect } from "vitest";
 import { call, idOf, setup } from "#/api/test-support";

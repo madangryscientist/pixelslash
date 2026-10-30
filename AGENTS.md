@@ -26,7 +26,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | Project | Path | What it is |
 | --- | --- | --- |
 | `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
-| `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@pixelslash/engine` |
+| `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@hackcove/pixelslash-engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, every page prerendered from the repo's own docs and `data.json`; no D1, R2 or sign-in. The planner deploys it after a merge (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |

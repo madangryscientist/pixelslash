@@ -14,7 +14,12 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { askOpencode, bunSpawn, JudgeError, type SpawnProc } from "@pixelslash/engine/judge";
+import {
+  askOpencode,
+  bunSpawn,
+  JudgeError,
+  type SpawnProc,
+} from "@hackcove/pixelslash-engine/judge";
 
 export const CHAT_PATH = "/v1/chat/completions";
 /** update.sh points the orgs at this port. */

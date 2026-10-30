@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { newUploadProgress, type UploadProgress } from "@pixelslash/engine";
+import { newUploadProgress, type UploadProgress } from "@hackcove/pixelslash-engine";
 
 /**
  * Exit 7: an unexpected error, a bug in pixelslash. Not 1, which is reserved for NEW violations on

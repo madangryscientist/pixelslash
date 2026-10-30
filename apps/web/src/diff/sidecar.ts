@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
-import type { DiffIgnore, DiffOptions, PixelDiff } from "@pixelslash/engine/diff";
-import { release } from "@pixelslash/engine/release";
+import type { DiffIgnore, DiffOptions, PixelDiff } from "@hackcove/pixelslash-engine/diff";
+import { release } from "@hackcove/pixelslash-engine/release";
 import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";
 import { SIDECAR_PATH, decodeResponse, encodeRequest } from "./sidecar-wire";

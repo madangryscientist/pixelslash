@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { DiffOptions, IgnoreRect } from "@pixelslash/engine";
+import type { DiffOptions, IgnoreRect } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng, tmp } from "./support.ts";
 

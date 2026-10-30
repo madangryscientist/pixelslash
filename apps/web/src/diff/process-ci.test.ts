@@ -1,4 +1,4 @@
-import { ENGINE_VERSION } from "@pixelslash/engine/ci-diff";
+import { ENGINE_VERSION } from "@hackcove/pixelslash-engine/ci-diff";
 import { describe, expect, test } from "vitest";
 import { call, setup } from "#/api/test-support";
 import { getBuild } from "#/db/builds";

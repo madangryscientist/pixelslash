@@ -1,5 +1,9 @@
 import { Caption, Disclosure, Stack, SubsectionHeading, Text } from "@hackcove/ui";
-import { MAX_VIOLATIONS, type A11yDiff, type A11yViolation } from "@pixelslash/engine/a11y-entry";
+import {
+  MAX_VIOLATIONS,
+  type A11yDiff,
+  type A11yViolation,
+} from "@hackcove/pixelslash-engine/a11y-entry";
 
 /**
  * A shot's accessibility scan against its baseline's (PS-238): the violations new on Branch first,

@@ -1,5 +1,5 @@
 // The declarations `dist/index.d.ts` ships. The bundle has the engine inlined, so its types cannot
-// point at `@pixelslash/engine`; this file restates the public surface, and `test/types.ts` fails the
+// point at `@hackcove/pixelslash-engine`; this file restates the public surface, and `test/types.ts` fails the
 // typecheck when it and `src/index.ts` drift apart.
 import type { Page } from "@playwright/test";
 

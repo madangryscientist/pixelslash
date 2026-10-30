@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { existsSync, statSync } from "node:fs";
-import { CLIENT_VERSION } from "@pixelslash/engine";
+import { CLIENT_VERSION } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { capture, cleanup } from "./support.ts";
 import {

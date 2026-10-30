@@ -167,7 +167,7 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 - **The overlay's deflate level does not matter** (404–416 ms at every pngjs level); the encoder does
   (napi-image 27 ms, sharp 35 ms).
 - **ts startup is now ~21 ms**, against ~103 ms in the ob 1932 run. The bench imports
-  `@pixelslash/engine/diff` instead of the package root, which loaded Playwright. That is two runs
+  `@hackcove/pixelslash-engine/diff` instead of the package root, which loaded Playwright. That is two runs
   in two envs, so it is not a percentage. `bun build --compile` does not improve it (26 ms).
 - **Parallel decode only pays on big images, and only for a slow decoder.** On phone the Worker's
   start-up costs more than it saves; with napi-image, parallel is slower even on the long page

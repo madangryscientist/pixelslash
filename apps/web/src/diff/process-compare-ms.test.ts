@@ -1,4 +1,4 @@
-import { diffPngs } from "@pixelslash/engine/diff";
+import { diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { describe, expect, test } from "vitest";
 import type { BlobStore } from "#/storage/blobs";
 import { processBuild } from "./process";

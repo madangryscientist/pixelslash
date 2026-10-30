@@ -1,4 +1,4 @@
-import { parseConfig, resolveDiff } from "@pixelslash/engine";
+import { parseConfig, resolveDiff } from "@hackcove/pixelslash-engine";
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";

@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { loadConfig } from "@pixelslash/engine";
+import { loadConfig } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { SERVER, USER_TOKEN, fakeApi, home, login, project } from "./remote-support.ts";
 import { capture, cleanup, tmp } from "./support.ts";

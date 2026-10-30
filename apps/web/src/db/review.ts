@@ -1,5 +1,5 @@
-import type { A11yDiff } from "@pixelslash/engine/a11y-entry";
-import type { Composition } from "@pixelslash/engine/composition-entry";
+import type { A11yDiff } from "@hackcove/pixelslash-engine/a11y-entry";
+import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { and, eq, ne } from "drizzle-orm";
 import { SNAPSHOT_GROUPS, awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";

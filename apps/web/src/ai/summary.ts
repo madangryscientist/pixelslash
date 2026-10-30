@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { BRIEF_LIMIT } from "@pixelslash/engine/brief";
+import { BRIEF_LIMIT } from "@hackcove/pixelslash-engine/brief";
 import type { Build } from "#/db/builds";
 import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";

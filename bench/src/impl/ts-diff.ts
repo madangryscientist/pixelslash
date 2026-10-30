@@ -23,7 +23,7 @@
  */
 // The diff entry, not the package root: the root also exports capture, which loads Playwright.
 import { readFileSync } from "node:fs";
-import { wasmDiff } from "@pixelslash/engine/diff-wasm";
+import { wasmDiff } from "@hackcove/pixelslash-engine/diff-wasm";
 import { SPAWN_AT_ENV, type ImplOutput } from "./contract.ts";
 import { changeRegions } from "../pixelslash.ts";
 import { say, warn } from "../say.ts";
