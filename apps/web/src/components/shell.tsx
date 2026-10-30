@@ -1,5 +1,13 @@
 import { Link, getRouteApi } from "@tanstack/react-router";
-import { AppShellBrand, Avatar, Button, Cluster, ColourSchemeToggle, Text } from "@hackcove/ui";
+import {
+  AppShellBrand,
+  AppShellHideBelow,
+  Avatar,
+  Button,
+  Cluster,
+  ColourSchemeToggle,
+  Text,
+} from "@hackcove/ui";
 import { rememberTheme } from "#/lib/theme";
 import { useHydrated } from "#/lib/use-hydrated";
 
@@ -40,14 +48,10 @@ function ThemeToggle() {
 function UserMenu({ viewer }: { viewer: { login: string; name: string | null } }) {
   return (
     <Cluster gap="md">
-      <span
-        data-testid="viewer"
-        title={viewer.name ?? viewer.login}
-        className="hidden items-center gap-2 sm:flex"
-      >
-        <Avatar name={viewer.login} size="sm" />
+      <AppShellHideBelow data-testid="viewer">
+        <Avatar name={viewer.login} size="sm" title={viewer.name ?? viewer.login} />
         <Text>{viewer.login}</Text>
-      </span>
+      </AppShellHideBelow>
       <Button variant="link" render={(props) => <Link to="/settings" {...props} />}>
         Settings
       </Button>

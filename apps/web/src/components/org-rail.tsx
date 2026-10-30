@@ -27,7 +27,7 @@ export function OrgRail({
               key={org.id}
               size="sm"
               selected={org.id === selectedId}
-              leading={<Avatar name={org.name} size="sm" />}
+              leading={<Avatar name={org.name} size="sm" shape="square" />}
               trailing={
                 org.waiting > 0 ? (
                   <Pill
