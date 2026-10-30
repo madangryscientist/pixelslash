@@ -1,6 +1,6 @@
 {
   "updated": "2026-10-27",
-  "ours_commit": "c8fb3a2",
+  "ours_commit": "2082085",
   "audited": "2026-10-27",
   "method": "Our column is read from the code at {commit}: a yes means it exists in the code and is exercised by the gate where it has a test, not that a customer can reach it. The other five are their public docs, fetched {date}. A ? means the docs did not say, not that the tool lacks it.",
   "tools": [
@@ -42,7 +42,7 @@
       "ps": {
         "v": "y",
         "note": "pair mode, or --routes over an origin; pages behind sign-in via a config setup script",
-        "commit": "01e5ae9"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -60,7 +60,7 @@
       "ps": {
         "v": "y",
         "note": "pages and PNG dirs, nothing to wrap; a Storybook is read over HTTP, never imported",
-        "commit": "e175f30"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -78,7 +78,7 @@
       "ps": {
         "v": "y",
         "note": "reads index.json from a running Storybook 7+; one snapshot per story, no route list",
-        "commit": "e175f30"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -96,7 +96,7 @@
       "ps": {
         "v": "y",
         "note": "config lists globals (a theme, say); every story is shot under each combination",
-        "commit": "e175f30"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -114,7 +114,7 @@
       "ps": {
         "v": "p",
         "note": "Playwright only: @hackcove/pixelslash-playwright snapshot() writes a dir `pixelslash upload` takes, on plain Node; packed with npm pack, not published yet",
-        "commit": "32be607"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -133,7 +133,7 @@
       "ps": {
         "v": "p",
         "note": "snapshot(page, name, { ignore, redact }) settles, shoots and measures ignore boxes in image px; runs under plain `npx playwright test` on Node (the gate runs it there, and a CI-style check with no bun on PATH uploads its dir); packed with npm pack, not published yet",
-        "commit": "32be607"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -152,7 +152,7 @@
       "ps": {
         "v": "y",
         "note": "chromium, firefox and webkit: a variant names its browser (default chromium) and the capture image ships all three; a baseline is matched per browser, never across; the report and the review app show it; --browser on the local pair mode",
-        "commit": "9597b45"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -170,7 +170,7 @@
       "ps": {
         "v": "y",
         "note": "variants carry viewport, per route",
-        "commit": "f358669"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -188,7 +188,7 @@
       "ps": {
         "v": "y",
         "note": "a variant is browser + viewport + theme",
-        "commit": "f358669"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -206,7 +206,7 @@
       "ps": {
         "v": "y",
         "note": "fullPage: true; true since before the omnibus extraction",
-        "commit": "06a2472"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -224,7 +224,7 @@
       "ps": {
         "v": "y",
         "note": "image digest + font hash in the fingerprint",
-        "commit": "f358669"
+        "commit": "2082085"
       },
       "t": {
         "argos": "?",
@@ -242,7 +242,7 @@
       "ps": {
         "v": "y",
         "note": "all four, plus a bounded settle",
-        "commit": "9e55170"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -260,7 +260,7 @@
       "ps": {
         "v": "y",
         "note": "painted #FF00FF before the PNG is written",
-        "commit": "f358669"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -278,7 +278,7 @@
       "ps": {
         "v": "y",
         "note": "dropped before clustering, hatched, counted; drawn per test or variant in the review UI, audited, exportable as config; capture warns once per shot with each <video>/<audio> element's box that no ignore area covers, so the rect to add is named where it happens (PS-230)",
-        "commit": "23af4e9"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -296,7 +296,7 @@
       "ps": {
         "v": "y",
         "note": "YIQ threshold, alpha over white; two byte-equal PNGs are settled as unchanged without decoding or diffing, the server by the sha256 stored at upload, and the report says so",
-        "commit": "7371bc3"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -314,7 +314,7 @@
       "ps": {
         "v": "y",
         "note": "edge pixels set aside in either shot",
-        "commit": "b85f170"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -332,7 +332,7 @@
       "ps": {
         "v": "y",
         "note": "four-test fit with an edge-tile veto",
-        "commit": "42289c5"
+        "commit": "2082085"
       },
       "t": {
         "argos": "?",
@@ -350,7 +350,7 @@
       "ps": {
         "v": "y",
         "note": "faint + uneven + both directions is noise; on the server, a project's own (or its org's) OpenAI-compatible model labels each changed region (intended, unintended, noise) with a sentence, and with Auto-pass noise on, a shot it labels all noise is accepted and listed as AI-filtered; reasoning models get a 4000-token ceiling, and the build summary is made only under 10 changed shots; explaining runs on a queue after the diff, each call with its own time",
-        "commit": "74e58b4"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -368,7 +368,7 @@
       "ps": {
         "v": "y",
         "note": "both sizes stated, non-overlap never painted",
-        "commit": "b85f170"
+        "commit": "2082085"
       },
       "t": {
         "argos": "n",
@@ -386,7 +386,7 @@
       "ps": {
         "v": "y",
         "note": "boxes, 24px merge, speck floor",
-        "commit": "b2f1053"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -404,7 +404,7 @@
       "ps": {
         "v": "y",
         "note": "three config levels, stored on upload; set per test or variant in the review UI, audited, exportable as config",
-        "commit": "80e2cfc"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -422,7 +422,7 @@
       "ps": {
         "v": "y",
         "note": "server diff picks it per snapshot; `check` previews that pick locally; the CLI sends the merge-base and 200 of its first-parent ancestors and the server takes the nearest, so a project CI skipped for many commits on main still finds its baseline",
-        "commit": "67d3499"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -440,7 +440,7 @@
       "ps": {
         "v": "y",
         "note": "an acceptance on the branch survives a rebase or amend; a branch build is diffed against the branch's last build, and a still-open change is carried and decided once",
-        "commit": "af54f8c"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -458,7 +458,7 @@
       "ps": {
         "v": "y",
         "note": "acceptDefaultBranchBuild on finalise; the branch is the project's, set in settings (default main)",
-        "commit": "8416393"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -476,7 +476,7 @@
       "ps": {
         "v": "y",
         "note": "project / build / snapshot pages and a branch page (the branch against main, plus what changed since its last build); accept or reject records who and when, and moves the reviewer to the next shot awaiting a decision — a reject goes to the build page, because a rejection fails the build (PS-229); a mis-detection can be flagged and kept; Playwright e2e",
-        "commit": "717a6f8"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -494,7 +494,7 @@
       "ps": {
         "v": "y",
         "note": "j/k walk the build, a accept, r reject; a decision advances to the next undecided shot, and only j/k and Prev/Next walk decided ones (PS-229); e2e walks one",
-        "commit": "717a6f8"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -512,7 +512,7 @@
       "ps": {
         "v": "y",
         "note": "a PixelSlash check run on each build's commit in the project's connected repo: failure while changes await review or one is rejected, success once all are accepted or nothing changed, updated in place on each decision (PS-23; needs the GitHub App registered, apps/web/github-app). A self-host without the App posts the same states as a `PixelSlash` commit status with a fine-grained token (PS-235). A CI job can also block by exit code with `pixelslash status --wait`",
-        "commit": "d6f8388"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -530,7 +530,7 @@
       "ps": {
         "v": "p",
         "note": "sign-in, and an outbound-only App that posts the check run (PS-23); no webhooks and no PR comment yet",
-        "commit": "6048674"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -549,7 +549,7 @@
       "ps": {
         "v": "y",
         "note": "psci_ token per project, env or file; psu_ personal tokens the CLI and MCP act as their user with; one psorg_ org token reaches every project of its org, with `project create NAME` making projects by name",
-        "commit": "dc6152f"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -567,7 +567,7 @@
       "ps": {
         "v": "y",
         "note": "D1 tables, org invites, per-project tokens",
-        "commit": "853940f"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -585,7 +585,7 @@
       "ps": {
         "v": "y",
         "note": "upload and capture --upload; /api/v1, a stable additive-only contract: projects, builds, snapshots, images, baselines, detection flags, flakes",
-        "commit": "f4a5622"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -603,7 +603,7 @@
       "ps": {
         "v": "y",
         "note": "docker/self-host: one image and one volume (`docker compose up`), with the app, the diff worker, D1 as a SQLite file, R2 as files and real GitHub sign-in, no Cloudflare account; `test:e2e:docker` builds it, signs in through a stand-in, uploads with the CLI, diffs, restarts and finds it all kept (needs Docker, not in the gate). Also your own Cloudflare account, or a Proxmox container on your LAN (apps/web/SELF-HOST.md)",
-        "commit": "c4694c0"
+        "commit": "2082085"
       },
       "t": {
         "argos": "n",
@@ -621,7 +621,7 @@
       "ps": {
         "v": "y",
         "note": "the default; --upload is the only way out, and `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake",
-        "commit": "e4c2a1f"
+        "commit": "2082085"
       },
       "t": {
         "argos": "?",
@@ -639,7 +639,7 @@
       "ps": {
         "v": "y",
         "note": "local mlx or ollama, or a hosted model through a tool-less `opencode run` when `PIXELSLASH_OPENCODE_MODEL` names one; DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict; `upload --judge` writes one sentence per changed shot, shown on the build and branch pages; on the server, a project's own (or its org's) OpenAI-compatible model writes one summary of the build from its measurements and region notes, never its images, each sentence linking to the shots it names; given the uploader's brief (`upload --brief`), it closes with one sentence on whether the changes match it, read as untrusted text and deciding nothing (PS-232)",
-        "commit": "b65ee2c"
+        "commit": "2082085"
       },
       "t": {
         "argos": "n",
@@ -657,7 +657,7 @@
       "ps": {
         "v": "y",
         "note": "opt-in (`a11y: true`): axe-core runs on each settled page after the screenshot, WCAG 2.x A and AA violations are stored with the shot, and the compare report and the review app list the ones new on Branch against the baseline's; never changes an exit code (PS-238)",
-        "commit": "fadfbab"
+        "commit": "2082085"
       },
       "t": {
         "argos": "p",
@@ -675,7 +675,7 @@
       "ps": {
         "v": "y",
         "note": "CLI re-captures each changed shot (default 2 more) and flags it flaky when its runs disagree; the server stores each detection as evidence on a per-key flake, applies the shot's review/skip policy (skip never waits, blocks or moves a baseline), badges it, and keeps a Flakes list with Mark flaky and resolve/reopen, over the UI and API v1; `pixelslash flake ID` reproduces one locally N times, names each difference's cause, suggests the config fix (`--write` adds it after a prompt) and resolves it only when stable; a flaky shot that holds media is offered that element's ignore rect first (PS-230)",
-        "commit": "23af4e9"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -693,7 +693,7 @@
       "ps": {
         "v": "p",
         "note": "PIXELSLASH_RETENTION_DAYS turns on an hourly sweep that deletes non-default-branch builds past the window, with their blobs and rows, but never a baseline a surviving build points at; a dry run (the default) lists the builds and bytes, and the build page shows 'expires in N days'. Off unless set: no deployment runs with it on, so nothing expires yet",
-        "commit": "a2c84de"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -712,7 +712,7 @@
       "ps": {
         "v": "n",
         "note": "no pricing in the code; the shape is decided (bill changed shots only), price points wait on beta cost data",
-        "commit": "4a50905"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",
@@ -731,7 +731,7 @@
       "ps": {
         "v": "p",
         "note": "MIT licence and NOTICE are in the tree; the repo is private until the go-public step",
-        "commit": "27c3215"
+        "commit": "2082085"
       },
       "t": {
         "argos": "y",

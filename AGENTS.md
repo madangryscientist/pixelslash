@@ -181,8 +181,8 @@ it opens as `file://` without a build step.
   and `note` true. A commit cannot name its own sha, so the change leaves `commit` alone and a
   follow-up commit after the squash, `docs(...): matrix rows name the <sha> land`, sets each
   changed row's `commit` to the squash's short sha and re-runs `build.py`. `build.py` stops on a
-  sha `git` cannot resolve. A row whose value and note were already true before the extraction
-  from the maintainer's monorepo names `06a2472` and says so in its note.
+  sha `git` cannot resolve. A row whose value and note were already true in the public root
+  names that root's sha (`2082085`).
   `audited` is the date our column was last read against `ours_commit`; `updated` is the
   competitors' fetch date.
 - **A positioning or pricing decision is about to be made** — refresh the competitor columns
