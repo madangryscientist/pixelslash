@@ -67,13 +67,7 @@ export function Shell({
   }));
   return (
     <AppShell
-      brand={
-        <AppShellBrand
-          href="/"
-          label={<span className="sr-only">PixelSlash</span>}
-          logo={<Wordmark decorative />}
-        />
-      }
+      brand={<AppShellBrand href="/" label={<Wordmark />} />}
       controls={<Controls />}
       subnav={
         // One scrolling row on a phone rather than wrapping out of the fixed-height bar.
