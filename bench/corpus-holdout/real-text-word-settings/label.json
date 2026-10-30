@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "text",
+  "page": "settings",
+  "width": 680,
+  "height": 480,
+  "box": {
+    "x": 203,
+    "y": 102,
+    "w": 440,
+    "h": 17
+  }
+}

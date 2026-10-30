@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>article</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          15px/1.6 Georgia,
+          "Times New Roman",
+          serif;
+        background: #fff;
+        color: #27272a;
+      }
+      main {
+        max-width: 540px;
+        margin: 0 auto;
+        padding: 24px 20px;
+      }
+      h1 {
+        font:
+          600 26px/1.25 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        margin: 0 0 6px;
+      }
+      .meta {
+        font:
+          12px ui-sans-serif,
+          system-ui,
+          sans-serif;
+        color: #71717a;
+        margin-bottom: 14px;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      a {
+        color: #2563eb;
+      }
+      blockquote {
+        margin: 0 0 12px;
+        padding: 4px 14px;
+        border-left: 3px solid #d4d4d8;
+        color: #52525b;
+        font-style: italic;
+      }
+      #hero {
+        height: 70px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #f97316, #facc15 55%, #84cc16);
+        margin-bottom: 14px;
+      }
+      ul {
+        margin: 0 0 12px;
+        padding-left: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Why pixel diffs lie to you</h1>
+      <div class="meta" id="meta">Posted 12 March · 4 min read</div>
+      <div id="hero"></div>
+      <p id="p1">
+        A screenshot is the output of a long pipeline: layout, font rasterisation, compositing,
+        colour management. Two runs of the same page can disagree in places nobody can see, because
+        each stage makes small choices that depend on the machine it ran on.
+      </p>
+      <blockquote id="quote">
+        The signal is the change a person would notice; the rest is weather.
+      </blockquote>
+      <p id="p2">
+        Teams end up reviewing hundreds of <a href="#">flagged shots</a> a week, and learn to
+        approve without looking. That is the moment a visual test stops testing anything.
+      </p>
+      <ul id="list">
+        <li>Pin the browser and the fonts.</li>
+        <li>Freeze animations and the clock.</li>
+        <li>Compare pixels, then localise the change.</li>
+      </ul>
+      <p id="p3">
+        None of this is exotic, but it has to be done every time, by default, or the noise comes
+        back.
+      </p>
+    </main>
+  </body>
+</html>

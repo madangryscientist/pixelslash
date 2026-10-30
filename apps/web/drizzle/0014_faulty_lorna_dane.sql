@@ -1,0 +1,1 @@
+ALTER TABLE `detection_flags` ADD `exported_at` integer;

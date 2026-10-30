@@ -1,0 +1,21 @@
+[package]
+name = "pixelslash-diff-native"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+description = "diff.wasm's Rust built for the host, to time it against C# (PS-212). Bench only"
+
+# No dependencies, like the module it builds.
+[dependencies]
+
+[[bin]]
+name = "diff-native"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false

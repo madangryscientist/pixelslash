@@ -1,0 +1,1 @@
+ALTER TABLE `snapshots` ADD `diff_ms` integer;

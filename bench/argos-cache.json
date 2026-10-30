@@ -1,0 +1,4711 @@
+{
+  "version": 1,
+  "entries": {
+    "003666c6b7691436f6ba8a89ff0c358293a4cb5c86c06e9ab83fde1ffedc1f24:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-icon-swap-settings",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 45.4,
+      "regions": [
+        {
+          "x": 205,
+          "y": 315,
+          "w": 12,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "009cd2c8b0d4d398923e0037759bbba323d14b10c7e2cd34ac74d2bec6f08409:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-card-fade",
+      "changed": true,
+      "score": 0.1673,
+      "ms": 23.6,
+      "regions": [
+        {
+          "x": 21,
+          "y": 141,
+          "w": 598,
+          "h": 96
+        }
+      ],
+      "diff": true
+    },
+    "016efa56d6a0645ef25a9d5e24881e5031a0fd2b3de003f3ab1442123e41966c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-missing-icon",
+      "changed": true,
+      "score": 0.0004,
+      "ms": 16.9,
+      "regions": [
+        {
+          "x": 37,
+          "y": 327,
+          "w": 12,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "0690d167714aef109fd6c1afd30454c1140f07f0323c4e5549e64a16d1104313:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-missing-icon-settings",
+      "changed": true,
+      "score": 0.0003,
+      "ms": 18,
+      "regions": [
+        {
+          "x": 205,
+          "y": 285,
+          "w": 12,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "0985a4c3d1055cc085a8f0cdf82d8d2603ad379bdc4f5977d58f79d4f4a92b9c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-reflow-stats-column",
+      "changed": true,
+      "score": 0.2095,
+      "ms": 23.5,
+      "regions": [
+        {
+          "x": 20,
+          "y": 140,
+          "w": 600,
+          "h": 340
+        },
+        {
+          "x": 566,
+          "y": 299,
+          "w": 38,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "0c0bb5692f303ae2bcf758eedca47cdeba9e8a0c69db39b3b7b8ccb471724101:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-card-fade-inbox",
+      "changed": true,
+      "score": 0.3674,
+      "ms": 25.7,
+      "regions": [
+        {
+          "x": 41,
+          "y": 59,
+          "w": 598,
+          "h": 185
+        }
+      ],
+      "diff": true
+    },
+    "0c7fdc1640dc9b9a101fb402d478d012f1b749cbcfa4758638042c2d5b16f8fe:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-1step-button",
+      "changed": false,
+      "score": 0,
+      "ms": 14.5,
+      "regions": [],
+      "diff": false
+    },
+    "0cb45809ac02ae677614267c70e94ad10a29dadf234ee25221f8be6630bb5b26:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-text-word",
+      "changed": true,
+      "score": 0.0025,
+      "ms": 23.4,
+      "regions": [
+        {
+          "x": 163,
+          "y": 477,
+          "w": 376,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "0cbf7d9b6ec37c836c93b69fe16fa58867f7732fd6b3237e5b9dbbb66deda2f7:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-webp85-settings",
+      "changed": true,
+      "score": 0.0006,
+      "ms": 22.6,
+      "regions": [
+        {
+          "x": 22,
+          "y": 104,
+          "w": 76,
+          "h": 13
+        },
+        {
+          "x": 22,
+          "y": 179,
+          "w": 50,
+          "h": 12
+        },
+        {
+          "x": 22,
+          "y": 141,
+          "w": 34,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "0dcf2387135bf68e9ca3a4e5bc6fec23752df2bac7bfa5ef8265ef8c7eff6676:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-missing-icon-inbox",
+      "changed": true,
+      "score": 0.0004,
+      "ms": 14.4,
+      "regions": [
+        {
+          "x": 73,
+          "y": 108,
+          "w": 12,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "0e3adc8274c54f0e0d9fb7f8d55c97981859beb6492beb5369a14aa8534bfcfb:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-1step-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 14.3,
+      "regions": [],
+      "diff": false
+    },
+    "0ee0d9ae33c2a8df43a7c8f7edebcf41202264dca71840114b58c96bcf5334fa:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/identical-dashboard-fullpage",
+      "changed": false,
+      "score": 0,
+      "ms": 15.3,
+      "regions": [],
+      "diff": false
+    },
+    "0f23ae45e05b43e52e7ccff810d6a5b4f8890c2a635bd6e9f0f41c5d06d07409:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-spinner-frame",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 17.2,
+      "regions": [
+        {
+          "x": 153,
+          "y": 410,
+          "w": 10,
+          "h": 18
+        }
+      ],
+      "diff": true
+    },
+    "0fff75154eba77a5b37b227a9415ae64b589f5ef3e255d606f9b57c9908bf297:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/identical-form",
+      "changed": false,
+      "score": 0,
+      "ms": 13.9,
+      "regions": [],
+      "diff": false
+    },
+    "10d8ae02462c357023b856c350202bb973de25e388cb0206fbd8620ce78564ab:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-text-number",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 16.7,
+      "regions": [
+        {
+          "x": 287,
+          "y": 180,
+          "w": 11,
+          "h": 16
+        }
+      ],
+      "diff": true
+    },
+    "12c041c5bec00e1f2ca6cba33a76d7a473b37ca758a7d21160552fd3a6287d55:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shadow-blur-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 16.1,
+      "regions": [],
+      "diff": false
+    },
+    "12fb821f17915772b25dd1a864c14f0f88d29f476f43af822eaeedfb0c7dd3c5:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-reflow-stack-pricing",
+      "changed": true,
+      "score": 0.0843,
+      "ms": 23.6,
+      "regions": [
+        {
+          "x": 15,
+          "y": 185,
+          "w": 650,
+          "h": 335
+        },
+        {
+          "x": 474,
+          "y": 291,
+          "w": 108,
+          "h": 41
+        },
+        {
+          "x": 257,
+          "y": 245,
+          "w": 88,
+          "h": 24
+        },
+        {
+          "x": 474,
+          "y": 245,
+          "w": 88,
+          "h": 24
+        },
+        {
+          "x": 41,
+          "y": 509,
+          "w": 130,
+          "h": 11
+        },
+        {
+          "x": 512,
+          "y": 359,
+          "w": 89,
+          "h": 11
+        },
+        {
+          "x": 87,
+          "y": 359,
+          "w": 72,
+          "h": 11
+        }
+      ],
+      "diff": true
+    },
+    "168b8d417789069561c508565475ec6fd5fbdf0203d465e7061a0b1836b7e2a8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-spacing-paragraph-margin-1px",
+      "changed": true,
+      "score": 0.0111,
+      "ms": 21.2,
+      "regions": [
+        {
+          "x": 71,
+          "y": 333,
+          "w": 479,
+          "h": 39
+        },
+        {
+          "x": 71,
+          "y": 477,
+          "w": 468,
+          "h": 37
+        },
+        {
+          "x": 76,
+          "y": 393,
+          "w": 262,
+          "h": 64
+        },
+        {
+          "x": 70,
+          "y": 283,
+          "w": 419,
+          "h": 25
+        },
+        {
+          "x": 70,
+          "y": 315,
+          "w": 3,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "188e8f58bd5358a3d4005819655ad45d0e5343ffb4e185cf56e0a4d0b404a141:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-missing-hero",
+      "changed": true,
+      "score": 0.0725,
+      "ms": 24.3,
+      "regions": [
+        {
+          "x": 70,
+          "y": 91,
+          "w": 500,
+          "h": 70
+        }
+      ],
+      "diff": true
+    },
+    "18d58d289cde11b5542798afb36fc0255eb785612ac6dd2c0fced14bc4c323fd:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-button-clear-settings",
+      "changed": true,
+      "score": 0.0125,
+      "ms": 16.3,
+      "regions": [
+        {
+          "x": 188,
+          "y": 389,
+          "w": 125,
+          "h": 37
+        }
+      ],
+      "diff": true
+    },
+    "190877d40f3769275387e6b138465d4bfe0d136ad537d60df27ed3967251e161:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shift-part-pricing",
+      "changed": true,
+      "score": 0.0051,
+      "ms": 22.6,
+      "regions": [
+        {
+          "x": 367,
+          "y": 188,
+          "w": 75,
+          "h": 210
+        },
+        {
+          "x": 474,
+          "y": 293,
+          "w": 108,
+          "h": 38
+        },
+        {
+          "x": 286,
+          "y": 291,
+          "w": 102,
+          "h": 14
+        },
+        {
+          "x": 62,
+          "y": 320,
+          "w": 114,
+          "h": 12
+        },
+        {
+          "x": 71,
+          "y": 291,
+          "w": 79,
+          "h": 14
+        },
+        {
+          "x": 286,
+          "y": 320,
+          "w": 86,
+          "h": 12
+        },
+        {
+          "x": 520,
+          "y": 361,
+          "w": 78,
+          "h": 9
+        },
+        {
+          "x": 312,
+          "y": 360,
+          "w": 58,
+          "h": 10
+        },
+        {
+          "x": 87,
+          "y": 362,
+          "w": 66,
+          "h": 8
+        },
+        {
+          "x": 476,
+          "y": 217,
+          "w": 32,
+          "h": 8
+        },
+        {
+          "x": 531,
+          "y": 260,
+          "w": 26,
+          "h": 7
+        },
+        {
+          "x": 263,
+          "y": 251,
+          "w": 11,
+          "h": 13
+        },
+        {
+          "x": 54,
+          "y": 218,
+          "w": 15,
+          "h": 6
+        },
+        {
+          "x": 81,
+          "y": 261,
+          "w": 15,
+          "h": 6
+        },
+        {
+          "x": 263,
+          "y": 218,
+          "w": 16,
+          "h": 4
+        },
+        {
+          "x": 335,
+          "y": 261,
+          "w": 9,
+          "h": 6
+        },
+        {
+          "x": 480,
+          "y": 250,
+          "w": 2,
+          "h": 19
+        },
+        {
+          "x": 472,
+          "y": 355,
+          "w": 1,
+          "h": 21
+        },
+        {
+          "x": 310,
+          "y": 261,
+          "w": 2,
+          "h": 5
+        },
+        {
+          "x": 46,
+          "y": 250,
+          "w": 3,
+          "h": 3
+        }
+      ],
+      "diff": true
+    },
+    "192b9d072efd8f9ef36f009f721bb20d141e30a960c2352729705965d1b4e4c0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-size-append-section",
+      "changed": true,
+      "score": 0.07440000000000001,
+      "ms": 32.5,
+      "regions": [
+        {
+          "x": 0,
+          "y": 480,
+          "w": 640,
+          "h": 127
+        }
+      ],
+      "diff": true
+    },
+    "19407fb873c2057ccb0eeab5dc5b5a3183d3e32530b221c599d8cf3e09ed1847:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-glyph-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 24,
+      "regions": [],
+      "diff": false
+    },
+    "19c4b08894b79a67f1d18d0487d13550af015dfb4c0dabf2a5dd5a3d6aab046d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-caret-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 18.1,
+      "regions": [],
+      "diff": false
+    },
+    "1cb94e51cc0435219d69eb4c53415c626b1c61875e48130ef2d80c5f8f22b032:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-missing-row-reflow-inbox",
+      "changed": true,
+      "score": 0.0926,
+      "ms": 19.6,
+      "regions": [
+        {
+          "x": 40,
+          "y": 183,
+          "w": 600,
+          "h": 102
+        },
+        {
+          "x": 219,
+          "y": 147,
+          "w": 205,
+          "h": 12
+        },
+        {
+          "x": 41,
+          "y": 265,
+          "w": 137,
+          "h": 13
+        },
+        {
+          "x": 73,
+          "y": 146,
+          "w": 100,
+          "h": 13
+        },
+        {
+          "x": 576,
+          "y": 146,
+          "w": 51,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "1dde7f2630a9adbcf5e7209a56d64361bab27e7fe23e06802c5a2c8079772896:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-1step-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 14.6,
+      "regions": [],
+      "diff": false
+    },
+    "1f05dc8a0ce7fa3fd8b07c1086efe9780af078c213202980eb2b6122dfd7b7c7:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-fixture-pages-card-to-yellow",
+      "changed": true,
+      "score": 0.0074,
+      "ms": 32.5,
+      "regions": [
+        {
+          "x": 24,
+          "y": 122,
+          "w": 320,
+          "h": 36
+        }
+      ],
+      "diff": true
+    },
+    "1f42c5d195d2d92b3a65e6b369e4eca01b5f0a3f4619836e8e1cf9c3e75404a2:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-jpeg95-dashboard",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 21.8,
+      "regions": [
+        {
+          "x": 85,
+          "y": 17,
+          "w": 26,
+          "h": 11
+        },
+        {
+          "x": 240,
+          "y": 214,
+          "w": 15,
+          "h": 5
+        },
+        {
+          "x": 455,
+          "y": 218,
+          "w": 8,
+          "h": 1
+        },
+        {
+          "x": 40,
+          "y": 361,
+          "w": 1,
+          "h": 2
+        },
+        {
+          "x": 50,
+          "y": 218,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 87,
+          "y": 418,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "1f9531b77e641304253c870d3376ea14b078531663af773d813501f0414ca35a:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-spacing-gap-1px-settings",
+      "changed": true,
+      "score": 0.005699999999999999,
+      "ms": 19.4,
+      "regions": [
+        {
+          "x": 190,
+          "y": 389,
+          "w": 121,
+          "h": 39
+        },
+        {
+          "x": 208,
+          "y": 284,
+          "w": 149,
+          "h": 15
+        },
+        {
+          "x": 206,
+          "y": 315,
+          "w": 129,
+          "h": 16
+        },
+        {
+          "x": 205,
+          "y": 346,
+          "w": 112,
+          "h": 14
+        },
+        {
+          "x": 614,
+          "y": 282,
+          "w": 28,
+          "h": 50
+        },
+        {
+          "x": 328,
+          "y": 400,
+          "w": 10,
+          "h": 5
+        }
+      ],
+      "diff": true
+    },
+    "211f7f5d9941ca1f0818629e0afe500a2e132845f48acd2edc4d09d68829ee4a:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-geometric-precision-article",
+      "changed": true,
+      "score": 0.016200000000000003,
+      "ms": 24.2,
+      "regions": [
+        {
+          "x": 71,
+          "y": 180,
+          "w": 494,
+          "h": 84
+        },
+        {
+          "x": 71,
+          "y": 333,
+          "w": 480,
+          "h": 38
+        },
+        {
+          "x": 71,
+          "y": 477,
+          "w": 468,
+          "h": 35
+        },
+        {
+          "x": 91,
+          "y": 393,
+          "w": 247,
+          "h": 62
+        },
+        {
+          "x": 89,
+          "y": 293,
+          "w": 400,
+          "h": 14
+        },
+        {
+          "x": 76,
+          "y": 66,
+          "w": 47,
+          "h": 5
+        },
+        {
+          "x": 140,
+          "y": 67,
+          "w": 86,
+          "h": 2
+        },
+        {
+          "x": 229,
+          "y": 35,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 176,
+          "y": 40,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 368,
+          "y": 47,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 139,
+          "y": 48,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "21238e72344b1a991117883c7c01888e8761474ede258ad5cac93d680b1d1bec:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-button-subtle-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 14.4,
+      "regions": [],
+      "diff": false
+    },
+    "21ba46c7b71746fa4af0de4cfa1aaf6b1b485005bd0b99fece08fcbe8c948d79:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-border-1px-stat",
+      "changed": true,
+      "score": 0.030699999999999998,
+      "ms": 18.8,
+      "regions": [
+        {
+          "x": 20,
+          "y": 141,
+          "w": 600,
+          "h": 298
+        },
+        {
+          "x": 566,
+          "y": 299,
+          "w": 38,
+          "h": 14
+        },
+        {
+          "x": 148,
+          "y": 411,
+          "w": 12,
+          "h": 18
+        }
+      ],
+      "diff": true
+    },
+    "221850a6e15b4bf6f6913a6665cb200ef09ba6b2ed246afe299888394257ed33:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-hinting-none-vs-lcd-form",
+      "changed": true,
+      "score": 0.0059,
+      "ms": 17.9,
+      "regions": [
+        {
+          "x": 134,
+          "y": 33,
+          "w": 151,
+          "h": 14
+        },
+        {
+          "x": 166,
+          "y": 325,
+          "w": 170,
+          "h": 11
+        },
+        {
+          "x": 121,
+          "y": 65,
+          "w": 131,
+          "h": 10
+        },
+        {
+          "x": 150,
+          "y": 218,
+          "w": 109,
+          "h": 12
+        },
+        {
+          "x": 153,
+          "y": 287,
+          "w": 90,
+          "h": 11
+        },
+        {
+          "x": 157,
+          "y": 394,
+          "w": 92,
+          "h": 10
+        },
+        {
+          "x": 138,
+          "y": 356,
+          "w": 99,
+          "h": 7
+        },
+        {
+          "x": 327,
+          "y": 118,
+          "w": 59,
+          "h": 9
+        },
+        {
+          "x": 273,
+          "y": 67,
+          "w": 45,
+          "h": 11
+        },
+        {
+          "x": 138,
+          "y": 119,
+          "w": 60,
+          "h": 8
+        },
+        {
+          "x": 338,
+          "y": 150,
+          "w": 50,
+          "h": 9
+        },
+        {
+          "x": 254,
+          "y": 357,
+          "w": 71,
+          "h": 6
+        },
+        {
+          "x": 138,
+          "y": 259,
+          "w": 43,
+          "h": 8
+        },
+        {
+          "x": 307,
+          "y": 35,
+          "w": 26,
+          "h": 12
+        },
+        {
+          "x": 138,
+          "y": 187,
+          "w": 31,
+          "h": 9
+        },
+        {
+          "x": 149,
+          "y": 150,
+          "w": 21,
+          "h": 9
+        }
+      ],
+      "diff": true
+    },
+    "275dba98a75aff58ca621d603d59de547e734ce62ae825a9f3119c32368a9dbc:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-banding-stops-dashboard",
+      "changed": false,
+      "score": 0,
+      "ms": 13.9,
+      "regions": [],
+      "diff": false
+    },
+    "28996e50080d24c775ef7788b566d5b8439e0892c2a751a77b7d53b9feb14212:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-button-subtle-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 15.4,
+      "regions": [],
+      "diff": false
+    },
+    "2a363e344944e0ac378f29b53db4e52048dd55e7ba25fd5ecf6cfe3d2c742438:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-jpeg80-inbox",
+      "changed": true,
+      "score": 0.0436,
+      "ms": 24.4,
+      "regions": [
+        {
+          "x": 488,
+          "y": 15,
+          "w": 153,
+          "h": 272
+        },
+        {
+          "x": 32,
+          "y": 16,
+          "w": 151,
+          "h": 224
+        },
+        {
+          "x": 208,
+          "y": 64,
+          "w": 352,
+          "h": 63
+        },
+        {
+          "x": 216,
+          "y": 184,
+          "w": 207,
+          "h": 56
+        },
+        {
+          "x": 216,
+          "y": 144,
+          "w": 215,
+          "h": 16
+        },
+        {
+          "x": 40,
+          "y": 263,
+          "w": 147,
+          "h": 20
+        },
+        {
+          "x": 41,
+          "y": 239,
+          "w": 7,
+          "h": 7
+        },
+        {
+          "x": 40,
+          "y": 170,
+          "w": 1,
+          "h": 2
+        },
+        {
+          "x": 40,
+          "y": 207,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "2b8947278ba7a97d194c66bd74fd7dc686d4b86104a1b6b7f1a942ad29f43d01:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-text-number-pricing",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 18.2,
+      "regions": [
+        {
+          "x": 274,
+          "y": 255,
+          "w": 13,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "2faebf5298b3570ebe8b8e41d8b7212110a34c99e9603df40e7cbf652d46324b:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-spacing-padding-1px-pricing",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 22.3,
+      "regions": [
+        {
+          "x": 545,
+          "y": 421,
+          "w": 13,
+          "h": 26
+        }
+      ],
+      "diff": true
+    },
+    "31a68a653b2ffb1a6f36ac4282af7c71d13c4087b005c81bea597f5ff86e6436:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-border-1px-inbox",
+      "changed": true,
+      "score": 0.0031,
+      "ms": 16.2,
+      "regions": [
+        {
+          "x": 131,
+          "y": 17,
+          "w": 373,
+          "h": 28
+        }
+      ],
+      "diff": true
+    },
+    "349f888b1743c3080bf548b0db832ae89c98c41f116e486bff9026716fb8ff84:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-hinting-full-vs-lcd-article",
+      "changed": true,
+      "score": 0.056299999999999996,
+      "ms": 31.1,
+      "regions": [
+        {
+          "x": 71,
+          "y": 333,
+          "w": 488,
+          "h": 203
+        },
+        {
+          "x": 71,
+          "y": 181,
+          "w": 495,
+          "h": 83
+        },
+        {
+          "x": 77,
+          "y": 31,
+          "w": 295,
+          "h": 43
+        },
+        {
+          "x": 88,
+          "y": 294,
+          "w": 416,
+          "h": 13
+        },
+        {
+          "x": 76,
+          "y": 41,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "38defccaa450a77b87d61b9f6474e3479f06f6a66f73c6236f8b54d8cdb0c20a:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-button-clear-pricing",
+      "changed": true,
+      "score": 0.016399999999999998,
+      "ms": 20.1,
+      "regions": [
+        {
+          "x": 256,
+          "y": 347,
+          "w": 168,
+          "h": 37
+        }
+      ],
+      "diff": true
+    },
+    "3b44cef6810be07fdd1c2ef2ccb5800ca8719ba2bff6d927c98793ca09040b92:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-text-weight",
+      "changed": true,
+      "score": 0.003,
+      "ms": 20.1,
+      "regions": [
+        {
+          "x": 77,
+          "y": 30,
+          "w": 296,
+          "h": 24
+        }
+      ],
+      "diff": true
+    },
+    "3d8cdca539acf242dba1e72bc68d74027c5f7e2a93fd5bebd2119bb1ba587ed1:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-body-text-subtle",
+      "changed": false,
+      "score": 0,
+      "ms": 22.1,
+      "regions": [],
+      "diff": false
+    },
+    "3db18215713233d3b0568ad0c09405dd18ecae99b2430443f183c77c36d01e2e:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-subpixel-glyphs-settings",
+      "changed": true,
+      "score": 0.0024,
+      "ms": 15.6,
+      "regions": [
+        {
+          "x": 189,
+          "y": 22,
+          "w": 186,
+          "h": 20
+        },
+        {
+          "x": 205,
+          "y": 345,
+          "w": 112,
+          "h": 13
+        },
+        {
+          "x": 204,
+          "y": 226,
+          "w": 88,
+          "h": 12
+        },
+        {
+          "x": 204,
+          "y": 77,
+          "w": 44,
+          "h": 12
+        },
+        {
+          "x": 313,
+          "y": 230,
+          "w": 28,
+          "h": 8
+        }
+      ],
+      "diff": true
+    },
+    "40de31aa9e2a03d62c4c5c7a0ad4bc2afae5608b8102313fe541ac0e11aabbce:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-text-number-settings",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 14.9,
+      "regions": [
+        {
+          "x": 213,
+          "y": 346,
+          "w": 6,
+          "h": 11
+        }
+      ],
+      "diff": true
+    },
+    "43ba88d971262f4331ab2e9904b73b52b16b1eb12e89dbef4817a20ece0a6bbd:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-hinting-none-vs-full-dashboard",
+      "changed": true,
+      "score": 0.015,
+      "ms": 20.5,
+      "regions": [
+        {
+          "x": 38,
+          "y": 272,
+          "w": 170,
+          "h": 41
+        },
+        {
+          "x": 38,
+          "y": 403,
+          "w": 114,
+          "h": 32
+        },
+        {
+          "x": 36,
+          "y": 181,
+          "w": 83,
+          "h": 38
+        },
+        {
+          "x": 37,
+          "y": 89,
+          "w": 189,
+          "h": 16
+        },
+        {
+          "x": 444,
+          "y": 181,
+          "w": 66,
+          "h": 38
+        },
+        {
+          "x": 240,
+          "y": 183,
+          "w": 54,
+          "h": 36
+        },
+        {
+          "x": 69,
+          "y": 18,
+          "w": 119,
+          "h": 13
+        },
+        {
+          "x": 62,
+          "y": 328,
+          "w": 139,
+          "h": 10
+        },
+        {
+          "x": 62,
+          "y": 356,
+          "w": 113,
+          "h": 12
+        },
+        {
+          "x": 205,
+          "y": 18,
+          "w": 50,
+          "h": 12
+        },
+        {
+          "x": 560,
+          "y": 328,
+          "w": 43,
+          "h": 11
+        },
+        {
+          "x": 241,
+          "y": 158,
+          "w": 63,
+          "h": 7
+        },
+        {
+          "x": 565,
+          "y": 300,
+          "w": 38,
+          "h": 10
+        },
+        {
+          "x": 570,
+          "y": 356,
+          "w": 33,
+          "h": 11
+        },
+        {
+          "x": 37,
+          "y": 158,
+          "w": 47,
+          "h": 7
+        },
+        {
+          "x": 447,
+          "y": 157,
+          "w": 45,
+          "h": 7
+        }
+      ],
+      "diff": true
+    },
+    "4bafb640ab2b20a57d8e07f2401655ed4c7103a9f6716ad505ac8c83f8efa692:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-webp85-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 22.3,
+      "regions": [],
+      "diff": false
+    },
+    "4e1604391999061d1098a0b174d217982e7cfea38ad0a20573403632c6d6cb7c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-glyph-meta-digit",
+      "changed": false,
+      "score": 0,
+      "ms": 16.9,
+      "regions": [],
+      "diff": false
+    },
+    "51174e7494d25b75f557172cb44f21d83100e1a4d218e8def3a733499e9048e0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-size-append-settings",
+      "changed": true,
+      "score": 0.1493,
+      "ms": 28.7,
+      "regions": [
+        {
+          "x": 0,
+          "y": 480,
+          "w": 680,
+          "h": 86
+        }
+      ],
+      "diff": true
+    },
+    "555a4eacca0851ae5a733dc2379874fbd0ea1cae01ae55ddff3ad8202abdf760:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-dither-form-1",
+      "changed": false,
+      "score": 0,
+      "ms": 18.2,
+      "regions": [],
+      "diff": false
+    },
+    "556c1464e9efe8cea38615ff6b9fcabc3d6353cee1c131abb644b7f84910dea2:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-hinting-settings",
+      "changed": true,
+      "score": 0.0144,
+      "ms": 21.5,
+      "regions": [
+        {
+          "x": 208,
+          "y": 106,
+          "w": 434,
+          "h": 37
+        },
+        {
+          "x": 207,
+          "y": 390,
+          "w": 134,
+          "h": 35
+        },
+        {
+          "x": 189,
+          "y": 24,
+          "w": 187,
+          "h": 19
+        },
+        {
+          "x": 230,
+          "y": 285,
+          "w": 130,
+          "h": 13
+        },
+        {
+          "x": 230,
+          "y": 316,
+          "w": 108,
+          "h": 13
+        },
+        {
+          "x": 204,
+          "y": 346,
+          "w": 114,
+          "h": 12
+        },
+        {
+          "x": 230,
+          "y": 255,
+          "w": 82,
+          "h": 12
+        },
+        {
+          "x": 204,
+          "y": 227,
+          "w": 89,
+          "h": 11
+        },
+        {
+          "x": 219,
+          "y": 164,
+          "w": 72,
+          "h": 11
+        },
+        {
+          "x": 205,
+          "y": 135,
+          "w": 75,
+          "h": 10
+        },
+        {
+          "x": 447,
+          "y": 163,
+          "w": 70,
+          "h": 9
+        },
+        {
+          "x": 27,
+          "y": 69,
+          "w": 46,
+          "h": 12
+        },
+        {
+          "x": 204,
+          "y": 78,
+          "w": 45,
+          "h": 10
+        },
+        {
+          "x": 44,
+          "y": 23,
+          "w": 35,
+          "h": 8
+        },
+        {
+          "x": 311,
+          "y": 231,
+          "w": 31,
+          "h": 7
+        },
+        {
+          "x": 42,
+          "y": 142,
+          "w": 15,
+          "h": 12
+        },
+        {
+          "x": 86,
+          "y": 109,
+          "w": 13,
+          "h": 8
+        },
+        {
+          "x": 31,
+          "y": 182,
+          "w": 6,
+          "h": 4
+        }
+      ],
+      "diff": true
+    },
+    "5597d05231b68f53f3309156b076674e1179de41b3f673be2cc5f69ff00afbf8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shift-part-settings",
+      "changed": true,
+      "score": 0.0026,
+      "ms": 20.1,
+      "regions": [
+        {
+          "x": 206,
+          "y": 229,
+          "w": 106,
+          "h": 38
+        },
+        {
+          "x": 231,
+          "y": 284,
+          "w": 126,
+          "h": 14
+        },
+        {
+          "x": 230,
+          "y": 315,
+          "w": 105,
+          "h": 11
+        },
+        {
+          "x": 262,
+          "y": 351,
+          "w": 56,
+          "h": 7
+        },
+        {
+          "x": 207,
+          "y": 348,
+          "w": 37,
+          "h": 8
+        },
+        {
+          "x": 314,
+          "y": 232,
+          "w": 28,
+          "h": 6
+        }
+      ],
+      "diff": true
+    },
+    "56e509bc862f1d473e2c602977aa4c150cac674c23936e13f64fa0fbd771993b:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-glyph-settings",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 16.7,
+      "regions": [
+        {
+          "x": 344,
+          "y": 289,
+          "w": 7,
+          "h": 6
+        }
+      ],
+      "diff": true
+    },
+    "57a57a887b0ff227e6b5533fd2c880749309e0bac76eb08efbf203bf530826d0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-spacing-gap-1px-pricing",
+      "changed": true,
+      "score": 0.0138,
+      "ms": 19.3,
+      "regions": [
+        {
+          "x": 26,
+          "y": 417,
+          "w": 518,
+          "h": 35
+        },
+        {
+          "x": 240,
+          "y": 318,
+          "w": 200,
+          "h": 82
+        },
+        {
+          "x": 43,
+          "y": 318,
+          "w": 157,
+          "h": 67
+        },
+        {
+          "x": 480,
+          "y": 318,
+          "w": 153,
+          "h": 67
+        },
+        {
+          "x": 566,
+          "y": 417,
+          "w": 84,
+          "h": 35
+        },
+        {
+          "x": 40,
+          "y": 469,
+          "w": 100,
+          "h": 13
+        },
+        {
+          "x": 476,
+          "y": 325,
+          "w": 3,
+          "h": 3
+        }
+      ],
+      "diff": true
+    },
+    "58c11bd89eb3d82a5e887b867b4279b4d5c8af2bd640c432925da1804b6dba9e:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-jpeg85-article",
+      "changed": true,
+      "score": 0.0327,
+      "ms": 24.8,
+      "regions": [
+        {
+          "x": 64,
+          "y": 24,
+          "w": 511,
+          "h": 240
+        },
+        {
+          "x": 64,
+          "y": 392,
+          "w": 480,
+          "h": 120
+        },
+        {
+          "x": 64,
+          "y": 288,
+          "w": 487,
+          "h": 88
+        },
+        {
+          "x": 70,
+          "y": 283,
+          "w": 2,
+          "h": 5
+        }
+      ],
+      "diff": true
+    },
+    "5a17c451cd595694c338f007ecae74348893fc4a9028f6263230f6a61ff3c56f:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-banding-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 14.2,
+      "regions": [],
+      "diff": false
+    },
+    "5ea6dfe9db5644d70a37590fb3aa113087aaed0555daf32a532901cdfdb0bb33:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-missing-row-reflow-settings",
+      "changed": true,
+      "score": 0.064,
+      "ms": 19.7,
+      "regions": [
+        {
+          "x": 188,
+          "y": 282,
+          "w": 472,
+          "h": 144
+        },
+        {
+          "x": 205,
+          "y": 284,
+          "w": 152,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "5f7b33cabd24ba4ce100d7acab2617c2e8e6d13a2c47fd9e1b22f3260cf86622:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-animation-frame-pricing",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 17.4,
+      "regions": [
+        {
+          "x": 23,
+          "y": 470,
+          "w": 8,
+          "h": 8
+        }
+      ],
+      "diff": true
+    },
+    "609c156f2365925d6f5693df6b0d0520c5c3ff53568d30e6d1d1a9d172d32405:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-webp75-form",
+      "changed": false,
+      "score": 0,
+      "ms": 18,
+      "regions": [],
+      "diff": false
+    },
+    "6367014ed50f25df9a4cb1baba51699b4aa0a4fec869793faf9064e03078fd80:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-spacing-gap-1px-inbox",
+      "changed": true,
+      "score": 0.0152,
+      "ms": 16.7,
+      "regions": [
+        {
+          "x": 218,
+          "y": 70,
+          "w": 340,
+          "h": 14
+        },
+        {
+          "x": 218,
+          "y": 147,
+          "w": 209,
+          "h": 12
+        },
+        {
+          "x": 218,
+          "y": 184,
+          "w": 202,
+          "h": 11
+        },
+        {
+          "x": 218,
+          "y": 109,
+          "w": 171,
+          "h": 12
+        },
+        {
+          "x": 218,
+          "y": 221,
+          "w": 148,
+          "h": 12
+        },
+        {
+          "x": 82,
+          "y": 184,
+          "w": 93,
+          "h": 12
+        },
+        {
+          "x": 76,
+          "y": 147,
+          "w": 91,
+          "h": 12
+        },
+        {
+          "x": 77,
+          "y": 72,
+          "w": 80,
+          "h": 12
+        },
+        {
+          "x": 75,
+          "y": 221,
+          "w": 60,
+          "h": 9
+        },
+        {
+          "x": 98,
+          "y": 109,
+          "w": 39,
+          "h": 12
+        },
+        {
+          "x": 78,
+          "y": 110,
+          "w": 1,
+          "h": 8
+        }
+      ],
+      "diff": true
+    },
+    "636ee708778dde46a0c8ff4721b6c97f85c022ff632fd8c0c8ad5b38296d0d9e:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-subpixel-glyphs-dashboard",
+      "changed": true,
+      "score": 0.0025,
+      "ms": 16.1,
+      "regions": [
+        {
+          "x": 38,
+          "y": 88,
+          "w": 188,
+          "h": 16
+        },
+        {
+          "x": 36,
+          "y": 179,
+          "w": 82,
+          "h": 22
+        },
+        {
+          "x": 241,
+          "y": 179,
+          "w": 57,
+          "h": 22
+        },
+        {
+          "x": 449,
+          "y": 179,
+          "w": 60,
+          "h": 18
+        }
+      ],
+      "diff": true
+    },
+    "64d09ef46b1f485d17e007f44eeceff6ff1d037043443d8cdaa3c29e36c6b2d5:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-card-fade-settings",
+      "changed": true,
+      "score": 0.1437,
+      "ms": 19.9,
+      "regions": [
+        {
+          "x": 189,
+          "y": 61,
+          "w": 470,
+          "h": 135
+        }
+      ],
+      "diff": true
+    },
+    "65e9af340a5650db0d792381a148628e9cae416a598e2559ec05749d338d284b:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-reflow-form-row-stack",
+      "changed": true,
+      "score": 0.034,
+      "ms": 18.9,
+      "regions": [
+        {
+          "x": 120,
+          "y": 324,
+          "w": 400,
+          "h": 136
+        },
+        {
+          "x": 310,
+          "y": 118,
+          "w": 79,
+          "h": 53
+        },
+        {
+          "x": 149,
+          "y": 218,
+          "w": 110,
+          "h": 12
+        },
+        {
+          "x": 149,
+          "y": 287,
+          "w": 110,
+          "h": 12
+        },
+        {
+          "x": 139,
+          "y": 256,
+          "w": 43,
+          "h": 12
+        },
+        {
+          "x": 140,
+          "y": 187,
+          "w": 57,
+          "h": 9
+        },
+        {
+          "x": 490,
+          "y": 290,
+          "w": 8,
+          "h": 4
+        }
+      ],
+      "diff": true
+    },
+    "67c74e9649062d99d5a7744056964f464183261e15d0b728f75bf7a3c07730e9:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-text-lede",
+      "changed": true,
+      "score": 0.0014000000000000002,
+      "ms": 18.2,
+      "regions": [
+        {
+          "x": 200,
+          "y": 64,
+          "w": 140,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "6907d3ded38cd6bef37943c6954d14652641f886c9a5c32689632e748c0a54e0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/identical-article",
+      "changed": false,
+      "score": 0,
+      "ms": 14.1,
+      "regions": [],
+      "diff": false
+    },
+    "6a8bd2d6b9dbcd44e0dac7d924ea48cf0c020164ae36c64d6ff854654c6ce83c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-dither-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 16.2,
+      "regions": [],
+      "diff": false
+    },
+    "6dff1b3f48a1f293a55a501632072326681ccda69264dabc34f8eb2046024acc:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-missing-avatar",
+      "changed": true,
+      "score": 0.0018,
+      "ms": 15.8,
+      "regions": [
+        {
+          "x": 593,
+          "y": 11,
+          "w": 26,
+          "h": 26
+        }
+      ],
+      "diff": true
+    },
+    "7027f7a0b3bb6f9bae330240b44abecf2d12dc2b1933342bc5ca25f91da20a90:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-shift-dashboard-main",
+      "changed": true,
+      "score": 0.004,
+      "ms": 19.3,
+      "regions": [
+        {
+          "x": 39,
+          "y": 89,
+          "w": 187,
+          "h": 13
+        },
+        {
+          "x": 63,
+          "y": 299,
+          "w": 143,
+          "h": 14
+        },
+        {
+          "x": 62,
+          "y": 327,
+          "w": 132,
+          "h": 11
+        },
+        {
+          "x": 62,
+          "y": 355,
+          "w": 112,
+          "h": 12
+        },
+        {
+          "x": 36,
+          "y": 274,
+          "w": 95,
+          "h": 8
+        },
+        {
+          "x": 47,
+          "y": 417,
+          "w": 64,
+          "h": 8
+        },
+        {
+          "x": 255,
+          "y": 198,
+          "w": 16,
+          "h": 19
+        },
+        {
+          "x": 51,
+          "y": 159,
+          "w": 32,
+          "h": 6
+        },
+        {
+          "x": 41,
+          "y": 183,
+          "w": 15,
+          "h": 11
+        },
+        {
+          "x": 44,
+          "y": 212,
+          "w": 23,
+          "h": 7
+        },
+        {
+          "x": 493,
+          "y": 182,
+          "w": 11,
+          "h": 10
+        },
+        {
+          "x": 257,
+          "y": 158,
+          "w": 8,
+          "h": 7
+        },
+        {
+          "x": 295,
+          "y": 159,
+          "w": 9,
+          "h": 6
+        },
+        {
+          "x": 465,
+          "y": 212,
+          "w": 7,
+          "h": 5
+        },
+        {
+          "x": 599,
+          "y": 359,
+          "w": 2,
+          "h": 6
+        },
+        {
+          "x": 153,
+          "y": 413,
+          "w": 7,
+          "h": 1
+        },
+        {
+          "x": 41,
+          "y": 360,
+          "w": 3,
+          "h": 2
+        }
+      ],
+      "diff": true
+    },
+    "702bd159ac97a6cbdca23b35ec2b5051ee5f62c676e2fea52ee3c9ab960d8af8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-reflow-nav-right",
+      "changed": true,
+      "score": 0.0023,
+      "ms": 22.3,
+      "regions": [
+        {
+          "x": 205,
+          "y": 17,
+          "w": 48,
+          "h": 14
+        },
+        {
+          "x": 523,
+          "y": 17,
+          "w": 48,
+          "h": 14
+        },
+        {
+          "x": 65,
+          "y": 17,
+          "w": 57,
+          "h": 11
+        },
+        {
+          "x": 383,
+          "y": 17,
+          "w": 57,
+          "h": 11
+        },
+        {
+          "x": 140,
+          "y": 18,
+          "w": 47,
+          "h": 13
+        },
+        {
+          "x": 458,
+          "y": 18,
+          "w": 47,
+          "h": 13
+        }
+      ],
+      "diff": true
+    },
+    "702d059c49ace33aca981d6f0aa3532e7441986e04085c42b46911911b37d1eb:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shift-container-pricing",
+      "changed": true,
+      "score": 0.006,
+      "ms": 23.6,
+      "regions": [
+        {
+          "x": 496,
+          "y": 293,
+          "w": 85,
+          "h": 37
+        },
+        {
+          "x": 239,
+          "y": 194,
+          "w": 13,
+          "h": 205
+        },
+        {
+          "x": 286,
+          "y": 291,
+          "w": 102,
+          "h": 14
+        },
+        {
+          "x": 36,
+          "y": 430,
+          "w": 118,
+          "h": 12
+        },
+        {
+          "x": 72,
+          "y": 320,
+          "w": 109,
+          "h": 12
+        },
+        {
+          "x": 436,
+          "y": 206,
+          "w": 6,
+          "h": 191
+        },
+        {
+          "x": 71,
+          "y": 291,
+          "w": 79,
+          "h": 14
+        },
+        {
+          "x": 286,
+          "y": 320,
+          "w": 86,
+          "h": 12
+        },
+        {
+          "x": 520,
+          "y": 361,
+          "w": 78,
+          "h": 9
+        },
+        {
+          "x": 276,
+          "y": 104,
+          "w": 38,
+          "h": 14
+        },
+        {
+          "x": 87,
+          "y": 362,
+          "w": 66,
+          "h": 8
+        },
+        {
+          "x": 577,
+          "y": 430,
+          "w": 63,
+          "h": 8
+        },
+        {
+          "x": 378,
+          "y": 99,
+          "w": 19,
+          "h": 17
+        },
+        {
+          "x": 476,
+          "y": 217,
+          "w": 32,
+          "h": 8
+        },
+        {
+          "x": 382,
+          "y": 193,
+          "w": 33,
+          "h": 5
+        },
+        {
+          "x": 546,
+          "y": 139,
+          "w": 18,
+          "h": 9
+        },
+        {
+          "x": 312,
+          "y": 361,
+          "w": 19,
+          "h": 8
+        },
+        {
+          "x": 263,
+          "y": 251,
+          "w": 11,
+          "h": 13
+        },
+        {
+          "x": 348,
+          "y": 362,
+          "w": 20,
+          "h": 7
+        },
+        {
+          "x": 243,
+          "y": 140,
+          "w": 15,
+          "h": 8
+        },
+        {
+          "x": 118,
+          "y": 472,
+          "w": 20,
+          "h": 6
+        },
+        {
+          "x": 498,
+          "y": 140,
+          "w": 14,
+          "h": 8
+        },
+        {
+          "x": 54,
+          "y": 218,
+          "w": 15,
+          "h": 6
+        },
+        {
+          "x": 277,
+          "y": 140,
+          "w": 11,
+          "h": 8
+        },
+        {
+          "x": 305,
+          "y": 140,
+          "w": 8,
+          "h": 8
+        },
+        {
+          "x": 154,
+          "y": 140,
+          "w": 7,
+          "h": 8
+        },
+        {
+          "x": 430,
+          "y": 140,
+          "w": 7,
+          "h": 8
+        },
+        {
+          "x": 397,
+          "y": 137,
+          "w": 5,
+          "h": 11
+        },
+        {
+          "x": 125,
+          "y": 140,
+          "w": 5,
+          "h": 8
+        },
+        {
+          "x": 46,
+          "y": 251,
+          "w": 3,
+          "h": 13
+        },
+        {
+          "x": 480,
+          "y": 250,
+          "w": 2,
+          "h": 19
+        },
+        {
+          "x": 263,
+          "y": 218,
+          "w": 15,
+          "h": 2
+        },
+        {
+          "x": 423,
+          "y": 105,
+          "w": 2,
+          "h": 12
+        },
+        {
+          "x": 349,
+          "y": 105,
+          "w": 1,
+          "h": 10
+        }
+      ],
+      "diff": true
+    },
+    "7352d0dc989b9ae617da095b2854df1a82918fb4ce127040301ad6f120ff4b05:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shift-container-inbox",
+      "changed": true,
+      "score": 0.0062,
+      "ms": 18.6,
+      "regions": [
+        {
+          "x": 245,
+          "y": 73,
+          "w": 310,
+          "h": 9
+        },
+        {
+          "x": 218,
+          "y": 184,
+          "w": 199,
+          "h": 9
+        },
+        {
+          "x": 218,
+          "y": 149,
+          "w": 203,
+          "h": 8
+        },
+        {
+          "x": 218,
+          "y": 221,
+          "w": 134,
+          "h": 12
+        },
+        {
+          "x": 571,
+          "y": 266,
+          "w": 55,
+          "h": 12
+        },
+        {
+          "x": 105,
+          "y": 187,
+          "w": 67,
+          "h": 8
+        },
+        {
+          "x": 103,
+          "y": 74,
+          "w": 51,
+          "h": 10
+        },
+        {
+          "x": 104,
+          "y": 148,
+          "w": 61,
+          "h": 8
+        },
+        {
+          "x": 219,
+          "y": 110,
+          "w": 60,
+          "h": 8
+        },
+        {
+          "x": 296,
+          "y": 109,
+          "w": 50,
+          "h": 9
+        },
+        {
+          "x": 78,
+          "y": 28,
+          "w": 39,
+          "h": 9
+        },
+        {
+          "x": 99,
+          "y": 111,
+          "w": 37,
+          "h": 9
+        },
+        {
+          "x": 539,
+          "y": 29,
+          "w": 47,
+          "h": 6
+        },
+        {
+          "x": 145,
+          "y": 29,
+          "w": 38,
+          "h": 7
+        },
+        {
+          "x": 100,
+          "y": 223,
+          "w": 34,
+          "h": 7
+        },
+        {
+          "x": 365,
+          "y": 110,
+          "w": 21,
+          "h": 10
+        },
+        {
+          "x": 107,
+          "y": 267,
+          "w": 7,
+          "h": 6
+        },
+        {
+          "x": 176,
+          "y": 267,
+          "w": 3,
+          "h": 8
+        },
+        {
+          "x": 621,
+          "y": 186,
+          "w": 2,
+          "h": 6
+        },
+        {
+          "x": 77,
+          "y": 224,
+          "w": 3,
+          "h": 2
+        },
+        {
+          "x": 79,
+          "y": 190,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "73d5b2e19498a7412c567042b2807137c16e75333f721f3902c03688c10ab66d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-webp90-dashboard",
+      "changed": false,
+      "score": 0,
+      "ms": 21.4,
+      "regions": [],
+      "diff": false
+    },
+    "762ac4ffaf92207242b55dd4dc0a1b5f282d4162d1cb49a2983ef66d6abb587c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-reflow-article-narrower",
+      "changed": true,
+      "score": 0.0683,
+      "ms": 31.4,
+      "regions": [
+        {
+          "x": 70,
+          "y": 283,
+          "w": 481,
+          "h": 277
+        },
+        {
+          "x": 71,
+          "y": 181,
+          "w": 494,
+          "h": 86
+        },
+        {
+          "x": 71,
+          "y": 30,
+          "w": 342,
+          "h": 44
+        },
+        {
+          "x": 420,
+          "y": 91,
+          "w": 150,
+          "h": 70
+        },
+        {
+          "x": 70,
+          "y": 91,
+          "w": 106,
+          "h": 70
+        }
+      ],
+      "diff": true
+    },
+    "7700c5a7acb0e55b4757b8a2288b15c168ffa2e47bdc8ca537ac35a876b3cdd6:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/identical-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 14.2,
+      "regions": [],
+      "diff": false
+    },
+    "77f7aa3c2370c20104d6799e0ef81c1d861a0c9132b4eeb863c4477a30d733a0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-text-number-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 14.2,
+      "regions": [],
+      "diff": false
+    },
+    "78943940b7c84c9216ee3e42f840a45a3ef152100b136b61332ebb4672f9f6e7:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-dither-dashboard-1",
+      "changed": false,
+      "score": 0,
+      "ms": 30.2,
+      "regions": [],
+      "diff": false
+    },
+    "7d74bfa956b32cbad589d6cb965e7113c2611c3f01f574df9c6ba76b8ba30741:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-subpixel-glyphs-inbox",
+      "changed": true,
+      "score": 0.0011,
+      "ms": 17.1,
+      "regions": [
+        {
+          "x": 401,
+          "y": 73,
+          "w": 154,
+          "h": 9
+        },
+        {
+          "x": 245,
+          "y": 74,
+          "w": 125,
+          "h": 7
+        }
+      ],
+      "diff": true
+    },
+    "7ddca8411009eeb598c77b72db65de91c9f18b831ecf16138bbe6fee120fbaeb:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-text-word-settings",
+      "changed": true,
+      "score": 0.0015,
+      "ms": 17.8,
+      "regions": [
+        {
+          "x": 473,
+          "y": 105,
+          "w": 168,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "7eb64a793bb0d0c241f284482dddd0738f59f623a3791b7f8a2313b389f27553:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-icon-info-glyph",
+      "changed": false,
+      "score": 0,
+      "ms": 16.7,
+      "regions": [],
+      "diff": false
+    },
+    "7f059a3496fcbf25d83895290bc5ed5c675180854223464c8f94d10a55ad2120:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-icon-swap-pricing",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 19.5,
+      "regions": [
+        {
+          "x": 41,
+          "y": 292,
+          "w": 10,
+          "h": 11
+        }
+      ],
+      "diff": true
+    },
+    "816322063a3475b405b1fa27ef2f4916430f2303156ab6feec6bb6ab908008ae:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-banding-interpolation-article",
+      "changed": false,
+      "score": 0,
+      "ms": 20.1,
+      "regions": [],
+      "diff": false
+    },
+    "82ba02cf0b5ccd6f08088c36bad584d8e7c64fa5cff094faeae1ea468dfe2a62:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-spacing-padding-1px-settings",
+      "changed": true,
+      "score": 0.0009,
+      "ms": 17.5,
+      "regions": [
+        {
+          "x": 207,
+          "y": 395,
+          "w": 124,
+          "h": 25
+        }
+      ],
+      "diff": true
+    },
+    "8596242d9d8de8f11115bc2b7fd21f7091a8cc1f77eb55c80493f95e5f7ad54d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-emoji-subpixel-settings",
+      "changed": true,
+      "score": 0.0007000000000000001,
+      "ms": 18,
+      "regions": [
+        {
+          "x": 343,
+          "y": 446,
+          "w": 75,
+          "h": 13
+        },
+        {
+          "x": 226,
+          "y": 446,
+          "w": 54,
+          "h": 17
+        }
+      ],
+      "diff": true
+    },
+    "861c6a57b482f344fe145c332202ec695fe7605f2496cb5362f9842e4119f689:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-jpeg80-pricing",
+      "changed": true,
+      "score": 0.0882,
+      "ms": 38.7,
+      "regions": [
+        {
+          "x": 16,
+          "y": 175,
+          "w": 653,
+          "h": 312
+        },
+        {
+          "x": 21,
+          "y": 67,
+          "w": 647,
+          "h": 109
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "w": 680,
+          "h": 46
+        },
+        {
+          "x": 104,
+          "y": 96,
+          "w": 472,
+          "h": 56
+        },
+        {
+          "x": 509,
+          "y": 353,
+          "w": 99,
+          "h": 23
+        },
+        {
+          "x": 145,
+          "y": 175,
+          "w": 46,
+          "h": 1
+        },
+        {
+          "x": 585,
+          "y": 175,
+          "w": 30,
+          "h": 1
+        },
+        {
+          "x": 273,
+          "y": 175,
+          "w": 14,
+          "h": 1
+        },
+        {
+          "x": 319,
+          "y": 175,
+          "w": 13,
+          "h": 1
+        },
+        {
+          "x": 523,
+          "y": 175,
+          "w": 13,
+          "h": 1
+        },
+        {
+          "x": 557,
+          "y": 175,
+          "w": 7,
+          "h": 1
+        },
+        {
+          "x": 505,
+          "y": 175,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "878a8018dd8b7f58b4f9d3bde093103086db7b0e7915c25262f602e59525a4e0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-reflow-stack-settings",
+      "changed": true,
+      "score": 0.15539999999999998,
+      "ms": 29.6,
+      "regions": [
+        {
+          "x": 188,
+          "y": 134,
+          "w": 472,
+          "h": 346
+        },
+        {
+          "x": 632,
+          "y": 166,
+          "w": 8,
+          "h": 4
+        }
+      ],
+      "diff": true
+    },
+    "87c5466fdbf574dab06ce6906b41645918b29b691c9aeb2f3401f1676d27280c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-jpeg70-form",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 28.3,
+      "regions": [
+        {
+          "x": 141,
+          "y": 325,
+          "w": 26,
+          "h": 12
+        },
+        {
+          "x": 156,
+          "y": 393,
+          "w": 22,
+          "h": 10
+        },
+        {
+          "x": 243,
+          "y": 226,
+          "w": 12,
+          "h": 1
+        },
+        {
+          "x": 270,
+          "y": 74,
+          "w": 8,
+          "h": 1
+        },
+        {
+          "x": 216,
+          "y": 297,
+          "w": 1,
+          "h": 2
+        },
+        {
+          "x": 145,
+          "y": 67,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 219,
+          "y": 67,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 197,
+          "y": 123,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 153,
+          "y": 151,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 145,
+          "y": 221,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 169,
+          "y": 230,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 310,
+          "y": 331,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 217,
+          "y": 334,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 189,
+          "y": 357,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 249,
+          "y": 396,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "8a8a6c8bbd04220f3f25917e1a665d54635ea29160d652c971c57c648307df4d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-size-append-inbox",
+      "changed": true,
+      "score": 0.1144,
+      "ms": 33.2,
+      "regions": [
+        {
+          "x": 0,
+          "y": 400,
+          "w": 680,
+          "h": 53
+        }
+      ],
+      "diff": true
+    },
+    "8d113253347c8ed21f567bdd16625dca86701f65639d2eebe7d30973673fb14d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-card-fade-pricing",
+      "changed": true,
+      "score": 0.0915,
+      "ms": 20.9,
+      "regions": [
+        {
+          "x": 23,
+          "y": 195,
+          "w": 201,
+          "h": 203
+        }
+      ],
+      "diff": true
+    },
+    "92e0f6affc9a7ed5e375ffc31c9b11bfea9e96d40caae135d523314f892c9837:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-jpeg80-settings",
+      "changed": true,
+      "score": 0.0464,
+      "ms": 27.6,
+      "regions": [
+        {
+          "x": 184,
+          "y": 60,
+          "w": 479,
+          "h": 372
+        },
+        {
+          "x": 9,
+          "y": 16,
+          "w": 91,
+          "h": 176
+        },
+        {
+          "x": 184,
+          "y": 16,
+          "w": 192,
+          "h": 32
+        },
+        {
+          "x": 608,
+          "y": 248,
+          "w": 40,
+          "h": 86
+        },
+        {
+          "x": 624,
+          "y": 15,
+          "w": 45,
+          "h": 56
+        },
+        {
+          "x": 151,
+          "y": 58,
+          "w": 7,
+          "h": 32
+        },
+        {
+          "x": 655,
+          "y": 370,
+          "w": 3,
+          "h": 5
+        }
+      ],
+      "diff": true
+    },
+    "93f8879ce069bdc1a5e59b66ef7928814fda3696f7e1a4ce211b1e4c628f4490:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-shadow-offset-form",
+      "changed": false,
+      "score": 0,
+      "ms": 14.5,
+      "regions": [],
+      "diff": false
+    },
+    "96041c521507e60aabdb58e22d733bfaff399b55e49a96dd535c9ffe86864c6c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-border-1px-select",
+      "changed": true,
+      "score": 0.0034999999999999996,
+      "ms": 16.1,
+      "regions": [
+        {
+          "x": 138,
+          "y": 276,
+          "w": 364,
+          "h": 32
+        }
+      ],
+      "diff": true
+    },
+    "9a71d724dac1179e902336c6f4875823d02b32f0280200c40aa899285fe1d499:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-webp85-pricing",
+      "changed": true,
+      "score": 0.0571,
+      "ms": 34.7,
+      "regions": [
+        {
+          "x": 20,
+          "y": 175,
+          "w": 640,
+          "h": 309
+        },
+        {
+          "x": 21,
+          "y": 67,
+          "w": 637,
+          "h": 109
+        },
+        {
+          "x": 0,
+          "y": 7,
+          "w": 680,
+          "h": 39
+        },
+        {
+          "x": 104,
+          "y": 96,
+          "w": 472,
+          "h": 56
+        },
+        {
+          "x": 508,
+          "y": 356,
+          "w": 94,
+          "h": 16
+        },
+        {
+          "x": 84,
+          "y": 357,
+          "w": 75,
+          "h": 15
+        },
+        {
+          "x": 177,
+          "y": 175,
+          "w": 41,
+          "h": 1
+        },
+        {
+          "x": 495,
+          "y": 175,
+          "w": 29,
+          "h": 1
+        },
+        {
+          "x": 291,
+          "y": 175,
+          "w": 19,
+          "h": 1
+        },
+        {
+          "x": 545,
+          "y": 175,
+          "w": 13,
+          "h": 1
+        },
+        {
+          "x": 239,
+          "y": 175,
+          "w": 12,
+          "h": 1
+        },
+        {
+          "x": 206,
+          "y": 353,
+          "w": 1,
+          "h": 2
+        }
+      ],
+      "diff": true
+    },
+    "9b47fe1db5b9f90cfc7830f35723a16da95a78fbb854c90131c710a4e3ad409f:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-button-subtle-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 15.6,
+      "regions": [],
+      "diff": false
+    },
+    "9c13ebedd07482e22da0751f1a76daad6cbc11584dd517956bb4168f893fa5a6:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-missing-row-reflow",
+      "changed": true,
+      "score": 0.0738,
+      "ms": 19.5,
+      "regions": [
+        {
+          "x": 20,
+          "y": 327,
+          "w": 600,
+          "h": 110
+        },
+        {
+          "x": 560,
+          "y": 328,
+          "w": 21,
+          "h": 9
+        }
+      ],
+      "diff": true
+    },
+    "9c3d782bb5fddcb45dd1ec80f527e191ce1d5b914d0c34e862e6b7f54d325e6e:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-icon-swap-inbox",
+      "changed": true,
+      "score": 0.0003,
+      "ms": 14.6,
+      "regions": [
+        {
+          "x": 73,
+          "y": 183,
+          "w": 12,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "9cc7bc982b7f482ad6c7c5401b575e4c123d55f78d0c28a2cf3fd6e10c7c8ee5:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-animation-frame-inbox",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 14.6,
+      "regions": [
+        {
+          "x": 165,
+          "y": 265,
+          "w": 14,
+          "h": 13
+        }
+      ],
+      "diff": true
+    },
+    "9d9bba6268504e60165a31aa4a62e22a6cca7dc8ebc0616b93c8907728eb7dc9:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-text-word-inbox",
+      "changed": true,
+      "score": 0.0012,
+      "ms": 17.1,
+      "regions": [
+        {
+          "x": 342,
+          "y": 147,
+          "w": 133,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "9fc69ea7c6a2620e80bc237e4e285ed1c53ca9fb55fbaf9f488a7b4e8d7c2da8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-spacing-padding-1px-inbox",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 13.5,
+      "regions": [
+        {
+          "x": 501,
+          "y": 22,
+          "w": 14,
+          "h": 18
+        }
+      ],
+      "diff": true
+    },
+    "a15cc602a7cccd42ceabe546ac57afe5fb64eb0278b15ec8be89e1d173675943:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shift-part-inbox",
+      "changed": true,
+      "score": 0.0066,
+      "ms": 20.6,
+      "regions": [
+        {
+          "x": 245,
+          "y": 72,
+          "w": 311,
+          "h": 10
+        },
+        {
+          "x": 223,
+          "y": 148,
+          "w": 198,
+          "h": 9
+        },
+        {
+          "x": 219,
+          "y": 221,
+          "w": 133,
+          "h": 12
+        },
+        {
+          "x": 219,
+          "y": 185,
+          "w": 198,
+          "h": 8
+        },
+        {
+          "x": 219,
+          "y": 109,
+          "w": 127,
+          "h": 9
+        },
+        {
+          "x": 98,
+          "y": 186,
+          "w": 75,
+          "h": 9
+        },
+        {
+          "x": 98,
+          "y": 74,
+          "w": 56,
+          "h": 10
+        },
+        {
+          "x": 102,
+          "y": 148,
+          "w": 63,
+          "h": 8
+        },
+        {
+          "x": 98,
+          "y": 110,
+          "w": 38,
+          "h": 10
+        },
+        {
+          "x": 99,
+          "y": 222,
+          "w": 35,
+          "h": 7
+        },
+        {
+          "x": 365,
+          "y": 110,
+          "w": 21,
+          "h": 10
+        },
+        {
+          "x": 615,
+          "y": 149,
+          "w": 12,
+          "h": 5
+        },
+        {
+          "x": 575,
+          "y": 147,
+          "w": 6,
+          "h": 8
+        },
+        {
+          "x": 622,
+          "y": 74,
+          "w": 4,
+          "h": 6
+        },
+        {
+          "x": 621,
+          "y": 186,
+          "w": 2,
+          "h": 6
+        },
+        {
+          "x": 621,
+          "y": 224,
+          "w": 2,
+          "h": 6
+        },
+        {
+          "x": 621,
+          "y": 115,
+          "w": 1,
+          "h": 2
+        }
+      ],
+      "diff": true
+    },
+    "a1b66140c00281778117a0095cdeda9167b0231731f746b93dcb6fdd49a7cac5:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-banner-hue",
+      "changed": true,
+      "score": 0.09179999999999999,
+      "ms": 23.4,
+      "regions": [
+        {
+          "x": 64,
+          "y": 68,
+          "w": 556,
+          "h": 56
+        }
+      ],
+      "diff": true
+    },
+    "a28ac0ba8dae3046ba0c4407e705905cc6a1da616048b6f671c0f9b886793fbe:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-button-subtle",
+      "changed": false,
+      "score": 0,
+      "ms": 13.5,
+      "regions": [],
+      "diff": false
+    },
+    "a290b3b66af8e211be1301116c10ad6d8df04abfb24f4ed4d462f4949ef64251:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-dither-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 23,
+      "regions": [],
+      "diff": false
+    },
+    "a32be1957cd45e4e7cec5869c2f00e607c37d56fa41dea93ecc390e5ef4e16d8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-hinting-inbox",
+      "changed": true,
+      "score": 0.0169,
+      "ms": 17.9,
+      "regions": [
+        {
+          "x": 265,
+          "y": 71,
+          "w": 293,
+          "h": 13
+        },
+        {
+          "x": 219,
+          "y": 146,
+          "w": 205,
+          "h": 13
+        },
+        {
+          "x": 218,
+          "y": 108,
+          "w": 169,
+          "h": 12
+        },
+        {
+          "x": 270,
+          "y": 183,
+          "w": 146,
+          "h": 13
+        },
+        {
+          "x": 219,
+          "y": 220,
+          "w": 144,
+          "h": 13
+        },
+        {
+          "x": 73,
+          "y": 265,
+          "w": 81,
+          "h": 12
+        },
+        {
+          "x": 99,
+          "y": 183,
+          "w": 75,
+          "h": 12
+        },
+        {
+          "x": 569,
+          "y": 265,
+          "w": 58,
+          "h": 13
+        },
+        {
+          "x": 99,
+          "y": 71,
+          "w": 57,
+          "h": 12
+        },
+        {
+          "x": 575,
+          "y": 147,
+          "w": 48,
+          "h": 11
+        },
+        {
+          "x": 99,
+          "y": 108,
+          "w": 38,
+          "h": 12
+        },
+        {
+          "x": 144,
+          "y": 26,
+          "w": 40,
+          "h": 9
+        },
+        {
+          "x": 219,
+          "y": 183,
+          "w": 32,
+          "h": 10
+        },
+        {
+          "x": 128,
+          "y": 146,
+          "w": 29,
+          "h": 11
+        },
+        {
+          "x": 100,
+          "y": 220,
+          "w": 33,
+          "h": 9
+        },
+        {
+          "x": 596,
+          "y": 73,
+          "w": 24,
+          "h": 8
+        },
+        {
+          "x": 596,
+          "y": 110,
+          "w": 24,
+          "h": 8
+        },
+        {
+          "x": 604,
+          "y": 184,
+          "w": 16,
+          "h": 8
+        },
+        {
+          "x": 529,
+          "y": 25,
+          "w": 15,
+          "h": 8
+        },
+        {
+          "x": 561,
+          "y": 29,
+          "w": 20,
+          "h": 5
+        },
+        {
+          "x": 606,
+          "y": 222,
+          "w": 14,
+          "h": 7
+        },
+        {
+          "x": 237,
+          "y": 71,
+          "w": 8,
+          "h": 9
+        },
+        {
+          "x": 42,
+          "y": 265,
+          "w": 9,
+          "h": 7
+        },
+        {
+          "x": 175,
+          "y": 266,
+          "w": 3,
+          "h": 10
+        },
+        {
+          "x": 98,
+          "y": 146,
+          "w": 7,
+          "h": 3
+        },
+        {
+          "x": 74,
+          "y": 24,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "a3e1c50ddaead12485b7c25e6d596afb15441ab5be915a3aac1716f683aa8979:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-hero-shimmer-frame",
+      "changed": false,
+      "score": 0,
+      "ms": 15.2,
+      "regions": [],
+      "diff": false
+    },
+    "a57769011ac63023b7e159cdd54ede3e1d3209d471e7e5a76c1b4cd65ce0f533:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/identical-form-hinting-none",
+      "changed": false,
+      "score": 0,
+      "ms": 13.1,
+      "regions": [],
+      "diff": false
+    },
+    "a5cbd8e37cdc03083a7e52bcb4a7728f932b2b30b9cbccb5cafd6cce3be599e3:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-shift-dashboard-stats",
+      "changed": true,
+      "score": 0.0008,
+      "ms": 16.7,
+      "regions": [
+        {
+          "x": 243,
+          "y": 184,
+          "w": 28,
+          "h": 34
+        },
+        {
+          "x": 39,
+          "y": 198,
+          "w": 41,
+          "h": 21
+        },
+        {
+          "x": 242,
+          "y": 157,
+          "w": 62,
+          "h": 8
+        },
+        {
+          "x": 36,
+          "y": 157,
+          "w": 47,
+          "h": 8
+        },
+        {
+          "x": 444,
+          "y": 158,
+          "w": 49,
+          "h": 7
+        },
+        {
+          "x": 448,
+          "y": 211,
+          "w": 24,
+          "h": 8
+        },
+        {
+          "x": 41,
+          "y": 183,
+          "w": 15,
+          "h": 11
+        },
+        {
+          "x": 493,
+          "y": 182,
+          "w": 11,
+          "h": 10
+        },
+        {
+          "x": 100,
+          "y": 184,
+          "w": 1,
+          "h": 2
+        }
+      ],
+      "diff": true
+    },
+    "a8509d1adf715fabd3c6e66fac2d1008f7615cba7ffa6741f2bceb49c69f0e6c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-missing-button",
+      "changed": true,
+      "score": 0.0118,
+      "ms": 16.3,
+      "regions": [
+        {
+          "x": 20,
+          "y": 401,
+          "w": 113,
+          "h": 36
+        }
+      ],
+      "diff": true
+    },
+    "aa9065fc81347d33c5ff7ed365025e058b5d08e5539f8b3912a5fded5716cc7d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-caret-email",
+      "changed": false,
+      "score": 0,
+      "ms": 15.1,
+      "regions": [],
+      "diff": false
+    },
+    "ac60e8d0aa4ca3dfbafc1593b6f910141a868dc56a4982b876909925de6fd3e4:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-input-border",
+      "changed": true,
+      "score": 0.0051,
+      "ms": 14.8,
+      "regions": [
+        {
+          "x": 137,
+          "y": 137,
+          "w": 366,
+          "h": 34
+        },
+        {
+          "x": 137,
+          "y": 206,
+          "w": 366,
+          "h": 34
+        }
+      ],
+      "diff": true
+    },
+    "b12bcd8980deb855103d709be8d8f8214570d9cafeb433aec5aa4927ea046f76:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-missing-row-reflow-pricing",
+      "changed": true,
+      "score": 0.0924,
+      "ms": 24.3,
+      "regions": [
+        {
+          "x": 87,
+          "y": 185,
+          "w": 577,
+          "h": 227
+        },
+        {
+          "x": 474,
+          "y": 245,
+          "w": 88,
+          "h": 24
+        }
+      ],
+      "diff": true
+    },
+    "b2d5328121dba972c2bd154331d9b7f694687fe561e54dc8bbb421ffaadd7220:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-hinting-pricing",
+      "changed": true,
+      "score": 0.009399999999999999,
+      "ms": 24.4,
+      "regions": [
+        {
+          "x": 178,
+          "y": 99,
+          "w": 394,
+          "h": 51
+        },
+        {
+          "x": 62,
+          "y": 292,
+          "w": 120,
+          "h": 40
+        },
+        {
+          "x": 495,
+          "y": 292,
+          "w": 86,
+          "h": 39
+        },
+        {
+          "x": 36,
+          "y": 429,
+          "w": 118,
+          "h": 13
+        },
+        {
+          "x": 279,
+          "y": 292,
+          "w": 109,
+          "h": 10
+        },
+        {
+          "x": 280,
+          "y": 319,
+          "w": 92,
+          "h": 11
+        },
+        {
+          "x": 520,
+          "y": 360,
+          "w": 82,
+          "h": 11
+        },
+        {
+          "x": 92,
+          "y": 360,
+          "w": 68,
+          "h": 10
+        },
+        {
+          "x": 106,
+          "y": 137,
+          "w": 55,
+          "h": 11
+        },
+        {
+          "x": 257,
+          "y": 245,
+          "w": 31,
+          "h": 19
+        },
+        {
+          "x": 577,
+          "y": 428,
+          "w": 65,
+          "h": 9
+        },
+        {
+          "x": 63,
+          "y": 17,
+          "w": 46,
+          "h": 11
+        },
+        {
+          "x": 127,
+          "y": 17,
+          "w": 40,
+          "h": 12
+        },
+        {
+          "x": 42,
+          "y": 471,
+          "w": 94,
+          "h": 5
+        },
+        {
+          "x": 315,
+          "y": 360,
+          "w": 51,
+          "h": 8
+        },
+        {
+          "x": 608,
+          "y": 18,
+          "w": 36,
+          "h": 11
+        },
+        {
+          "x": 186,
+          "y": 18,
+          "w": 30,
+          "h": 10
+        },
+        {
+          "x": 483,
+          "y": 218,
+          "w": 27,
+          "h": 7
+        },
+        {
+          "x": 259,
+          "y": 216,
+          "w": 19,
+          "h": 8
+        },
+        {
+          "x": 47,
+          "y": 218,
+          "w": 23,
+          "h": 6
+        },
+        {
+          "x": 46,
+          "y": 251,
+          "w": 10,
+          "h": 12
+        },
+        {
+          "x": 481,
+          "y": 251,
+          "w": 8,
+          "h": 13
+        },
+        {
+          "x": 81,
+          "y": 260,
+          "w": 30,
+          "h": 2
+        },
+        {
+          "x": 531,
+          "y": 260,
+          "w": 30,
+          "h": 2
+        },
+        {
+          "x": 315,
+          "y": 260,
+          "w": 29,
+          "h": 2
+        },
+        {
+          "x": 380,
+          "y": 192,
+          "w": 8,
+          "h": 3
+        },
+        {
+          "x": 408,
+          "y": 195,
+          "w": 4,
+          "h": 2
+        },
+        {
+          "x": 506,
+          "y": 253,
+          "w": 1,
+          "h": 2
+        }
+      ],
+      "diff": true
+    },
+    "b3e1c84d012adb68d08c01be840b54c2ef0e0f007634bc7baad96cc1759d112d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shift-container-settings",
+      "changed": true,
+      "score": 0.0044,
+      "ms": 23.3,
+      "regions": [
+        {
+          "x": 411,
+          "y": 108,
+          "w": 204,
+          "h": 9
+        },
+        {
+          "x": 208,
+          "y": 287,
+          "w": 149,
+          "h": 11
+        },
+        {
+          "x": 231,
+          "y": 315,
+          "w": 104,
+          "h": 11
+        },
+        {
+          "x": 240,
+          "y": 254,
+          "w": 71,
+          "h": 12
+        },
+        {
+          "x": 207,
+          "y": 229,
+          "w": 85,
+          "h": 9
+        },
+        {
+          "x": 215,
+          "y": 163,
+          "w": 72,
+          "h": 10
+        },
+        {
+          "x": 212,
+          "y": 405,
+          "w": 85,
+          "h": 8
+        },
+        {
+          "x": 446,
+          "y": 163,
+          "w": 68,
+          "h": 9
+        },
+        {
+          "x": 210,
+          "y": 136,
+          "w": 69,
+          "h": 7
+        },
+        {
+          "x": 262,
+          "y": 351,
+          "w": 55,
+          "h": 7
+        },
+        {
+          "x": 318,
+          "y": 109,
+          "w": 52,
+          "h": 7
+        },
+        {
+          "x": 210,
+          "y": 80,
+          "w": 38,
+          "h": 9
+        },
+        {
+          "x": 222,
+          "y": 28,
+          "w": 20,
+          "h": 10
+        },
+        {
+          "x": 262,
+          "y": 110,
+          "w": 39,
+          "h": 5
+        },
+        {
+          "x": 214,
+          "y": 106,
+          "w": 16,
+          "h": 10
+        },
+        {
+          "x": 316,
+          "y": 233,
+          "w": 25,
+          "h": 5
+        },
+        {
+          "x": 214,
+          "y": 350,
+          "w": 30,
+          "h": 4
+        },
+        {
+          "x": 436,
+          "y": 136,
+          "w": 19,
+          "h": 6
+        },
+        {
+          "x": 637,
+          "y": 260,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "x": 637,
+          "y": 291,
+          "w": 7,
+          "h": 9
+        },
+        {
+          "x": 290,
+          "y": 29,
+          "w": 29,
+          "h": 2
+        },
+        {
+          "x": 328,
+          "y": 401,
+          "w": 10,
+          "h": 2
+        },
+        {
+          "x": 267,
+          "y": 29,
+          "w": 2,
+          "h": 5
+        },
+        {
+          "x": 194,
+          "y": 31,
+          "w": 5,
+          "h": 2
+        },
+        {
+          "x": 369,
+          "y": 29,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 636,
+          "y": 168,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 215,
+          "y": 256,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "b7673efece99518963167032ed1570ec930da6f02e9921dcb9b22dbdbe4e14b0:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-subpixel-glyphs-article",
+      "changed": true,
+      "score": 0.016,
+      "ms": 23.2,
+      "regions": [
+        {
+          "x": 71,
+          "y": 180,
+          "w": 494,
+          "h": 84
+        },
+        {
+          "x": 71,
+          "y": 332,
+          "w": 479,
+          "h": 39
+        },
+        {
+          "x": 72,
+          "y": 476,
+          "w": 467,
+          "h": 36
+        },
+        {
+          "x": 91,
+          "y": 392,
+          "w": 247,
+          "h": 63
+        },
+        {
+          "x": 89,
+          "y": 293,
+          "w": 400,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "b8d9a5f4656703e2bdd6fc2ef1449b848613f5d6c2d69603fa37b2de381d0197:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-border-1px-pricing",
+      "changed": true,
+      "score": 0.0326,
+      "ms": 22.7,
+      "regions": [
+        {
+          "x": 22,
+          "y": 186,
+          "w": 636,
+          "h": 297
+        },
+        {
+          "x": 258,
+          "y": 291,
+          "w": 131,
+          "h": 41
+        },
+        {
+          "x": 474,
+          "y": 291,
+          "w": 108,
+          "h": 40
+        },
+        {
+          "x": 42,
+          "y": 245,
+          "w": 71,
+          "h": 26
+        },
+        {
+          "x": 512,
+          "y": 361,
+          "w": 89,
+          "h": 9
+        },
+        {
+          "x": 476,
+          "y": 246,
+          "w": 31,
+          "h": 23
+        },
+        {
+          "x": 311,
+          "y": 360,
+          "w": 59,
+          "h": 10
+        },
+        {
+          "x": 527,
+          "y": 259,
+          "w": 35,
+          "h": 8
+        },
+        {
+          "x": 476,
+          "y": 217,
+          "w": 34,
+          "h": 8
+        }
+      ],
+      "diff": true
+    },
+    "bd27c9eba1621b0042ff95a116f641dead410be81d9708383f1b805631f75d9d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-icon-logo-plus",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 15.7,
+      "regions": [
+        {
+          "x": 27,
+          "y": 18,
+          "w": 11,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "be8620b7a5550619b238fdddd15d45791d4b3d0af4d03ddcbbfc5df2b44507b1:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-animation-frame-settings",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 15.3,
+      "regions": [
+        {
+          "x": 331,
+          "y": 399,
+          "w": 10,
+          "h": 16
+        }
+      ],
+      "diff": true
+    },
+    "bfc707bbd55aac9db7f4f58ff6b7c47074159cfad26494b1621cde9a25e9ca3d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-missing-icon-pricing",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 17.4,
+      "regions": [
+        {
+          "x": 41,
+          "y": 292,
+          "w": 10,
+          "h": 11
+        }
+      ],
+      "diff": true
+    },
+    "c4a7d8e3e4c3540ea24041981a2fcbfce38d509a59e5effa5f914fb215d0f504:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-glyph-row-label",
+      "changed": false,
+      "score": 0,
+      "ms": 14.8,
+      "regions": [],
+      "diff": false
+    },
+    "c50c154ae06927ce7368dfdbfbdea388e901e8f8f24d66ed208cffbd4e06fd01:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-shift-form-main",
+      "changed": true,
+      "score": 0.0067,
+      "ms": 17.8,
+      "regions": [
+        {
+          "x": 138,
+          "y": 188,
+          "w": 113,
+          "h": 50
+        },
+        {
+          "x": 313,
+          "y": 121,
+          "w": 73,
+          "h": 48
+        },
+        {
+          "x": 138,
+          "y": 118,
+          "w": 60,
+          "h": 51
+        },
+        {
+          "x": 138,
+          "y": 257,
+          "w": 44,
+          "h": 50
+        },
+        {
+          "x": 138,
+          "y": 355,
+          "w": 188,
+          "h": 10
+        },
+        {
+          "x": 173,
+          "y": 326,
+          "w": 164,
+          "h": 10
+        },
+        {
+          "x": 129,
+          "y": 67,
+          "w": 186,
+          "h": 8
+        },
+        {
+          "x": 160,
+          "y": 287,
+          "w": 84,
+          "h": 11
+        },
+        {
+          "x": 156,
+          "y": 395,
+          "w": 94,
+          "h": 9
+        },
+        {
+          "x": 140,
+          "y": 33,
+          "w": 37,
+          "h": 14
+        },
+        {
+          "x": 345,
+          "y": 153,
+          "w": 44,
+          "h": 6
+        },
+        {
+          "x": 228,
+          "y": 36,
+          "w": 12,
+          "h": 10
+        },
+        {
+          "x": 261,
+          "y": 43,
+          "w": 24,
+          "h": 4
+        },
+        {
+          "x": 502,
+          "y": 143,
+          "w": 2,
+          "h": 25
+        },
+        {
+          "x": 502,
+          "y": 212,
+          "w": 2,
+          "h": 25
+        },
+        {
+          "x": 502,
+          "y": 281,
+          "w": 2,
+          "h": 25
+        },
+        {
+          "x": 141,
+          "y": 326,
+          "w": 1,
+          "h": 9
+        },
+        {
+          "x": 317,
+          "y": 36,
+          "w": 1,
+          "h": 1
+        },
+        {
+          "x": 202,
+          "y": 45,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "c542a1e1de6572c5b2febb36b389ae63d3cd2d6fa25bf51e8c435a498f859ecd:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-shadow-blur-dashboard",
+      "changed": false,
+      "score": 0,
+      "ms": 13.9,
+      "regions": [],
+      "diff": false
+    },
+    "c923ff221a6e489919bee22165961373d297883e32b6337ff01f99ec5b9aaf11:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-badge",
+      "changed": true,
+      "score": 0.0004,
+      "ms": 15,
+      "regions": [
+        {
+          "x": 270,
+          "y": 66,
+          "w": 49,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "c9ff1032135658f2a8a0f62468634f8999bcaf96fb817f1680e86f2c76107892:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-subpixel-glyphs-pricing",
+      "changed": true,
+      "score": 0.0012,
+      "ms": 19.5,
+      "regions": [
+        {
+          "x": 478,
+          "y": 244,
+          "w": 84,
+          "h": 25
+        },
+        {
+          "x": 264,
+          "y": 244,
+          "w": 81,
+          "h": 23
+        },
+        {
+          "x": 379,
+          "y": 190,
+          "w": 39,
+          "h": 11
+        },
+        {
+          "x": 473,
+          "y": 214,
+          "w": 36,
+          "h": 11
+        },
+        {
+          "x": 76,
+          "y": 257,
+          "w": 36,
+          "h": 10
+        },
+        {
+          "x": 40,
+          "y": 214,
+          "w": 29,
+          "h": 11
+        },
+        {
+          "x": 40,
+          "y": 244,
+          "w": 10,
+          "h": 25
+        },
+        {
+          "x": 257,
+          "y": 214,
+          "w": 22,
+          "h": 11
+        }
+      ],
+      "diff": true
+    },
+    "ca8f6ef8013e144adec924c2da1e73a191f965e102c244027143cfd191543eb4:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-size-append-paragraph",
+      "changed": true,
+      "score": 0.0024,
+      "ms": 26.7,
+      "regions": [
+        {
+          "x": 121,
+          "y": 479,
+          "w": 359,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "cc3e447cd45d20066143068159b47e244c415770a5766cc0b93eda8008e24b4b:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-caret-first-name",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 14.7,
+      "regions": [
+        {
+          "x": 175,
+          "y": 146,
+          "w": 1,
+          "h": 16
+        }
+      ],
+      "diff": true
+    },
+    "cf885d4aa1417805b5e33b5d7309ff21701063404775f10ee688d6b0707ee6f8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-glyph-inbox",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 14.4,
+      "regions": [
+        {
+          "x": 167,
+          "y": 187,
+          "w": 6,
+          "h": 6
+        }
+      ],
+      "diff": true
+    },
+    "d0de7006b1b98d3a2de6fc495d9067ec3c9f8219ae3c7401df335f9b8a2337a8:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-dither-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 19,
+      "regions": [],
+      "diff": false
+    },
+    "d125f1f2fe3222fdd8934643d97408c5c8d14705dd583579c0d9eafb557f6b1f:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-caret-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 17,
+      "regions": [],
+      "diff": false
+    },
+    "d145af0bed297e1550836ee77e7b8d2a48c6957c4ad0c181183ac924d047f305:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-emoji-subpixel-dashboard",
+      "changed": true,
+      "score": 0.0011,
+      "ms": 17.8,
+      "regions": [
+        {
+          "x": 59,
+          "y": 459,
+          "w": 111,
+          "h": 17
+        },
+        {
+          "x": 233,
+          "y": 459,
+          "w": 75,
+          "h": 13
+        }
+      ],
+      "diff": true
+    },
+    "d1d53ba2a886973d29a0a4870dca34a4e8319a8e4b8b77a4383ee138beadcd93:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-spacing-form-gap-1px",
+      "changed": true,
+      "score": 0.0226,
+      "ms": 18,
+      "regions": [
+        {
+          "x": 122,
+          "y": 187,
+          "w": 396,
+          "h": 248
+        }
+      ],
+      "diff": true
+    },
+    "d463b996fe565d3822e4fa668d3535f5ea2395ebe083340392d58e99c261a94b:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-1step-submit",
+      "changed": false,
+      "score": 0,
+      "ms": 14.6,
+      "regions": [],
+      "diff": false
+    },
+    "d673adfd7e9a36c0e1e600ce0c7b329083c4ccc3ec1326cf191f99f30bba9da4:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-button-clear-inbox",
+      "changed": true,
+      "score": 0.0083,
+      "ms": 14.6,
+      "regions": [
+        {
+          "x": 515,
+          "y": 16,
+          "w": 87,
+          "h": 30
+        }
+      ],
+      "diff": true
+    },
+    "d75ffb7c211dccbb60941eb43cfe96d273d8403c856bf83b8437daf6e1f4768c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-banding-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 15.3,
+      "regions": [],
+      "diff": false
+    },
+    "da4fed7900498ff0d38156dce4b49f570cf6f3c4ce98b27f2ce42e661eb91287:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-colour-button-clear",
+      "changed": true,
+      "score": 0.0118,
+      "ms": 16.2,
+      "regions": [
+        {
+          "x": 20,
+          "y": 401,
+          "w": 113,
+          "h": 36
+        }
+      ],
+      "diff": true
+    },
+    "daf3e9269e55d9cc7a3071409dc5216b2a6385f8e2f9d510fba181b5963b03f6:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-icon-check-to-cross",
+      "changed": true,
+      "score": 0.0003,
+      "ms": 15.4,
+      "regions": [
+        {
+          "x": 37,
+          "y": 299,
+          "w": 12,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "de1e6d8a3eacf39bada7edafb1016af098dbfe26ef6cf53b1fc4b7d60c1d7cbc:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-caret-inbox",
+      "changed": true,
+      "score": 0.0001,
+      "ms": 14.4,
+      "regions": [
+        {
+          "x": 201,
+          "y": 23,
+          "w": 1,
+          "h": 16
+        }
+      ],
+      "diff": true
+    },
+    "dec245e035d892ddda38678de73cb9862df9953f27c2529ea56be2f49ea8c2cf:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shadow-blur-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 14.9,
+      "regions": [],
+      "diff": false
+    },
+    "dfdc01d63bf6bf2725eb4596e78722089898e646c8a1f497cff243a0f0b8bbf4:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-border-1px-settings",
+      "changed": true,
+      "score": 0.002,
+      "ms": 20,
+      "regions": [
+        {
+          "x": 204,
+          "y": 153,
+          "w": 213,
+          "h": 30
+        }
+      ],
+      "diff": true
+    },
+    "e1d44e7a76a1b4c885bd8b63f1bc13f0d875dd9c38093ffd4532f73ec6781d07:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-banding-inbox",
+      "changed": false,
+      "score": 0,
+      "ms": 12.1,
+      "regions": [],
+      "diff": false
+    },
+    "e61c5c368d12d4429c7be877e6cbce58d05d7b092b2d9117eeddcafa56226062:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-spacing-button-padding-1px",
+      "changed": true,
+      "score": 0.0006,
+      "ms": 16.3,
+      "regions": [
+        {
+          "x": 37,
+          "y": 407,
+          "w": 97,
+          "h": 24
+        }
+      ],
+      "diff": true
+    },
+    "e7a6360dbb006e664a31b91f46252708e4d59c04448d2a9d812c4fc05e714f74:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-dither-article-2",
+      "changed": false,
+      "score": 0,
+      "ms": 16.1,
+      "regions": [],
+      "diff": false
+    },
+    "e99ca68e33c7501c3a6a3ac02260d91ce280f2615aa4455886f2b092e3afb96b:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-text-word-pricing",
+      "changed": true,
+      "score": 0.006,
+      "ms": 17.6,
+      "regions": [
+        {
+          "x": 76,
+          "y": 137,
+          "w": 529,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "ea18c3ee92982e63b99dd4aca109f9e4ba2064cc67449b7d4032753f66a15328:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-text-button-longer",
+      "changed": true,
+      "score": 0.0043,
+      "ms": 15.6,
+      "regions": [
+        {
+          "x": 202,
+          "y": 381,
+          "w": 97,
+          "h": 37
+        }
+      ],
+      "diff": true
+    },
+    "eb095f20a54a767955e58fb30dee3674a202fe2d60add9da46f0c77b3eedacee:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-emoji-subpixel-inbox",
+      "changed": true,
+      "score": 0.0008,
+      "ms": 14,
+      "regions": [
+        {
+          "x": 195,
+          "y": 304,
+          "w": 75,
+          "h": 13
+        },
+        {
+          "x": 78,
+          "y": 304,
+          "w": 54,
+          "h": 17
+        }
+      ],
+      "diff": true
+    },
+    "ed083c2a6a89fc3631890f7f06f9d5e42d2cc4701a71d62bbd0d4c237ed8d46d:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-emoji-subpixel-pricing",
+      "changed": true,
+      "score": 0.0008,
+      "ms": 16.2,
+      "regions": [
+        {
+          "x": 364,
+          "y": 174,
+          "w": 78,
+          "h": 13
+        },
+        {
+          "x": 239,
+          "y": 175,
+          "w": 63,
+          "h": 16
+        }
+      ],
+      "diff": true
+    },
+    "ee4f579d5a442bff0ea2f718e5551a66098e27855fc4f2585932f947de838808:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/real-spacing-list-gap-1px",
+      "changed": true,
+      "score": 0.006500000000000001,
+      "ms": 16.8,
+      "regions": [
+        {
+          "x": 22,
+          "y": 327,
+          "w": 594,
+          "h": 112
+        },
+        {
+          "x": 560,
+          "y": 328,
+          "w": 44,
+          "h": 13
+        },
+        {
+          "x": 148,
+          "y": 411,
+          "w": 12,
+          "h": 5
+        },
+        {
+          "x": 42,
+          "y": 329,
+          "w": 1,
+          "h": 9
+        }
+      ],
+      "diff": true
+    },
+    "f126c71b0eb4b194227fc889389d6527e96e1b33cca3f246aad986a37538e924:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-emoji-glyph-positioning-form",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 14.7,
+      "regions": [
+        {
+          "x": 315,
+          "y": 456,
+          "w": 32,
+          "h": 4
+        },
+        {
+          "x": 424,
+          "y": 455,
+          "w": 6,
+          "h": 5
+        },
+        {
+          "x": 150,
+          "y": 458,
+          "w": 7,
+          "h": 2
+        },
+        {
+          "x": 297,
+          "y": 455,
+          "w": 1,
+          "h": 5
+        },
+        {
+          "x": 182,
+          "y": 457,
+          "w": 1,
+          "h": 3
+        },
+        {
+          "x": 219,
+          "y": 457,
+          "w": 1,
+          "h": 3
+        },
+        {
+          "x": 269,
+          "y": 457,
+          "w": 1,
+          "h": 3
+        },
+        {
+          "x": 403,
+          "y": 457,
+          "w": 1,
+          "h": 3
+        }
+      ],
+      "diff": true
+    },
+    "f22a18091432193c174880920427abc78af782375a921cb299deddd11089d236:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-size-append-pricing",
+      "changed": true,
+      "score": 0.0016,
+      "ms": 36.4,
+      "regions": [
+        {
+          "x": 23,
+          "y": 687,
+          "w": 359,
+          "h": 14
+        }
+      ],
+      "diff": true
+    },
+    "f2cb654dabd93aeab472f0b3b00d2c0ad01ba39b23086c7bcf7578ac63313ede:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/identical-inbox-fullpage",
+      "changed": false,
+      "score": 0,
+      "ms": 13.2,
+      "regions": [],
+      "diff": false
+    },
+    "f439627fe3319fc73c0c2f833de06e32431a86a403b20a4a2fa382a7a56fce53:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-shift-article-main",
+      "changed": true,
+      "score": 0.009000000000000001,
+      "ms": 30.7,
+      "regions": [
+        {
+          "x": 71,
+          "y": 182,
+          "w": 468,
+          "h": 82
+        },
+        {
+          "x": 72,
+          "y": 334,
+          "w": 479,
+          "h": 36
+        },
+        {
+          "x": 98,
+          "y": 398,
+          "w": 236,
+          "h": 56
+        },
+        {
+          "x": 72,
+          "y": 478,
+          "w": 467,
+          "h": 13
+        },
+        {
+          "x": 91,
+          "y": 294,
+          "w": 277,
+          "h": 11
+        },
+        {
+          "x": 93,
+          "y": 395,
+          "w": 111,
+          "h": 9
+        },
+        {
+          "x": 385,
+          "y": 296,
+          "w": 99,
+          "h": 8
+        },
+        {
+          "x": 78,
+          "y": 504,
+          "w": 60,
+          "h": 8
+        },
+        {
+          "x": 556,
+          "y": 234,
+          "w": 8,
+          "h": 6
+        },
+        {
+          "x": 138,
+          "y": 36,
+          "w": 1,
+          "h": 12
+        },
+        {
+          "x": 368,
+          "y": 47,
+          "w": 2,
+          "h": 1
+        },
+        {
+          "x": 208,
+          "y": 36,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "f59360a64552f8ea027d714d101eeab1e4ff675788d907be5dc0a6d8944621ff:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-badge-pulse-frame",
+      "changed": true,
+      "score": 0.0002,
+      "ms": 16.8,
+      "regions": [
+        {
+          "x": 270,
+          "y": 66,
+          "w": 49,
+          "h": 12
+        }
+      ],
+      "diff": true
+    },
+    "f5daa95935410cf676f53f321db47e2e15d240372a2213e3634f8d81012a9f2c:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-reflow-stack-inbox",
+      "changed": true,
+      "score": 0.5885,
+      "ms": 31.8,
+      "regions": [
+        {
+          "x": 40,
+          "y": 16,
+          "w": 600,
+          "h": 384
+        },
+        {
+          "x": 95,
+          "y": 397,
+          "w": 82,
+          "h": 3
+        },
+        {
+          "x": 41,
+          "y": 398,
+          "w": 10,
+          "h": 2
+        },
+        {
+          "x": 73,
+          "y": 398,
+          "w": 1,
+          "h": 1
+        }
+      ],
+      "diff": true
+    },
+    "f6b9a1cf13111ad8789d7c9492293dae57ec0f4fb009a96ae39d215375c21c86:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/noise-shadow-blur-settings",
+      "changed": false,
+      "score": 0,
+      "ms": 14.3,
+      "regions": [],
+      "diff": false
+    },
+    "fa8eea9b35655859ecbd84456c8d9d304143a83cc667bbac3a1f13520915e3da:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/identical-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 19,
+      "regions": [],
+      "diff": false
+    },
+    "fa95667e05ea1d2f181a67deb84abe44b108a342fe5bca0fcf3ef1c34aded997:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "main/noise-jpeg50-article",
+      "changed": true,
+      "score": 0.0613,
+      "ms": 30.6,
+      "regions": [
+        {
+          "x": 64,
+          "y": 24,
+          "w": 512,
+          "h": 240
+        },
+        {
+          "x": 64,
+          "y": 281,
+          "w": 487,
+          "h": 231
+        }
+      ],
+      "diff": true
+    },
+    "fe4270c1ef560dc1c908ad628724e3c6a2d0fd6274eb98bf85be639a5f582ee6:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/identical-settings-hinting-none",
+      "changed": false,
+      "score": 0,
+      "ms": 15.1,
+      "regions": [],
+      "diff": false
+    },
+    "fe73191aac99aa2d5341537362f0740b09f3e324c244006d2b8ffd6d701ec208:21e8520c28129d501b22028a5499546b03336e38:0.5": {
+      "label": "holdout/real-colour-1step-pricing",
+      "changed": false,
+      "score": 0,
+      "ms": 17.6,
+      "regions": [],
+      "diff": false
+    }
+  }
+}

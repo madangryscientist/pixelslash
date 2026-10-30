@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pixelslash-site",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  // The marketing site: every page is prerendered, so the Worker serves static files and holds no
+  // data (no D1, no R2, no secrets). It answers on the apex of the pixelslash.dev zone only.
+  "workers_dev": false,
+  "routes": [{ "pattern": "pixelslash.dev", "custom_domain": true }],
+  "observability": { "enabled": false },
+}

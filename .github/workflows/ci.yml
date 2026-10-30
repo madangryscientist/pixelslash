@@ -1,0 +1,139 @@
+name: CI
+
+# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read anywhere in this file, and
+# the trigger is `pull_request` (never `pull_request_target`), so a pull request from a fork runs
+# with a read-only token and no secrets. Actions are pinned to a commit; the tag is in the comment.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # release.yml runs this same gate before it publishes.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Bun the repo is built and pinned against (docker/capture/Dockerfile, bench/PERF.md).
+  BUN_VERSION: "1.4.2"
+
+jobs:
+  gate:
+    name: Gate (typecheck, lint, format, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      # global.json pins the SDK; engines/dotnet is part of the gate where an SDK exists.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - run: bun install --frozen-lockfile
+      # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
+      - name: Install the Playwright browser
+        working-directory: packages/engine
+        run: bunx playwright install --with-deps chromium-headless-shell
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run format:check
+      # Includes bench:check (the regression guard); never bench:perf.
+      - run: bun run test
+
+  # The Playwright helper on plain Node, outside the workspace (PS-237): both packages are packed,
+  # installed from their tarballs into a copy of examples/playwright-node, its tests run with no `bun`
+  # on PATH, and `pixelslash upload` takes the dir they wrote. Nothing is published.
+  example:
+    name: Playwright example on Node (packed tarballs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - run: bun install --frozen-lockfile
+      # System libraries for chromium; the check installs the browser itself, from the sample's Playwright.
+      - name: Install the browser's system libraries
+        working-directory: packages/engine
+        run: bunx playwright install-deps chromium-headless-shell
+      - run: bun run check:example
+
+  changes:
+    name: Did the web app change?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.diff.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # apps/web and packages (what it imports), plus what decides how they install and run.
+          if git diff --name-only "origin/$BASE_REF...HEAD" \
+            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  web:
+    name: Web gate (build, e2e, deploy dry run)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The e2e uploads run the CLI in this checkout, which wants a merge-base with main.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - run: bun install --frozen-lockfile
+      - name: Install the Playwright browser
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium-headless-shell
+      - run: bunx nx build web
+      - run: bunx nx test:e2e web
+      - name: e2e against vite dev
+        working-directory: apps/web
+        run: bun run test:e2e:dev
+      - name: Deploy dry run
+        working-directory: apps/web
+        run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry"
+      - name: Deploy dry run, env.production (app.pixelslash.dev)
+        working-directory: apps/web
+        run: |
+          CLOUDFLARE_ENV=production bun run build
+          bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry-production"

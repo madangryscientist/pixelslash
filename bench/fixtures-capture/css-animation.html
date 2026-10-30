@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>CSS animation</title>
+<style>
+  body {
+    font: 16px/1.5 sans-serif;
+    margin: 32px;
+    color: #1d2433;
+  }
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 6px solid #d5dbe8;
+    border-top-color: #3563e9;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .pulse {
+    height: 12px;
+    width: 240px;
+    background: #3563e9;
+    border-radius: 6px;
+    margin-top: 24px;
+    animation: pulse 1.1s ease-in-out infinite alternate;
+  }
+  .slide-in {
+    margin-top: 24px;
+    padding: 12px 16px;
+    background: #eef2fb;
+    border-radius: 8px;
+    width: 240px;
+    animation: slide 0.5s ease-out both;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes pulse {
+    from {
+      transform: scaleX(0.3);
+      opacity: 0.4;
+    }
+    to {
+      transform: scaleX(1);
+      opacity: 1;
+    }
+  }
+  @keyframes slide {
+    from {
+      transform: translateX(-120px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+</style>
+<h1>Deploying</h1>
+<div class="spinner"></div>
+<div class="pulse"></div>
+<div class="slide-in">Build queued</div>
+<script>
+  // Start at a random point in the cycle. Load timing between two CI runs does the same; on an idle
+  // machine a capture lands on the same frame every time, which would show nothing.
+  for (const el of document.querySelectorAll(".spinner, .pulse"))
+    el.style.animationDelay = -Math.random() * 1 + "s";
+</script>

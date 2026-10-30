@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "colour-1step",
+  "page": "pricing",
+  "width": 680,
+  "height": 520,
+  "box": {
+    "x": 255,
+    "y": 346,
+    "w": 170,
+    "h": 38
+  }
+}

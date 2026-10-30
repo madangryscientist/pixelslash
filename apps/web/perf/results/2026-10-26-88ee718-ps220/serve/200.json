@@ -1,0 +1,230 @@
+{
+  "commit": "88ee718-serve",
+  "server": "http://127.0.0.1:3301",
+  "shots": 200,
+  "mix": "mixed",
+  "concurrency": 4,
+  "uploadMB": {
+    "main": 279.042384,
+    "branch": 279.049702
+  },
+  "cold": true,
+  "idle": {
+    "workerd": 137.4,
+    "vite": 0,
+    "host": 111.1,
+    "sidecar": 30.7
+  },
+  "phases": [
+    {
+      "phase": "main PUTs",
+      "seconds": 16.822,
+      "peakMB": {
+        "workerd": 399.7,
+        "vite": 0,
+        "host": 111.1,
+        "sidecar": 30.8
+      },
+      "hwmMB": {
+        "workerd": 400.7,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.5
+      },
+      "endMB": {
+        "workerd": 365.3,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.2
+      },
+      "webUnitPeakMB": 662.6,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 399.4,
+      "webUnitFilePeakMB": 272.8,
+      "webUnitEndMB": 643.2,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 6.5
+    },
+    {
+      "phase": "main finalize",
+      "seconds": 5.683,
+      "note": "passed",
+      "peakMB": {
+        "workerd": 369.4,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.2
+      },
+      "hwmMB": {
+        "workerd": 369.4,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.2
+      },
+      "endMB": {
+        "workerd": 369.4,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.2
+      },
+      "webUnitPeakMB": 647.8,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 368.9,
+      "webUnitFilePeakMB": 273.5,
+      "webUnitEndMB": 647.8,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 5.7
+    },
+    {
+      "phase": "branch PUTs",
+      "seconds": 21.743,
+      "peakMB": {
+        "workerd": 491.7,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.2
+      },
+      "hwmMB": {
+        "workerd": 494.1,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30.1
+      },
+      "endMB": {
+        "workerd": 491.7,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 30
+      },
+      "webUnitPeakMB": 1039,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 491.4,
+      "webUnitFilePeakMB": 541.6,
+      "webUnitEndMB": 1039,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 5.7
+    },
+    {
+      "phase": "branch finalize (diff)",
+      "seconds": 37.38,
+      "note": "2 finalizes, changes",
+      "peakMB": {
+        "workerd": 500.6,
+        "vite": 0,
+        "host": 110.4,
+        "sidecar": 416.8
+      },
+      "hwmMB": {
+        "workerd": 499.5,
+        "vite": 0,
+        "host": 109.8,
+        "sidecar": 424.6
+      },
+      "endMB": {
+        "workerd": 435.4,
+        "vite": 0,
+        "host": 104,
+        "sidecar": 310.1
+      },
+      "webUnitPeakMB": 1050.6,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 498.9,
+      "webUnitFilePeakMB": 550.2,
+      "webUnitEndMB": 984.4,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 382.2
+    },
+    {
+      "phase": "settled +10s",
+      "seconds": 10.05,
+      "peakMB": {
+        "workerd": 435.4,
+        "vite": 0,
+        "host": 104,
+        "sidecar": 310.1
+      },
+      "hwmMB": {
+        "workerd": 434.2,
+        "vite": 0,
+        "host": 104,
+        "sidecar": 309.6
+      },
+      "endMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 104,
+        "sidecar": 308.3
+      },
+      "webUnitPeakMB": 983.7,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 427.3,
+      "webUnitFilePeakMB": 550.2,
+      "webUnitEndMB": 950.9,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 273.8
+    },
+    {
+      "phase": "settled +60s",
+      "seconds": 50.001,
+      "peakMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 104.2,
+        "sidecar": 308.3
+      },
+      "hwmMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 103.8,
+        "sidecar": 308
+      },
+      "endMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 103.2,
+        "sidecar": 301.3
+      },
+      "webUnitPeakMB": 952,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 403,
+      "webUnitFilePeakMB": 542.4,
+      "webUnitEndMB": 949.9,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 271.9
+    },
+    {
+      "phase": "settled +180s",
+      "seconds": 120.002,
+      "peakMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 103.2,
+        "sidecar": 301.3
+      },
+      "hwmMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 103.2,
+        "sidecar": 301
+      },
+      "endMB": {
+        "workerd": 410.7,
+        "vite": 0,
+        "host": 103.2,
+        "sidecar": 301
+      },
+      "webUnitPeakMB": 951,
+      "webUnitSwapPeakMB": 0,
+      "webUnitAnonPeakMB": 402,
+      "webUnitFilePeakMB": 542.4,
+      "webUnitEndMB": 949.9,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 265.5
+    }
+  ],
+  "probes": {
+    "count": 82,
+    "failed": 0,
+    "slowestMs": 2423
+  }
+}

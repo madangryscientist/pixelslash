@@ -1,0 +1,1 @@
+ALTER TABLE `builds` ADD `ai_summary` text;

@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Shimmer skeleton</title>
+<style>
+  body {
+    font: 16px/1.5 sans-serif;
+    margin: 32px;
+    color: #1d2433;
+  }
+  .row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .sk {
+    border-radius: 6px;
+    background: linear-gradient(90deg, #e4e8f0 25%, #f4f6fa 50%, #e4e8f0 75%);
+    background-size: 300% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+  .avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+  }
+  .line {
+    height: 14px;
+    width: 320px;
+    margin-bottom: 8px;
+  }
+  .line.short {
+    width: 180px;
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+</style>
+<h1>Loading activity</h1>
+<div class="row">
+  <div class="sk avatar"></div>
+  <div>
+    <div class="sk line"></div>
+    <div class="sk line short"></div>
+  </div>
+</div>
+<div class="row">
+  <div class="sk avatar"></div>
+  <div>
+    <div class="sk line"></div>
+    <div class="sk line short"></div>
+  </div>
+</div>
+<div class="row">
+  <div class="sk avatar"></div>
+  <div>
+    <div class="sk line"></div>
+    <div class="sk line short"></div>
+  </div>
+</div>
+<script>
+  // Start at a random point in the cycle. Load timing between two CI runs does the same; on an idle
+  // machine a capture lands on the same frame every time, which would show nothing.
+  for (const el of document.querySelectorAll(".sk"))
+    el.style.animationDelay = -Math.random() * 1.2 + "s";
+</script>

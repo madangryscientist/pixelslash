@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Focused input</title>
+<style>
+  body {
+    font: 16px/1.5 sans-serif;
+    margin: 32px;
+    color: #1d2433;
+  }
+  input,
+  textarea {
+    font: inherit;
+    padding: 8px 12px;
+    border: 1px solid #aab3c5;
+    border-radius: 6px;
+    width: 320px;
+    caret-color: #d6247b;
+  }
+  input:focus,
+  textarea:focus {
+    outline: 2px solid #3563e9;
+  }
+  label {
+    display: block;
+    margin: 16px 0 4px;
+  }
+</style>
+<h1>Search</h1>
+<label for="q">Query</label>
+<input id="q" value="visual regression" autofocus />
+<label for="n">Notes</label>
+<textarea id="n" rows="3">first line</textarea>
+<script>
+  // Put the caret at the end of the text, as a user who just typed would have it.
+  const q = document.getElementById("q");
+  q.focus();
+  q.setSelectionRange(q.value.length, q.value.length);
+</script>

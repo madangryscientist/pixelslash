@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>form</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: #fafafa;
+        color: #18181b;
+      }
+      main {
+        max-width: 440px;
+        margin: 0 auto;
+        padding: 24px 20px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 22px;
+        font-weight: 600;
+      }
+      p.lede {
+        margin: 0 0 16px;
+        color: #52525b;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: #fff;
+        border: 1px solid #d4d4d8;
+        border-radius: 10px;
+        padding: 16px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-weight: 500;
+        font-size: 13px;
+      }
+      input[type="text"],
+      select {
+        width: 100%;
+        min-width: 0;
+        height: 34px;
+        border: 1px solid #a1a1aa;
+        border-radius: 6px;
+        padding: 0 10px;
+        font: inherit;
+        background: #fff;
+        color: #18181b;
+      }
+      .check {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        font-weight: 400;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+      }
+      .row label {
+        flex: 1;
+      }
+      #submit {
+        align-self: flex-start;
+        background: #18181b;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 18px;
+        font: inherit;
+        font-weight: 500;
+      }
+      #hint {
+        color: #71717a;
+        font-size: 12px;
+      }
+      #badge {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 99px;
+        background: #dcfce7;
+        color: #166534;
+        font-size: 12px;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Create your account</h1>
+      <p class="lede">Takes about a minute. <span id="badge">Free plan</span></p>
+      <form id="form">
+        <div class="row">
+          <label>First name<input type="text" id="first" value="Ada" /></label>
+          <label>Last name<input type="text" id="last" value="Lovelace" /></label>
+        </div>
+        <label>Email<input type="text" id="email" value="ada@example.com" /></label>
+        <label
+          >Country<select id="country">
+            <option>United Kingdom</option>
+            <option>Netherlands</option>
+          </select></label
+        >
+        <label class="check" id="terms"
+          ><input type="checkbox" checked /> I agree to the terms of service</label
+        >
+        <span id="hint">We never share your email address.</span>
+        <button id="submit" type="button">Create account</button>
+      </form>
+    </main>
+  </body>
+</html>

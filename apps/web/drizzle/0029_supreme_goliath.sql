@@ -1,0 +1,1 @@
+ALTER TABLE `snapshots` ADD `a11y` text;

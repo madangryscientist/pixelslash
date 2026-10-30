@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>masks</title>
+  <style>
+    body { margin: 0; font: 16px/1.5 sans-serif; background: #fff; color: #111; }
+    .ad { position: absolute; left: 40px; top: 40px; width: 200px; height: 100px; }
+    .ad.two { left: 300px; }
+    .feed { position: absolute; left: 0; top: 200px; width: 320px; height: 40px; }
+    .still { position: absolute; left: 0; top: 300px; width: 320px; height: 40px; background: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="ad"></div>
+  <div class="ad two"></div>
+  <div class="feed" id="feed"></div>
+  <div class="still"></div>
+  <script>
+    // Different on every load: only the masks make this page capture identically.
+    const rand = () => `hsl(${Math.floor(Math.random() * 360)} 80% 50%)`;
+    for (const ad of document.querySelectorAll(".ad")) ad.style.background = rand();
+    const feed = document.getElementById("feed");
+    feed.style.background = rand();
+    feed.textContent = Math.random().toString(36);
+  </script>
+</body>
+</html>

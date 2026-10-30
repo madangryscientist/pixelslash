@@ -1,0 +1,40 @@
+{
+  "width": 1280,
+  "height": 720,
+  "changedPixels": 13418,
+  "regions": [
+    {
+      "x": 617,
+      "y": 368,
+      "w": 266,
+      "h": 44,
+      "changedPixels": 11259,
+      "kind": "change"
+    },
+    {
+      "x": 284,
+      "y": 507,
+      "w": 210,
+      "h": 8,
+      "changedPixels": 1674,
+      "kind": "change"
+    },
+    {
+      "x": 584,
+      "y": 483,
+      "w": 108,
+      "h": 11,
+      "changedPixels": 360,
+      "kind": "change"
+    },
+    {
+      "x": 656,
+      "y": 178,
+      "w": 18,
+      "h": 23,
+      "changedPixels": 125,
+      "kind": "change"
+    }
+  ],
+  "createdAt": "2026-10-28T21:00:11.169Z"
+}

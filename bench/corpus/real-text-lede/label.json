@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "text",
+  "page": "form",
+  "width": 640,
+  "height": 460,
+  "box": {
+    "x": 120,
+    "y": 61,
+    "w": 229,
+    "h": 21
+  }
+}

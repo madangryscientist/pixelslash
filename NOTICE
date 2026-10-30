@@ -1,0 +1,103 @@
+PixelSlash
+Copyright 2026 Jacobus Langner and the PixelSlash contributors
+
+PixelSlash is MIT-licensed; see LICENSE.
+
+This product contains code ported from, calibration data taken from, and depends on, the works below. Each
+entry says where its code is used and gives the licence, reproduced in full at the end.
+
+1. pixelmatch (ISC)
+   Copyright (c) 2025, Mapbox; author Volodymyr Agafonkin
+   https://github.com/mapbox/pixelmatch
+   Ported in:
+     packages/engine/src/yiq.ts      lumaIq, colourDelta, MAX_YIQ_DELTA
+     engines/wasm/src/lib.rs         MAX_YIQ_DELTA, blended, luma, luma_iq, colour_delta,
+                                     has_many_siblings, is_antialiased
+     engines/dotnet/PixelSlash.Diff/Diff.cs
+                                     MaxYiqDelta, Luma, ColourDelta, HasManySiblings, IsAntialiased
+   The YIQ coefficients, the 35215 maximum delta and the neighbour tests follow pixelmatch's
+   YIQ colour delta.
+
+2. pngjs (MIT)
+   Copyright (c) 2015 Luke Page & Original Contributors; Copyright (c) 2012 Kuba Niegowski
+   https://github.com/pngjs/pngjs
+   Ported in:
+     engines/wasm/src/lib.rs         paeth, unfilter, unfilter_pixels, PASSES, passes,
+                                     line_bytes, unfilter_line, decode, filter_sums, filter_row,
+                                     filter (the PNG decoder and the overlay's adaptive filter)
+     packages/engine/src/png-walk.ts headerOf, readTrns, walkPng (the chunk parser, after
+                                     pngjs's sync reader and its error messages)
+
+3. Papers the engine's colour and anti-alias maths rests on (no text is copied)
+   - Kotsarenko, N. and Ramos, F. (2010). Measuring perceived color difference using YIQ NTSC
+     transmission color space in mobile applications. The YIQ weights behind the colour delta,
+     as pixelmatch cites them.
+   - Vysniauskas, V. (2009). Anti-aliased Pixel and Intensity Slope Detector. The anti-alias test
+     (engines/wasm/src/lib.rs is_antialiased; engines/dotnet/PixelSlash.Diff/Diff.cs
+     IsAntialiased), as pixelmatch cites it.
+
+4. Argos calibration cases (MIT)
+   Copyright 2017 Olivier Tassinari & Greg Bergé; https://github.com/argos-ci/argos
+   Pinned at 21e8520c28129d501b22028a5499546b03336e38 (ops/argos-bench/Dockerfile).
+   bench/src/calibration.ts copies the case names, thresholds and expected verdicts of Argos's
+   own __fixtures__ table. No image from that set is stored in this repository.
+
+5. axe-core (MPL-2.0)
+   Copyright (c) Deque Systems, Inc.; https://github.com/dequelabs/axe-core
+   Used, unmodified, as an npm dependency of packages/engine (packages/engine/src/a11y.ts reads
+   its axe.min.js from node_modules and runs it in the page under test). Nothing of it is copied
+   into this repository, and no file of it is changed. Its source and licence are at the URL above.
+
+Licence texts
+=============
+
+pixelmatch: ISC
+
+ISC License
+
+Copyright (c) 2025, Mapbox
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
+
+pngjs: MIT
+
+pngjs original work Copyright (c) 2015 Luke Page & Original Contributors
+pngjs derived work Copyright (c) 2012 Kuba Niegowski
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Argos: MIT
+
+Copyright 2017 Olivier Tassinari & Greg Bergé
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

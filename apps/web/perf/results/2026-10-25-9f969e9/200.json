@@ -1,0 +1,194 @@
+{
+  "commit": "9f969e9",
+  "server": "server",
+  "shots": 200,
+  "mix": "mixed",
+  "concurrency": 4,
+  "uploadMB": {
+    "main": 279.042384,
+    "branch": 279.049702
+  },
+  "cold": true,
+  "idle": {
+    "workerd": 141.7,
+    "vite": 560.5,
+    "sidecar": 26.7
+  },
+  "phases": [
+    {
+      "phase": "main PUTs",
+      "seconds": 16.845,
+      "peakMB": {
+        "workerd": 388.1,
+        "vite": 557,
+        "sidecar": 26.8
+      },
+      "hwmMB": {
+        "workerd": 389,
+        "vite": 561.1,
+        "sidecar": 26.8
+      },
+      "endMB": {
+        "workerd": 365.3,
+        "vite": 554.1,
+        "sidecar": 26.3
+      },
+      "webUnitPeakMB": 1101.8,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 1099.8,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 8.8
+    },
+    {
+      "phase": "main finalize",
+      "seconds": 2.217,
+      "note": "passed",
+      "peakMB": {
+        "workerd": 365.9,
+        "vite": 554.2,
+        "sidecar": 26.3
+      },
+      "hwmMB": {
+        "workerd": 366.1,
+        "vite": 554.2,
+        "sidecar": 26.3
+      },
+      "endMB": {
+        "workerd": 363.9,
+        "vite": 554.2,
+        "sidecar": 26.3
+      },
+      "webUnitPeakMB": 1100.1,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 1098.7,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 8
+    },
+    {
+      "phase": "branch PUTs",
+      "seconds": 24.892,
+      "peakMB": {
+        "workerd": 495.2,
+        "vite": 554.5,
+        "sidecar": 26.3
+      },
+      "hwmMB": {
+        "workerd": 496.8,
+        "vite": 554.5,
+        "sidecar": 26.3
+      },
+      "endMB": {
+        "workerd": 479.5,
+        "vite": 554.5,
+        "sidecar": 24.4
+      },
+      "webUnitPeakMB": 1399.9,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 1384.3,
+      "webHighEvents": 276,
+      "diffUnitPeakMB": 8
+    },
+    {
+      "phase": "branch finalize (diff)",
+      "seconds": 59.041,
+      "note": "3 finalizes, changes",
+      "peakMB": {
+        "workerd": 507.2,
+        "vite": 554.5,
+        "sidecar": 411.5
+      },
+      "hwmMB": {
+        "workerd": 507.5,
+        "vite": 556.4,
+        "sidecar": 419.9
+      },
+      "endMB": {
+        "workerd": 454.1,
+        "vite": 488.5,
+        "sidecar": 319.7
+      },
+      "webUnitPeakMB": 1394.5,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 1054.4,
+      "webHighEvents": 285,
+      "diffUnitPeakMB": 393.9
+    },
+    {
+      "phase": "settled +10s",
+      "seconds": 10.928,
+      "peakMB": {
+        "workerd": 660.7,
+        "vite": 488.5,
+        "sidecar": 319.7
+      },
+      "hwmMB": {
+        "workerd": 688.7,
+        "vite": 488.4,
+        "sidecar": 319.5
+      },
+      "endMB": {
+        "workerd": 654.6,
+        "vite": 363,
+        "sidecar": 251.6
+      },
+      "webUnitPeakMB": 1174.3,
+      "webUnitSwapPeakMB": 129.4,
+      "webUnitEndMB": 967,
+      "webHighEvents": 285,
+      "diffUnitPeakMB": 300.5
+    },
+    {
+      "phase": "settled +60s",
+      "seconds": 49.999,
+      "peakMB": {
+        "workerd": 799.2,
+        "vite": 363.5,
+        "sidecar": 251.6
+      },
+      "hwmMB": {
+        "workerd": 835.1,
+        "vite": 363.4,
+        "sidecar": 251.9
+      },
+      "endMB": {
+        "workerd": 746.8,
+        "vite": 242.7,
+        "sidecar": 241.7
+      },
+      "webUnitPeakMB": 1107.2,
+      "webUnitSwapPeakMB": 252.3,
+      "webUnitEndMB": 959.8,
+      "webHighEvents": 285,
+      "diffUnitPeakMB": 232.1
+    },
+    {
+      "phase": "settled +180s",
+      "seconds": 120.001,
+      "peakMB": {
+        "workerd": 789.8,
+        "vite": 242.9,
+        "sidecar": 241.7
+      },
+      "hwmMB": {
+        "workerd": 846,
+        "vite": 242.9,
+        "sidecar": 242.2
+      },
+      "endMB": {
+        "workerd": 753.4,
+        "vite": 201.7,
+        "sidecar": 227.4
+      },
+      "webUnitPeakMB": 1015.7,
+      "webUnitSwapPeakMB": 288.3,
+      "webUnitEndMB": 986.7,
+      "webHighEvents": 285,
+      "diffUnitPeakMB": 225.8
+    }
+  ],
+  "probes": {
+    "count": 104,
+    "failed": 0,
+    "slowestMs": 2286
+  }
+}

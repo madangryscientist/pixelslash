@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "spacing",
+  "page": "dashboard",
+  "width": 640,
+  "height": 480,
+  "box": {
+    "x": 20,
+    "y": 253,
+    "w": 600,
+    "h": 187
+  }
+}

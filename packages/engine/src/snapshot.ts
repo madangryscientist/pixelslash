@@ -1,0 +1,405 @@
+import type { Browser, BrowserContext, Page } from "playwright";
+import { scanA11y } from "./a11y.ts";
+import type { A11y } from "./a11y-entry.ts";
+import { keepNativeRaf } from "./capture.ts";
+import { launchSessionBrowsers } from "./capture-browsers.ts";
+import { openPage, type Opened } from "./capture-open.ts";
+import {
+  loadLibrary,
+  measureComposition,
+  type Composition,
+  type CompositionLibrary,
+} from "./composition.ts";
+import {
+  resolveIgnore,
+  type BrowserName,
+  type CaptureConfig,
+  type FlakyPolicy,
+  type Ignore,
+  type Route,
+  type Stabilise,
+  type Variant,
+} from "./config.ts";
+import type { DiffOptions, IgnoreRect } from "./diff.ts";
+import { CaptureError } from "./errors.ts";
+import {
+  BARE,
+  fcList,
+  fontSetHash,
+  imageId,
+  type Fingerprint,
+  type ListFonts,
+} from "./fingerprint.ts";
+import {
+  maskLocators,
+  measureIgnore,
+  measureMedia,
+  MASK_COLOR,
+  toImageRects,
+  unexcluded,
+  type MediaBox,
+} from "./page-areas.ts";
+import { mediaWarner } from "./media.ts";
+import { joinOrigin } from "./routes.ts";
+import { captureInto } from "./capture-into.ts";
+import type { Session } from "./setup.ts";
+import { startApp, type StopApp } from "./start.ts";
+import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
+import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
+import { storybookRoutes } from "./storybook.ts";
+import { paintRects } from "./paint-rects.ts";
+import { measureStoryBox, shiftBoxes, storyShot, type Crop } from "./story-crop.ts";
+
+/** One snapshot in the manifest: what it is (name + variant + tags), what made it, and its PNG. */
+export type SnapshotEntry = {
+  name: string;
+  path: string;
+  variant: Variant;
+  tags: string[];
+  /**
+   * The diff options this snapshot is compared with, resolved from the config (variant > route >
+   * project). Only keys someone set; absent keys take the engine default at diff time. Manifests
+   * written before this field existed have none, read as `{}`.
+   */
+  diff: DiffOptions;
+  /**
+   * Areas the diff skips, in image px (full page, already scaled by the device scale factor and
+   * clipped to the image). Selectors in the config are resolved to these boxes at capture time.
+   * Real pixels stay in the PNG. Manifests written before this field existed have none, read as `[]`.
+   */
+  ignore: IgnoreRect[];
+  /**
+   * What the server does if this shot's captures disagree (ob 1737), resolved from the config.
+   * Manifests written before this field existed have none, read as `"review"`.
+   */
+  flaky: FlakyPolicy;
+  /** Relative to the manifest's directory. */
+  file: string;
+  fingerprint: Fingerprint;
+  /**
+   * A composition-only project's findings for this shot (ob 1850): what is styled outside the
+   * library, and the declared special cases. Absent for any other project, and in manifests
+   * written before the field existed.
+   */
+  composition?: Composition;
+  /**
+   * This shot's accessibility violations (PS-238). Present only when the config scans; a shot that
+   * was not scanned has no field, and nothing is claimed about it. Manifests written before the
+   * field existed have none.
+   */
+  a11y?: A11y;
+};
+
+/** `manifest.json` in the snapshot dir. No timestamps: two runs of the same build write the same bytes. */
+export type SnapshotManifest = { version: 1; snapshots: SnapshotEntry[] };
+
+export type SnapshotDeps = {
+  env?: NodeJS.ProcessEnv;
+  listFonts?: ListFonts;
+  warn?: (message: string) => void;
+};
+
+export type SnapshotResult = {
+  manifest: SnapshotManifest;
+  manifestPath: string;
+  /** How long each shot took to capture (load, settle, screenshot), in capture order. Not in the manifest: that stays byte-for-byte reproducible. */
+  shots: ShotTiming[];
+  /** `gaps.html` beside the manifest, for a composition-only project. */
+  gapsPath?: string;
+  /** The media no ignore area covers, by shot (`identity`), for the shots that have any (PS-230). Not in the manifest. */
+  media: Record<string, MediaBox[]>;
+};
+
+export { MASK_COLOR, toImageRects };
+export type { MediaBox };
+export { captureInto } from "./capture-into.ts";
+
+/** Launch flags that take host-specific rendering choices out of the picture. */
+const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];
+
+/** The shot as it is kept: its size in image px and, for a cropped story, the crop origin in full-page CSS px. */
+type Frame = { image: { width: number; height: number }; origin?: Crop["origin"] | undefined };
+
+/**
+ * Resolve ignore areas on the live page to image-px boxes: every match of every selector, every
+ * `[data-pixelslash-ignore]` element, and the fixed rectangles. Nothing is painted. A selector that
+ * matches nothing is tallied for the run, like a mask's.
+ */
+async function resolveIgnoreBoxes(
+  page: Page,
+  areas: Ignore[],
+  shot: Pick<Shot, "stabilise" | "unmatched">,
+  frame: Frame,
+): Promise<IgnoreRect[]> {
+  const selectors = areas.filter((a) => typeof a === "string");
+  const misses = shot.unmatched.checked("ignore", selectors);
+  const boxes = await measureIgnore(page, selectors, true, misses);
+  boxes.push(...areas.filter((a) => typeof a !== "string"));
+  const scale = shot.stabilise.deviceScaleFactor;
+  return toImageRects(shiftBoxes(boxes, frame.origin), scale, frame.image);
+}
+
+type Shot = {
+  url: string;
+  route: Route;
+  variant: Variant;
+  stabilise: Stabilise;
+  /** Ignore areas to resolve at screenshot time; the pixels are left as they are. */
+  ignore: Ignore[];
+  /** What the config's `setup` left signed in, if it has one. */
+  session: Session | undefined;
+  /** The library a composition-only project is measured against; undefined for any other project. */
+  library: CompositionLibrary | undefined;
+  /** Scan the settled page for accessibility violations (PS-238). */
+  a11y: boolean;
+  warn: (m: string) => void;
+  unmatched: UnmatchedTally;
+};
+
+/**
+ * One capture of a shot: its PNG, its ignore areas in image px, the page's load + settle time, and
+ * (composition-only projects) what is styled outside the library.
+ */
+export type Shoot = {
+  png: Buffer;
+  ignore: IgnoreRect[];
+  /** Navigate and settle together, unrounded: `pixelslash dev` adds these up. */
+  loadMs?: number;
+  /** Navigate, settle and screenshot apart (PS-195). */
+  steps?: CaptureSteps;
+  /**
+   * The `<video>` and `<audio>` on the page that no ignore area covers, in CSS px: media renders
+   * unreliably, so each is a region to exclude (PS-230). Measured after the settle; nothing is done
+   * to the media, and the PNG and the diff are as they were.
+   */
+  media: MediaBox[];
+  composition?: Composition;
+  a11y?: A11y;
+};
+
+/**
+ * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
+ * instant, so nothing the page schedules fires on its own, and the clock is never advanced after
+ * (the settle uses the browser's own frames; see `keepNativeRaf`). Without, only Date is fixed and
+ * timers run. A real clock is left alone.
+ */
+async function pinClock(context: BrowserContext, { clock, timers }: Stabilise): Promise<void> {
+  if (clock === false) return;
+  if (!timers) return context.clock.setFixedTime(clock);
+  await context.addInitScript(keepNativeRaf);
+  await context.clock.install({ time: clock });
+  await context.clock.pauseAt(clock);
+}
+
+/**
+ * What is read off the settled page once it is shot: the ignore boxes, media, composition and a11y
+ * scan. `png` is the shot as it is kept; a story's crop moves its `origin` (full-page CSS px) to the
+ * top left, so every box is shifted to sit on the same pixels.
+ */
+async function measure(page: Page, shot: Shot, png: Buffer, origin?: Crop["origin"]) {
+  const { stabilise } = shot;
+  // The PNG's size from its IHDR chunk, without decoding the image.
+  const frame = {
+    image: { width: png.readUInt32BE(16), height: png.readUInt32BE(20) },
+    origin,
+  };
+  const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, frame);
+  const media = unexcluded(
+    shiftBoxes(await measureMedia(page), origin),
+    ignore,
+    stabilise.deviceScaleFactor,
+    frame.image,
+  );
+  const composition =
+    shot.library &&
+    (await measureComposition(page, shot.library, {
+      scale: stabilise.deviceScaleFactor,
+      image: frame.image,
+      origin,
+      warn: shot.warn,
+    }));
+  // After the screenshot and the measurements, so nothing the scan lets run can reach the PNG.
+  // axe waits on timers, which `timers` has paused for good: let the page clock run again first.
+  if (shot.a11y && stabilise.timers) await page.clock.resume();
+  const a11y = shot.a11y ? await scanA11y(page) : undefined;
+  return { ignore, media, composition, a11y };
+}
+
+/** The settled page shot: cropped to its story when it is one, then measured in the frame it is kept in. */
+async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
+  const { stabilise, route } = shot;
+  const selectors = route.masks.filter((m) => typeof m === "string");
+  const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
+  // Measured before the shot, on the settled page, in the frame the shot is taken in.
+  const story = route.storybook ? await measureStoryBox(page, stabilise.animations) : null;
+  const shooting = performance.now();
+  const full = await page.screenshot({
+    fullPage: true,
+    animations: stabilise.animations ? "disabled" : "allow",
+    caret: stabilise.caret ? "hide" : "initial",
+    mask: locators,
+    maskColor: MASK_COLOR,
+  });
+  const steps: CaptureSteps = {
+    navigateMs: Math.round(opened.navigateMs),
+    settleMs: Math.round(opened.settleMs),
+    screenshotMs: elapsed(shooting),
+    settle: opened.settle,
+  };
+  const { png, origin } = storyShot(full, story, stabilise.deviceScaleFactor);
+  const { ignore, media, composition, a11y } = await measure(page, shot, png, origin);
+  const rects = route.masks.filter((m) => typeof m !== "string");
+  return {
+    png: paintRects(png, shiftBoxes(rects, origin), stabilise.deviceScaleFactor),
+    ignore,
+    media,
+    loadMs: opened.navigateMs + opened.settleMs,
+    steps,
+    ...(composition && { composition }),
+    ...(a11y && { a11y }),
+  };
+}
+
+async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
+  const { variant, stabilise, route, url } = shot;
+  const context = await browser.newContext({
+    viewport: variant.viewport,
+    deviceScaleFactor: stabilise.deviceScaleFactor,
+    colorScheme: variant.theme,
+    ...(shot.session && { storageState: shot.session }),
+  });
+  try {
+    await pinClock(context, stabilise);
+    const page = await context.newPage();
+    const opened = await openPage(page, url, route, stabilise.timeoutMs);
+    return await capture(page, shot, opened);
+  } catch (e) {
+    if (e instanceof CaptureError) throw e;
+    throw new CaptureError(
+      `capture failed for ${url}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * A browser on the config's app, held open: the app started (when the config starts one), signed
+ * in, the routes read. `captureInto` shoots every route through it, and an upload re-captures a
+ * shot through it (ob 1737), with the same route, variant and stabilisation as the first time.
+ */
+export type CaptureSession = {
+  config: CaptureConfig;
+  routes: Route[];
+  /** The fingerprint of a shot taken in `browser`; one of the config's variants' browsers. */
+  fingerprintFor: (browser: BrowserName) => Fingerprint;
+  /** How long the browsers took to launch, together (PS-195). */
+  browserLaunchMs: number;
+  /** `scan` asks for the accessibility scan (PS-238); only `captureInto` keeps its result, so a flake re-capture or a dev loop skips it. */
+  shoot: (route: Route, variant: Variant, scan?: { a11y?: boolean }) => Promise<Shoot>;
+  /** Print the selectors that matched nothing since the last flush (PS-241); `close` does too. */
+  flush: () => void;
+  close: () => Promise<void>;
+};
+
+/** Start the app, launch the browser, sign in and read the routes. The caller closes it. */
+export async function openCaptureSession(
+  config: CaptureConfig,
+  deps: SnapshotDeps = {},
+): Promise<CaptureSession> {
+  const warn = deps.warn ?? (() => {});
+  const warnMedia = mediaWarner(warn);
+  const unmatched = unmatchedTally(warn);
+  const image = imageId(deps.env ?? process.env);
+  if (image === BARE)
+    warn(
+      "warning: capturing outside the pinned PixelSlash image; local fonts skew rendering. Fingerprint recorded as bare.",
+    );
+  const fonts = await fontSetHash(deps.listFonts ?? fcList);
+  // Read before the app starts, so a library that is not installed fails first.
+  const library = config.composition && (await loadLibrary(config.composition));
+  let stopApp: StopApp | undefined;
+  const browsers = new Map<BrowserName, Browser>();
+  const close = async () => {
+    unmatched.flush();
+    await Promise.all([...browsers.values()].map((b) => b.close()));
+    await stopApp?.();
+  };
+  try {
+    if (config.start) stopApp = await startApp(config.start);
+    const held = await launchSessionBrowsers(config, browsers, LAUNCH_ARGS);
+    // The app is up now, so the Storybook's index can be read.
+    const routes = config.storybook
+      ? [
+          ...config.routes,
+          ...(await storybookRoutes(
+            config.storybook,
+            config.routes.map((r) => r.name),
+          )),
+        ]
+      : config.routes;
+    return {
+      config,
+      routes,
+      fingerprintFor: (name) => ({
+        image,
+        browser: `${name} ${held.of(name).version()}`,
+        fonts,
+      }),
+      browserLaunchMs: held.launchMs,
+      shoot: async (route, variant, scan) => {
+        const taken = await shoot(held.of(variant.browser), {
+          url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
+          route,
+          variant,
+          stabilise: config.stabilise,
+          ignore: resolveIgnore(config, route, variant),
+          session: held.session,
+          library,
+          a11y: config.a11y && scan?.a11y === true,
+          warn,
+          unmatched,
+        });
+        warnMedia(route, variant, taken.media);
+        return taken;
+      },
+      flush: () => unmatched.flush(),
+      close,
+    };
+  } catch (e) {
+    await close();
+    throw e;
+  }
+}
+
+/** The shot a manifest entry names, again; `undefined` when the config has no such route or variant. */
+export function recapture(
+  session: CaptureSession,
+  entry: Pick<SnapshotEntry, "name" | "variant">,
+): Promise<Shoot | undefined> {
+  const route = session.routes.find((r) => r.name === entry.name);
+  // A baseline is only ever matched in its own browser: the same name in another is another shot.
+  const variant = session.config.variants.find(
+    (v) => v.name === entry.variant.name && v.browser === entry.variant.browser,
+  );
+  return route && variant ? session.shoot(route, variant) : Promise.resolve(undefined);
+}
+
+/**
+ * Capture every route × variant in `config` into `out` and write `out/manifest.json`.
+ * Starts the app first when the config has a start command, and stops it after; runs the
+ * config's `setup` once the app is up, and shoots every route with the session it left.
+ * Outside the pinned image this still works, warns, and records `image: "bare"`.
+ */
+export async function captureSnapshots(
+  config: CaptureConfig,
+  out: string,
+  deps: SnapshotDeps = {},
+): Promise<SnapshotResult> {
+  const session = await openCaptureSession(config, deps);
+  try {
+    return await captureInto(session, out);
+  } finally {
+    await session.close();
+  }
+}

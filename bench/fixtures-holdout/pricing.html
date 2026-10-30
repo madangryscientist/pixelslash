@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pricing</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: #fffaf3;
+        color: #2a2118;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        height: 46px;
+        padding: 0 22px;
+        border-bottom: 1px solid #ecdcc4;
+      }
+      .top nav {
+        display: flex;
+        gap: 16px;
+        flex: 1;
+        color: #6b5a45;
+      }
+      #logo {
+        display: block;
+      }
+      #login {
+        border: 1px solid #c9b391;
+        background: transparent;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font: inherit;
+      }
+      main {
+        padding: 22px;
+      }
+      #hero {
+        padding: 22px 20px;
+        border-radius: 12px;
+        background: linear-gradient(120deg, #fde68a, #fdba74 60%, #fca5a5);
+        text-align: center;
+      }
+      #title {
+        margin: 0 0 4px;
+        font-size: 26px;
+        font-weight: 800;
+      }
+      #lede {
+        margin: 0;
+        color: #5b4630;
+      }
+      #plans {
+        display: flex;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .plan {
+        position: relative;
+        flex: 1;
+        background: #fff;
+        border: 1px solid #ecdcc4;
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: 0 2px 8px rgba(80, 50, 10, 0.08);
+      }
+      .plan.featured {
+        border-color: #ea580c;
+        box-shadow: 0 6px 18px rgba(234, 88, 12, 0.18);
+      }
+      .plan h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .price {
+        font-size: 30px;
+        font-weight: 800;
+        margin: 2px 0 8px;
+      }
+      .price small {
+        font-size: 12px;
+        font-weight: 500;
+        color: #8a7860;
+      }
+      .plan ul {
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .plan li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .icon {
+        width: 14px;
+        height: 14px;
+        flex: none;
+      }
+      #ribbon {
+        position: absolute;
+        top: -10px;
+        right: 12px;
+        background: #ea580c;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 99px;
+      }
+      .cta {
+        width: 100%;
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 0;
+        font: inherit;
+        font-weight: 700;
+        background: #2a2118;
+        color: #fff;
+      }
+      .featured .cta {
+        background: #ea580c;
+      }
+      #news {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 18px;
+      }
+      #email {
+        flex: 1;
+        height: 34px;
+        border: 1px solid #c9b391;
+        border-radius: 8px;
+        padding: 0 12px;
+        font: inherit;
+        background: #fff;
+      }
+      #subscribe {
+        height: 34px;
+        border: 0;
+        border-radius: 8px;
+        padding: 0 16px;
+        background: #0f766e;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+      }
+      #live {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #16a34a;
+        animation: blink 1.4s ease-in-out infinite;
+        animation-play-state: paused;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.25;
+        }
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+        color: #8a7860;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <svg id="logo" width="22" height="22" viewBox="0 0 22 22">
+        <rect width="22" height="22" rx="5" fill="#ea580c" />
+        <path d="M5 16V6l6 6 6-6v10" stroke="#fff" stroke-width="2" fill="none" />
+      </svg>
+      <nav><a href="#">Product</a><a href="#">Pricing</a><a href="#">Docs</a></nav>
+      <button id="login" type="button">Log in</button>
+    </header>
+    <main>
+      <section id="hero">
+        <h1 id="title">Simple pricing</h1>
+        <p id="lede">Start free, upgrade when your team grows. No hidden fees, cancel any time.</p>
+      </section>
+      <div id="plans">
+        <article class="plan" id="plan-free">
+          <h2>Free</h2>
+          <div class="price" id="price-free">$0<small> /month</small></div>
+          <ul>
+            <li>
+              <svg class="icon" id="tick-1" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#16a34a" />
+                <path
+                  d="M4.5 8.5l2.5 2.5 4.5-5"
+                  stroke="#fff"
+                  stroke-width="1.8"
+                  fill="none"
+                /></svg
+              >Three projects
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#16a34a" />
+                <path
+                  d="M4.5 8.5l2.5 2.5 4.5-5"
+                  stroke="#fff"
+                  stroke-width="1.8"
+                  fill="none"
+                /></svg
+              >Community support
+            </li>
+          </ul>
+          <button class="cta" id="cta-free" type="button">Get started</button>
+        </article>
+        <article class="plan featured" id="plan-pro">
+          <span id="ribbon">Popular</span>
+          <h2>Pro</h2>
+          <div class="price" id="price-pro">$29<small> /month</small></div>
+          <ul>
+            <li>
+              <svg class="icon" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#16a34a" />
+                <path
+                  d="M4.5 8.5l2.5 2.5 4.5-5"
+                  stroke="#fff"
+                  stroke-width="1.8"
+                  fill="none"
+                /></svg
+              >Unlimited projects
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#16a34a" />
+                <path
+                  d="M4.5 8.5l2.5 2.5 4.5-5"
+                  stroke="#fff"
+                  stroke-width="1.8"
+                  fill="none"
+                /></svg
+              >Priority support
+            </li>
+          </ul>
+          <button class="cta" id="cta-pro" type="button">Start trial</button>
+        </article>
+        <article class="plan" id="plan-team">
+          <h2>Team</h2>
+          <div class="price" id="price-team">$99<small> /month</small></div>
+          <ul>
+            <li>
+              <svg class="icon" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#16a34a" />
+                <path
+                  d="M4.5 8.5l2.5 2.5 4.5-5"
+                  stroke="#fff"
+                  stroke-width="1.8"
+                  fill="none"
+                /></svg
+              >Single sign-on
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#16a34a" />
+                <path
+                  d="M4.5 8.5l2.5 2.5 4.5-5"
+                  stroke="#fff"
+                  stroke-width="1.8"
+                  fill="none"
+                /></svg
+              >Audit log
+            </li>
+          </ul>
+          <button class="cta" id="cta-team" type="button">Contact sales</button>
+        </article>
+      </div>
+      <form id="news">
+        <input id="email" type="text" value="you@example.com" />
+        <button id="subscribe" type="button">Subscribe</button>
+      </form>
+      <footer><span id="live"></span> All systems normal</footer>
+    </main>
+  </body>
+</html>

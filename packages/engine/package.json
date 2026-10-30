@@ -1,0 +1,37 @@
+{
+  "name": "@pixelslash/engine",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "imports": {
+    "#diff-module": {
+      "workerd": "./src/diff-module.workerd.ts",
+      "default": "./src/diff-module.bun.ts"
+    }
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./diff": "./src/diff.ts",
+    "./diff-wasm": "./src/diff-wasm.ts",
+    "./playwright": "./src/playwright-entry.ts",
+    "./release": "./src/release.ts",
+    "./judge": "./src/judge.ts",
+    "./ci-diff": "./src/ci-diff.ts",
+    "./region-crops": "./src/region-crops.ts",
+    "./composition-entry": "./src/composition-entry.ts",
+    "./a11y-entry": "./src/a11y-entry.ts",
+    "./sentry-scrub": "./src/sentry-scrub.ts",
+    "./brief": "./src/brief.ts"
+  },
+  "dependencies": {
+    "axe-core": "^4.14.0",
+    "playwright": "1.64.1",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "@types/pngjs": "^6.0.5",
+    "vitest": "5.0.5"
+  }
+}

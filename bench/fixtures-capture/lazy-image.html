@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Lazy images</title>
+<style>
+  body {
+    font: 16px/1.5 sans-serif;
+    margin: 32px;
+    color: #1d2433;
+  }
+  img {
+    display: block;
+    width: 480px;
+    height: 160px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  .gap {
+    height: 900px;
+  }
+</style>
+<h1>Gallery</h1>
+<!-- Slow to arrive (the server holds it 400 ms), above the fold. -->
+<img src="/slow.svg?ms=400&color=3563e9" alt="hero" />
+<div class="gap"></div>
+<!-- Below the fold: the browser fetches it only when it scrolls near the viewport. -->
+<img loading="lazy" src="/slow.svg?ms=300&color=d6247b" alt="lazy" />

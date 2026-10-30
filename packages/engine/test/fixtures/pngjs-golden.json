@@ -1,0 +1,1258 @@
+{
+ "corpus/identical-article": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "0954af6cdd61a2609b330a05499d61d6eb78e0cde413db7ac557ddcb099bd9bb",
+  "diff": "520e0bf04b480cd3",
+  "measure": "0a3de6b0c62118d4"
+ },
+ "corpus/identical-dashboard": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "526e7fc503b82c4fd0e52704fc4b6135200c8a98d2838e15fbac44812d9f08b1",
+  "diff": "48c731b0f98977db",
+  "measure": "c3caf5134b83d8b3"
+ },
+ "corpus/identical-dashboard-fullpage": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "526e7fc503b82c4fd0e52704fc4b6135200c8a98d2838e15fbac44812d9f08b1",
+  "diff": "48c731b0f98977db",
+  "measure": "c3caf5134b83d8b3"
+ },
+ "corpus/identical-form": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "c47f018891713ff8dc51ac20b2a125d57e1439eb7257e926d1a8cc6428f92ef2",
+  "diff": "f2ec390ad8a629b2",
+  "measure": "25799d0aab07547c"
+ },
+ "corpus/identical-form-hinting-none": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "c47f018891713ff8dc51ac20b2a125d57e1439eb7257e926d1a8cc6428f92ef2",
+  "diff": "f2ec390ad8a629b2",
+  "measure": "25799d0aab07547c"
+ },
+ "corpus/noise-badge-pulse-frame": {
+  "changedPixels": 1050,
+  "antialiased": 135,
+  "regions": 1,
+  "overlay": "5e1e53e6f4e9536bbb5ab02fad3c118aa875e4497ffae11104502df84d9e96ff",
+  "diff": "5e002c2dad3e8b1a",
+  "measure": "5e002c2dad3e8b1a"
+ },
+ "corpus/noise-banding-interpolation-article": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "0954af6cdd61a2609b330a05499d61d6eb78e0cde413db7ac557ddcb099bd9bb",
+  "diff": "0a3de6b0c62118d4",
+  "measure": "0a3de6b0c62118d4"
+ },
+ "corpus/noise-banding-stops-dashboard": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "526e7fc503b82c4fd0e52704fc4b6135200c8a98d2838e15fbac44812d9f08b1",
+  "diff": "c3caf5134b83d8b3",
+  "measure": "c3caf5134b83d8b3"
+ },
+ "corpus/noise-caret-email": {
+  "changedPixels": 10,
+  "antialiased": 5,
+  "regions": 1,
+  "overlay": "3d1987461bf1c966eec32fd53e13fb5b33f34d20b6af463e717f7785ce932e9d",
+  "diff": "74533aea340d0145",
+  "measure": "74533aea340d0145"
+ },
+ "corpus/noise-caret-first-name": {
+  "changedPixels": 16,
+  "antialiased": 0,
+  "regions": 1,
+  "overlay": "8c6060d58c48c37e676408546d09816ec6a15681320808e5c616c1d37a817b4c",
+  "diff": "00c89917b377ddbd",
+  "measure": "00c89917b377ddbd"
+ },
+ "corpus/noise-dither-article-2": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "0954af6cdd61a2609b330a05499d61d6eb78e0cde413db7ac557ddcb099bd9bb",
+  "diff": "0a3de6b0c62118d4",
+  "measure": "0a3de6b0c62118d4"
+ },
+ "corpus/noise-dither-dashboard-1": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "526e7fc503b82c4fd0e52704fc4b6135200c8a98d2838e15fbac44812d9f08b1",
+  "diff": "c3caf5134b83d8b3",
+  "measure": "c3caf5134b83d8b3"
+ },
+ "corpus/noise-dither-form-1": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "c47f018891713ff8dc51ac20b2a125d57e1439eb7257e926d1a8cc6428f92ef2",
+  "diff": "25799d0aab07547c",
+  "measure": "25799d0aab07547c"
+ },
+ "corpus/noise-emoji-glyph-positioning-form": {
+  "changedPixels": 119,
+  "antialiased": 120,
+  "regions": 3,
+  "overlay": "7e4a8795e8ec88ca616659deca7cd2446308886ab5c366b7dff31451ec7b7141",
+  "diff": "454d2400e82bb2ec",
+  "measure": "454d2400e82bb2ec"
+ },
+ "corpus/noise-emoji-subpixel-dashboard": {
+  "changedPixels": 515,
+  "antialiased": 846,
+  "regions": 2,
+  "overlay": "80c65de8666ff1c393e8d50b8e597b6f5ccd5ad8d90ece8ad8cda20d87bb2219",
+  "diff": "639daf823dd5ed7c",
+  "measure": "639daf823dd5ed7c"
+ },
+ "corpus/noise-geometric-precision-article": {
+  "changedPixels": 10567,
+  "antialiased": 10558,
+  "regions": 2,
+  "overlay": "b94f35dfd58de3804c1ca36692e8bf3547e34ae6f110fd7e16f59db7d845d50d",
+  "diff": "b6574f34168112d3",
+  "measure": "b6574f34168112d3"
+ },
+ "corpus/noise-hero-shimmer-frame": {
+  "changedPixels": 32323,
+  "antialiased": 2212,
+  "regions": 1,
+  "overlay": "b0ee044b7df41a3df20d168bc9d8bdf7e54f851f6514795d24a932eaefdbd8fd",
+  "diff": "b956b3b587c4a9b4",
+  "measure": "b956b3b587c4a9b4"
+ },
+ "corpus/noise-hinting-full-vs-lcd-article": {
+  "changedPixels": 25127,
+  "antialiased": 12074,
+  "regions": 2,
+  "overlay": "eb83f842179b4656f303956b210bb24bba31f4c076e32225ddac9714b67f5af7",
+  "diff": "c3ee29fe74f0a266",
+  "measure": "c3ee29fe74f0a266"
+ },
+ "corpus/noise-hinting-none-vs-full-dashboard": {
+  "changedPixels": 7466,
+  "antialiased": 4655,
+  "regions": 7,
+  "overlay": "2a36c469ad063b446b1249ae28ce1a63a00d110fa9decff1ef40d3d22844c431",
+  "diff": "dceda027f8591017",
+  "measure": "dceda027f8591017"
+ },
+ "corpus/noise-hinting-none-vs-lcd-form": {
+  "changedPixels": 5109,
+  "antialiased": 3824,
+  "regions": 1,
+  "overlay": "a71f268fbccd25337488ac06b1f488684fdff95a7f8d36e830230c80e3b6c801",
+  "diff": "1f86e4bc73c010b0",
+  "measure": "1f86e4bc73c010b0"
+ },
+ "corpus/noise-jpeg50-article": {
+  "changedPixels": 35653,
+  "antialiased": 12639,
+  "regions": 1,
+  "overlay": "8c4ad138e9b37defa53e9e17341eaa1af7f7898a6f961dbeec19df27fb4f0c52",
+  "diff": "135f5131583cc9ad",
+  "measure": "135f5131583cc9ad"
+ },
+ "corpus/noise-jpeg70-form": {
+  "changedPixels": 19275,
+  "antialiased": 3219,
+  "regions": 1,
+  "overlay": "dfd2ad5262492a9a59e212a1b0a3ae1acfcdb338b201d0804cc11869f01bd5c7",
+  "diff": "6e55bbb87adbea5f",
+  "measure": "6e55bbb87adbea5f"
+ },
+ "corpus/noise-jpeg85-article": {
+  "changedPixels": 23665,
+  "antialiased": 9068,
+  "regions": 1,
+  "overlay": "ff18a88dedb13cf38d808ac8c173852b78e7e212b8a47f68e22c6fc9df058eea",
+  "diff": "33274bc9045b1813",
+  "measure": "33274bc9045b1813"
+ },
+ "corpus/noise-jpeg95-dashboard": {
+  "changedPixels": 12871,
+  "antialiased": 1126,
+  "regions": 1,
+  "overlay": "7de1582c860b6eb7bcd06de2d12d0dd26469fd018420da33fba689858ca533e7",
+  "diff": "1c33968b7cac7e62",
+  "measure": "1c33968b7cac7e62"
+ },
+ "corpus/noise-shadow-blur-dashboard": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "526e7fc503b82c4fd0e52704fc4b6135200c8a98d2838e15fbac44812d9f08b1",
+  "diff": "c3caf5134b83d8b3",
+  "measure": "c3caf5134b83d8b3"
+ },
+ "corpus/noise-shadow-offset-form": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "c47f018891713ff8dc51ac20b2a125d57e1439eb7257e926d1a8cc6428f92ef2",
+  "diff": "25799d0aab07547c",
+  "measure": "25799d0aab07547c"
+ },
+ "corpus/noise-shift-article-main": {
+  "changedPixels": 8415,
+  "antialiased": 12738,
+  "regions": 3,
+  "overlay": "7ee0c72ec7001426694c78f367656c294497ea8b1340b3a255bed2302a3ebdb8",
+  "diff": "cdba0b6d44d12a71",
+  "measure": "cdba0b6d44d12a71"
+ },
+ "corpus/noise-shift-dashboard-main": {
+  "changedPixels": 6325,
+  "antialiased": 9399,
+  "regions": 1,
+  "overlay": "759eadb2a16b47bae82d1cb445cffe9dc52d45b46cb231ce269389249a7d9882",
+  "diff": "e352fad5087ef34c",
+  "measure": "e352fad5087ef34c"
+ },
+ "corpus/noise-shift-dashboard-stats": {
+  "changedPixels": 719,
+  "antialiased": 1942,
+  "regions": 3,
+  "overlay": "002892fe525be5173e371bff3a179e57e6a82166e056fa84c28b230b7bd51f5b",
+  "diff": "bee454dd8233b21d",
+  "measure": "bee454dd8233b21d"
+ },
+ "corpus/noise-shift-form-main": {
+  "changedPixels": 3792,
+  "antialiased": 5643,
+  "regions": 2,
+  "overlay": "da3f787ce48c6e1dd11fff1da9ca2ca825e38dec2bba612ceb99225076780dc4",
+  "diff": "09fb58731d1f325c",
+  "measure": "09fb58731d1f325c"
+ },
+ "corpus/noise-spinner-frame": {
+  "changedPixels": 69,
+  "antialiased": 86,
+  "regions": 1,
+  "overlay": "fe07167ed856c1a794fc7b3059f8a4b7f408d4ea1e593072ebc4bad9eb656283",
+  "diff": "cc7242e07542c190",
+  "measure": "cc7242e07542c190"
+ },
+ "corpus/noise-subpixel-glyphs-article": {
+  "changedPixels": 10819,
+  "antialiased": 9039,
+  "regions": 1,
+  "overlay": "f90a3f0951b8bd03e460a944e04219b75ea750a61fa00d96d80af8c253ce69d6",
+  "diff": "9d7b7e78fc884bba",
+  "measure": "9d7b7e78fc884bba"
+ },
+ "corpus/noise-subpixel-glyphs-dashboard": {
+  "changedPixels": 1247,
+  "antialiased": 1466,
+  "regions": 4,
+  "overlay": "282d38a2f4965b1c57f3f49494cd268315f41c8a02558ad19c700b0e24d5021f",
+  "diff": "3680a8c6e496c2b6",
+  "measure": "3680a8c6e496c2b6"
+ },
+ "corpus/noise-webp75-form": {
+  "changedPixels": 12327,
+  "antialiased": 2525,
+  "regions": 1,
+  "overlay": "15cb8b66084b248566639f51482e7680f7489a2e738c53a666be2a3f8f740af1",
+  "diff": "233fe5e6ea15374e",
+  "measure": "233fe5e6ea15374e"
+ },
+ "corpus/noise-webp90-dashboard": {
+  "changedPixels": 12161,
+  "antialiased": 1930,
+  "regions": 1,
+  "overlay": "0928e6d21ada72837382fca9e0304813b6969415192b8569ce740a560e495e37",
+  "diff": "b1e859dd26a57cc2",
+  "measure": "b1e859dd26a57cc2"
+ },
+ "corpus/real-border-1px-select": {
+  "changedPixels": 1154,
+  "antialiased": 324,
+  "regions": 1,
+  "overlay": "1c6a9c952665851393d09aa492e45bb8b52e148a3308af77f8693b7fb5396616",
+  "diff": "8cdb738839dfd33f",
+  "measure": "8cdb738839dfd33f"
+ },
+ "corpus/real-border-1px-stat": {
+  "changedPixels": 10276,
+  "antialiased": 3722,
+  "regions": 1,
+  "overlay": "75c24b58305a8b343138a93e8107880b4065c6965ea88c5354fce191ff29401c",
+  "diff": "a1f38718955598bb",
+  "measure": "a1f38718955598bb"
+ },
+ "corpus/real-colour-1step-button": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "526e7fc503b82c4fd0e52704fc4b6135200c8a98d2838e15fbac44812d9f08b1",
+  "diff": "c3caf5134b83d8b3",
+  "measure": "c3caf5134b83d8b3"
+ },
+ "corpus/real-colour-1step-submit": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "c47f018891713ff8dc51ac20b2a125d57e1439eb7257e926d1a8cc6428f92ef2",
+  "diff": "25799d0aab07547c",
+  "measure": "25799d0aab07547c"
+ },
+ "corpus/real-colour-badge": {
+  "changedPixels": 1051,
+  "antialiased": 159,
+  "regions": 1,
+  "overlay": "645470d90875c4741d9c8445d6be405a5121e4dc5bc21c17b4bcc2c0aa8c3043",
+  "diff": "5f61e3f696ee0df7",
+  "measure": "5f61e3f696ee0df7"
+ },
+ "corpus/real-colour-banner-hue": {
+  "changedPixels": 29672,
+  "antialiased": 2036,
+  "regions": 1,
+  "overlay": "527e97fc42ecaffc27580d776e2dacbe2b445e2f14311dce92726be1ace705a1",
+  "diff": "c2718bc221e9fab1",
+  "measure": "c2718bc221e9fab1"
+ },
+ "corpus/real-colour-body-text-subtle": {
+  "changedPixels": 7877,
+  "antialiased": 8981,
+  "regions": 3,
+  "overlay": "dc9399c60c00bf130bfb994913e8e055301abfec1614edc8621dbcaa642c8c95",
+  "diff": "812583d5f0cb588d",
+  "measure": "812583d5f0cb588d"
+ },
+ "corpus/real-colour-button-clear": {
+  "changedPixels": 3690,
+  "antialiased": 310,
+  "regions": 1,
+  "overlay": "972f09d75a1f2dbc7b6ccdadd5dcf0ce30b2dc6713042dfe3586a3138edc8859",
+  "diff": "e5e7f933c3ac6e5b",
+  "measure": "e5e7f933c3ac6e5b"
+ },
+ "corpus/real-colour-button-subtle": {
+  "changedPixels": 3610,
+  "antialiased": 155,
+  "regions": 1,
+  "overlay": "b7be05ad8c97d8d4bd267fbd2449b4257ba017a96716e2ec4a308bb154242471",
+  "diff": "4986d46d1c437aa7",
+  "measure": "4986d46d1c437aa7"
+ },
+ "corpus/real-colour-card-fade": {
+  "changedPixels": 51495,
+  "antialiased": 1412,
+  "regions": 1,
+  "overlay": "63fe43d3036a0913427aafcb1c409bfa8ad4e5d5e9c45be0785a3615767c2fab",
+  "diff": "3af07e71b47abed0",
+  "measure": "3af07e71b47abed0"
+ },
+ "corpus/real-colour-input-border": {
+  "changedPixels": 1500,
+  "antialiased": 180,
+  "regions": 1,
+  "overlay": "57b088462329604578088d9c87cda0c02ec31cd6f34f8e15032df87f8081ed16",
+  "diff": "b2b5f642f05f069b",
+  "measure": "b2b5f642f05f069b"
+ },
+ "corpus/real-fixture-pages-card-to-yellow": {
+  "changedPixels": 19103,
+  "antialiased": 673,
+  "regions": 1,
+  "overlay": "2a82f124ba670377a8dbd1df5876303a041ed9f1548f665566dcf9f5dfc9e87c",
+  "diff": "130d4f7a91475a25",
+  "measure": "130d4f7a91475a25"
+ },
+ "corpus/real-glyph-meta-digit": {
+  "changedPixels": 30,
+  "antialiased": 21,
+  "regions": 1,
+  "overlay": "6d70ccb6daf187d2d6667be1200154057a353ecac2ab6c7e3ca4e6c77c6192ce",
+  "diff": "6e7394028e515062",
+  "measure": "6e7394028e515062"
+ },
+ "corpus/real-glyph-row-label": {
+  "changedPixels": 14,
+  "antialiased": 43,
+  "regions": 1,
+  "overlay": "7331b7d82c5a79c5751932cbd0ba70c21dd6775171559f038d4ccd70875050a9",
+  "diff": "0260b24fb06a3adc",
+  "measure": "0260b24fb06a3adc"
+ },
+ "corpus/real-icon-check-to-cross": {
+  "changedPixels": 89,
+  "antialiased": 83,
+  "regions": 1,
+  "overlay": "44729658464990635bfaaeb8af1c875bdccab73859dd9a443006991314969c2c",
+  "diff": "994e6a1329ef984f",
+  "measure": "994e6a1329ef984f"
+ },
+ "corpus/real-icon-info-glyph": {
+  "changedPixels": 4,
+  "antialiased": 4,
+  "regions": 1,
+  "overlay": "6613c62031c2f2b296788e881a574b283bcb49f5feb7a4abdaabc0a6cf158796",
+  "diff": "2df2bc99aacfa6c6",
+  "measure": "2df2bc99aacfa6c6"
+ },
+ "corpus/real-icon-logo-plus": {
+  "changedPixels": 33,
+  "antialiased": 58,
+  "regions": 1,
+  "overlay": "2819dc19df7dbd2b756bb3d779c4f0ca04e8e09d1dfb54221178f2c93aa884f9",
+  "diff": "6b14aea3bc264d84",
+  "measure": "6b14aea3bc264d84"
+ },
+ "corpus/real-missing-avatar": {
+  "changedPixels": 560,
+  "antialiased": 90,
+  "regions": 1,
+  "overlay": "51170d33b07a4cf791538cd904f89f52051264a95e5afad83db79723acb5df17",
+  "diff": "4db4d72783b86dca",
+  "measure": "4db4d72783b86dca"
+ },
+ "corpus/real-missing-button": {
+  "changedPixels": 3738,
+  "antialiased": 310,
+  "regions": 1,
+  "overlay": "f832be051ad0c4f6e1e8abd7a26349b58f89f2e9547a0e2507d72b94da15b636",
+  "diff": "31298dcc0ac27f62",
+  "measure": "31298dcc0ac27f62"
+ },
+ "corpus/real-missing-hero": {
+  "changedPixels": 29696,
+  "antialiased": 5269,
+  "regions": 1,
+  "overlay": "8f2e57c95ffbb3d49bd7e3e895dd48985bff9d2948773ab0a87e330ccda3635c",
+  "diff": "c84eea4ab75a0cc1",
+  "measure": "c84eea4ab75a0cc1"
+ },
+ "corpus/real-missing-icon": {
+  "changedPixels": 118,
+  "antialiased": 54,
+  "regions": 1,
+  "overlay": "f0a73afee5ab61cefcc6903b9394736e95e44daf2a4c183b87af684e7243c402",
+  "diff": "0f9649dd9fdda734",
+  "measure": "0f9649dd9fdda734"
+ },
+ "corpus/real-missing-row-reflow": {
+  "changedPixels": 22862,
+  "antialiased": 1778,
+  "regions": 1,
+  "overlay": "c06ea96788f3398ad6bc9f33c930d4595f259c87c88365edd14938db5b874225",
+  "diff": "c0169ca9f15ef45a",
+  "measure": "c0169ca9f15ef45a"
+ },
+ "corpus/real-reflow-article-narrower": {
+  "changedPixels": 40897,
+  "antialiased": 21052,
+  "regions": 1,
+  "overlay": "62e445fe5da7cb84af640b93100c283d1570f8cad8f99486eeb40fce3ee4a524",
+  "diff": "c678fb916c282043",
+  "measure": "c678fb916c282043"
+ },
+ "corpus/real-reflow-form-row-stack": {
+  "changedPixels": 18963,
+  "antialiased": 3078,
+  "regions": 1,
+  "overlay": "01c6080e115c8cfbdd0c2258c5804ab0c52ade2b52645011471883346a993ec1",
+  "diff": "9dcdc8da9d8ca612",
+  "measure": "9dcdc8da9d8ca612"
+ },
+ "corpus/real-reflow-nav-right": {
+  "changedPixels": 808,
+  "antialiased": 1018,
+  "regions": 2,
+  "overlay": "d179566fd8b543fa0296551b92091f4ec7461d7cc2ca544064d1fe6cd1bad389",
+  "diff": "20c303ca56e80174",
+  "measure": "20c303ca56e80174"
+ },
+ "corpus/real-reflow-stats-column": {
+  "changedPixels": 64508,
+  "antialiased": 4535,
+  "regions": 1,
+  "overlay": "4406abd9ec5eb43924485b88af4b1b0f2a4324c647e2cf911f3fa6bfad1bc0e9",
+  "diff": "9b9ce0723ba66c3f",
+  "measure": "9b9ce0723ba66c3f"
+ },
+ "corpus/real-size-append-paragraph": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "7bd95987f1ee57f56ee4bd2df5f91a51cfa7448f2f9cf5572e3041efdf6b51a0",
+  "diff": "a5a5a18903a0e0aa",
+  "measure": "a5a5a18903a0e0aa"
+ },
+ "corpus/real-size-append-section": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "5adc62fa853226b4f8485b45ffcce9bd48456848b5f99b2c2d6b2946c4cc9ea0",
+  "diff": "229dd9db89ed3949",
+  "measure": "229dd9db89ed3949"
+ },
+ "corpus/real-spacing-button-padding-1px": {
+  "changedPixels": 274,
+  "antialiased": 434,
+  "regions": 1,
+  "overlay": "3fb200d896793a2eb667c98ecda787210540e331100e854a92e608665d23d072",
+  "diff": "96961a13faee469e",
+  "measure": "96961a13faee469e"
+ },
+ "corpus/real-spacing-form-gap-1px": {
+  "changedPixels": 9460,
+  "antialiased": 2391,
+  "regions": 1,
+  "overlay": "a317a0081711ffeb350fa5afb324d4377e673fe78f54279c993c806bd0da7d51",
+  "diff": "ced5980e595c4c8b",
+  "measure": "ced5980e595c4c8b"
+ },
+ "corpus/real-spacing-list-gap-1px": {
+  "changedPixels": 3815,
+  "antialiased": 1390,
+  "regions": 1,
+  "overlay": "dccbc63d10d647909ad8251132bca4d785b25d974eecbd2af492442ebb43bcd6",
+  "diff": "d1440fe5e81e1bf3",
+  "measure": "d1440fe5e81e1bf3"
+ },
+ "corpus/real-spacing-paragraph-margin-1px": {
+  "changedPixels": 7337,
+  "antialiased": 6190,
+  "regions": 1,
+  "overlay": "bf690b2ede1301833e75c46235d6f5ae403f65646c5ef9b89e56a6ec2e259c5b",
+  "diff": "4dbfba2a2d26ff02",
+  "measure": "4dbfba2a2d26ff02"
+ },
+ "corpus/real-text-button-longer": {
+  "changedPixels": 1320,
+  "antialiased": 273,
+  "regions": 1,
+  "overlay": "5627ab6bedc0ca8bf85dc668080ac8a968299982093affe291b8c551ab0b53c1",
+  "diff": "45c5319d4bc5835c",
+  "measure": "45c5319d4bc5835c"
+ },
+ "corpus/real-text-lede": {
+  "changedPixels": 1186,
+  "antialiased": 352,
+  "regions": 1,
+  "overlay": "11274a23558363b6c19c53bb092fe045507dda71c5fb8f03a79b3b4b28c716cc",
+  "diff": "255f90c9286c2d33",
+  "measure": "255f90c9286c2d33"
+ },
+ "corpus/real-text-number": {
+  "changedPixels": 58,
+  "antialiased": 101,
+  "regions": 1,
+  "overlay": "f825cebc40a4c59ac48044fa74351eba371d32fefe8a9c9af992362c3e878c50",
+  "diff": "fa65308e6e614069",
+  "measure": "fa65308e6e614069"
+ },
+ "corpus/real-text-weight": {
+  "changedPixels": 1453,
+  "antialiased": 1921,
+  "regions": 1,
+  "overlay": "f7464e50a0099d823864d004c7c46e60a5eee0ee0b2b53f06013641603b15aab",
+  "diff": "916e1b60ed0429d9",
+  "measure": "916e1b60ed0429d9"
+ },
+ "corpus/real-text-word": {
+  "changedPixels": 1481,
+  "antialiased": 935,
+  "regions": 1,
+  "overlay": "8aea0b4ad4ce230d9fecfa14af4aac3f65a931601bb79b1991497855a49adcf8",
+  "diff": "77961ce14de2bbe0",
+  "measure": "77961ce14de2bbe0"
+ },
+ "corpus-holdout/identical-inbox": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "995f58c1b945ac2cd39606cee0e31800b59ba2f51d34e8d27805b0a67dee8280",
+  "diff": "50caef2301fa2e3f",
+  "measure": "efe901c170c06b01"
+ },
+ "corpus-holdout/identical-pricing": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "a9c3990076489a9b83cc534c34829ebc31a86af9dadcf77f343d41582ee449e4",
+  "diff": "47666ed662837da6",
+  "measure": "efbee6cd30ac1c5c"
+ },
+ "corpus-holdout/identical-settings": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "3aa8a7aa5a6f2e4ff68624717420f1fb1cb826950047f247b5c24cd211942855",
+  "diff": "67051a76975ebd8b",
+  "measure": "4ef7152ebaadff9f"
+ },
+ "corpus-holdout/identical-settings-hinting-none": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "3aa8a7aa5a6f2e4ff68624717420f1fb1cb826950047f247b5c24cd211942855",
+  "diff": "67051a76975ebd8b",
+  "measure": "4ef7152ebaadff9f"
+ },
+ "corpus-holdout/noise-animation-frame-inbox": {
+  "changedPixels": 43,
+  "antialiased": 50,
+  "regions": 1,
+  "overlay": "d48c1c2789548e8a9e4828e9a7342dcaad0660f83ed1da0da9fb0c0825946c17",
+  "diff": "ce6a457dd13e0616",
+  "measure": "ce6a457dd13e0616"
+ },
+ "corpus-holdout/noise-animation-frame-pricing": {
+  "changedPixels": 55,
+  "antialiased": 33,
+  "regions": 1,
+  "overlay": "2920cbd8aafcd956b07b7dcca50a5a50cfd1ecf5776de097986a709336ff7a7a",
+  "diff": "9f3d2b20aff8252c",
+  "measure": "9f3d2b20aff8252c"
+ },
+ "corpus-holdout/noise-animation-frame-settings": {
+  "changedPixels": 61,
+  "antialiased": 75,
+  "regions": 1,
+  "overlay": "1fbb1e3ab5c2fba914d015e1c2000ec4f5362595c5df25703af78bfd34ae7419",
+  "diff": "95e6ac30a5690dbb",
+  "measure": "95e6ac30a5690dbb"
+ },
+ "corpus-holdout/noise-banding-inbox": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "995f58c1b945ac2cd39606cee0e31800b59ba2f51d34e8d27805b0a67dee8280",
+  "diff": "efe901c170c06b01",
+  "measure": "efe901c170c06b01"
+ },
+ "corpus-holdout/noise-banding-pricing": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "a9c3990076489a9b83cc534c34829ebc31a86af9dadcf77f343d41582ee449e4",
+  "diff": "efbee6cd30ac1c5c",
+  "measure": "efbee6cd30ac1c5c"
+ },
+ "corpus-holdout/noise-banding-settings": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "3aa8a7aa5a6f2e4ff68624717420f1fb1cb826950047f247b5c24cd211942855",
+  "diff": "4ef7152ebaadff9f",
+  "measure": "4ef7152ebaadff9f"
+ },
+ "corpus-holdout/noise-caret-inbox": {
+  "changedPixels": 16,
+  "antialiased": 0,
+  "regions": 1,
+  "overlay": "532ad999a715e5fcaed8c51ec58df2583874ba89fd7726b7e5fa3f533e660d23",
+  "diff": "f8ffdc12cda2351a",
+  "measure": "f8ffdc12cda2351a"
+ },
+ "corpus-holdout/noise-caret-pricing": {
+  "changedPixels": 10,
+  "antialiased": 5,
+  "regions": 1,
+  "overlay": "0bd822020903a1c12888e6278ddcafebb737f0e7ebe681f33a1ff54e82070785",
+  "diff": "a9a38d398602bc91",
+  "measure": "a9a38d398602bc91"
+ },
+ "corpus-holdout/noise-caret-settings": {
+  "changedPixels": 16,
+  "antialiased": 0,
+  "regions": 1,
+  "overlay": "6fc95c03c0c0e065ef417d1bb2f5b9ee9fba9679c2514c64e276b049ff80f4bd",
+  "diff": "6f70c00ade72b877",
+  "measure": "6f70c00ade72b877"
+ },
+ "corpus-holdout/noise-dither-inbox": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "995f58c1b945ac2cd39606cee0e31800b59ba2f51d34e8d27805b0a67dee8280",
+  "diff": "efe901c170c06b01",
+  "measure": "efe901c170c06b01"
+ },
+ "corpus-holdout/noise-dither-pricing": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "a9c3990076489a9b83cc534c34829ebc31a86af9dadcf77f343d41582ee449e4",
+  "diff": "efbee6cd30ac1c5c",
+  "measure": "efbee6cd30ac1c5c"
+ },
+ "corpus-holdout/noise-dither-settings": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "3aa8a7aa5a6f2e4ff68624717420f1fb1cb826950047f247b5c24cd211942855",
+  "diff": "4ef7152ebaadff9f",
+  "measure": "4ef7152ebaadff9f"
+ },
+ "corpus-holdout/noise-emoji-subpixel-inbox": {
+  "changedPixels": 388,
+  "antialiased": 614,
+  "regions": 2,
+  "overlay": "23267936463ffa53222b578352220c77d6bf77666f5f861a0d4746d1b41d65e4",
+  "diff": "3a26f8e15f1fa450",
+  "measure": "3a26f8e15f1fa450"
+ },
+ "corpus-holdout/noise-emoji-subpixel-pricing": {
+  "changedPixels": 779,
+  "antialiased": 173,
+  "regions": 2,
+  "overlay": "4ebcea73eeef9e261c96cbda2c2119b2937430af4d2cf1f9115b7b12402409eb",
+  "diff": "d089935b4dffa12b",
+  "measure": "d089935b4dffa12b"
+ },
+ "corpus-holdout/noise-emoji-subpixel-settings": {
+  "changedPixels": 389,
+  "antialiased": 616,
+  "regions": 2,
+  "overlay": "f6e45f7ee90de214fa4cdf7cead67d57321abbe6e13bd1ba00d45953f6a95901",
+  "diff": "efc16167544967f7",
+  "measure": "efc16167544967f7"
+ },
+ "corpus-holdout/noise-hinting-inbox": {
+  "changedPixels": 7369,
+  "antialiased": 3736,
+  "regions": 1,
+  "overlay": "9d14acf9d2daa911e09814c93fd044fcc934bb50ac5e1b3df2ffe3d57eb10a07",
+  "diff": "0f904ec97a50f574",
+  "measure": "0f904ec97a50f574"
+ },
+ "corpus-holdout/noise-hinting-pricing": {
+  "changedPixels": 10297,
+  "antialiased": 6591,
+  "regions": 5,
+  "overlay": "71435192034c0aeccda8227911e5ac10037fc3b0eee96dcb42d5e80463436335",
+  "diff": "724d6a0dc2f7283c",
+  "measure": "724d6a0dc2f7283c"
+ },
+ "corpus-holdout/noise-hinting-settings": {
+  "changedPixels": 8967,
+  "antialiased": 5022,
+  "regions": 3,
+  "overlay": "6b816a1108d142c373959c3668a7b323bff8da0d5f2dd72d544becf981e56cb9",
+  "diff": "68cac277c8fd3cb9",
+  "measure": "68cac277c8fd3cb9"
+ },
+ "corpus-holdout/noise-jpeg80-inbox": {
+  "changedPixels": 26090,
+  "antialiased": 3650,
+  "regions": 1,
+  "overlay": "ac866e106352d12d20255b0ebab24b29fe0121e510eaa0d97429d4295c6eb3c7",
+  "diff": "b01f67f6f18f7808",
+  "measure": "b01f67f6f18f7808"
+ },
+ "corpus-holdout/noise-jpeg80-pricing": {
+  "changedPixels": 57242,
+  "antialiased": 3690,
+  "regions": 1,
+  "overlay": "b97d542f8fc9181d1fbc63c2133ce33802d59cdc91a19a099c56a9ac0c9e7ac4",
+  "diff": "a3ccb2eddcc2d295",
+  "measure": "a3ccb2eddcc2d295"
+ },
+ "corpus-holdout/noise-jpeg80-settings": {
+  "changedPixels": 30214,
+  "antialiased": 2825,
+  "regions": 1,
+  "overlay": "9ab554bdb6e5153e0315c14d32af7faa4b2a365a1804ffa0e36ad28217e37c65",
+  "diff": "70d9756508113afe",
+  "measure": "70d9756508113afe"
+ },
+ "corpus-holdout/noise-shadow-blur-inbox": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "995f58c1b945ac2cd39606cee0e31800b59ba2f51d34e8d27805b0a67dee8280",
+  "diff": "efe901c170c06b01",
+  "measure": "efe901c170c06b01"
+ },
+ "corpus-holdout/noise-shadow-blur-pricing": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "a9c3990076489a9b83cc534c34829ebc31a86af9dadcf77f343d41582ee449e4",
+  "diff": "efbee6cd30ac1c5c",
+  "measure": "efbee6cd30ac1c5c"
+ },
+ "corpus-holdout/noise-shadow-blur-settings": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "3aa8a7aa5a6f2e4ff68624717420f1fb1cb826950047f247b5c24cd211942855",
+  "diff": "4ef7152ebaadff9f",
+  "measure": "4ef7152ebaadff9f"
+ },
+ "corpus-holdout/noise-shift-container-inbox": {
+  "changedPixels": 9017,
+  "antialiased": 10835,
+  "regions": 1,
+  "overlay": "ec52ba228467bc26bb64ecf12ad0c6b406c9c04c4b41b2a2174fb52a546c20f8",
+  "diff": "ca5e154173d5f410",
+  "measure": "ca5e154173d5f410"
+ },
+ "corpus-holdout/noise-shift-container-pricing": {
+  "changedPixels": 10214,
+  "antialiased": 11999,
+  "regions": 1,
+  "overlay": "614615cb990e61751869ea7665553ff91c3715602147ab4391ec88c56a0938eb",
+  "diff": "7d8c5d211a502429",
+  "measure": "7d8c5d211a502429"
+ },
+ "corpus-holdout/noise-shift-container-settings": {
+  "changedPixels": 8125,
+  "antialiased": 9717,
+  "regions": 1,
+  "overlay": "ec33480e7519467192b4db982b2d28016266b66ce407a7ffaa6c51504cb3ff37",
+  "diff": "3c0cfd9f69a959c1",
+  "measure": "3c0cfd9f69a959c1"
+ },
+ "corpus-holdout/noise-shift-part-inbox": {
+  "changedPixels": 3683,
+  "antialiased": 3860,
+  "regions": 1,
+  "overlay": "7ae7351d7bb06e6341c926c0102b4017e2c5c2231ccb91c7ac216d99fa92451c",
+  "diff": "3534912162194201",
+  "measure": "3534912162194201"
+ },
+ "corpus-holdout/noise-shift-part-pricing": {
+  "changedPixels": 3679,
+  "antialiased": 4703,
+  "regions": 2,
+  "overlay": "263b71e4cabd9e872da7f96724ab5cdf7226c999d101e3958bce3cb4ad302b23",
+  "diff": "a958c6fa270b521a",
+  "measure": "a958c6fa270b521a"
+ },
+ "corpus-holdout/noise-shift-part-settings": {
+  "changedPixels": 1494,
+  "antialiased": 1611,
+  "regions": 1,
+  "overlay": "023611e66997724e668748567906f2084cb99e3685a0e2746fa0cf3392bb75b4",
+  "diff": "f2f4df04724b90cd",
+  "measure": "f2f4df04724b90cd"
+ },
+ "corpus-holdout/noise-subpixel-glyphs-inbox": {
+  "changedPixels": 640,
+  "antialiased": 701,
+  "regions": 1,
+  "overlay": "20ca02a60ca6e688c2a86102e6aaad06d43d8eed55d44478710cdac5cd18ac8c",
+  "diff": "aecbc2aa8bae06ad",
+  "measure": "aecbc2aa8bae06ad"
+ },
+ "corpus-holdout/noise-subpixel-glyphs-pricing": {
+  "changedPixels": 729,
+  "antialiased": 1706,
+  "regions": 4,
+  "overlay": "48168fe3d9398176f3fd7a2c7e2281a54404abe8ece1fde981489f6020b270e5",
+  "diff": "7be7637b74bb3635",
+  "measure": "7be7637b74bb3635"
+ },
+ "corpus-holdout/noise-subpixel-glyphs-settings": {
+  "changedPixels": 1238,
+  "antialiased": 1497,
+  "regions": 3,
+  "overlay": "68acad29777adba411c1d56f55d64cc9aa5b68fcbf208c98a2dd4087943a5606",
+  "diff": "4ed76083ce3f6e7d",
+  "measure": "4ed76083ce3f6e7d"
+ },
+ "corpus-holdout/noise-webp85-inbox": {
+  "changedPixels": 15549,
+  "antialiased": 2535,
+  "regions": 1,
+  "overlay": "9d73f1ed98d591c4464f10ac99a228d9838a02368c581775691fb3803c5d9c5d",
+  "diff": "aaa9b654099b67da",
+  "measure": "aaa9b654099b67da"
+ },
+ "corpus-holdout/noise-webp85-pricing": {
+  "changedPixels": 38116,
+  "antialiased": 3149,
+  "regions": 1,
+  "overlay": "c94d272ad1d872345f7422b178b835728578a06ad80960e5a22021210d0f9e7d",
+  "diff": "11e2b7dd8620552f",
+  "measure": "11e2b7dd8620552f"
+ },
+ "corpus-holdout/noise-webp85-settings": {
+  "changedPixels": 19734,
+  "antialiased": 2131,
+  "regions": 1,
+  "overlay": "8b6d5d6716c3c14b8f02a5f628fd01ea9be9303df4c7adb0da3aa8bf07a046bc",
+  "diff": "4335f1dd218f4da1",
+  "measure": "4335f1dd218f4da1"
+ },
+ "corpus-holdout/real-border-1px-inbox": {
+  "changedPixels": 912,
+  "antialiased": 276,
+  "regions": 1,
+  "overlay": "3cc0567de358456ce2fcece1cdbd52ebf84d46ef6e3f1c6bbf2c7db03b4e05fe",
+  "diff": "446f7b809241be86",
+  "measure": "446f7b809241be86"
+ },
+ "corpus-holdout/real-border-1px-pricing": {
+  "changedPixels": 14539,
+  "antialiased": 6171,
+  "regions": 1,
+  "overlay": "95e5d91569e6cfc062ae6a051f42cdc56f233ef27de73da5015b5f9b61fb9fc6",
+  "diff": "cc91270093088231",
+  "measure": "cc91270093088231"
+ },
+ "corpus-holdout/real-border-1px-settings": {
+  "changedPixels": 721,
+  "antialiased": 259,
+  "regions": 1,
+  "overlay": "974259ae9ca0722cd267e418c112de5bdcc1a0adb82c1e36a4892254380a4b5e",
+  "diff": "55824c4b10c72e7b",
+  "measure": "55824c4b10c72e7b"
+ },
+ "corpus-holdout/real-colour-1step-inbox": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "995f58c1b945ac2cd39606cee0e31800b59ba2f51d34e8d27805b0a67dee8280",
+  "diff": "efe901c170c06b01",
+  "measure": "efe901c170c06b01"
+ },
+ "corpus-holdout/real-colour-1step-pricing": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "a9c3990076489a9b83cc534c34829ebc31a86af9dadcf77f343d41582ee449e4",
+  "diff": "efbee6cd30ac1c5c",
+  "measure": "efbee6cd30ac1c5c"
+ },
+ "corpus-holdout/real-colour-1step-settings": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "3aa8a7aa5a6f2e4ff68624717420f1fb1cb826950047f247b5c24cd211942855",
+  "diff": "4ef7152ebaadff9f",
+  "measure": "4ef7152ebaadff9f"
+ },
+ "corpus-holdout/real-colour-button-clear-inbox": {
+  "changedPixels": 2302,
+  "antialiased": 217,
+  "regions": 1,
+  "overlay": "14aa3bd5520c723141ba6ac9faded33a69134e665c47fd52d0a81e68ea38bde4",
+  "diff": "202113b7d6cd72bd",
+  "measure": "202113b7d6cd72bd"
+ },
+ "corpus-holdout/real-colour-button-clear-pricing": {
+  "changedPixels": 5811,
+  "antialiased": 266,
+  "regions": 1,
+  "overlay": "55f4c2355bc9e463a3ce55784d29b99a25b9f6d159a5bf6b0c66a600a99a40a2",
+  "diff": "c6c0975a3eb1a61f",
+  "measure": "c6c0975a3eb1a61f"
+ },
+ "corpus-holdout/real-colour-button-clear-settings": {
+  "changedPixels": 4156,
+  "antialiased": 298,
+  "regions": 1,
+  "overlay": "0964968d8cdd4f86610fd030b00ff2e19b6c59b47bca1a08254eec9e0b86ba93",
+  "diff": "c382aba62ddff864",
+  "measure": "c382aba62ddff864"
+ },
+ "corpus-holdout/real-colour-button-subtle-inbox": {
+  "changedPixels": 2250,
+  "antialiased": 101,
+  "regions": 1,
+  "overlay": "08198a7b39d0e18f2907bcf1a231cbcdebb87ada411d5fcf752b019b876e2cfb",
+  "diff": "698de767b7ea94a5",
+  "measure": "698de767b7ea94a5"
+ },
+ "corpus-holdout/real-colour-button-subtle-pricing": {
+  "changedPixels": 5743,
+  "antialiased": 53,
+  "regions": 1,
+  "overlay": "660c81c546f21505e4d3a6783c1fef769f892e47111d6c9adc9de659eaba80a6",
+  "diff": "0a108b3e7cee0650",
+  "measure": "0a108b3e7cee0650"
+ },
+ "corpus-holdout/real-colour-button-subtle-settings": {
+  "changedPixels": 4065,
+  "antialiased": 143,
+  "regions": 1,
+  "overlay": "05837dacbda43983d334f5e7aea390aa81fe02bfa9a7e1aedd8ba4d8b163bf79",
+  "diff": "6fc1d3507c0139c0",
+  "measure": "6fc1d3507c0139c0"
+ },
+ "corpus-holdout/real-colour-card-fade-inbox": {
+  "changedPixels": 100902,
+  "antialiased": 2509,
+  "regions": 1,
+  "overlay": "3be76f5ffc43407117e2b6ee847e58b1e2fd9c48fa39fbb66b7a8f615410fb53",
+  "diff": "860c026bbc0c0f36",
+  "measure": "860c026bbc0c0f36"
+ },
+ "corpus-holdout/real-colour-card-fade-pricing": {
+  "changedPixels": 32467,
+  "antialiased": 954,
+  "regions": 1,
+  "overlay": "53d3aca439baadfa14231450aa99e68746f03f25353f5a911bf55a0a86fd2cb1",
+  "diff": "2872c42d52216693",
+  "measure": "2872c42d52216693"
+ },
+ "corpus-holdout/real-colour-card-fade-settings": {
+  "changedPixels": 47132,
+  "antialiased": 1327,
+  "regions": 1,
+  "overlay": "36be6aad4c19c91a80335d23a3ca0dbd62913e4de90c9dde982b9401b30e38e5",
+  "diff": "cfffcf20e9d4960b",
+  "measure": "cfffcf20e9d4960b"
+ },
+ "corpus-holdout/real-glyph-inbox": {
+  "changedPixels": 32,
+  "antialiased": 13,
+  "regions": 1,
+  "overlay": "479ab054b5db19df39d6ae052509b847a55d5528606b9253cdd6a8d6bb2ee5a1",
+  "diff": "c2e2567958f82a23",
+  "measure": "c2e2567958f82a23"
+ },
+ "corpus-holdout/real-glyph-pricing": {
+  "changedPixels": 22,
+  "antialiased": 11,
+  "regions": 1,
+  "overlay": "b6b65e02ef0b273a2a133bca2d407fb68b58a31ad9c4b8556e382c224eb8c82b",
+  "diff": "5daf83358646ba2f",
+  "measure": "5daf83358646ba2f"
+ },
+ "corpus-holdout/real-glyph-settings": {
+  "changedPixels": 32,
+  "antialiased": 14,
+  "regions": 1,
+  "overlay": "0f909c765880449b5ea7e6cdbd9d2fa01ed19de2d9627295906459b913ca6ff3",
+  "diff": "5d1072495aeb226d",
+  "measure": "5d1072495aeb226d"
+ },
+ "corpus-holdout/real-icon-swap-inbox": {
+  "changedPixels": 89,
+  "antialiased": 81,
+  "regions": 1,
+  "overlay": "fcb0e9f69fc75811987bf29135f1eaafb1fb62150baa0dc1330bf0a99baea7ab",
+  "diff": "7f45db49923c9615",
+  "measure": "7f45db49923c9615"
+ },
+ "corpus-holdout/real-icon-swap-pricing": {
+  "changedPixels": 67,
+  "antialiased": 65,
+  "regions": 1,
+  "overlay": "189f2982b5609a3e868e2b9ca5544756ffd28279a72cf756b6d810b8615705e9",
+  "diff": "24b01fdd4b2c5007",
+  "measure": "24b01fdd4b2c5007"
+ },
+ "corpus-holdout/real-icon-swap-settings": {
+  "changedPixels": 95,
+  "antialiased": 77,
+  "regions": 1,
+  "overlay": "ded2fa62eb3c0d8e3f2656f7964a680ca624c1f7c43b81ce08a3358d10990780",
+  "diff": "305895e6ed864a88",
+  "measure": "305895e6ed864a88"
+ },
+ "corpus-holdout/real-missing-icon-inbox": {
+  "changedPixels": 118,
+  "antialiased": 54,
+  "regions": 1,
+  "overlay": "14b74be04a516ea96a541bc85c55bfd749b03d6a57bf595c668caf51b97148a2",
+  "diff": "339032c5812f8796",
+  "measure": "339032c5812f8796"
+ },
+ "corpus-holdout/real-missing-icon-pricing": {
+  "changedPixels": 67,
+  "antialiased": 64,
+  "regions": 1,
+  "overlay": "e537387280930ec40f07f9ad33005b24494236bc0f26e82d82d358ae7917a521",
+  "diff": "6b3476743bbb4df7",
+  "measure": "6b3476743bbb4df7"
+ },
+ "corpus-holdout/real-missing-icon-settings": {
+  "changedPixels": 90,
+  "antialiased": 76,
+  "regions": 1,
+  "overlay": "a6addcbc1138f6dcf1a68301c113c1e2efbbe201fa087ff060e950071dd95d32",
+  "diff": "f285eb425da7bf8b",
+  "measure": "f285eb425da7bf8b"
+ },
+ "corpus-holdout/real-missing-row-reflow-inbox": {
+  "changedPixels": 25571,
+  "antialiased": 3235,
+  "regions": 1,
+  "overlay": "d659774e6554185bf45ddb5959cec16a86da8d5ae062de11e34a1aecdfbaf13d",
+  "diff": "7502908c0e7b8f9c",
+  "measure": "7502908c0e7b8f9c"
+ },
+ "corpus-holdout/real-missing-row-reflow-pricing": {
+  "changedPixels": 37469,
+  "antialiased": 5071,
+  "regions": 1,
+  "overlay": "65caf87ed40a89ac6a513be99ae033a9fb7cd5b5255913d44cae2238d4e80df2",
+  "diff": "950d558012322714",
+  "measure": "950d558012322714"
+ },
+ "corpus-holdout/real-missing-row-reflow-settings": {
+  "changedPixels": 21553,
+  "antialiased": 2551,
+  "regions": 1,
+  "overlay": "e513868795d694a18b764839c7d63276359c335ccd8f8cc38f239ea7771007f4",
+  "diff": "535d727570305d0b",
+  "measure": "535d727570305d0b"
+ },
+ "corpus-holdout/real-reflow-stack-inbox": {
+  "changedPixels": 160633,
+  "antialiased": 9970,
+  "regions": 1,
+  "overlay": "ad98418f5d951dd9c9bb9dd78aec2f4c7198fe39c389e87162fa0dad93576550",
+  "diff": "58cfd12931c1a31c",
+  "measure": "58cfd12931c1a31c"
+ },
+ "corpus-holdout/real-reflow-stack-pricing": {
+  "changedPixels": 76875,
+  "antialiased": 6202,
+  "regions": 1,
+  "overlay": "84e781f374a288fa87331a3f0e4b721848439471ef6d981dc69a4a7647ae9776",
+  "diff": "d479aa063d608a4e",
+  "measure": "d479aa063d608a4e"
+ },
+ "corpus-holdout/real-reflow-stack-settings": {
+  "changedPixels": 51785,
+  "antialiased": 7193,
+  "regions": 1,
+  "overlay": "2679b2bd70d56d8a41f7b67377ccfa904795abcc16a4b25e6c289df321850cff",
+  "diff": "08857c44dc46f034",
+  "measure": "08857c44dc46f034"
+ },
+ "corpus-holdout/real-size-append-inbox": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "e5ff4e94771b102214c75c2289bb830107a482f273ff8530606365d870cc59d9",
+  "diff": "e2038494693f6afd",
+  "measure": "e2038494693f6afd"
+ },
+ "corpus-holdout/real-size-append-pricing": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "59341c778e8a26c10de2f22b5e6f497abb4a564e7072322f5ccf5747fed147b7",
+  "diff": "46913279dbb461ab",
+  "measure": "46913279dbb461ab"
+ },
+ "corpus-holdout/real-size-append-settings": {
+  "changedPixels": 0,
+  "antialiased": 0,
+  "regions": 0,
+  "overlay": "02dae8248b506dfe88308ced9719b9979490c1bc9c52ec6260ff20064876bd34",
+  "diff": "ee8f34fb6dab654d",
+  "measure": "ee8f34fb6dab654d"
+ },
+ "corpus-holdout/real-spacing-gap-1px-inbox": {
+  "changedPixels": 6467,
+  "antialiased": 3039,
+  "regions": 1,
+  "overlay": "139f4475e820f8a28cab08e341f281d128aab9cf0574192ddd86a49bb3cfabde",
+  "diff": "b5b1f881837ab702",
+  "measure": "b5b1f881837ab702"
+ },
+ "corpus-holdout/real-spacing-gap-1px-pricing": {
+  "changedPixels": 6645,
+  "antialiased": 2857,
+  "regions": 1,
+  "overlay": "7941140d8302858ffa39eff6a97e315e1050d23093cfdbd1a24a325f44d7762f",
+  "diff": "953441929b119797",
+  "measure": "953441929b119797"
+ },
+ "corpus-holdout/real-spacing-gap-1px-settings": {
+  "changedPixels": 4828,
+  "antialiased": 1721,
+  "regions": 1,
+  "overlay": "b4a16d83ad71c7cc4ab1c9ef811385be43546aa19864f657a71f46da2700f15e",
+  "diff": "7b05e95240fc330d",
+  "measure": "7b05e95240fc330d"
+ },
+ "corpus-holdout/real-spacing-padding-1px-inbox": {
+  "changedPixels": 64,
+  "antialiased": 93,
+  "regions": 1,
+  "overlay": "5f46e69771991fc399727e47adf1fca6ae6110ea626915f7c002aba73aee5a75",
+  "diff": "2f26d399abaf0571",
+  "measure": "2f26d399abaf0571"
+ },
+ "corpus-holdout/real-spacing-padding-1px-pricing": {
+  "changedPixels": 70,
+  "antialiased": 80,
+  "regions": 1,
+  "overlay": "fc5a88e7b4c9327a8a7b192f323a29807180169c7ac46732f726680769e91c62",
+  "diff": "80d72abb881fc267",
+  "measure": "80d72abb881fc267"
+ },
+ "corpus-holdout/real-spacing-padding-1px-settings": {
+  "changedPixels": 455,
+  "antialiased": 396,
+  "regions": 1,
+  "overlay": "dc9dd8f6c103b48b4074481e37548154bb3a4ac7372d1c64b6911bcc84f58d73",
+  "diff": "d66e354061cbbe83",
+  "measure": "d66e354061cbbe83"
+ },
+ "corpus-holdout/real-text-number-inbox": {
+  "changedPixels": 21,
+  "antialiased": 23,
+  "regions": 1,
+  "overlay": "fd2bc2c621ea143d43148a3ec9a54e41180d1373a79bf9ceeb6678bb27c2cb0d",
+  "diff": "a75d0cd18f9612e2",
+  "measure": "a75d0cd18f9612e2"
+ },
+ "corpus-holdout/real-text-number-pricing": {
+  "changedPixels": 34,
+  "antialiased": 123,
+  "regions": 1,
+  "overlay": "0877da3ebb49c25d6b6870594ff649afd30752976b053b687fdd3b3128092cbb",
+  "diff": "9a1043bf8a8240ef",
+  "measure": "9a1043bf8a8240ef"
+ },
+ "corpus-holdout/real-text-number-settings": {
+  "changedPixels": 47,
+  "antialiased": 38,
+  "regions": 1,
+  "overlay": "be149c2d754fbf95fe7e42c433425d736e35db176f7f2f6e2c4b2f2651d08ea7",
+  "diff": "61824e76bcab2106",
+  "measure": "61824e76bcab2106"
+ },
+ "corpus-holdout/real-text-word-inbox": {
+  "changedPixels": 493,
+  "antialiased": 312,
+  "regions": 1,
+  "overlay": "1e73ca5749858e63d3adf8ee35690acd0b87553b4dbd42e50ec780dba3960378",
+  "diff": "00f1bb9cd67f300b",
+  "measure": "00f1bb9cd67f300b"
+ },
+ "corpus-holdout/real-text-word-pricing": {
+  "changedPixels": 3259,
+  "antialiased": 337,
+  "regions": 1,
+  "overlay": "c415465edf0027eb25baa606f44f99d4cb939a4f0308bb6a94540428aa40c1d7",
+  "diff": "61632874bb11ca95",
+  "measure": "61632874bb11ca95"
+ },
+ "corpus-holdout/real-text-word-settings": {
+  "changedPixels": 790,
+  "antialiased": 412,
+  "regions": 1,
+  "overlay": "d45b58a221f7d2f50c14ba12de8c57e293496cf6b86284978b687b05ff9fc2c3",
+  "diff": "f1f1050ba1f4dee7",
+  "measure": "f1f1050ba1f4dee7"
+ }
+}

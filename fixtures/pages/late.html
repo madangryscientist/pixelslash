@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>late</title>
+  <style>
+    body { margin: 0; background: #ffffff; }
+  </style>
+</head>
+<body>
+  <script>
+    // Content that only starts loading after DOMContentLoaded: the capture settle
+    // must wait for it, so the shot is not an empty page.
+    document.addEventListener("DOMContentLoaded", () => {
+      const img = document.createElement("img");
+      img.src = "late.png";
+      img.alt = "late";
+      document.body.appendChild(img);
+    });
+  </script>
+</body>
+</html>

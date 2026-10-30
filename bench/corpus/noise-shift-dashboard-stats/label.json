@@ -1,0 +1,7 @@
+{
+  "label": "noise",
+  "kind": "subpixel-shift",
+  "page": "dashboard",
+  "width": 640,
+  "height": 480
+}

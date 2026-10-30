@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>settings</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.45 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: #eef0f4;
+        color: #1e2430;
+      }
+      .app {
+        display: flex;
+        min-height: 480px;
+      }
+      #side {
+        width: 168px;
+        flex: none;
+        background: #1e2430;
+        color: #c7cdd9;
+        padding: 16px 12px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #fff;
+        font-weight: 700;
+        margin-bottom: 20px;
+      }
+      #side nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #side a {
+        padding: 6px 10px;
+        border-radius: 6px;
+      }
+      #side a.active {
+        background: #3b4763;
+        color: #fff;
+      }
+      main {
+        flex: 1;
+        padding: 16px 20px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      #avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #f59e0b;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #dde1ea;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 2px rgba(30, 36, 48, 0.08);
+      }
+      .card h2 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      #intro {
+        margin: 0 0 10px;
+        color: #5a6578;
+      }
+      #fields {
+        display: flex;
+        gap: 12px;
+      }
+      #fields label {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #3a4356;
+      }
+      input[type="text"],
+      select {
+        height: 32px;
+        border: 1px solid #b4bccb;
+        border-radius: 6px;
+        padding: 0 10px;
+        font: inherit;
+        font-weight: 400;
+        background: #fff;
+        color: #1e2430;
+      }
+      #badge {
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 99px;
+        background: #e0e7ff;
+        color: #3730a3;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      #toggles {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #toggles li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      .switch {
+        margin-left: auto;
+        width: 34px;
+        height: 18px;
+        border-radius: 99px;
+        background: #cbd2df;
+        position: relative;
+      }
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .switch.on {
+        background: #4f46e5;
+      }
+      .switch.on::after {
+        left: 18px;
+      }
+      #seats {
+        margin: 10px 0 0;
+        color: #5a6578;
+        font-size: 12px;
+      }
+      #seats b {
+        color: #1e2430;
+        font-size: 16px;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      #save {
+        background: #4f46e5;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font: inherit;
+        font-weight: 600;
+      }
+      #sync {
+        width: 16px;
+        height: 16px;
+        border: 3px solid #cbd2df;
+        border-top-color: #4f46e5;
+        border-radius: 50%;
+        animation: spin 1.2s linear infinite;
+        animation-play-state: paused;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside id="side">
+        <div class="brand">
+          <svg id="logo" width="22" height="22" viewBox="0 0 22 22">
+            <circle cx="11" cy="11" r="11" fill="#818cf8" />
+            <path d="M6 11h10M11 6v10" stroke="#fff" stroke-width="2" fill="none" />
+          </svg>
+          Acme
+        </div>
+        <nav>
+          <a class="active" href="#">General</a><a href="#">Notifications</a><a href="#">Billing</a
+          ><a href="#">Security</a>
+        </nav>
+      </aside>
+      <main>
+        <header>
+          <h1 id="title">Workspace settings</h1>
+          <div id="avatar"></div>
+        </header>
+        <section class="card" id="card-profile">
+          <h2>Profile</h2>
+          <p id="intro">Choose how your name and role appear to the rest of the workspace.</p>
+          <div id="fields">
+            <label>Display name<input id="name" type="text" value="Grace Hopper" /></label>
+            <label
+              >Role<select>
+                <option>Administrator</option>
+                <option>Member</option>
+              </select></label
+            >
+          </div>
+        </section>
+        <section class="card" id="card-notify">
+          <h2>Notifications <span id="badge">3 new</span></h2>
+          <ul id="toggles">
+            <li id="t1">
+              <svg class="icon" id="icon-mail" viewBox="0 0 16 16">
+                <rect x="1" y="3" width="14" height="10" rx="2" fill="#4f46e5" />
+                <path d="M2 4l6 5 6-5" stroke="#fff" stroke-width="1.4" fill="none" /></svg
+              ><span>Email digests</span><span class="switch on"></span>
+            </li>
+            <li id="t2">
+              <svg class="icon" id="icon-at" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#0891b2" />
+                <circle cx="8" cy="8" r="2.4" stroke="#fff" stroke-width="1.4" fill="none" /></svg
+              ><span>Mentions and replies</span><span class="switch on"></span>
+            </li>
+            <li id="t3">
+              <svg class="icon" id="icon-clock" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="7" fill="#d97706" />
+                <path d="M8 4v4l3 2" stroke="#fff" stroke-width="1.4" fill="none" /></svg
+              ><span>Weekly summary</span><span class="switch"></span>
+            </li>
+          </ul>
+          <p id="seats"><b id="seat-count">14</b> of 25 seats in use</p>
+        </section>
+        <div class="actions">
+          <button id="save" type="button">Save changes</button>
+          <div id="sync"></div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

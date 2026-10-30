@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "colour-1step",
+  "page": "form",
+  "width": 640,
+  "height": 460,
+  "box": {
+    "x": 137,
+    "y": 381,
+    "w": 131,
+    "h": 37
+  }
+}

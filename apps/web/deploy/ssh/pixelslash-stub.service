@@ -1,0 +1,16 @@
+# The GitHub stand-in (e2e/github-stub.ts) on :4174: every visitor signs in as e2e-octocat.
+# LAN only. See apps/web/README.md, "Run it on the Proxmox server".
+[Unit]
+Description=PixelSlash GitHub stand-in
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pixelslash
+WorkingDirectory=/home/pixelslash/releases/current/apps/web
+ExecStart=/home/pixelslash/.bun/bin/bun e2e/github-stub.ts
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

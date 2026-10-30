@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ticker</title>
+  <style>
+    body { margin: 24px; font: 16px/1.5 sans-serif; background: #fff; color: #111; }
+    #count { font: 700 48px sans-serif; }
+  </style>
+</head>
+<body>
+  <p>Ticks: <span id="count">0</span></p>
+  <p id="word">alpha</p>
+  <script>
+    // A 100 ms interval and a random-delay timeout: both are timing-dependent unless timers are frozen.
+    let n = 0;
+    setInterval(() => {
+      document.getElementById("count").textContent = String(++n);
+    }, 100);
+    const words = ["alpha", "beta", "gamma"];
+    setTimeout(() => {
+      document.getElementById("word").textContent = words[Math.floor(Math.random() * 3)];
+    }, Math.random() * 300);
+  </script>
+</body>
+</html>

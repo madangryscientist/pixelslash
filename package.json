@@ -1,0 +1,43 @@
+{
+  "name": "pixelslash-workspace",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "bench"
+  ],
+  "type": "module",
+  "scripts": {
+    "pixelslash": "bun packages/cli/src/index.ts",
+    "typecheck": "bun scripts/nx.ts run-many -t typecheck",
+    "lint": "bun scripts/nx.ts run-many -t lint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "bun scripts/nx.ts run-many -t test",
+    "bench": "bun scripts/nx.ts run bench:bench --output-style=stream",
+    "bench:check": "bun scripts/nx.ts run bench:check --output-style=stream",
+    "bench:perf": "bun bench/src/perf/run.ts",
+    "bench:native": "bun bench/src/perf/native.ts",
+    "bench:perf:check": "bun bench/src/perf/run.ts --check",
+    "bench:decoders": "bun bench/src/perf/decoders.ts",
+    "bench:import-flags": "bun bench/src/import-flags.ts",
+    "build:cli": "bun scripts/build-cli.ts",
+    "build:playwright": "bun scripts/build-playwright.ts",
+    "check:example": "bun scripts/check-example.ts",
+    "wasm:build": "bun scripts/build-wasm.ts",
+    "wasm:check": "bun scripts/build-wasm.ts --check"
+  },
+  "devDependencies": {
+    "@nx/dotnet": "24.0.1",
+    "@types/bun": "1.4.4",
+    "@types/pngjs": "^6.0.5",
+    "nx": "24.0.1",
+    "oxfmt": "0.74.0",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "pngjs": "^7.0.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

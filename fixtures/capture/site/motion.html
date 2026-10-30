@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>motion</title>
+  <style>
+    body { margin: 24px; font: 16px/1.5 sans-serif; background: #fff; color: #111; }
+    .spin { width: 60px; height: 60px; background: #e11d48; animation: spin 0.7s linear infinite; }
+    .slide { width: 60px; height: 20px; margin-top: 16px; background: #16a34a; animation: slide 1.3s ease-in-out infinite alternate; }
+    .fade { margin-top: 16px; transition: opacity 3s; opacity: 1; }
+    .fade.go { opacity: 0.1; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slide { from { margin-left: 0; } to { margin-left: 200px; } }
+  </style>
+</head>
+<body>
+  <div class="spin"></div>
+  <div class="slide"></div>
+  <p class="fade" id="fade">A three-second transition.</p>
+  <input id="field" autofocus value="caret here">
+  <p>Date.now(): <span id="now"></span></p>
+  <p>new Date(): <span id="iso"></span></p>
+  <script>
+    const tick = () => {
+      document.getElementById("now").textContent = String(Date.now());
+      document.getElementById("iso").textContent = new Date().toISOString();
+    };
+    tick();
+    setInterval(tick, 50);
+    requestAnimationFrame(() => document.getElementById("fade").classList.add("go"));
+    document.getElementById("field").focus();
+  </script>
+</body>
+</html>

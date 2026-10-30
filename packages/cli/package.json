@@ -1,0 +1,49 @@
+{
+  "name": "@hackcove/pixelslash",
+  "version": "0.1.0",
+  "description": "Visual review from the command line: capture Main and Branch, pixel-diff them, write a report.",
+  "keywords": [
+    "cli",
+    "pixel-diff",
+    "playwright",
+    "screenshot",
+    "visual-regression"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/madangryscientist/pixelslash.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "pixelslash": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@sentry/bun": "11.9.0",
+    "axe-core": "^4.14.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@pixelslash/engine": "workspace:*",
+    "@types/bun": "1.4.4",
+    "@types/pngjs": "^6.0.5",
+    "vitest": "5.0.5"
+  },
+  "peerDependencies": {
+    "playwright": "^1.60.0"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  }
+}

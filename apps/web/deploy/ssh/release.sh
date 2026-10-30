@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Deploy a commit to a self-host container: build it here, ship the release, switch on the CT.
+# Run from a clean checkout of that commit (the planner's land worktree), on the desktop. See
+# apps/web/README.md, "Run it on the Proxmox server".
+#
+#   PIXELSLASH_LAN_SSH=root@<proxmox host> PIXELSLASH_LAN_CT=<ct id> \
+#     [PIXELSLASH_LAN_SSH_KEY=<identity file>] [PIXELSLASH_SENTRY_DSN=<dsn>] \
+#     [PIXELSLASH_GITHUB_APP_ID=<id>] [PIXELSLASH_GITHUB_APP_KEY=<pem>] \
+#     [PIXELSLASH_PUBLIC_URL=<url>] [PIXELSLASH_DEPLOY_FORCE=1] \
+#     apps/web/deploy/ssh/release.sh <sha>
+#
+# The CT never builds (PS-225): the vite build cannot fit in its 2 GiB beside a running workerd (ob
+# 1887), so it used to stop the server for the build. Here the build runs on this machine, the
+# release (the commit's tracked files and the built dist) goes over ssh to the Proxmox host and in
+# with `pct push`, and the release's own update.sh unpacks, installs and switches it on the CT.
+#
+# PIXELSLASH_SENTRY_DSN (PS-227) turns on error reporting: the DSN goes into the tarball as a
+# private file, over the same ssh stream, and update.sh saves it with the CT's secrets. It is read
+# from the environment and never printed or put on a command line. Without it the CT keeps the DSN
+# it already has in .dev.vars.e2e.
+#
+# The GitHub App (PS-23) travels the same way: PIXELSLASH_GITHUB_APP_ID and PIXELSLASH_GITHUB_APP_KEY
+# (the private key's PEM, e.g. `PIXELSLASH_GITHUB_APP_KEY="$(cat github-app-key.pem)"`)
+# become GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY, the key base64'd onto one line so it fits one
+# .dev.vars line. PIXELSLASH_PUBLIC_URL is the URL a check run links its build page on. Each one left
+# unset keeps what the CT has. See apps/web/github-app/README.md.
+#
+# The CT is built with CLOUDFLARE_ENV=e2e, so GITHUB_API_BASE is the sign-in stand-in. Whenever
+# PIXELSLASH_GITHUB_APP_ID is set, release.sh also carries GITHUB_APP_API_BASE=https://api.github.com
+# (PS-281), so the App's check runs reach GitHub while sign-in stays on the stand-in.
+set -Eeuo pipefail
+
+# Writes value $2 to the private file $1 in the release, for update.sh to save with the CT's
+# secrets; an empty value writes nothing, so the CT keeps what it has.
+carry() {
+  [[ -z $2 ]] || (umask 077 && printf '%s\n' "$2" >"$1")
+}
+
+main() {
+  local sha=${1:?usage: release.sh <sha>}
+  local ssh_dest=${PIXELSLASH_LAN_SSH:?set PIXELSLASH_LAN_SSH to the Proxmox host, e.g. root@<host>}
+  local ct=${PIXELSLASH_LAN_CT:?set PIXELSLASH_LAN_CT to the CT id}
+  local ssh_args=(-o BatchMode=yes)
+  [[ -z ${PIXELSLASH_LAN_SSH_KEY:-} ]] || ssh_args+=(-i "$PIXELSLASH_LAN_SSH_KEY")
+
+  local root
+  root=$(git rev-parse --show-toplevel)
+  cd "$root"
+  # The release is the commit, not this working tree: a dirty tree or another HEAD would ship
+  # something no commit names.
+  sha=$(git rev-parse --verify --quiet "$sha^{commit}") || { echo "no commit $1" >&2; exit 1; }
+  [[ $sha == "$(git rev-parse HEAD)" ]] || { echo "HEAD is not $sha: check it out first" >&2; exit 1; }
+  [[ -z $(git status --porcelain) ]] || { echo "the checkout is not clean" >&2; exit 1; }
+  local short=${sha:0:12}
+
+  bun install --frozen-lockfile
+  (cd apps/web && rm -rf dist && CLOUDFLARE_ENV=e2e bun run build)
+
+  # Global, not local: the EXIT trap runs after main has returned.
+  stage=$(mktemp -d)
+  trap 'rm -rf "$stage"' EXIT
+  # Every tracked file but bench/ (its corpora are large, and nothing on the CT runs it; the frozen
+  # install skips a workspace that is not on disk).
+  mkdir "$stage/$short"
+  git archive --format=tar "$sha" -- . ':!bench' | tar -x -C "$stage/$short"
+  cp -a apps/web/dist "$stage/$short/apps/web/dist"
+  # This machine's .dev.vars must never reach the CT: it carries its own, which update.sh puts here.
+  rm -f "$stage/$short/apps/web/dist/server/.dev.vars"
+  carry "$stage/$short/.sentry-dsn" "${PIXELSLASH_SENTRY_DSN:-}"
+  carry "$stage/$short/.github-app-id" "${PIXELSLASH_GITHUB_APP_ID:-}"
+  carry "$stage/$short/.github-app-key" "$(printf '%s' "${PIXELSLASH_GITHUB_APP_KEY:-}" | base64 -w0)"
+  [[ -z ${PIXELSLASH_GITHUB_APP_ID:-} ]] || carry "$stage/$short/.github-app-api-base" "https://api.github.com"
+  carry "$stage/$short/.public-url" "${PIXELSLASH_PUBLIC_URL:-}"
+  tar -czf "$stage/$short.tar.gz" -C "$stage/$short" .
+  echo "release $short: $(du -h "$stage/$short.tar.gz" | cut -f1)" >&2
+
+  # On the Proxmox host: take the tarball from stdin, push it and its own update.sh into the CT, run
+  # that update.sh there, and remove both copies whatever it exits with.
+  # shellcheck disable=SC2016 # expanded on the host
+  local remote='set -euo pipefail
+ct=$1 short=$2 force=$3 d=$(mktemp -d)
+trap "rm -rf $d" EXIT
+cat >"$d/$short.tar.gz"
+tar -xzf "$d/$short.tar.gz" -C "$d" ./apps/web/deploy/ssh/update.sh
+pct push "$ct" "$d/$short.tar.gz" "/root/pixelslash-$short.tar.gz"
+pct push "$ct" "$d/apps/web/deploy/ssh/update.sh" /root/pixelslash-update.sh --perms 0755
+status=0
+pct exec "$ct" -- env "PIXELSLASH_DEPLOY_FORCE=$force" /root/pixelslash-update.sh "/root/pixelslash-$short.tar.gz" || status=$?
+pct exec "$ct" -- rm -f "/root/pixelslash-$short.tar.gz" /root/pixelslash-update.sh
+exit $status'
+  ssh "${ssh_args[@]}" "$ssh_dest" "bash -c $(printf %q "$remote") _ $(printf %q "$ct") $short $(printf %q "${PIXELSLASH_DEPLOY_FORCE:-}")" \
+    <"$stage/$short.tar.gz"
+}
+
+main "$@"

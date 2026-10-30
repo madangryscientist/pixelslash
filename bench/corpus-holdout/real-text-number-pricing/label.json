@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "text",
+  "page": "pricing",
+  "width": 680,
+  "height": 520,
+  "box": {
+    "x": 255,
+    "y": 233,
+    "w": 170,
+    "h": 46
+  }
+}

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>early timers</title>
+  <style>
+    body { margin: 0; background: #fff; color: #111; font: 16px/1.5 sans-serif; }
+  </style>
+</head>
+<body>
+  <p>Timers of 1 to 10 ms turn the page red when they fire.</p>
+  <script>
+    const red = () => { document.body.style.background = "#e11d48"; };
+    setTimeout(red, 1);
+    setTimeout(red, 5);
+    setInterval(red, 10);
+  </script>
+</body>
+</html>

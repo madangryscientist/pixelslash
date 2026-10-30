@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>PixelSlash vs Argos, 2026-10-19</title>
+<style>
+body{font:14px/1.4 system-ui,sans-serif;margin:24px;color:#18181b;background:#fafafa}
+h1{margin:0 0 4px}h2{margin:32px 0 4px}h3{margin:0 0 4px;font-size:15px}.note{color:#52525b;margin:0 0 12px}
+.case{background:#fff;border:1px solid #d4d4d8;border-radius:8px;padding:12px 14px;margin-bottom:16px}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+figure{margin:0}figcaption{font-size:12px;color:#52525b;margin-bottom:2px}
+.shot{position:relative;line-height:0}.shot img{width:100%;border:1px solid #d4d4d8;image-rendering:pixelated;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/12px 12px}
+.over{position:relative}.over img{position:absolute;left:0;top:0}.over img.under{opacity:.3;border:0}.over img:not(.under){width:100%}
+.gt{position:absolute;border:2px solid #16a34a;pointer-events:none}
+.none{border:1px dashed #a1a1aa;color:#71717a;font-size:12px;text-align:center;padding:40px 8px}
+.chip{display:inline-block;padding:1px 8px;border-radius:99px;font-weight:600;font-size:12px}
+.chip.changed{background:#fee2e2;color:#991b1b}.chip.same{background:#dcfce7;color:#166534}
+.label{font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px;vertical-align:middle}
+.label.real{background:#dbeafe;color:#1e40af}.label.noise{background:#fef3c7;color:#92400e}.label.identical{background:#e4e4e7;color:#3f3f46}
+</style></head><body>
+<h1>PixelSlash vs Argos, 2026-10-19</h1>
+<p class="note">Red chip = the tool flagged the pair. Right answer: real flagged, noise and identical left alone. PixelSlash's diff is magenta and Argos's is red, each laid over a faded Branch shot.</p>
+<h2>Verdicts disagree (10)</h2><p class="note">One tool flagged the pair and the other did not.</p><section class="case">
+  <h3>noise-caret-email <span class="label noise">noise</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>60 px</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/noise-caret-email/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img src="../../corpus/noise-caret-email/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" src="../../corpus/noise-caret-email/head.png" style="width:100%" alt=""><img src="diffs/noise-caret-email.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>noise-dither-article-2 <span class="label noise">noise</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>18204 px</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/noise-dither-article-2/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img src="../../corpus/noise-dither-article-2/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/640"><img class="under" src="../../corpus/noise-dither-article-2/head.png" style="width:100%" alt=""><img src="diffs/noise-dither-article-2.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>noise-dither-dashboard-1 <span class="label noise">noise</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>288296 px</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/noise-dither-dashboard-1/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img src="../../corpus/noise-dither-dashboard-1/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" src="../../corpus/noise-dither-dashboard-1/head.png" style="width:100%" alt=""><img src="diffs/noise-dither-dashboard-1.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>noise-dither-form-1 <span class="label noise">noise</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>83929 px</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/noise-dither-form-1/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img src="../../corpus/noise-dither-form-1/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" src="../../corpus/noise-dither-form-1/head.png" style="width:100%" alt=""><img src="diffs/noise-dither-form-1.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>noise-hero-shimmer-frame <span class="label noise">noise</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>34963 px</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/noise-hero-shimmer-frame/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head)</figcaption><div class="shot"><img src="../../corpus/noise-hero-shimmer-frame/head.png" alt="Branch (head)"></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/640"><img class="under" src="../../corpus/noise-hero-shimmer-frame/head.png" style="width:100%" alt=""><img src="diffs/noise-hero-shimmer-frame.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-colour-body-text-subtle <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>18727 px, IoU 0.53</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-colour-body-text-subtle/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-colour-body-text-subtle/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:10.9375%;top:27.8125%;width:77.5%;height:52.65625%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/640"><img class="under" src="../../corpus/real-colour-body-text-subtle/head.png" style="width:100%" alt=""><img src="diffs/real-colour-body-text-subtle.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-colour-button-subtle <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>3968 px, IoU 0.95</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-colour-button-subtle/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-colour-button-subtle/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:3.125%;top:83.33333333333333%;width:17.65625%;height:7.916666666666667%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" src="../../corpus/real-colour-button-subtle/head.png" style="width:100%" alt=""><img src="diffs/real-colour-button-subtle.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-icon-info-glyph <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>8 px, IoU 0.04</small> &nbsp; <span class="chip same">Argos: same</span> <small>score 0</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-icon-info-glyph/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-icon-info-glyph/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:5.46875%;top:67.70833333333333%;width:2.5%;height:3.5416666666666665%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" src="../../corpus/real-icon-info-glyph/head.png" style="width:100%" alt=""><img src="diffs/real-icon-info-glyph.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-size-append-paragraph <span class="label real">real</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>0 px</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0024, IoU 0.60</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-size-append-paragraph/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-size-append-paragraph/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:18.75%;top:88.93058161350844%;width:62.5%;height:3.9399624765478425%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/533"><img class="under" src="../../corpus/real-size-append-paragraph/head.png" style="width:100%" alt=""><img src="diffs/real-size-append-paragraph.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-size-append-section <span class="label real">real</span></h3>
+  <p><span class="chip same">PixelSlash: same</span> <small>0 px</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0744, IoU 0.67</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-size-append-section/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-size-append-section/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:3.125%;top:81.87808896210873%;width:93.75%;height:14.99176276771005%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="none">no diff image<br>(unchanged)</div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/607"><img class="under" src="../../corpus/real-size-append-section/head.png" style="width:100%" alt=""><img src="diffs/real-size-append-section.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<h2>Same verdict, different place (3)</h2><p class="note">Real changes both tools flagged, but whose changed region differs by at least 0.30 IoU against the ground-truth box.</p><section class="case">
+  <h3>real-colour-badge <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>1219 px, IoU 0.89</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0004, IoU 0.41</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-colour-badge/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-colour-badge/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:40.625%;top:13.26086956521739%;width:10.625%;height:4.565217391304348%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" src="../../corpus/real-colour-badge/head.png" style="width:100%" alt=""><img src="diffs/real-colour-badge.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/460"><img class="under" src="../../corpus/real-colour-badge/head.png" style="width:100%" alt=""><img src="diffs/real-colour-badge.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-fixture-pages-card-to-yellow <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>19794 px, IoU 0.98</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0074, IoU 0.57</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-fixture-pages-card-to-yellow/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-fixture-pages-card-to-yellow/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:1.875%;top:16.805555555555557%;width:27.65625%;height:7.916666666666667%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:1280/720"><img class="under" src="../../corpus/real-fixture-pages-card-to-yellow/head.png" style="width:100%" alt=""><img src="diffs/real-fixture-pages-card-to-yellow.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:1280/720"><img class="under" src="../../corpus/real-fixture-pages-card-to-yellow/head.png" style="width:100%" alt=""><img src="diffs/real-fixture-pages-card-to-yellow.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+<section class="case">
+  <h3>real-spacing-button-padding-1px <span class="label real">real</span></h3>
+  <p><span class="chip changed">PixelSlash: changed</span> <small>726 px, IoU 0.84</small> &nbsp; <span class="chip changed">Argos: changed</span> <small>score 0.0006, IoU 0.43</small></p>
+  <div class="row">
+    <figure><figcaption>Main (base)</figcaption><div class="shot"><img src="../../corpus/real-spacing-button-padding-1px/base.png" alt="Main (base)"></div></figure>
+    <figure><figcaption>Branch (head), green = ground truth</figcaption><div class="shot"><img src="../../corpus/real-spacing-button-padding-1px/head.png" alt="Branch (head), green = ground truth"><div class="gt" style="left:3.125%;top:83.33333333333333%;width:22.5%;height:7.916666666666667%"></div></div></figure>
+    <figure><figcaption>PixelSlash diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" src="../../corpus/real-spacing-button-padding-1px/head.png" style="width:100%" alt=""><img src="diffs/real-spacing-button-padding-1px.pixelslash.png" alt="PixelSlash diff"></div></figure>
+    <figure><figcaption>Argos diff</figcaption><div class="shot over" style="aspect-ratio:640/480"><img class="under" src="../../corpus/real-spacing-button-padding-1px/head.png" style="width:100%" alt=""><img src="diffs/real-spacing-button-padding-1px.argos.png" alt="Argos diff"></div></figure>
+  </div>
+</section>
+</body></html>

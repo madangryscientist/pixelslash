@@ -1,0 +1,22 @@
+[package]
+name = "pixelslash-diff-wasm"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+description = "The server diff's hot loops (unfilter, pixel loop, region blobs) for workerd (PS-204)"
+
+# No dependencies: plain `extern "C"` exports, no wasm-bindgen, no allocator crate.
+[dependencies]
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false
+strip = true

@@ -1,0 +1,9 @@
+// The diff.wasm timing worker (PS-204, restored minimal in PS-212): the engine's diff in workerd.
+// Not deployed; `run.ts` builds and serves it with `vite preview`, the way the e2e run serves the app.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "pixelslash-diff-wasm-bench",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./worker.ts",
+}

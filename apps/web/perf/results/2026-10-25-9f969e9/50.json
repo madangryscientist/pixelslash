@@ -1,0 +1,194 @@
+{
+  "commit": "9f969e9",
+  "server": "server",
+  "shots": 50,
+  "mix": "mixed",
+  "concurrency": 4,
+  "uploadMB": {
+    "main": 69.767284,
+    "branch": 69.769277
+  },
+  "cold": true,
+  "idle": {
+    "workerd": 141.2,
+    "vite": 558.3,
+    "sidecar": 24.3
+  },
+  "phases": [
+    {
+      "phase": "main PUTs",
+      "seconds": 5.404,
+      "peakMB": {
+        "workerd": 329.4,
+        "vite": 561.8,
+        "sidecar": 24.3
+      },
+      "hwmMB": {
+        "workerd": 329.4,
+        "vite": 561.6,
+        "sidecar": 24.3
+      },
+      "endMB": {
+        "workerd": 300,
+        "vite": 557.1,
+        "sidecar": 24.3
+      },
+      "webUnitPeakMB": 826.6,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 812.9,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 7.8
+    },
+    {
+      "phase": "main finalize",
+      "seconds": 0.667,
+      "note": "passed",
+      "peakMB": {
+        "workerd": 294,
+        "vite": 557.1,
+        "sidecar": 23.8
+      },
+      "hwmMB": {
+        "workerd": 299.9,
+        "vite": 557.1,
+        "sidecar": 24.2
+      },
+      "endMB": {
+        "workerd": 294,
+        "vite": 557.1,
+        "sidecar": 23.8
+      },
+      "webUnitPeakMB": 806.9,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 806.9,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 7
+    },
+    {
+      "phase": "branch PUTs",
+      "seconds": 4.267,
+      "peakMB": {
+        "workerd": 321.3,
+        "vite": 557.1,
+        "sidecar": 23.8
+      },
+      "hwmMB": {
+        "workerd": 321.4,
+        "vite": 556.9,
+        "sidecar": 23.8
+      },
+      "endMB": {
+        "workerd": 319.8,
+        "vite": 554.4,
+        "sidecar": 23.8
+      },
+      "webUnitPeakMB": 901,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 901,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 7.5
+    },
+    {
+      "phase": "branch finalize (diff)",
+      "seconds": 13.731,
+      "note": "1 finalizes, changes",
+      "peakMB": {
+        "workerd": 334.7,
+        "vite": 554.4,
+        "sidecar": 419.1
+      },
+      "hwmMB": {
+        "workerd": 334.6,
+        "vite": 563.7,
+        "sidecar": 418.8
+      },
+      "endMB": {
+        "workerd": 311.2,
+        "vite": 484.3,
+        "sidecar": 303.2
+      },
+      "webUnitPeakMB": 915.1,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 820.3,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 399
+    },
+    {
+      "phase": "settled +10s",
+      "seconds": 10.051,
+      "peakMB": {
+        "workerd": 523.2,
+        "vite": 484.5,
+        "sidecar": 303.2
+      },
+      "hwmMB": {
+        "workerd": 523.1,
+        "vite": 484.4,
+        "sidecar": 303
+      },
+      "endMB": {
+        "workerd": 338.2,
+        "vite": 484.2,
+        "sidecar": 288.2
+      },
+      "webUnitPeakMB": 1078.3,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 896.5,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 282.7
+    },
+    {
+      "phase": "settled +60s",
+      "seconds": 49.999,
+      "peakMB": {
+        "workerd": 520,
+        "vite": 484.5,
+        "sidecar": 288.3
+      },
+      "hwmMB": {
+        "workerd": 519.9,
+        "vite": 484.5,
+        "sidecar": 288.4
+      },
+      "endMB": {
+        "workerd": 346.4,
+        "vite": 484.5,
+        "sidecar": 286
+      },
+      "webUnitPeakMB": 1081.1,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 901.6,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 274.7
+    },
+    {
+      "phase": "settled +180s",
+      "seconds": 120,
+      "peakMB": {
+        "workerd": 549.5,
+        "vite": 484.6,
+        "sidecar": 286
+      },
+      "hwmMB": {
+        "workerd": 549.4,
+        "vite": 484.7,
+        "sidecar": 286.2
+      },
+      "endMB": {
+        "workerd": 361.8,
+        "vite": 484.6,
+        "sidecar": 281
+      },
+      "webUnitPeakMB": 1086.7,
+      "webUnitSwapPeakMB": 0,
+      "webUnitEndMB": 905.1,
+      "webHighEvents": 0,
+      "diffUnitPeakMB": 271.8
+    }
+  ],
+  "probes": {
+    "count": 25,
+    "failed": 0,
+    "slowestMs": 432
+  }
+}

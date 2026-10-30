@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>random</title>
+  <style>
+    body { margin: 0; width: 400px; height: 300px; background: #f4f4f5; position: relative; }
+    #dot { position: absolute; width: 40px; height: 40px; background: #e03c3c; }
+  </style>
+</head>
+<body>
+  <div id="dot"></div>
+  <script>
+    // Math.random is not pinned by stabilise: the dot lands somewhere new on every load.
+    const dot = document.getElementById("dot");
+    dot.style.left = `${Math.floor(Math.random() * 300)}px`;
+    dot.style.top = `${Math.floor(Math.random() * 200)}px`;
+  </script>
+</body>
+</html>

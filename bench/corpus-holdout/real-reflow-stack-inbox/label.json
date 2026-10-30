@@ -1,0 +1,13 @@
+{
+  "label": "real",
+  "kind": "reflow",
+  "page": "inbox",
+  "width": 680,
+  "height": 400,
+  "box": {
+    "x": 40,
+    "y": 16,
+    "w": 600,
+    "h": 384
+  }
+}
