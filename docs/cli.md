@@ -12,7 +12,7 @@ bun run test        # nx: vitest on every project
 bun run pixelslash -- <args below>
 ```
 
-As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it; not published yet), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`). PNG mode (`--live-png` / `--local-png`) needs no browser.
+As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`). PNG mode (`--live-png` / `--local-png`) needs no browser.
 
 ```
 bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--browser chromium|firefox|webkit] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...

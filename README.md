@@ -11,11 +11,8 @@ to a review server where a person accepts or rejects them.
 
 You need [Bun](https://bun.sh) (the CLI runs on it, not on Node; `npx` and `bunx` both start it)
 and two screenshots of the same page: Main (the version you ship today) and Branch (your change).
-PixelSlash is early (version 0.1.0). It is published as `@hackcove/pixelslash`, but the package is
-**not on the npm registry yet**: until it is, build the tarball (`bun install && bun run build:cli`,
-then `npm pack` in `packages/cli`) and install the `.tgz` it writes with `npm i -D ./<file>.tgz`.
-Once it is published, `npm i -D @hackcove/pixelslash` installs it. The command is `pixelslash`
-either way.
+PixelSlash is early (0.1.x). It is published on npm as `@hackcove/pixelslash`:
+`npm i -D @hackcove/pixelslash` installs it, and the command is `pixelslash`.
 
 ```bash
 npx @hackcove/pixelslash --live-png a.png --local-png b.png --out out
