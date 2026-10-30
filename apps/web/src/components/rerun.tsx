@@ -42,7 +42,7 @@ export function RerunErrored({ projectId, buildId }: { projectId: string; buildI
   const hydrated = useHydrated();
   const { busy, error, run } = useRerun(projectId, buildId);
   return (
-    <div className="mt-2 space-y-2">
+    <Stack gap="xs">
       <Button
         variant="outline"
         disabled={!hydrated}
@@ -55,7 +55,7 @@ export function RerunErrored({ projectId, buildId }: { projectId: string; buildI
         Re-run errored shots
       </Button>
       <RerunError error={error} />
-    </div>
+    </Stack>
   );
 }
 

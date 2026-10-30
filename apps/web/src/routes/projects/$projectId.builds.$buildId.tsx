@@ -31,16 +31,21 @@ type Loaded = ReturnType<typeof Route.useLoaderData>;
 function BuildError({ project, build }: Pick<Loaded, "project" | "build">) {
   if (!build.error) return null;
   return (
-    <Callout tone="danger" role="alert">
+    <Callout
+      tone="danger"
+      role="alert"
+      actions={
+        project.diffLocation === "server" && build.status === "errored" ? (
+          <RerunErrored projectId={project.id} buildId={build.id} />
+        ) : undefined
+      }
+    >
       <Stack gap="xs">
         <span>{build.error}</span>
         {project.diffLocation === "ci" && build.status === "errored" && (
           <Text strong as="p" tone="danger" data-testid="rerun-ci">
             This project diffs in CI, so the server cannot measure it again: re-run the CI job.
           </Text>
-        )}
-        {project.diffLocation === "server" && build.status === "errored" && (
-          <RerunErrored projectId={project.id} buildId={build.id} />
         )}
       </Stack>
     </Callout>
