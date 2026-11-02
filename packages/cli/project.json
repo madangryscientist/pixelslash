@@ -1,5 +1,4 @@
 {
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "name": "cli",
   "sourceRoot": "packages/cli/src",
   "projectType": "application",
@@ -8,6 +7,17 @@
     "lint": {
       "command": "oxlint --type-aware --deny-warnings packages/cli && bun scripts/check-slop.ts packages/cli"
     },
-    "test": { "command": "bun --bun vitest run", "options": { "cwd": "packages/cli" } }
+    "test": { "command": "bun --bun vitest run", "options": { "cwd": "packages/cli" } },
+    "build": {
+      "command": "bun scripts/build-cli.ts",
+      "options": { "cwd": "{workspaceRoot}" },
+      "cache": false
+    },
+    "smoke": {
+      "command": "bun --bun vitest run -c vitest.smoke.config.ts",
+      "dependsOn": ["build"],
+      "options": { "cwd": "packages/cli" },
+      "cache": false
+    }
   }
 }

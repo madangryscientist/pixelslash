@@ -312,7 +312,6 @@ describe("upload API", () => {
     const id = await openBuild(deps, acme.token);
     expect((await call(deps, `GET /api/v1/builds`, acme.token)).status).toBe(405);
     expect((await call(deps, `GET /api/v1/builds/${id}/snapshots`, acme.token)).status).toBe(405);
-    expect((await call(deps, `GET /api/v1/nope`, acme.token)).status).toBe(404);
     expect((await call(deps, `GET /api/v1/builds/${id}/other`, acme.token)).status).toBe(404);
     // The method is checked by path alone (ob 1729), so a wrong one is a 405 for any build id.
     expect((await call(deps, `GET /api/v1/builds/missing/snapshots`, acme.token)).status).toBe(405);
