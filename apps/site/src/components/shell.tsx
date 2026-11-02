@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { TRADEMARK } from "#/content/docs";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 import { PAGES } from "#/content/pages";
-import { Logo } from "#/components/logo";
+import { Wordmark } from "#/components/logo";
 
 /** Where the source is: a link once the repository is public (PS-257), a plain sentence until then. */
 function SourceLink(): ReactNode {
@@ -67,7 +67,7 @@ export function Shell({
   }));
   return (
     <AppShell
-      brand={<AppShellBrand href="/" label="PixelSlash" logo={<Logo />} />}
+      brand={<AppShellBrand href="/" label={<Wordmark />} />}
       controls={<Controls />}
       subnav={
         // One scrolling row on a phone rather than wrapping out of the fixed-height bar.
