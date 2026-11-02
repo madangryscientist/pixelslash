@@ -14,7 +14,10 @@ let loaded: Promise<SentryReact | null> | null = null;
  */
 export function startBrowserSentry(config: SentryConfig | null): void {
   if (!config || loaded) return;
-  loaded = Promise.all([import("@sentry/react"), import("@pixelslash/engine/sentry-scrub")])
+  loaded = Promise.all([
+    import("@sentry/react"),
+    import("@hackcove/pixelslash-engine/sentry-scrub"),
+  ])
     .then(([Sentry, { scrubEvent }]) => {
       Sentry.init({
         dsn: config.dsn,

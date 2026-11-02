@@ -1,4 +1,4 @@
-import { diffPngs, summarizeDiff } from "@pixelslash/engine/diff";
+import { diffPngs, summarizeDiff } from "@hackcove/pixelslash-engine/diff";
 import { describe, expect, test } from "vitest";
 import { parseCiInput, pngSize } from "#/api/validate";
 import { CiResultError, type CiUpload, checkCiResult } from "./ci-result";

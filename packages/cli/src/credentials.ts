@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { UsageError } from "@pixelslash/engine";
+import { UsageError } from "@hackcove/pixelslash-engine";
 import { isObj, str } from "./api.ts";
 
 /**

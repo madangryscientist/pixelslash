@@ -9,7 +9,7 @@ import {
   notComparedLines,
   notComparedSummary,
   timingLine,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import type { Io } from "./run.ts";
 import { readFlagPairs } from "./args.ts";
 import { ESCALATE, INTERNAL_EXIT, failedLines } from "./failure.ts";

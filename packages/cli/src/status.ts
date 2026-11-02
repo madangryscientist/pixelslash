@@ -1,5 +1,5 @@
 import { join, resolve } from "node:path";
-import { UsageError } from "@pixelslash/engine";
+import { UsageError } from "@hackcove/pixelslash-engine";
 import { REMOTE_EXIT, RemoteError, isObj, objects, str } from "./api.ts";
 import { REMOTE_FLAGS, connect, resolveProject, type Remote, type RemoteDeps } from "./remote.ts";
 import type { Io } from "./run.ts";

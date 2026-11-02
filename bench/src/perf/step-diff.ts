@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { diffPngs } from "@pixelslash/engine";
+import { diffPngs } from "@hackcove/pixelslash-engine";
 import { branchFile, IDENTICAL_STEP, mainFile } from "./fixtures.ts";
 
 const WARMUP = 2;

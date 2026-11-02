@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "vitest";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { SpawnProc } from "@pixelslash/engine";
+import type { SpawnProc } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { DS, capture, cleanup, fakeProc, identicalSpawn, newMissSpawn, tmp } from "./support.ts";
 

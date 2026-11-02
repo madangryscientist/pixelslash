@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { join } from "node:path";
-import { OPENCODE_MODEL_ENV, type SpawnProc } from "@pixelslash/engine";
+import { OPENCODE_MODEL_ENV, type SpawnProc } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { DS, capture, cleanup, fakeProc, tmp } from "./support.ts";
 

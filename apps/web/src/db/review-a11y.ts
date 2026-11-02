@@ -1,4 +1,4 @@
-import { type A11y, type A11yDiff, diffA11y } from "@pixelslash/engine/a11y-entry";
+import { type A11y, type A11yDiff, diffA11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import { inArray } from "drizzle-orm";
 import { inChunks } from "./chunks";
 import type { Db } from "./db";

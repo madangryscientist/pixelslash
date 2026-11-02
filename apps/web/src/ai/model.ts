@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { ENGINE_VERSION } from "@pixelslash/engine/diff";
+import { ENGINE_VERSION } from "@hackcove/pixelslash-engine/diff";
 import { AI_LABELS, type AiLabel } from "#/db/schema";
 import { ModelHostError, type ModelHostPolicy, checkModelHost } from "./model-host";
 import { type TokenUsage, usageOf } from "./usage";

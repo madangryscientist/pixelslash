@@ -8,7 +8,7 @@
  * request alone. With `&check` the answer is every field and the overlay's sha256.
  */
 import { createHash } from "node:crypto";
-import { wasmDiff } from "@pixelslash/engine/diff-wasm";
+import { wasmDiff } from "@hackcove/pixelslash-engine/diff-wasm";
 
 const pairs = new Map<string, [Buffer, Buffer]>();
 const json = (body: unknown) => Response.json(body);

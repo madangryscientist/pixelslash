@@ -1,4 +1,4 @@
-import { USER_AGENT } from "@pixelslash/engine";
+import { USER_AGENT } from "@hackcove/pixelslash-engine";
 
 /**
  * The exit code for a remote command the server did not answer with what was asked: the token was

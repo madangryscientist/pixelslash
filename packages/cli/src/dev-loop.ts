@@ -19,7 +19,7 @@ import {
   runIteration,
   serveDevPage,
   watchTree,
-} from "@pixelslash/engine";
+} from "@hackcove/pixelslash-engine";
 import { dirname } from "node:path";
 import { attachTo } from "./dev-attach.ts";
 import { type DevArgs, type DevDeps, jsonOf, lineOf } from "./dev.ts";
