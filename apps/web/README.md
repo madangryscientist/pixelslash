@@ -161,11 +161,22 @@ counts drop with the builds. With retention on, a PR build's page says "expires 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a
 **PixelSlash** check run on each build's commit: failing while changes await review or one is
 rejected, passing once every change is accepted or nothing changed, updated in place as the build
-is reviewed. It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
+is reviewed. A build of a pull request also keeps one comment on the PR, edited in place on each
+build (below). It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
 `PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. `GITHUB_APP_API_BASE`
 (PS-281) is the App's own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
 `https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub. Registering the
 App, its permissions and deploying its key: [`github-app/README.md`](github-app/README.md).
+
+### The pull request comment (PS-82)
+
+A build uploaded for a PR (`prNumber`) gets one comment on it, edited in place by every later build
+of the PR: the model's summary or "Summary skipped", the counts, the three to five most changed shots
+as links, and the build page link. Text and links only; no screenshot goes to GitHub. It is sent
+with the same client as the check run (the App, or the token), only to the project's connected repo,
+and only when the project's "Comment on pull requests" setting (on by default) is on. A failed
+comment call is logged and never changes a build's verdict. The App needs `pull_requests: write`
+(`github-app/README.md`).
 
 ### Without the App: a commit status with a token (PS-235)
 
@@ -178,8 +189,9 @@ new status on the commit and GitHub shows the latest.
 
 - **Token scope.** Create a fine-grained token (GitHub → Settings → Developer settings → Personal
   access tokens), resource owner = the account or org that owns the repos, repositories = only the
-  ones whose projects you will connect, repository permission **Commit statuses: Read and write**
-  (GitHub adds the read-only Metadata permission itself). Nothing else.
+  ones whose projects you will connect, repository permissions **Commit statuses: Read and write** and, for the pull request
+  comment, **Pull requests: Read and write** (GitHub adds the read-only Metadata permission itself).
+  Nothing else.
 - **Where the secret lives.** `GITHUB_STATUS_TOKEN`, a secret and never a var: `wrangler secret put
   GITHUB_STATUS_TOKEN` on Cloudflare, `.dev.vars` for `vite dev`, and the CT's `.dev.vars.e2e` on the
   LAN self-host (`release.sh` does not carry it; a release keeps the lines it did not write). The

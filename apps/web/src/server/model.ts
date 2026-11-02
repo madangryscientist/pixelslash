@@ -3,7 +3,7 @@ import { summarizeBuild } from "#/ai/summary";
 import { getBuild } from "#/db/builds";
 import { clearOrgModel, clearProjectModel, setOrgModel, setProjectModel } from "#/db/models";
 import { getProjectWithOrg } from "#/db/orgs";
-import { database, modelFetch, modelHosts, modelKeySecret } from "./env";
+import { database, modelFetch, modelHosts, modelKeySecret, syncChecks } from "./env";
 import { field, or404 } from "./input";
 import { requireViewer } from "./session";
 
@@ -82,10 +82,11 @@ export const regenerateBuildSummary = createServerFn({ method: "POST" })
     const build = await or404(getBuild(db, project.id, data.buildId));
     if (build.status !== "changes" && build.status !== "passed" && build.status !== "failed")
       throw new Error(`build is ${build.status}: it has no verdict to summarise yet`);
-    return {
-      stored: await summarizeBuild(
-        { db, modelKeySecret: modelKeySecret(), modelFetch: modelFetch() },
-        build,
-      ),
-    };
+    const stored = await summarizeBuild(
+      { db, modelKeySecret: modelKeySecret(), modelFetch: modelFetch() },
+      build,
+    );
+    // The PR comment carries the summary (PS-82); a failed call changed nothing to send.
+    if (stored) await syncChecks(db, [build.id]);
+    return { stored };
   });

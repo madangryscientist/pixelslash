@@ -92,6 +92,11 @@ export const projects = sqliteTable(
     diffLocation: text("diff_location", { enum: DIFF_LOCATIONS }).notNull().default("server"),
     /** The GitHub repo (`owner/name`) its builds' check runs go to (PS-23); null sends none. */
     githubRepo: text("github_repo"),
+    /**
+     * Whether a build with a PR posts the PR comment (PS-82); the check run is sent either way.
+     * On by default, and for projects from before it.
+     */
+    githubComment: integer("github_comment", { mode: "boolean" }).notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [unique().on(t.orgId, t.name)],

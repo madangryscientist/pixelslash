@@ -28,7 +28,12 @@ export type Call = { method: string; path: string; auth: string; raw: string };
 export type Mode = "ok" | { status: number } | "hang";
 
 const reply = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  status === 204
+    ? new Response(null, { status })
+    : new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
 
 function never(signal: AbortSignal | null | undefined): Promise<Response> {
   return new Promise((_, reject) => {
@@ -51,9 +56,14 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
   let minted = 0;
   let nextRun = 100;
   let nextStatus = 500;
+  let nextComment = 900;
+  /** The PR comments that exist, by id: a PATCH or DELETE of another id is GitHub's 404. */
+  const comments = new Map<number, string>();
+  /** A status the comment endpoints fail with, the rest of the API still answering. */
+  let commentFailure: number | null = null;
 
   /** GitHub's answer to a call that gets one. */
-  function route(method: string, path: string): Response {
+  function route(method: string, path: string, body: string): Response {
     if (method === "GET" && /^\/repos\/[^/]+\/[^/]+\/installation$/.test(path))
       return reply(200, { id: 77 });
     if (method === "POST" && path === "/app/installations/77/access_tokens") {
@@ -61,7 +71,35 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
       const expiresAt = new Date(now() + 60 * 60_000).toISOString();
       return reply(201, { token: `ghs_token${minted}`, expires_at: expiresAt });
     }
-    return routeChecks(method, path);
+    return routeComments(method, path, body) ?? routeChecks(method, path);
+  }
+
+  /** The PR comment endpoints (PS-82): create on the PR's issue, edit and delete by id. */
+  function routeComments(method: string, path: string, body: string): Response | null {
+    if (commentFailure !== null && path.includes("/comments"))
+      return reply(commentFailure, { message: "comments are down" });
+    const text = () => {
+      const sent: { body?: string } = JSON.parse(body);
+      return sent.body ?? "";
+    };
+    if (method === "POST" && /^\/repos\/[^/]+\/[^/]+\/issues\/\d+\/comments$/.test(path)) {
+      const id = nextComment++;
+      comments.set(id, text());
+      return reply(201, { id });
+    }
+    const edit = /^\/repos\/[^/]+\/[^/]+\/issues\/comments\/(\d+)$/.exec(path);
+    if (!edit) return null;
+    const id = Number(edit[1]);
+    if (!comments.has(id)) return reply(404, { message: "Not Found" });
+    if (method === "PATCH") {
+      comments.set(id, text());
+      return reply(200, { id });
+    }
+    if (method === "DELETE") {
+      comments.delete(id);
+      return reply(204, null);
+    }
+    return null;
   }
 
   /** The check-run and commit-status endpoints. */
@@ -78,7 +116,7 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
     calls.push(call);
     if (mode === "hang") return never(init.signal);
     if (mode !== "ok") return reply(mode.status, { message: "GitHub is down" });
-    return route(call.method, call.path);
+    return route(call.method, call.path, call.raw);
   };
 
   return {
@@ -89,6 +127,16 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
     },
     /** The calls on check runs, without the token traffic. */
     checkRunCalls: () => calls.filter((c) => c.path.includes("/check-runs")),
+    /** The calls on PR comments (PS-82). */
+    commentCalls: () => calls.filter((c) => c.path.includes("/comments")),
+    /** The PR comments that exist now: id to body. */
+    comments: () => new Map(comments),
+    /** From now on only the comment endpoints fail, with this status. */
+    failComments: (status: number | null) => {
+      commentFailure = status;
+    },
+    /** Someone deletes a comment on GitHub. */
+    deleteComment: (id: number) => comments.delete(id),
     /** The calls on commit statuses (PS-235). */
     statusCalls: () => calls.filter((c) => c.path.includes("/statuses/")),
     token: (deps: GithubAppDeps = {}) => createGithubToken(TEST_TOKEN_CONFIG, { fetch, ...deps }),

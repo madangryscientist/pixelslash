@@ -9,6 +9,7 @@ export default defineConfig({
     "./src/db/schema-org-tokens.ts",
     "./src/db/schema-invites.ts",
     "./src/db/schema-timings.ts",
+    "./src/db/schema-pr-comments.ts",
   ],
   out: "./drizzle",
 });

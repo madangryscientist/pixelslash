@@ -343,5 +343,7 @@ async function summarizeWhenExplained(deps: ConsumerDeps, buildId: string): Prom
         finishedAt: finishedAfter(Date.now()),
       })
       .where(and(eq(builds.id, buildId), eq(builds.aiSummaryQueuedAt, queuedAt)));
+    // The PR comment carries the summary (PS-82): it is edited now that there is one, or none.
+    if (deps.checkRuns) await syncCheckRuns({ db: deps.db, ...deps.checkRuns }, [buildId]);
   }
 }

@@ -529,7 +529,7 @@
       "label": "GitHub App integration",
       "ps": {
         "v": "p",
-        "note": "sign-in, and an outbound-only App that posts the check run (PS-23); no webhooks and no PR comment yet",
+        "note": "sign-in, and an outbound-only App that posts the check run (PS-23) and keeps one PR comment per pull request, edited in place on each build, with the model's summary, the counts and the most changed shots as links (PS-82; a project can turn it off); no webhooks",
         "commit": "2082085"
       },
       "t": {
@@ -539,8 +539,8 @@
         "applitools": "y",
         "lost": "y"
       },
-      "plan": "PS-82",
-      "gap": "webhooks and a pull-request comment; the App posts the check run and nothing else"
+      "plan": "",
+      "gap": "webhooks; the App is outbound only, so it posts the check run and the PR comment but reacts to nothing on GitHub"
     },
     {
       "g": "flow",
