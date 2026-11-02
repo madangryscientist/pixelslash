@@ -82,7 +82,12 @@ function ProjectSettings() {
         </Card>
         <DefaultBranch projectId={project.id} branch={project.defaultBranch} />
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
-        <GithubRepo projectId={project.id} repo={project.githubRepo} configured={checks} />
+        <GithubRepo
+          projectId={project.id}
+          repo={project.githubRepo}
+          comment={project.githubComment}
+          configured={checks}
+        />
         <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
         <IgnoreBoxSettings
           projectId={project.id}

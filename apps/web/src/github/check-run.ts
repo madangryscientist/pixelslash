@@ -1,12 +1,13 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { buildUrl } from "#/api/read";
 import type { Db } from "#/db/db";
 import { type OpenShot, openShotsOf } from "#/db/open-shots";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
-import { type BuildStatus, builds, projects } from "#/db/schema";
+import { builds, projects } from "#/db/schema";
 import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";
-import { type GithubApp, type RepoName, field, isRepoName } from "./app";
+import { GithubError, type GithubApp, type RepoName, field, isRepoName } from "./app";
+import { type SyncedBuild, countsTable, detailsUrlOf, plural, titleOf } from "./build-text";
+import { syncPrComment } from "./pr-comment";
 
 /*
  * The "PixelSlash" check run on a build's commit (PS-23): one per build, created the first time
@@ -30,13 +31,6 @@ export type CheckRunDeps = {
   publicUrl: string | undefined;
 };
 
-type SyncedBuild = {
-  id: string;
-  projectId: string;
-  status: BuildStatus;
-  error: string | null;
-};
-
 export type CheckRunBody = {
   name: string;
   head_sha?: string;
@@ -46,18 +40,6 @@ export type CheckRunBody = {
   conclusion?: "success" | "failure";
   output: { title: string; summary: string };
 };
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-function titleOf(build: SyncedBuild, counts: BuildCounts): string {
-  if (build.status === "errored")
-    return `Build errored: ${build.error ?? "no reason recorded"}`.slice(0, 200);
-  if (build.status === "failed") return `${plural(counts.rejected, "change")} rejected`;
-  if (build.status === "changes") return `${plural(counts.toReview, "change")} to review`;
-  if (build.status === "passed")
-    return counts.changed > 0 ? "All changes accepted" : "No visual changes";
-  return "Diffing the shots";
-}
 
 /** How many shots the summary names; the build page has the rest. */
 const NAMED_SHOTS = 10;
@@ -91,14 +73,7 @@ function summaryOf(
   const lines =
     build.status === "uploading" || build.status === "processing"
       ? ["The build is being diffed."]
-      : [
-          `| Changed | To review | Accepted | Rejected | New | Removed | Unchanged |`,
-          `| ---: | ---: | ---: | ---: | ---: | ---: | ---: |`,
-          `| ${counts.changed} | ${counts.toReview} | ${counts.accepted} | ${counts.rejected} | ${counts.new} | ${counts.removed} | ${counts.unchanged} |`,
-          ...openLines(open),
-          "",
-          "Removed shots do not fail the check.",
-        ];
+      : [...countsTable(counts), ...openLines(open), "", "Removed shots do not fail the check."];
   if (detailsUrl) lines.push("", `[Review the build](${detailsUrl})`);
   return lines.join("\n");
 }
@@ -126,11 +101,6 @@ function checkRunOf(
   };
 }
 
-const detailsUrlOf = (publicUrl: string | undefined, build: SyncedBuild) =>
-  publicUrl
-    ? buildUrl({ origin: publicUrl.replace(/\/+$/, "") }, build.projectId, build.id)
-    : undefined;
-
 /** A status description is at most 140 characters. */
 const STATUS_DESCRIPTION_MAX = 140;
 
@@ -151,7 +121,13 @@ function statusOf(run: CheckRunBody): StatusBody {
   };
 }
 
-type BuildRow = SyncedBuild & { commitSha: string; checkRunId: number | null; repo: RepoName };
+type BuildRow = SyncedBuild & {
+  commitSha: string;
+  checkRunId: number | null;
+  repo: RepoName;
+  prNumber: number | null;
+  comment: boolean;
+};
 
 async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
   const [row] = await db
@@ -162,7 +138,9 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
       error: builds.error,
       commitSha: builds.commitSha,
       checkRunId: builds.checkRunId,
+      prNumber: builds.prNumber,
       repo: projects.githubRepo,
+      comment: projects.githubComment,
     })
     .from(builds)
     .innerJoin(projects, eq(projects.id, builds.projectId))
@@ -213,24 +191,46 @@ async function syncCheckRun(deps: CheckRunDeps, app: GithubApp, row: BuildRow): 
 }
 
 /**
- * Bring each build's check run (or, with only the token, its commit status) up to its current
- * state. Does nothing when neither is configured or the build's project has no repo, and never
- * throws.
+ * Bring each build's check run (or, with only the token, its commit status) and its PR's comment
+ * up to the current state. Does nothing when neither is configured or the build's project has no
+ * repo, and never throws: the two are separate calls, so one failing leaves the other.
  */
 export async function syncCheckRuns(deps: CheckRunDeps, buildIds: Iterable<string>): Promise<void> {
   const { app, token } = deps;
-  if (!app && !token) return;
+  const client = app ?? token;
+  if (!client) return;
   for (const buildId of new Set(buildIds)) {
-    try {
-      const row = await loadBuild(deps.db, buildId);
-      if (!row) continue;
-      if (app) await syncCheckRun(deps, app, row);
-      else if (token) await syncStatus(deps, token, row);
-    } catch (error) {
-      warn(
-        `github check run for build ${buildId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      reportError(error, { area: "github" });
-    }
+    const row = await loadBuild(deps.db, buildId).catch((error: unknown) => {
+      failed(`build ${buildId}`, error);
+      return null;
+    });
+    if (!row) continue;
+    await attempt(`github check run for build ${buildId}`, () =>
+      app ? syncCheckRun(deps, app, row) : syncStatus(deps, client, row),
+    );
+    // A 403 here is a server whose App or token was set up before the comment: the owner has to
+    // grant pull requests write. That is logged, not reported, or every PR build would be an event.
+    await attempt(
+      `github PR comment for build ${buildId}`,
+      () => syncPrComment(deps, client, row),
+      (error) => error instanceof GithubError && error.status === 403,
+    );
   }
+}
+
+async function attempt(
+  what: string,
+  run: () => Promise<void>,
+  expected: (error: unknown) => boolean = () => false,
+): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    failed(what, error, expected(error));
+  }
+}
+
+function failed(what: string, error: unknown, expected = false): void {
+  warn(`${what}: ${error instanceof Error ? error.message : String(error)}`);
+  if (!expected) reportError(error, { area: "github" });
 }

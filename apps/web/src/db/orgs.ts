@@ -5,6 +5,7 @@ import { type Db, NotFoundError } from "./db";
 import { type BuildCounts, countBuilds, emptyCounts } from "./build-counts";
 import { type DiffLocation, builds, members, orgs, projects, users } from "./schema";
 import { invites } from "./schema-invites";
+import { prComments } from "./schema-pr-comments";
 import type { User } from "./users";
 
 export type Org = typeof orgs.$inferSelect;
@@ -317,8 +318,11 @@ export async function setGithubRepo(
   const project = await getProject(db, userId, projectId);
   await db.update(projects).set({ githubRepo }).where(eq(projects.id, projectId));
   // A run id belongs to the repo it was made in: another repo gets new runs on the next sync.
-  if (project.githubRepo?.toLowerCase() !== githubRepo?.toLowerCase())
+  if (project.githubRepo?.toLowerCase() !== githubRepo?.toLowerCase()) {
     await db.update(builds).set({ checkRunId: null }).where(eq(builds.projectId, projectId));
+    // So is a comment id: the PRs of another repo get comments of their own.
+    await db.delete(prComments).where(eq(prComments.projectId, projectId));
+  }
 }
 
 /** A project the user can see, or NotFoundError: another org's project does not exist to them. */

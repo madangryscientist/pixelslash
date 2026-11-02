@@ -36,6 +36,8 @@ export async function world({
     commit: string;
     branch: string;
     mergeBase?: string;
+    /** The pull request the build is of (PS-82). */
+    pr?: number;
     png: Uint8Array<ArrayBuffer>;
   }) {
     const opened = await call(
@@ -46,6 +48,7 @@ export async function world({
         commitSha: spec.commit,
         branch: spec.branch,
         mergeBaseSha: spec.mergeBase ?? null,
+        ...(spec.pr === undefined ? {} : { prNumber: spec.pr }),
       }),
     );
     const id = await idOf(opened);

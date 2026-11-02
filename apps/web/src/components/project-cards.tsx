@@ -2,6 +2,7 @@ import {
   Button,
   ButtonGroup,
   Card,
+  Checkbox,
   Code,
   CopyLine,
   SectionHeading,
@@ -12,7 +13,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { InlineForm, useHydrated } from "#/components/ui";
 import { saveDefaultBranch } from "#/server/fns";
-import { saveGithubRepo } from "#/server/github-repo";
+import { saveGithubComment, saveGithubRepo } from "#/server/github-repo";
 
 /** The project settings' default-branch card. */
 export function DefaultBranch({ projectId, branch }: { projectId: string; branch: string }) {
@@ -43,14 +44,37 @@ export function DefaultBranch({ projectId, branch }: { projectId: string; branch
   );
 }
 
+/** The opt-out for the pull request comment (PS-82); the check run is sent either way. */
+function CommentToggle({ projectId, comment }: { projectId: string; comment: boolean }) {
+  const router = useRouter();
+  const hydrated = useHydrated();
+  const set = async (next: boolean) => {
+    await saveGithubComment({ data: { projectId, comment: next } });
+    await router.invalidate();
+  };
+  return (
+    <Checkbox
+      align="start"
+      checked={comment}
+      disabled={!hydrated}
+      onChange={(e) => void set(e.target.checked)}
+      data-testid="github-comment"
+      label={<Text strong>Comment on pull requests</Text>}
+      description="Off, no comment is posted or edited; the check run is sent either way."
+    />
+  );
+}
+
 /** The project settings' GitHub repo card (PS-23): where each build's check run goes. */
 export function GithubRepo({
   projectId,
   repo,
+  comment,
   configured,
 }: {
   projectId: string;
   repo: string | null;
+  comment: boolean;
   configured: boolean;
 }) {
   const router = useRouter();
@@ -76,11 +100,13 @@ export function GithubRepo({
           <Text as="p">
             Each build posts a PixelSlash check run on its commit: failing while changes wait for
             review or one is rejected, passing once they are accepted. The check carries counts and
-            a link, never a screenshot.
+            a link, never a screenshot. A pull request's builds also keep one comment, edited in
+            place, with the model's summary, the counts and the most changed shots as links.
           </Text>
           {!configured && (
             <Text as="p">
-              This server has no GitHub App or token set up, so no check runs are sent yet.
+              This server has no GitHub App or token set up, so no check runs or comments are sent
+              yet.
             </Text>
           )}
         </Stack>
@@ -92,6 +118,7 @@ export function GithubRepo({
           initialValue={repo ?? ""}
           onSubmit={save}
         />
+        <CommentToggle projectId={projectId} comment={comment} />
         {repo && (
           <ButtonGroup>
             <Button

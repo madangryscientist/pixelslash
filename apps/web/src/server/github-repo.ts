@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { setGithubComment } from "#/db/github-comment";
 import { setGithubRepo } from "#/db/orgs";
 import { repoNameOf } from "#/github/app";
 import { database } from "./env";
@@ -18,4 +19,15 @@ export const saveGithubRepo = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     await or404(setGithubRepo(database(), user.id, data.projectId, data.repo));
+  });
+
+/** Turn the PR comment on or off for the project (PS-82); the check run is sent either way. */
+export const saveGithubComment = createServerFn({ method: "POST" })
+  .validator((d: unknown) => ({
+    projectId: field(d, "projectId"),
+    comment: typeof d === "object" && d !== null && Reflect.get(d, "comment") === true,
+  }))
+  .handler(async ({ data }) => {
+    const user = await requireViewer();
+    await or404(setGithubComment(database(), user.id, data.projectId, data.comment));
   });

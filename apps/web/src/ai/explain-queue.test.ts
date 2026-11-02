@@ -1,7 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getBuild } from "#/db/builds";
-import { snapshots } from "#/db/schema";
+import { setGithubRepo } from "#/db/orgs";
+import { builds, snapshots } from "#/db/schema";
+import { fakeGithub } from "#/github/test-github";
 import { DIFF_BUDGET_MS } from "#/diff/budget";
 import { consumerDeps, context, onlyShot, sha, upload } from "#/diff/test-builds";
 import { EXPLAIN_ATTEMPTS, consumeExplain } from "./explain-queue";
@@ -183,5 +185,30 @@ describe("the explain queue (ob 1875)", () => {
     ]);
     expect(sent).toHaveLength(0);
     expect(await onlyShot(ctx, build)).toMatchObject({ aiQueuedAt: again, aiError: null });
+  });
+  test("the PR comment carries the summary once it is written (PS-82)", async () => {
+    const ctx = await context();
+    await withModel(ctx, false);
+    await setGithubRepo(ctx.db, ctx.userId, ctx.projectId, "acme/web");
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const queue = memoryQueue();
+    const { modelFetch } = stubModel();
+    const build = await upload(
+      ctx,
+      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: twoChanges }] },
+      { modelFetch, queue },
+    );
+    await ctx.db.update(builds).set({ prNumber: 9 }).where(eq(builds.id, build.id));
+    const github = fakeGithub();
+    const checkRuns = { app: github.app({ timeoutMs: 50 }), token: null, publicUrl: undefined };
+    await queue.drain({
+      ...consumerDeps({ db: ctx.db, blobs: ctx.scoped, modelFetch }),
+      checkRuns,
+    });
+
+    const comments = [...github.comments().values()];
+    expect(comments).toHaveLength(1);
+    expect(comments[0]).toContain("Something moved.");
+    expect(comments[0]).not.toContain("Summary skipped");
   });
 });

@@ -19,8 +19,26 @@ updated in place on finalize, on every accept or reject, on accept-all, on rerun
 flaky and when the model passes a build. A build that ends `changes` (a changed or new shot waits for review) fails it; removed shots never do, and the summary names the shots that wait (PS-284). No image goes to
 GitHub, only the link.
 
+### The pull request comment (PS-82)
+
+A build made for a pull request (`prNumber`, which the CLI sends from the CI's PR) also keeps **one
+comment** on that PR, created by the first build and edited in place by every later one, so a PR
+never collects a comment per push. It carries the project model's summary of the build (or "Summary
+skipped" when the project has no model, or the model's call failed), the counts table, the three to
+five most changed shots as links to their page, and the link to the build page. Only the newest
+build of a PR edits its comment. A comment someone deleted is made again on the next sync. The
+comment is text and links: no image is sent. A project turns it off in settings → GitHub repo →
+"Comment on pull requests"; the check run stays. The comment is posted to the project's connected repo
+and nowhere else, and a failed comment call is logged like a failed check run: it never changes a
+build's verdict and it never stops the check run being sent.
+
+The comment needs `pull_requests: write`. An installation made before PS-82 granted only `read`:
+**the owner of the App changes the permission in the App's settings, and the installation's owner
+accepts the upgrade request GitHub sends**, or the comment calls fail with a 403 (logged; the check
+run is unaffected).
+
 The App is outbound only: it has **no webhook**, and its permissions are `checks: write`,
-`metadata: read` and `pull_requests: read` (`manifest.json`). It is not public. With no App
+`metadata: read` and `pull_requests: write` (`manifest.json`). It is not public. With no App
 configured, or a project with no repo, the server calls GitHub not at all. A failed GitHub call is
 logged and reported to Sentry; it never changes a build's verdict and never fails a review.
 
