@@ -28,6 +28,11 @@
       "inputs": ["default", "^default"],
       "outputs": ["{projectRoot}/dist"]
     },
+    "smoke": {
+      "command": "vitest run -c vitest.smoke.config.ts",
+      "options": { "cwd": "apps/web" },
+      "cache": false
+    },
     "test:e2e": { "command": "playwright test", "options": { "cwd": "apps/web" } }
   }
 }

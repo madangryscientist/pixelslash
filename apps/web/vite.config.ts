@@ -85,7 +85,7 @@ export default defineConfig(({ command }) => ({
     freshConnectionPerRequest(),
     cloudflare({
       viteEnvironment: { name: "ssr" },
-      persistState: e2e ? { path: ".wrangler/e2e" } : true,
+      persistState: e2e ? { path: process.env["PIXELSLASH_E2E_STATE"] ?? ".wrangler/e2e" } : true,
       // The plugin probes for a free debugger port starting at 9229 and two runs probing at once
       // both get it (EADDRINUSE). Nothing in e2e attaches a debugger.
       ...(e2e ? { inspectorPort: false, config: pointAtStub } : {}),

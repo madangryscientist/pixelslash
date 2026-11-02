@@ -67,34 +67,3 @@ test("with no build the Timings tab says so, not a row of dashes", async ({ page
   );
   await expect(page.getByTestId("timings-row")).toHaveCount(0);
 });
-
-test("with several builds the Timings tab counts them and keeps the slowest as max", async ({
-  page,
-}) => {
-  const { token, projectId } = await provision(page, "Busy Co", "busy");
-  await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  const ids: string[] = [];
-  for (const letter of ["b", "c", "d"]) {
-    ids.push(
-      await uploadBuild(
-        token,
-        {
-          branch: `work-${letter}`,
-          commitSha: letter.repeat(40),
-          mergeBaseSha: SHA_MAIN,
-          ancestorShas: [SHA_MAIN],
-        },
-        [{ name: "hero", png: CHANGED }],
-      ),
-    );
-  }
-
-  await open(page, `/projects/${projectId}/builds/${ids[2]}`);
-  await expect(page.getByTestId("timing-server-total")).toContainText("total from diff start");
-
-  await openTimings(page, "Busy Co");
-  const row = page.getByTestId("timings-row");
-  await expect(row.getByTestId("timings-builds")).toHaveText("4");
-  await expect(row.getByTestId("timings-diff-tail")).toHaveText("max");
-  await expect(row.getByTestId("timings-queue")).toContainText("max");
-});

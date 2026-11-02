@@ -45,6 +45,7 @@ describe("diffPngs, identical bytes (ob 1948)", () => {
     expect(d.settledBy).toBe("identical-bytes");
     expect(d.changed).toBe(false);
     expect(d.changedPixels).toBe(0);
+    expect(d.antialiased).toBe(0);
     expect(d.regions).toEqual([]);
     expect(d.overlay).toBeNull();
     expect([d.mainWidth, d.mainHeight, d.branchWidth, d.branchHeight]).toEqual([4, 2, 4, 2]);
@@ -92,28 +93,6 @@ describe("diffPngs, identical bytes (ob 1948)", () => {
 });
 
 describe("diffPngs", () => {
-  test("identical → changedPixels 0", () => {
-    const png = solid(4, 2, [10, 20, 30, 255]);
-    const d = diffPngs(png, png);
-    expect(d.changedPixels).toBe(0);
-    expect(d.changed).toBe(false);
-    expect(d.antialiased).toBe(0);
-    expect(d.width).toBe(4);
-    expect(d.height).toBe(2);
-  });
-
-  test("one pixel differs", () => {
-    const a = solid(2, 2, [0, 0, 0, 255]);
-    const img = PNG.sync.read(solid(2, 2, [0, 0, 0, 255]));
-    img.data[0] = 255;
-    const b = PNG.sync.write(img);
-    const d = diffPngs(a, b);
-    expect(d.changedPixels).toBe(1);
-    expect(d.changed).toBe(false);
-    expect(d.specks).toEqual({ count: 1, pixels: 1 });
-    expect(diffPngs(a, b, { minRegionArea: 1 }).changed).toBe(true);
-  });
-
   test("size mismatch diffs the overlap and does not paint the gutter", () => {
     const a = solid(2, 2, [1, 2, 3, 255]);
     const taller = PNG.sync.read(solid(3, 4, [1, 2, 3, 255]));

@@ -22,12 +22,6 @@ async function pair(ctx: Ctx, scoped = ctx.scoped) {
   );
 }
 
-/** A clock that advances `step` ms per reading, so each shot appears to cost a fixed time. */
-const slow = (step: number) => {
-  let t = 0;
-  return () => (t += step);
-};
-
 describe("recovery (ob 1545)", () => {
   test("a diff that errored is re-diffed to a real verdict, replacing what it stored", async () => {
     const ctx = await context();
@@ -121,24 +115,5 @@ describe("recovery (ob 1545)", () => {
     const result = await processBuild({ db: ctx.db, blobs: ctx.scoped }, passed);
     expect(result).toEqual({ status: "passed", error: null, unmeasured: 0 });
     expect(await onlyShot(ctx, done)).toMatchObject({ reviewState: "accepted" });
-  });
-
-  test("a build the Worker ceiling stopped is resumed on retry, and the retry gives the verdict", async () => {
-    const ctx = await context();
-    const named = (png: typeof white) => ["a", "b", "c"].map((name) => ({ name, png }));
-    await upload(ctx, { branch: "main", commit: sha(1), shots: named(white) });
-    const stopped = await upload(
-      ctx,
-      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: named(red) },
-      { now: slow(4000) },
-    );
-    expect(stopped.status).toBe("errored");
-    expect(stopped.error).toMatch(/diff ceiling: measured 2 of 3 shots \(1 left\)/);
-    expect((await rows(ctx, stopped)).filter((r) => r.diffStatus === null)).toHaveLength(1);
-
-    // The same slow clock: the one shot left fits, and the build gets its verdict.
-    const result = await processBuild({ db: ctx.db, blobs: ctx.scoped, now: slow(4000) }, stopped);
-    expect(result).toEqual({ status: "changes", error: null, unmeasured: 0 });
-    expect(await rows(ctx, stopped)).toHaveLength(3);
   });
 });

@@ -118,6 +118,21 @@ bunx nx test:e2e web              # Playwright: a local build on a fresh local D
 (cd apps/web && CLOUDFLARE_ENV=production bun run build && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry-production")   # env.production, app.pixelslash.dev (PS-277)
 ```
 
+**Tests have four layers** (smoke, e2e, integration, unit; `docs/testing.md` is the policy, the
+inventory and the before/after). A behaviour is proved at the lowest layer that can prove it, and a
+new unit test is for a gap, not a second copy. The two smoke targets run the *built* artifact and are
+not part of `test` (they build, they are never cached, and `web` needs a local build and a port):
+
+```bash
+bunx nx smoke cli                 # builds packages/cli/dist, then runs it as a child process
+bunx nx smoke web                 # builds the web app, a fresh local D1 in .wrangler/smoke, drives /api/v1
+```
+
+A smoke run is **local only** and leaves no number behind: the web smoke's org is `is_smoke`, a test
+proves `usageCounts` is unchanged by it, and there is no production smoke (`docs/testing.md`).
+Run both after a change to the CLI's bundle (`scripts/build-cli.ts`, its dependencies) or to the web
+build, the upload API or the synthetic-org filter (`src/db/synthetic.ts`).
+
 A change to `apps/site`, or to a file it renders (`docs/cli.md`, `apps/web/SELF-HOST.md`,
 `SECURITY.md`, `docs/capabilities/data.json`, the README's trademark line), runs:
 
