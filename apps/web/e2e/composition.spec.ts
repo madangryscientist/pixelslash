@@ -82,7 +82,7 @@ test("one gap and one special case are listed and drawn on the branch shot", asy
   // The boxes have their own toggle and a legend.
   const toggle = page.getByRole("button", { name: "Composition" });
   await expect(page.getByRole("list", { name: "Composition legend" })).toContainText(
-    "Not from Hack Cove UI (1)",
+    "Not from Hack Cove UI1",
   );
   await toggle.click();
   await expect(gap).toHaveCount(0);

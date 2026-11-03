@@ -209,7 +209,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   const rows = page.getByTestId("build-row");
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText("review");
-  await expect(rows.first()).toContainText("2 changed · 1 new · 1 removed · 1 unchanged");
+  await expect(rows.first()).toContainText("changed2new1removed1unchanged1");
   await expect(rows.first().getByTestId("to-review")).toHaveText("3 to review");
   await expect(rows.first().getByTestId("build-status")).toHaveText("changes");
   await capture(page, "01-project");

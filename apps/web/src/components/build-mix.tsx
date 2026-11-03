@@ -1,64 +1,37 @@
-import { Caption, Stack, type TextTone, Text } from "@hackcove/ui";
+import { Caption, StackedBar, type StackedSegment, type TextTone, Text } from "@hackcove/ui";
 import type { BuildSummary } from "#/db/build-list";
 import type { BuildCounts } from "#/db/build-counts";
-import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
-import { formatNumber } from "#/lib/format";
 
 /** What the mix bar, the stripe and the to-review cell read off a build. */
 export type MixBuild = Pick<BuildSummary, "branch" | "status" | "counts">;
 
-type Slice = { key: string; label: string; count: number; colour: string };
+type Slice = StackedSegment & { key: string };
 
 /**
  * What a build's shots came to, in the order a reviewer cares about. Only what was measured is
  * painted as unchanged: a shot the server never compared, or could not compare against another
- * environment's baseline, is its own grey and its own words.
+ * environment's baseline, is its own grey (`neutral`, apart from the `muted` unchanged) and its own words.
  */
 function slicesOf(counts: BuildCounts): Slice[] {
-  return [
-    { key: "changed", label: "changed", count: counts.changed, colour: "var(--ps-changed)" },
-    { key: "new", label: "new", count: counts.new, colour: "var(--ps-new)" },
-    { key: "removed", label: "removed", count: counts.removed, colour: "var(--ps-removed)" },
+  const slices: Slice[] = [
+    { key: "changed", label: "changed", value: counts.changed, tone: "warn" },
+    { key: "new", label: "new", value: counts.new, tone: "info" },
+    { key: "removed", label: "removed", value: counts.removed, tone: "danger" },
     {
       key: "unmeasured",
       label: "not measured",
-      count: counts.unmeasured + counts.rebaseline,
-      colour: "var(--ps-unmeasured)",
+      value: counts.unmeasured + counts.rebaseline,
+      tone: "neutral",
     },
-    { key: "unchanged", label: "unchanged", count: counts.unchanged, colour: "var(--ps-same)" },
-  ].filter((slice) => slice.count > 0);
-}
-
-/** Every shot the build holds, removed markers included: the size of the bar's whole. */
-export function totalOf(counts: BuildCounts): number {
-  return SNAPSHOT_GROUPS.reduce((sum, group) => sum + counts[group], 0);
+    { key: "unchanged", label: "unchanged", value: counts.unchanged, tone: "muted" },
+  ];
+  return slices.filter((slice) => slice.value > 0);
 }
 
 export function MixBar({ counts }: { counts: BuildCounts }) {
   const slices = slicesOf(counts);
-  const total = totalOf(counts);
-  return (
-    <Stack gap="xs" data-testid="snapshot-mix">
-      <div
-        role="img"
-        aria-label={slices.map((s) => `${s.count} ${s.label}`).join(", ") || "no shots"}
-        className="flex h-1.5 w-full overflow-hidden rounded-[3px] bg-(--ps-same)"
-      >
-        {slices.map((slice) => (
-          <i
-            key={slice.key}
-            className="block h-full"
-            style={{ width: `${(slice.count / total) * 100}%`, background: slice.colour }}
-          />
-        ))}
-      </div>
-      <Caption as="p">
-        {slices.length === 0
-          ? "no shots"
-          : slices.map((s) => `${formatNumber(s.count)} ${s.label}`).join(" · ")}
-      </Caption>
-    </Stack>
-  );
+  if (slices.length === 0) return <Caption as="p">no shots</Caption>;
+  return <StackedBar data-testid="snapshot-mix" size="sm" label="Shots" segments={slices} legend />;
 }
 
 /** The stripe down a row's leading edge: amber when work is waiting, the verdict otherwise. */
