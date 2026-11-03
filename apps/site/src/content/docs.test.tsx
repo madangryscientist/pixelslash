@@ -3,18 +3,23 @@ import { join } from "node:path";
 import { type Token, lexer } from "marked";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { DocsPage } from "#/components/pages/docs";
+import { DocPage, DocsIndexPage, OLD_ANCHOR_SCRIPT } from "#/components/pages/docs";
 import { HomePage } from "#/components/pages/home";
 import { HowItWorksPage } from "#/components/pages/how-it-works";
-import { CLI_DOC, SECURITY_DOC, TRADEMARK, trademarkLine } from "./docs.ts";
+import { CLI_SPLIT, splitCli } from "./cli-pages.ts";
+import { CLI_INTRO_DOC, DOC_PAGE_DOCS, SECURITY_DOC, TRADEMARK, trademarkLine } from "./docs.ts";
+import { DOC_PAGES, GROUPS, type DocPageDef, neighbours } from "./docs-map.ts";
 import { plainText, slugger } from "./markdown.tsx";
 
 /*
- * The docs page against docs/cli.md as it is on disk: every heading and every code block of the
- * file is on the page, with the anchor GitHub gives it. A heading or block the page drops fails.
+ * The docs against docs/cli.md as it is on disk. The file is one document, the site cuts it into
+ * pages: every heading and every code block of the file must be on exactly one page, with the
+ * anchor GitHub gives it, and every H2 must be placed by the map. A heading or block a page drops,
+ * or shows twice, fails here.
  */
 const ROOT = join(import.meta.dirname, "../../../..");
-const tokens = lexer(readFileSync(join(ROOT, "docs/cli.md"), "utf8"));
+const CLI_MD = readFileSync(join(ROOT, "docs/cli.md"), "utf8");
+const tokens = lexer(CLI_MD);
 
 function codeBlocks(list: Token[]): string[] {
   return list.flatMap((token) => {
@@ -33,35 +38,154 @@ const unescape = (html: string): string =>
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'");
 
-describe("the docs page", () => {
-  const html = renderToStaticMarkup(<DocsPage />);
-  const text = unescape(html.replace(/<[^>]+>/g, ""));
+const cliPages = DOC_PAGES.filter((page) => page.file === undefined);
+const pageHtml = new Map(
+  DOC_PAGES.map((page) => [page.slug, renderToStaticMarkup(<DocPage slug={page.slug} />)]),
+);
+const indexHtml = renderToStaticMarkup(<DocsIndexPage />);
+/** Every part of cli.md as the site shows it: the index lead and each cli page's body. */
+const bodies = [indexHtml, ...cliPages.map((page) => pageHtml.get(page.slug) ?? "")];
 
-  test("has every heading of cli.md, with its GitHub anchor", () => {
-    const slug = slugger();
-    const headings = tokens.filter((token) => token.type === "heading" && token.depth > 1);
-    expect(CLI_DOC.headings).toHaveLength(headings.length);
-    for (const heading of headings) {
-      if (heading.type !== "heading") continue;
-      const id = slug(plainText(heading.tokens));
-      expect(html, `#${id}`).toContain(`id="${id}"`);
-      expect(html, `rail link to #${id}`).toContain(`href="#${id}"`);
+/** The `id="…"` of every heading in a page's body, which is where an anchor lands. */
+const idsIn = (html: string): string[] =>
+  [...html.matchAll(/<h[1-6][^>]*\sid="([^"]+)"/g)].map((m) => m[1] ?? "");
+
+describe("the docs map", () => {
+  test("puts every H2 of cli.md on exactly one page", () => {
+    const h2 = tokens.flatMap((token) =>
+      token.type === "heading" && token.depth === 2 ? [plainText(token.tokens)] : [],
+    );
+    expect(h2.length).toBeGreaterThan(0);
+    for (const text of h2) {
+      const owners = cliPages.filter((page) => page.sections.includes(text));
+      expect(
+        owners.map((page) => page.slug),
+        `"${text}"`,
+      ).toHaveLength(1);
     }
   });
 
-  test("has every code block of cli.md, verbatim", () => {
+  test("has at least six pages, each in a group", () => {
+    expect(DOC_PAGES.length).toBeGreaterThanOrEqual(6);
+    for (const page of DOC_PAGES) expect(GROUPS.map((group) => group.id)).toContain(page.group);
+    expect(new Set(DOC_PAGES.map((page) => page.slug)).size).toBe(DOC_PAGES.length);
+  });
+
+  test("stops the build on an H2 no page claims", () => {
+    expect(() => splitCli("# T\n\n## Placed\n\n## Stray\n", [def("a", ["Placed"])])).toThrow(
+      /"Stray" of cli\.md is on no page/,
+    );
+  });
+
+  test("stops the build on a section on two pages", () => {
+    expect(() => splitCli("# T\n\n## One\n", [def("a", ["One"]), def("b", ["One"])])).toThrow(
+      /"One" is on both a and b/,
+    );
+  });
+
+  test("stops the build on a listed heading that no longer exists", () => {
+    expect(() => splitCli("# T\n\n## One\n", [def("a", ["One", "Gone"])])).toThrow(
+      /no heading "Gone"/,
+    );
+  });
+
+  test("cuts an H3 out of its H2 and puts the rest back after it", () => {
+    const md = "# T\n\n## A\n\na1\n\n### Cut\n\ncut\n\n### Kept\n\nkept\n";
+    const split = splitCli(md, [def("a", ["A"]), def("b", ["Cut"])]);
+    const text = (slug: string): string =>
+      (split.pages.get(slug) ?? []).map((token) => plainText([token])).join("|");
+    expect(text("b")).toContain("Cut");
+    expect(text("a")).toContain("Kept");
+    expect(text("a")).not.toContain("Cut");
+    expect(split.anchorPage.get("cut")).toBe("b");
+    expect(split.anchorPage.get("kept")).toBe("a");
+  });
+});
+
+describe("the docs pages", () => {
+  test("every H2 and H3 of cli.md is on exactly one page, with its GitHub anchor", () => {
+    const slug = slugger();
+    const headings = tokens.filter(
+      (token) => token.type === "heading" && token.depth >= 2 && token.depth <= 3,
+    );
+    expect(headings.length).toBeGreaterThan(0);
+    const seen = bodies.flatMap(idsIn);
+    for (const heading of headings) {
+      if (heading.type !== "heading") continue;
+      const id = slug(plainText(heading.tokens));
+      expect(
+        seen.filter((seenId) => seenId === id),
+        `#${id}`,
+      ).toHaveLength(1);
+    }
+  });
+
+  test("every code block of cli.md is on exactly one page, verbatim", () => {
     const blocks = codeBlocks(tokens);
     expect(blocks.length).toBeGreaterThan(0);
-    expect(html.match(/<pre/g)).toHaveLength(blocks.length);
-    const flat = text.replace(/\s+/g, "");
+    const shown = bodies.reduce((count, html) => count + (html.match(/<pre/g)?.length ?? 0), 0);
+    expect(shown).toBe(blocks.length);
+    const flat = unescape(bodies.join("").replace(/<[^>]+>/g, "")).replace(/\s+/g, "");
     for (const block of blocks) expect(flat).toContain(block.replace(/\s+/g, ""));
   });
 
-  test("the title is cli.md's own", () => {
-    const first = tokens.find((token) => token.type === "heading");
-    const title = first?.type === "heading" && first.depth === 1 ? plainText(first.tokens) : "";
-    expect(title).not.toBe("");
-    expect(CLI_DOC.title).toBe(title);
+  test("heading ids on one page are unique, and across pages too", () => {
+    const all = bodies.flatMap(idsIn);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  test("the index shows the file's own title and the blurb before its first section", () => {
+    expect(CLI_INTRO_DOC.title).toBe(CLI_SPLIT.title);
+    expect(CLI_SPLIT.title).toBe("PixelSlash");
+    expect(indexHtml).toContain("Page vs design-system");
+  });
+
+  test("the index lists every page, once, under its group", () => {
+    // The rail links every page too, so count only the group cards.
+    const cards = indexHtml.slice(indexHtml.indexOf('data-testid="docs-index"'));
+    const counts = DOC_PAGES.map((item) => [
+      item.slug,
+      cards.match(new RegExp(`href="/docs/${item.slug}"`, "g"))?.length ?? 0,
+    ]);
+    expect(counts.filter(([, count]) => count !== 1)).toEqual([]);
+    for (const group of GROUPS) expect(indexHtml).toContain(group.title);
+  });
+
+  test.each(DOC_PAGES.map((p) => p.slug))(
+    "%s has the group nav, a rail and previous/next",
+    (slug) => {
+      const html = pageHtml.get(slug) ?? "";
+      expect(html).toContain('data-testid="docs-nav"');
+      for (const other of DOC_PAGES) expect(html).toContain(`href="/docs/${other.slug}"`);
+      expect(
+        html.match(/aria-current="page"/g)?.length,
+        "current page marked",
+      ).toBeGreaterThanOrEqual(1);
+      expect(html).toContain("On this page");
+      const { prev, next } = neighbours(slug);
+      expect(html.includes('data-testid="docs-prev"')).toBe(prev !== undefined);
+      expect(html.includes('data-testid="docs-next"')).toBe(next !== undefined);
+      expect(prev !== undefined || next !== undefined).toBe(true);
+    },
+  );
+
+  test("the first page has no previous and the last no next", () => {
+    expect(neighbours(DOC_PAGES[0]?.slug ?? "").prev).toBeUndefined();
+    expect(neighbours(DOC_PAGES.at(-1)?.slug ?? "").next).toBeUndefined();
+  });
+
+  test("getting started is docs/getting-started.md, and its links resolve", () => {
+    const md = readFileSync(join(ROOT, "docs/getting-started.md"), "utf8");
+    const doc = DOC_PAGE_DOCS.get("getting-started");
+    expect(doc?.title).toBe("Getting started");
+    expect(md).toContain("npm i -D @hackcove/pixelslash");
+    expect(md).toContain("pixelslash install-browser");
+    const html = pageHtml.get("getting-started") ?? "";
+    expect(html).not.toContain('href="cli.md');
+    for (const match of html.matchAll(/href="\/docs\/([^"#]+)#([^"]+)"/g)) {
+      expect(DOC_PAGES.map((p) => p.slug)).toContain(match[1]);
+      expect(CLI_SPLIT.anchorPage.get(match[2] ?? "")).toBe(match[1]);
+    }
   });
 });
 
@@ -72,19 +196,36 @@ describe("heading text", () => {
     );
     expect(heading?.text).toContain("stranger's");
     expect(heading?.id).toMatch(/^hardening-a-strangers-deployment/);
-    for (const doc of [CLI_DOC, SECURITY_DOC]) {
+    for (const doc of [...DOC_PAGE_DOCS.values(), SECURITY_DOC]) {
       for (const item of doc.headings) expect(item.text).not.toMatch(/&(amp|lt|gt|quot|#39);/);
     }
   });
 });
 
 describe("links into the docs", () => {
-  test("every /docs#anchor on home and how it works is a heading of cli.md", () => {
-    const ids = new Set(CLI_DOC.headings.map((heading) => heading.id));
+  test("every /docs/<page>#anchor on home and how it works lands on the page that holds it", () => {
     const html = renderToStaticMarkup(<HomePage />) + renderToStaticMarkup(<HowItWorksPage />);
-    const anchors = [...html.matchAll(/href="\/docs#([^"]+)"/g)].map((match) => match[1] ?? "");
-    expect(anchors.length).toBeGreaterThan(0);
-    for (const anchor of anchors) expect([...ids]).toContain(anchor);
+    const links = [...html.matchAll(/href="\/docs\/([^"#]+)(?:#([^"]+))?"/g)];
+    expect(links.length).toBeGreaterThan(0);
+    const slugs = DOC_PAGES.map((p) => p.slug);
+    const unknown = links.filter(([, slug]) => !slugs.includes(slug ?? ""));
+    expect(unknown.map((link) => link[0])).toEqual([]);
+    const misplaced = links.filter(
+      ([, slug, anchor]) => anchor !== undefined && CLI_SPLIT.anchorPage.get(anchor) !== slug,
+    );
+    expect(misplaced.map((link) => link[0])).toEqual([]);
+  });
+
+  test("an old /docs#anchor is sent to the page that holds it, for every heading of cli.md", () => {
+    const html = renderToStaticMarkup(<HomePage />) + renderToStaticMarkup(<HowItWorksPage />);
+    expect(html).not.toMatch(/href="\/docs#/);
+    for (const [anchor, slug] of CLI_SPLIT.anchorPage) {
+      expect(OLD_ANCHOR_SCRIPT).toContain(`"${anchor}":"${slug}"`);
+    }
+    expect(CLI_SPLIT.anchorPage.get("uploading-to-a-server")).toBe("upload");
+    expect(CLI_SPLIT.anchorPage.get("comparing-two-snapshot-dirs")).toBe("pngs");
+    expect(CLI_SPLIT.anchorPage.get("snapshot-capture-the-pinned-image")).toBe("capture");
+    expect(CLI_SPLIT.anchorPage.get("exit-codes-and-the-failed-line")).toBe("signing-in");
   });
 });
 
@@ -99,3 +240,7 @@ describe("the footer's trademark line", () => {
     expect(() => trademarkLine("# PixelSlash\n\nNo such line.")).toThrow(/trademark line/);
   });
 });
+
+function def(slug: string, sections: string[]): DocPageDef {
+  return { slug, title: slug, group: "reference", sections };
+}

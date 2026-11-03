@@ -26,25 +26,25 @@ const FEATURES = [
   {
     title: "Many pages",
     body: "--routes compares a list of paths, and compare diffs two snapshot directories.",
-    href: "/docs#comparing-two-snapshot-dirs",
+    href: "/docs/pngs#comparing-two-snapshot-dirs",
     icon: "▦",
   },
   {
     title: "Snapshots in CI",
     body: "pixelslash capture shoots every route in a pinned image, so the same commit renders the same pixels on any runner.",
-    href: "/docs#snapshot-capture-the-pinned-image",
+    href: "/docs/capture#snapshot-capture-the-pinned-image",
     icon: "⟳",
   },
   {
     title: "A review server",
     body: "pixelslash upload sends shots to a PixelSlash server, which holds the build for a person to review and reports a GitHub check.",
-    href: "/docs#uploading-to-a-server",
+    href: "/docs/upload#uploading-to-a-server",
     icon: "✓",
   },
   {
     title: "A design-system judge",
     body: "--ds checks each shot against your component rasters with a vision model. With no judge installed it says so and invents nothing.",
-    href: "/docs",
+    href: "/docs/judge",
     icon: "◈",
   },
 ] as const;

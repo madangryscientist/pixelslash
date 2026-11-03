@@ -1,4 +1,5 @@
 import manifest from "../../../web/github-app/manifest.json";
+import { CLI_SPLIT } from "./cli-pages.ts";
 
 /**
  * The site goes public before the repository does (PS-257), and before the hosted app exists. No
@@ -16,6 +17,7 @@ export const CONTACT = "hello@hack-cove.com";
 /** A repo file a page renders, and the site path it is shown on. */
 const SITE_PATHS: Record<string, string> = {
   "docs/cli.md": "/docs",
+  "docs/getting-started.md": "/docs/getting-started",
   "apps/web/SELF-HOST.md": "/self-host",
   "SECURITY.md": "/security",
   "docs/capabilities/matrix.html": "/compare",
@@ -46,9 +48,19 @@ function resolveExternal(href: string, gates: Gates): string | null {
   return href;
 }
 
+const CLI_DOC_PATH = "docs/cli.md";
+
+/** Where a heading of docs/cli.md is shown: the site cuts the file into pages, so an anchor names one. */
+function cliAnchorHref(anchor: string, currentPage?: string): string {
+  const slug = CLI_SPLIT.anchorPage.get(anchor);
+  if (slug === undefined) throw new Error(`${CLI_DOC_PATH} has no heading #${anchor} to link to`);
+  return slug === currentPage ? `#${anchor}` : `/docs/${slug}#${anchor}`;
+}
+
 function resolveRepoFile(href: string, sourcePath: string, gates: Gates): string | null {
   const [path = "", anchor] = href.split("#");
   const repoPath = joinRepoPath(sourcePath, path);
+  if (repoPath === CLI_DOC_PATH && anchor !== undefined) return cliAnchorHref(anchor);
   const sitePath = SITE_PATHS[repoPath];
   if (sitePath !== undefined) return anchor === undefined ? sitePath : `${sitePath}#${anchor}`;
   return gates.repoPublic ? `${REPO_URL}/blob/main/${repoPath}` : null;
@@ -57,9 +69,18 @@ function resolveRepoFile(href: string, sourcePath: string, gates: Gates): string
 /**
  * Where a link in a rendered repo document goes on the site, or `null` when it has nowhere a
  * visitor can follow yet (it is then drawn as plain text). `sourcePath` is the document's path in
- * the repo, so a relative link resolves as it does on GitHub.
+ * the repo, so a relative link resolves as it does on GitHub. `currentPage` is the docs page a
+ * `#anchor` link sits on, so a link to a heading elsewhere in docs/cli.md can leave it.
  */
-export function resolveHref(href: string, sourcePath: string, gates: Gates = GATES): string | null {
+export function resolveHref(
+  href: string,
+  sourcePath: string,
+  gates: Gates = GATES,
+  currentPage?: string,
+): string | null {
+  if (href.startsWith("#") && sourcePath === CLI_DOC_PATH) {
+    return cliAnchorHref(href.slice(1), currentPage);
+  }
   if (href.startsWith("#") || href.startsWith("mailto:")) return href;
   if (/^[a-z]+:\/\//.test(href)) return resolveExternal(href, gates);
   return resolveRepoFile(href, sourcePath, gates);

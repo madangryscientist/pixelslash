@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { DOC_PAGES } from "./src/content/docs-map.ts";
 import { PAGES } from "./src/content/pages.ts";
 
 // Every page is prerendered to static HTML at build time; the Worker only serves the files.
@@ -14,7 +15,10 @@ export default defineConfig({
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
     tanstackStart({
-      pages: PAGES.map((page) => ({ path: page.to })),
+      pages: [
+        ...PAGES.map((page) => page.to),
+        ...DOC_PAGES.map((page) => `/docs/${page.slug}`),
+      ].map((path) => ({ path })),
       prerender: { enabled: true, crawlLinks: true, failOnError: true },
     }),
     viteReact(),

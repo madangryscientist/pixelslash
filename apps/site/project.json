@@ -25,6 +25,7 @@
         "{workspaceRoot}/SECURITY.md",
         "{workspaceRoot}/apps/web/SELF-HOST.md",
         "{workspaceRoot}/docs/cli.md",
+        "{workspaceRoot}/docs/getting-started.md",
         "{workspaceRoot}/docs/capabilities/data.json",
         "{workspaceRoot}/apps/web/github-app/manifest.json"
       ]
@@ -42,6 +43,7 @@
         "{workspaceRoot}/SECURITY.md",
         "{workspaceRoot}/apps/web/SELF-HOST.md",
         "{workspaceRoot}/docs/cli.md",
+        "{workspaceRoot}/docs/getting-started.md",
         "{workspaceRoot}/docs/capabilities/data.json",
         "{workspaceRoot}/apps/web/github-app/manifest.json"
       ],
