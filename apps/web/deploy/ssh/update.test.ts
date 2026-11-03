@@ -80,6 +80,7 @@ describe("update.sh", () => {
     );
   });
 
+  // Eight sequential deploys of update.sh: too slow for the 5s default on a CI runner.
   test("keeps the last three releases", () => {
     const s = setup();
     for (const sha of ["aaaaaaa", "bbbbbbb", "ccccccc", "ddddddd", "eeeeeee"])
@@ -105,7 +106,7 @@ describe("update.sh", () => {
     expect(deploy(s, pack("ccccccc")).status).toBe(1);
     expect(current(s)).toBe(join(s.releases, "ddddddd"));
     expect(releaseNames(s)).toEqual(["ccccccc", "ddddddd", "eeeeeee"]);
-  });
+  }, 20_000);
 
   test("a D1 locked by an upload is tried again", () => {
     const s = setup();
