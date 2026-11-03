@@ -1,4 +1,5 @@
 import { PLATFORMS, type Platform } from "../../../../packages/engine/src/native.ts";
+import type { StaleCause } from "./stale";
 
 // Twin snapshots (PS-295): the same name and theme on another platform. Pure words and shapes, so
 // the db query, the API and the screens say the same thing; `db/twins.ts` is the one that pairs.
@@ -36,6 +37,8 @@ export type Twin = {
   source: TwinSource;
   /** Whether this shot came with a layout metrics file (PS-294). */
   hasMetrics: boolean;
+  /** The web change that made this native shot's key stale (PS-297); null when it is not stale. */
+  stale: StaleCause | null;
 };
 
 /** One shot of the build, with the twins the other platforms hold for its key (name + theme). */
@@ -47,6 +50,8 @@ export type TwinEntry = {
   device: string | null;
   viewport: string;
   hasMetrics: boolean;
+  /** Set on a native shot whose own key is stale (PS-297): the web change behind it. */
+  stale: StaleCause | null;
   /** Every shot of every other platform under the key, several viewports or devices included. */
   twins: Twin[];
   /** The platforms in play that hold no shot under the key. Empty on a linked entry. */

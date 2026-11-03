@@ -148,8 +148,36 @@ function summary(b: Record<string, unknown>): string {
   return `${str(b.status)}${error}: ${num(c, "to_review")} waiting · ${num(c, "accepted")} accepted · ${num(c, "rejected")} rejected`;
 }
 
-function describe(b: Record<string, unknown>): string {
+/**
+ * The stale twins a build's `twins` section marks (PS-297), one sentence each, the same words the
+ * review app and `GET /projects/:id/stale` use. A key stale on a platform is named once.
+ */
+export function staleLines(b: Record<string, unknown>, server: string): string[] {
+  const twins = isObj(b.twins) ? b.twins : {};
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  const add = (key: Record<string, unknown>, at: Record<string, unknown>) => {
+    const cause = isObj(at.stale_cause) ? at.stale_cause : undefined;
+    if (at.stale !== true || !cause) return;
+    const id = [key.name, key.theme, at.platform].join("\u0000");
+    if (seen.has(id)) return;
+    seen.add(id);
+    const link = `${server}/projects/${str(cause.project_id)}/builds/${str(cause.build_id)}`;
+    const by = str(cause.accepted_by) || "someone";
+    lines.push(
+      `${str(key.name)} ${str(key.theme)} on ${str(at.platform)} is stale: web changed in build ${link}, accepted by ${by} ${str(cause.accepted_at).slice(0, 10)}`,
+    );
+  };
+  for (const e of [...objects(twins.linked), ...objects(twins.unlinked)]) {
+    add(e, e);
+    for (const t of objects(e.twins)) add(e, t);
+  }
+  return lines;
+}
+
+function describe(b: Record<string, unknown>, server: string): string {
   const lines = [`build ${str(b.id)}  ${str(b.web_url)}`, summary(b)];
+  lines.push(...staleLines(b, server));
   for (const shot of objects(b.snapshots).filter((x) => x.skipped_flaky === true))
     lines.push(`skipped flaky: ${str(shot.name)} (${str(shot.viewport)} ${str(shot.theme)})`);
   return `${lines.join("\n")}\n`;
@@ -196,7 +224,7 @@ async function poll(watch: Watch, io: Io, deps: StatusDeps): Promise<Read> {
 export async function follow(watch: Watch, io: Io, deps: StatusDeps): Promise<number> {
   const end = await poll(watch, io, deps);
   const outcome = outcomeOf(end.build);
-  io.stdout.write(watch.json ? `${end.text}\n` : describe(end.build));
+  io.stdout.write(watch.json ? `${end.text}\n` : describe(end.build, watch.remote.client.server));
   if (watch.wait && !settled(outcome))
     io.stderr.write(`still ${outcome} after ${watch.wait.timeoutMs / 1000}s\n`);
   return EXIT[outcome];

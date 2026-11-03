@@ -18,6 +18,7 @@ import { authorize, bearer } from "./authorize";
 import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
 import { createProjectByName } from "./project-create";
 import { listFlakes, resolveProjectFlake } from "./flakes";
+import { listStale } from "./stale";
 import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines";
 import {
   API_VERSION,
@@ -247,6 +248,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
     run: byId(markDetectionFlagExported),
   },
   { method: "GET", path: "/api/v1/projects/:id/flakes", run: byId(listFlakes) },
+  { method: "GET", path: "/api/v1/projects/:id/stale", run: byId(listStale) },
   {
     method: "POST",
     path: "/api/v1/flakes/:id/resolve",

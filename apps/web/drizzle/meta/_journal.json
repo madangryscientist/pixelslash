@@ -239,6 +239,13 @@
       "when": 1793715760855,
       "tag": "0033_complex_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1793720861427,
+      "tag": "0034_tearful_eddie_brock",
+      "breakpoints": true
     }
   ]
 }

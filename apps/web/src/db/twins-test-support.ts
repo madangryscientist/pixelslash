@@ -18,6 +18,10 @@ export type Shot = {
   state?: "pending" | "accepted";
   diff?: "new" | "unchanged" | "changed" | "removed" | null;
   metrics?: boolean;
+  /** Accepted by a person (Ada), at the build's time: an auto-accept has no reviewer (PS-297). */
+  by?: boolean;
+  /** The shot this one carries an open change from (PS-297). */
+  carriedFrom?: string;
 };
 
 export const PIXEL = "Pixel 8 API 35";
@@ -34,11 +38,20 @@ function surface(s: Shot) {
   };
 }
 
-async function insertShot(db: Db, buildId: string, s: Shot) {
+/** How a shot was reviewed: a person (Ada) at the build's time, or not at all (an auto-accept has no reviewer). */
+function review(s: Shot, userId: string, at: Date) {
+  return {
+    reviewState: s.state ?? (s.by ? "accepted" : "pending"),
+    reviewedBy: s.by ? userId : null,
+    reviewedAt: s.by ? at : null,
+  } as const;
+}
+
+async function insertShot(db: Db, where: { buildId: string; at: Date; userId: string }, s: Shot) {
   const snapshotId = id("s");
   await db.insert(snapshots).values({
     id: snapshotId,
-    buildId,
+    buildId: where.buildId,
     name: s.name ?? "Button/primary",
     platform: s.platform ?? "linux",
     ...surface(s),
@@ -46,7 +59,8 @@ async function insertShot(db: Db, buildId: string, s: Shot) {
     envFingerprint: "{}",
     imageKey: `img/${snapshotId}`,
     metricsKey: s.metrics ? `metrics/${snapshotId}` : null,
-    reviewState: s.state ?? "pending",
+    ...review(s, where.userId, where.at),
+    carriedFrom: s.carriedFrom ?? null,
     diffStatus: s.diff === undefined ? "new" : s.diff,
   });
 }
@@ -72,15 +86,16 @@ export async function world() {
     extra: { status?: BuildStatus; age?: number } = {},
   ): Promise<string> {
     const buildId = id("b");
+    const createdAt = new Date(Date.now() - (extra.age ?? 0) * 60_000);
     await db.insert(builds).values({
       id: buildId,
       projectId,
       commitSha: sha(commit),
       branch: "main",
       status: extra.status ?? "passed",
-      createdAt: new Date(Date.now() - (extra.age ?? 0) * 60_000),
+      createdAt,
     });
-    for (const s of shots) await insertShot(db, buildId, s);
+    for (const s of shots) await insertShot(db, { buildId, at: createdAt, userId: user.id }, s);
     return buildId;
   }
 

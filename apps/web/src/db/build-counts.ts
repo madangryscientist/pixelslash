@@ -48,9 +48,20 @@ const statColumns = {
   rebaselineNeeded: snapshots.rebaselineNeeded,
   reviewState: snapshots.reviewState,
   carried: isNotNull(snapshots.carriedFrom),
+  stale: isNotNull(snapshots.staleOf),
   flaky: isNotNull(snapshots.flakeId),
   flakyPolicy: snapshots.flakyPolicy,
 };
+
+/** The against-main group (`changed` or `new`) a carried shot is filed under instead of its own, else null. */
+function movedByCarry(
+  carried: unknown,
+  group: SnapshotGroup,
+  own: SnapshotGroup,
+): "changed" | "new" | null {
+  if (!carried || group === own) return null;
+  return group === "changed" || group === "new" ? group : null;
+}
 
 /**
  * The per-group counts of each build's shots, in one grouped read per part of the ids (a project
@@ -67,11 +78,16 @@ export async function countBuilds(db: Db, buildIds: string[]): Promise<Map<strin
   );
   for (const stat of stats) {
     const held = counts.get(stat.buildId) ?? emptyCounts();
-    const row = { ...stat, carriedFrom: stat.carried ? "" : null, flakeId: stat.flaky ? "" : null };
+    const row = {
+      ...stat,
+      carriedFrom: stat.carried ? "" : null,
+      staleOf: stat.stale ? "" : null,
+      flakeId: stat.flaky ? "" : null,
+    };
     const group = reviewGroupOf(row);
     held[group] += stat.n;
-    if (group !== groupOf(stat) && (group === "changed" || group === "new"))
-      held.carriedFromMain[group] += stat.n;
+    const moved = movedByCarry(stat.carried, group, groupOf(stat));
+    if (moved) held.carriedFromMain[moved] += stat.n;
     held[stat.reviewState] += stat.n;
     if (awaitsDecision(row)) held.toReview += stat.n;
     if (skippedFlaky(row)) held.skippedFlaky += stat.n;

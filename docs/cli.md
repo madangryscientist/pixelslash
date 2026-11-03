@@ -447,9 +447,23 @@ For a build, each platform other than the shot's own is looked up in this order,
 A platform no source holds is not in play: a build with no other platform's shots anywhere has no twins, so its shots are not called unlinked, and a web-only project is read exactly as before.
 
 - **Linked projects.** A project can name one **twin project** of the same org, for the common case of a web app and a native app that live in two projects. Set it on the project's settings page (Twin project, a select of the org's other projects) or with `PUT /api/v1/projects/:id/twin` and `{ "twin_project_id": "…" }` (`null` clears it). Only a member of the org can set it, a project of another org is a 400, and nothing is ever linked across orgs. A project's own CI token never reads its twin project's shots; a personal or org token does.
-- **What a read returns.** `GET /api/v1/builds/:id` gains `twins`: `{ twin_project: { id, name } | null, linked: [entry], unlinked: [entry] }`. Each `entry` is a shot of the build: `snapshot_id`, `name`, `theme`, `platform`, `device`, `viewport`, `has_metrics` (it came with a [layout metrics file](metrics.md)) and `missing` (the platforms in play with no shot under the key; empty when linked), plus `twins`, each `{ snapshot_id, platform, device, viewport, project_id, project_name, build_id, source` (`build`, `commit` or `baselines`)`, source_label, commit_sha, has_metrics }`. `linked` holds the shots that have a twin on every platform in play, `unlinked` the rest; a partly linked shot is unlinked and still lists the twins it has. `twins` is absent on a build with none, and `pixelslash mcp`'s `get_build` returns it as sent.
+- **What a read returns.** `GET /api/v1/builds/:id` gains `twins`: `{ twin_project: { id, name } | null, linked: [entry], unlinked: [entry] }`. Each `entry` is a shot of the build: `snapshot_id`, `name`, `theme`, `platform`, `device`, `viewport`, `has_metrics` (it came with a [layout metrics file](metrics.md)) and `missing` (the platforms in play with no shot under the key; empty when linked), plus `twins`, each `{ snapshot_id, platform, device, viewport, project_id, project_name, build_id, source` (`build`, `commit` or `baselines`)`, source_label, commit_sha, has_metrics }`. `linked` holds the shots that have a twin on every platform in play, `unlinked` the rest; a partly linked shot is unlinked and still lists the twins it has. Each entry and twin also carries `stale` and `stale_cause` ([Stale twins](#stale-twins)). `twins` is absent on a build with none, and `pixelslash mcp`'s `get_build` returns it as sent.
 - **At the CLI.** `pixelslash build ID` prints `Button/loading dark has no android twin` for each unlinked shot (`has no web or android twin` when two platforms are missing) and `twins: N linked`. `--json` carries the full `twins` section.
 - **In the web app.** The snapshot side panel has a **Twins** row whose links go to each twin snapshot, labelled by platform and device (`android · Pixel 8 API 35`) and named with their source; the build page lists the **Unlinked** shots.
+
+### Stale twins
+
+A web change that was accepted leaves its native twins behind. A native twin is **stale** when its web twin (same name and theme) had a change **accepted** (a reviewer's accept, or accept-all, on a `changed` shot) and nobody has since accepted a native shot of that key in a native build created after it. Nothing marks a twin fresh by hand: there is no dismiss, snooze or mark-fresh. A reviewer accepting the native shot in a later native build is the only way out.
+
+- **What counts as the web change:** a `changed` web shot accepted by a person. A first baseline, an `unchanged` web shot and a main build's auto-accept do not make anything stale. A key with no native twin is `unlinked` (above), never stale.
+- **What clears it:** an `android` or `ios` shot of that key, accepted by a reviewer (not auto-accepted, not carried) in a native build created after the web change was accepted and diffed (`changes`, `passed` or `failed`).
+- **It is derived on read**, from the reviews, in one function (`apps/web/src/db/stale.ts`); it works inside one project and across a linked [twin project](#twins-across-platforms). It never blocks a web build, `parity --build` or `pixelslash build`.
+- **Reviewing a stale shot.** In a native build made after the web change, a stale key's native shot that the diff found *unchanged* still waits for a reviewer: it counts toward `to_review`, shows as needing review, and the snapshot carries `awaits_reason: "stale"`. The server records the web shot that made it stale on the new nullable column `snapshots.stale_of` when the diff runs (an additive migration: it is how an unchanged shot knows to hold a decision, which no other column says). Accepting it is the clearing review. A main build's auto-accept skips such a shot, so a default branch cannot clear a stale twin by itself.
+- **The cause** comes with each stale twin: the web snapshot, its build and project, who accepted it and when.
+- **Reads.** `GET /api/v1/projects/:id/stale[?platform=android|ios]` lists the project's stale twins (below). A build's `twins` section marks each entry and twin `stale: true` with `stale_cause` (`null` when fresh). `pixelslash status` prints one sentence per stale twin of the build it reads; `pixelslash mcp`'s `list_stale` returns the list; the project page has a **Stale** list; the snapshot side panel's **Twins** row shows a `stale` badge.
+- **The sentence** is `Button/md-primary dark on android is stale: web changed in build <link>, accepted by <name> <date>`.
+
+`GET /api/v1/projects/:id/stale` answers `{ stale: [item], next_cursor: null }`, ordered by name, theme and platform. An `item` is `{ name, theme, platform, sentence, cause, shots }`: `cause` is `{ snapshot_id, build_id, project_id, project_name, accepted_by, accepted_at }` (the web snapshot and who accepted it), and `shots` the native shots of that key still stale, each `{ snapshot_id, build_id, project_id, device, viewport }`. With `?platform=` the reply also carries `baselines: { platform, linked: [entry] }`, the accepted baseline pairs of web and that platform in a build's `twins.linked` shape; `parity --release` reads it. A `platform` other than `android` or `ios` is a 400.
 
 ## Comparing two snapshot dirs
 
@@ -533,6 +547,7 @@ pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash parity --build ID [--manifest PATH] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash parity --release android|ios [--project ID|NAME] [--manifest PATH] [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash project create NAME [--org NAME] [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash project list [--server URL] [--token-path PATH] [--config FILE] [--json]
@@ -546,7 +561,7 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 - **The credential file** is `~/.config/pixelslash/credentials.json` (`$XDG_CONFIG_HOME/pixelslash/` when that is set), mode 0600 in a 0700 dir, one token per server: `{ "servers": { "https://ps.example": { "token": "psu_…" } } }`. `logout` removes the server's entry and does not revoke the token; revoke it on the settings page.
 - `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), `org token for ORG` with the projects it reaches, or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
 - `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). When the build has [twins](#twins-across-platforms) it also prints one `NAME THEME has no PLATFORM twin` line per unlinked shot and a `twins: N linked` line; a build with no second platform prints nothing new. With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
-- `status` prints one build's link and where its review stands (`changes: 2 waiting · 1 accepted · 0 rejected`), then one `skipped flaky: <name> (WxH theme)` line per flaky shot the `skip` policy kept out of review, and exits by the outcome (the table below). The build is `--build ID`; else the newest at a commit `--commit SHA` starts; else the newest on `--branch NAME`; else the one `upload` recorded in `DIR/build.json` (`--dir`, default `pixelslash-snapshots`) for this same server and the checked-out commit; else the newest at the checked-out commit. `--commit` and the commit fallback look among the project's newest 100 builds; an older one is named with `--build`. Picking more than one is exit 2, and no build at the commit or on the branch is exit 3. `--json` prints the build read (`GET /api/v1/builds/:id`) as sent. See [Block CI on review](#block-ci-on-review) for `--wait`.
+- `status` prints one build's link and where its review stands (`changes: 2 waiting · 1 accepted · 0 rejected`), then one `skipped flaky: <name> (WxH theme)` line per flaky shot the `skip` policy kept out of review, then one sentence per [stale twin](#stale-twins) in the build (`Button/md-primary dark on android is stale: web changed in build …`; it changes no exit code), and exits by the outcome (the table below). The build is `--build ID`; else the newest at a commit `--commit SHA` starts; else the newest on `--branch NAME`; else the one `upload` recorded in `DIR/build.json` (`--dir`, default `pixelslash-snapshots`) for this same server and the checked-out commit; else the newest at the checked-out commit. `--commit` and the commit fallback look among the project's newest 100 builds; an older one is named with `--build`. Picking more than one is exit 2, and no build at the commit or on the branch is exit 3. `--json` prints the build read (`GET /api/v1/builds/:id`) as sent. See [Block CI on review](#block-ci-on-review) for `--wait`.
 - `--version` prints `pixelslash <version>`, the version the User-Agent sends. `install-browser [chromium|firefox|webkit|all]` runs the Playwright that `capture` uses to install that browser (`chromium-headless-shell` by default; an unknown name is exit 2).
 
 **Resolution order**, the same for every remote command, `upload` included:
@@ -567,7 +582,7 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 | 5 | `status`: the build still waits, for processing or for review. Under `--wait`, still waiting at `--timeout`. |
 | 6 | `flake`: the shot is still unstable here, some run differed from the first. Not 1: 1 stays reserved for new violations. |
 | 7 | **An internal error: a bug in pixelslash**, never a problem with your page or your config. A crash in capture, compare, the report or upload, or a `compare` shot the diff could not measure. A runner that sees 7 must **escalate to the PixelSlash planner**, not retry and not read it as a visual result. |
-| 8 | `parity`: a twin pair's layout metrics differ beyond tolerance and the manifest does not declare it ([Parity between twins](#parity-between-twins)). Not 1, which stays reserved for new violations. |
+| 8 | `parity`: a twin pair's layout metrics differ beyond tolerance and the manifest does not declare it ([Parity between twins](#parity-between-twins)); with `--release`, also a [stale twin](#stale-twins) on the platform ([Release check](#release-check)). Not 1, which stays reserved for new violations. |
 
 ### Parity between twins
 
@@ -579,6 +594,17 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 - **A pair where either side has no metrics file is `not measured`:** listed and counted, never drift. Shots with no twin are not parity's business.
 - **Exit codes:** 0 no drift (not measured and stale declarations do not fail it), **8** drift, 2 a usage error or a malformed manifest (it names the file and the field), 3 the server did not give what was asked, 7 a crash. It never exits 1.
 - **From your agent:** `get_parity` ([the tools](#your-coding-agent-pixelslash-mcp)) returns the `--json` result.
+
+### Release check
+
+`pixelslash parity --release android|ios` asks whether a platform is safe to ship against the web: every native twin is fresh, and the accepted baselines still agree. It exits **8** on any [stale twin](#stale-twins) on the platform or any drifting baseline twin pair, else 0.
+
+- **What it checks:** the project's stale twins on that platform (`GET /api/v1/projects/:id/stale?platform=…`, which includes a linked twin project), and every twin pair of the accepted baselines (web against that platform), compared exactly as `parity --build` compares them, with the same `--manifest`. A pair where a side has no metrics file is not measured: counted apart, never drift.
+- **What it prints:** a sentence per stale twin, a line per drifting pair, any stale declarations, then a count: `release android: 2 stale, 1 drifting, 40 pairs checked` (`pairs checked` are the pairs that were measured). The server, token and project resolve as for `build` (`--project` as in [Resolution order](#signing-in-and-reading-builds)).
+- **`--json`** prints one object: `release` (the platform), `project`, `manifest`, `ok`, `exit_code`, `stale`, `drifting`, `pairs_checked`, `not_measured`, `findings` (one entry per reason it fails: `{ kind: "stale", name, theme, platform, sentence, cause }` or `{ kind: "drift", name, theme, platform, sentence, mismatches }`), `stale_twins` (each `{ name, theme, platform, sentence, cause, shots }` as the API sends it), `results` (the pairs, as in `parity --build --json`) and `stale_declarations`.
+- **Exit codes:** 0 clean, **8** stale or drifting, 2 a usage error (`--release` with `--build` is exit 2, as is a platform other than `android` or `ios` or a malformed manifest), 3 the server did not give what was asked, 7 a crash. It never exits 1.
+- **Separate twin projects need a personal or org token.** A project's own CI token reaches its own project only (see Linked projects), so under one a web project in another project is not read and its changes are not seen. Run the release check with a personal or org token when web and native are two projects.
+- **It is a check, not a gate on the build:** a stale twin never fails `pixelslash build`, `parity --build` or a web upload.
 
 ### Exit codes and the `FAILED` line
 
@@ -636,8 +662,9 @@ It resolves the server, the token and the default project as every remote comman
 | `whoami` | — | `GET /api/v1/me`, with the server and where the token came from |
 | `list_projects` | — | `GET /api/v1/projects` |
 | `list_builds` | `project?`, `branch?`, `status?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/builds` |
-| `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier`; and, when a second platform is in play, `twins`: each shot's twins on the other platforms and the shots with none ([Twins](#twins-across-platforms)) |
+| `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier`; and, when a second platform is in play, `twins`: each shot's twins on the other platforms and the shots with none ([Twins](#twins-across-platforms)); each is marked `stale` with its `stale_cause` ([Stale twins](#stale-twins)) |
 | `get_parity` | `build_id`, `manifest?` | the same result as `pixelslash parity --build ID --json`: each twin pair's metrics mismatches, the pairs not measured, and stale declarations ([Parity between twins](#parity-between-twins)). Drift is in the result; the tool does not fail on it |
+| `list_stale` | `project?`, `platform?` (`android`, `ios`) | `GET /api/v1/projects/:id/stale`: the stale twins, each with its sentence and cause ([Stale twins](#stale-twins)) |
 | `get_snapshot` | `snapshot_id` | `GET /api/v1/snapshots/:id`, with image URLs but no pixels; a snapshot with [layout metrics](metrics.md) also carries them as `metrics` (the file's JSON, fetched from `metrics_url`) |
 | `get_snapshot_images` | `snapshot_id`, `which?` (`head`, `baseline`, `diff`) | the snapshot's PNGs, as images |
 | `list_flakes` | `project?` | `GET /api/v1/projects/:id/flakes` |
@@ -904,6 +931,7 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | `GET /api/v1/snapshots/:id` | CI, org or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
 | `GET /api/v1/projects/:id/detection-flags` | CI, org or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
 | `POST /api/v1/detection-flags/:id/exported` | personal | — | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
+| `GET /api/v1/projects/:id/stale` | CI, org or personal | `platform?` (`android` or `ios`; anything else is a 400) | `200 { stale: [item], next_cursor: null }`: the project's [stale twins](#stale-twins), each `{ name, theme, platform, sentence, cause, shots }`; a CI token reads its own project only. With `platform` also `baselines: { platform, linked: [entry] }`, the accepted baseline pairs for `parity --release` |
 | `GET /api/v1/projects/:id/flakes` | CI, org or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
 | `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
 
@@ -972,6 +1000,7 @@ A **snapshot**:
 
 - `group` is the section the build page shows it under.
 - `awaits_decision` is whether it still counts toward `to_review`.
+- `awaits_reason` is why an unchanged shot waits for a reviewer: `"stale"` for a native shot whose web twin changed and was accepted since a native shot was last accepted ([Stale twins](#stale-twins)); `null` for every other shot.
 - `carried_from` is set on an unchanged shot that carries an open change from an earlier build (see "What a shot is compared against" above).
 - `approved_earlier` is set on an unchanged shot whose change was already accepted on this branch.
 - `flake_id` is the flake the shot is labelled with, or `null`; `flaky_policy` is the policy it was sent with (`review`, `skip`, or `null` for none, which is `review`); `skipped_flaky` is whether its change is skipped as flaky (see "Flaky shots").
@@ -1000,6 +1029,7 @@ A **snapshot**:
   "reviewed_by": "ada",
   "reviewed_at": "2026-10-22T09:05:00.000Z",
   "awaits_decision": false,
+  "awaits_reason": null,
   "carried_from": null,
   "approved_earlier": null,
   "flake_id": null,

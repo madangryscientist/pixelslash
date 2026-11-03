@@ -82,7 +82,7 @@ A file is at most **1 MiB** and at most **2000 parts**. A bigger one is refused 
 
 ## Parity
 
-`pixelslash parity --build ID` ([CLI](cli.md#parity-between-twins)) compares the metrics file of every twin pair in a build: the same snapshot name and theme on two platforms. It is a read: it changes no diff, fingerprint or review state, and it fails a run only with its own exit code, **8**. One function in `@hackcove/pixelslash-engine` (`compareParity`) does the comparing, and the CLI and `pixelslash mcp` call it.
+`pixelslash parity --build ID` ([CLI](cli.md#parity-between-twins)) compares the metrics file of every twin pair in a build: the same snapshot name and theme on two platforms. It is a read: it changes no diff, fingerprint or review state, and it fails a run only with its own exit code, **8**. `pixelslash parity --release android|ios` ([Release check](cli.md#release-check)) runs the same comparison over the accepted baselines and also exits 8 on a [stale twin](cli.md#stale-twins). One function in `@hackcove/pixelslash-engine` (`compareParity`) does the comparing, and the CLI and `pixelslash mcp` call it.
 
 ### What is compared
 

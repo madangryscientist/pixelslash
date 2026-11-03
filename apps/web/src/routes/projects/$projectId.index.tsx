@@ -23,6 +23,7 @@ import {
 import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { orgCrumb } from "#/components/crumbs";
 import { ProjectFlags } from "#/components/detection-flag";
+import { StaleList } from "#/components/stale";
 import { Page, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildSummary } from "#/db/build-list";
 import { formatRelative } from "#/lib/format";
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/projects/$projectId/")({
 });
 
 function ProjectPage() {
-  const { project, org, builds, flags, now, serverUrl } = Route.useLoaderData();
+  const { project, org, builds, flags, stale, now, serverUrl } = Route.useLoaderData();
   return (
     <Page>
       <ListLayout
@@ -100,6 +101,7 @@ function ProjectPage() {
             </TableBody>
           </Table>
         )}
+        <StaleList items={stale} />
         <ProjectFlags projectId={project.id} flags={flags} />
       </ListLayout>
     </Page>

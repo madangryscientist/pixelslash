@@ -338,6 +338,14 @@ export const snapshots = sqliteTable(
      */
     carriedFrom: text("carried_from"),
     /**
+     * Set on a native shot the diff found while its twin key was stale (PS-297): the id of the web
+     * shot whose accepted change made it stale. Stale itself is derived on read (`db/stale.ts`) and
+     * needs no column; this one exists so the native shot, which the diff finds unchanged, still
+     * waits for a reviewer (`holdsChange`) and the build stays in `changes` until one accepts it.
+     * Null on every other shot. No foreign key, like `carried_from`.
+     */
+    staleOf: text("stale_of"),
+    /**
      * The shot this one was compared against (ob 1722): set by the diff from the baseline pick, null
      * when it was compared against nothing and on rows diffed before it existed. Provenance only,
      * read for display (`approvedEarlier` in `review.ts`); no foreign key, like `carried_from`.

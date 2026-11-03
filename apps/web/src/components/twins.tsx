@@ -1,5 +1,7 @@
 import { Caption, Overline, Stack, Text, TextLink } from "@hackcove/ui";
 import { Link } from "@tanstack/react-router";
+import { StaleBadge } from "#/components/stale";
+import { staleDate } from "#/lib/stale";
 import {
   type BuildTwins,
   type TwinEntry,
@@ -37,6 +39,16 @@ export function TwinsRow({ entry }: { entry: TwinEntry | null }) {
             >
               {twinLabel(t)}
             </TextLink>
+            {t.stale && (
+              <>
+                {" "}
+                <StaleBadge />
+                <Caption as="p" tone="muted" data-testid="twin-stale-cause">
+                  web changed, accepted by {t.stale.acceptedBy ?? "someone"}{" "}
+                  {staleDate(t.stale.acceptedAt)}
+                </Caption>
+              </>
+            )}
             <Caption as="p" tone="muted">
               {t.viewport} · {twinSourceLabel(t.source)}
             </Caption>

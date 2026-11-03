@@ -13,7 +13,7 @@ import {
   type DiffResult,
   type builds,
 } from "#/db/schema";
-import { awaitsDecision, groupOf, skippedFlaky } from "#/lib/snapshot-groups";
+import { awaitsDecision, awaitsReason, groupOf, skippedFlaky } from "#/lib/snapshot-groups";
 import { signedImagePath } from "#/storage/signed";
 import { twinsSection } from "./twins-section";
 import { BadRequest, Forbidden } from "./validate";
@@ -182,6 +182,8 @@ function snapshot(ctx: ReadCtx, projectId: string, buildId: string, s: SnapshotV
     reviewed_by: s.reviewedBy,
     reviewed_at: iso(s.reviewedAt),
     awaits_decision: awaitsDecision(s),
+    // Why an unchanged shot waits (PS-297): "stale", a native shot whose web twin changed; else null.
+    awaits_reason: awaitsReason(s),
     flake_id: s.flakeId,
     flaky_policy: s.flakyPolicy,
     skipped_flaky: skippedFlaky(s),

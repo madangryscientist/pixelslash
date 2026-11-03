@@ -1,4 +1,5 @@
 import { and, eq, ne } from "drizzle-orm";
+import type { StaleCause } from "#/lib/stale";
 import {
   type BuildTwins,
   PLATFORMS,
@@ -11,6 +12,7 @@ import {
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
 import { builds, projects } from "./schema";
+import { causeOf, staleIndex, staleOf, staleScope } from "./stale";
 import { type Held, baselinesOf, buildAtCommit, hasBaselines, held, shotsOf } from "./twins-read";
 
 /**
@@ -169,13 +171,20 @@ function entryOf(
   shot: Held,
   inPlay: Platform[],
   byKey: Map<Platform, Map<string, Twin[]>>,
+  stale: Map<string, StaleCause>,
 ): TwinEntry {
   const twins: Twin[] = [];
   const missing: Platform[] = [];
   for (const platform of inPlay.filter((p) => p !== shot.platform)) {
     const here = byKey.get(platform)?.get(keyOf(shot)) ?? [];
     if (here.length === 0) missing.push(platform);
-    twins.push(...here);
+    // A native twin whose key a web change left unreviewed says so (PS-297).
+    twins.push(
+      ...here.map((t) => ({
+        ...t,
+        stale: causeOf(stale, { platform: t.platform, name: shot.name, theme: shot.theme }),
+      })),
+    );
   }
   return {
     snapshotId: shot.snapshotId,
@@ -185,6 +194,7 @@ function entryOf(
     device: shot.device,
     viewport: shot.viewport,
     hasMetrics: shot.hasMetrics,
+    stale: causeOf(stale, shot),
     twins: twins.toSorted(twinOrder),
     missing,
   };
@@ -208,7 +218,10 @@ export async function twinsOfBuild(
   if (inPlay.length < 2) return noTwins(ctx.twinProject);
 
   const byKey = byKeyOf(sides);
-  const entries = mine.map((shot) => entryOf(shot, inPlay, byKey)).toSorted(entryOrder);
+  const stale = staleIndex(
+    await staleOf(db, await staleScope(db, ctx.own.id, options.crossProject)),
+  );
+  const entries = mine.map((shot) => entryOf(shot, inPlay, byKey, stale)).toSorted(entryOrder);
   return {
     twinProject: ctx.twinProject,
     linked: entries.filter((e) => e.missing.length === 0),

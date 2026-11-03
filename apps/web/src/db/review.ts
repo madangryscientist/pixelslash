@@ -44,6 +44,7 @@ export async function refreshBuildStatus(db: Db, buildId: string): Promise<Verdi
       diffStatus: snapshots.diffStatus,
       reviewState: snapshots.reviewState,
       carriedFrom: snapshots.carriedFrom,
+      staleOf: snapshots.staleOf,
       flakeId: snapshots.flakeId,
       flakyPolicy: snapshots.flakyPolicy,
     })
@@ -102,6 +103,8 @@ export type SnapshotView = {
   carriedFrom: string | null;
   /** The build that holds `carriedFrom`; null when that shot is gone. */
   carriedFromBuild: string | null;
+  /** The web shot whose accepted change made this native shot stale (PS-297); it waits for a reviewer. */
+  staleOf: string | null;
   /** Set on an unchanged shot whose difference from the default branch was accepted on an earlier build of this branch. */
   approvedEarlier: ApprovedEarlier | null;
   /** Where the diff ran (ob 1727): the CI job's CLI or this server; null until measured. */
@@ -206,6 +209,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       diffResult: snapshots.diffResult,
       rebaselineNeeded: snapshots.rebaselineNeeded,
       carriedFrom: snapshots.carriedFrom,
+      staleOf: snapshots.staleOf,
       measuredBy: snapshots.measuredBy,
       engineVersion: snapshots.engineVersion,
       diffMs: snapshots.diffMs,

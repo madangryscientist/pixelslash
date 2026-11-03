@@ -240,3 +240,77 @@ describe("pixelslash upload --wait", () => {
     expect(w.reads()).toBe(0);
   });
 });
+
+const CAUSE = {
+  snapshot_id: "w0",
+  build_id: "b1",
+  project_id: "p1",
+  project_name: "web",
+  accepted_by: "ada",
+  accepted_at: "2026-11-02T10:00:00.000Z",
+};
+
+const twinOf = (stale: boolean) => ({
+  snapshot_id: "a1",
+  platform: "android",
+  device: "pixel-8",
+  viewport: "1080x2400",
+  has_metrics: false,
+  stale,
+  stale_cause: stale ? CAUSE : null,
+});
+
+/** Build `b2` as the server reads it, with one linked web shot whose android twin is (not) stale. */
+const withTwins = (stale: boolean) => {
+  const api = fakeApi();
+  const at = buildAt("b2", "changes");
+  api.replies["/api/v1/builds/b2"] = {
+    ...at,
+    build: {
+      ...at.build,
+      twins: {
+        twin_project: null,
+        linked: [
+          {
+            snapshot_id: "w1",
+            name: "Button/md-primary",
+            theme: "dark",
+            platform: "web",
+            stale: false,
+            stale_cause: null,
+            twins: [twinOf(stale)],
+            missing: [],
+          },
+        ],
+        unlinked: [],
+      },
+    },
+  };
+  return api;
+};
+
+const read = async (api: ReturnType<typeof fakeApi>, ...more: string[]) => {
+  const cap = capture();
+  const code = await run(status("--build", "b2", ...more), cap.io, {
+    env: { PIXELSLASH_TOKEN: USER_TOKEN },
+    fetch: api.fetch,
+    cwd: await tmp(),
+  });
+  return { code, out: cap.stdout };
+};
+
+describe("pixelslash status: stale twins (PS-297)", () => {
+  test("a stale twin is a sentence under the summary, and does not change the exit code", async () => {
+    const r = await read(withTwins(true));
+    expect(r.code).toBe(5);
+    expect(r.out).toContain(
+      `Button/md-primary dark on android is stale: web changed in build ${SERVER}/projects/p1/builds/b1, accepted by ada 2026-11-02\n`,
+    );
+  });
+
+  test("a fresh twin prints nothing extra, and --json is the reply as sent", async () => {
+    expect((await read(withTwins(false))).out).not.toContain("stale");
+    const json = JSON.parse((await read(withTwins(true), "--json")).out);
+    expect(json.build.twins.linked[0].twins[0]).toMatchObject({ stale: true, stale_cause: CAUSE });
+  });
+});

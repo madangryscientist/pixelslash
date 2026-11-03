@@ -54,10 +54,13 @@ export async function acceptDefaultBranchBuild(
 ): Promise<void> {
   if (build.branch !== project.defaultBranch) return;
   // A flaky shot is never auto-accepted (ob 1724): under `review` it waits, under `skip` it is left.
+  // Nor is a native shot of a stale twin key (PS-297): only a person's accept makes it fresh.
   await db
     .update(snapshots)
     .set({ reviewState: "accepted", reviewedAt: new Date() })
-    .where(and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId)));
+    .where(
+      and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId), isNull(snapshots.staleOf)),
+    );
 }
 
 /**
