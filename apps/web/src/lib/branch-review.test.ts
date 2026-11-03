@@ -49,6 +49,7 @@ const view = (name: string, over: Partial<SnapshotView> = {}): SnapshotView => (
   rebaselineNeeded: false,
   carriedFrom: null,
   carriedFromBuild: null,
+  staleOf: null,
   approvedEarlier: null,
   measuredBy: null,
   engineVersion: null,

@@ -41,7 +41,7 @@ function carriedFromMain(snapshots: SnapshotView[]): { changed: number; new: num
   const held = { changed: 0, new: 0 };
   for (const shot of snapshots) {
     const group = reviewGroupOf(shot);
-    if (shot.diffStatus === "unchanged" && (group === "changed" || group === "new")) held[group]++;
+    if (shot.carriedFrom !== null && (group === "changed" || group === "new")) held[group]++;
   }
   return held;
 }

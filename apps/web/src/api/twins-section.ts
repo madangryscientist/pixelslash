@@ -1,8 +1,27 @@
+import type { StaleCause } from "#/lib/stale";
 import { type BuildTwins, type TwinEntry, hasTwins, twinSourceLabel } from "#/lib/twins";
 
 // The `twins` section of a build reply (PS-295), shaped in the API's snake_case.
 
-function twinEntry(e: TwinEntry) {
+/** The web change behind a stale twin, in the API's snake_case (PS-297). */
+export function causeJson(cause: StaleCause) {
+  return {
+    snapshot_id: cause.snapshotId,
+    build_id: cause.buildId,
+    project_id: cause.projectId,
+    project_name: cause.projectName,
+    accepted_by: cause.acceptedBy,
+    accepted_at: cause.acceptedAt.toISOString(),
+  };
+}
+
+/** `stale` and its cause on a twin or an entry: one shape for a client, `stale_cause` null when fresh. */
+const staleJson = (cause: StaleCause | null) => ({
+  stale: cause !== null,
+  stale_cause: cause && causeJson(cause),
+});
+
+export function twinEntry(e: TwinEntry) {
   return {
     snapshot_id: e.snapshotId,
     name: e.name,
@@ -11,6 +30,7 @@ function twinEntry(e: TwinEntry) {
     device: e.device,
     viewport: e.viewport,
     has_metrics: e.hasMetrics,
+    ...staleJson(e.stale),
     twins: e.twins.map((t) => ({
       snapshot_id: t.snapshotId,
       platform: t.platform,
@@ -23,6 +43,7 @@ function twinEntry(e: TwinEntry) {
       source_label: twinSourceLabel(t.source),
       commit_sha: t.source.commitSha,
       has_metrics: t.hasMetrics,
+      ...staleJson(t.stale),
     })),
     missing: e.missing,
   };

@@ -5,6 +5,7 @@ import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
 import { isMarker } from "#/db/markers";
 import { refreshBuildStatus } from "#/db/review";
+import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
 import { recordRun, runFields } from "#/db/server-timings";
 import { NoRecoveryError, claimForRerun } from "./claim";
@@ -118,7 +119,9 @@ async function settleReviews(
     await db
       .update(snapshots)
       .set({ reviewState: "accepted", reviewedAt })
-      .where(and(inArray(snapshots.id, part), isNull(snapshots.flakeId)));
+      .where(
+        and(inArray(snapshots.id, part), isNull(snapshots.flakeId), isNull(snapshots.staleOf)),
+      );
 }
 
 /**
@@ -169,6 +172,7 @@ export async function rediffShots(
     await timer.diff(() =>
       measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines),
     );
+    await markStale(deps.db, build.id);
     await settleReviews(deps.db, { build, project }, targets);
     await assertMeasured(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);

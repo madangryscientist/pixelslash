@@ -130,6 +130,7 @@ describe("pixelslash mcp", () => {
       "list_detection_flags",
       "list_flakes",
       "list_projects",
+      "list_stale",
       "whoami",
     ]);
     expect(read.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
@@ -154,6 +155,11 @@ describe("pixelslash mcp", () => {
     });
     expect(json(await call("list_flakes", { project: "web" })).flakes).toEqual([{ id: "f1" }]);
     expect(json(await call("list_detection_flags")).detection_flags).toHaveLength(1);
+    fake.replies["/api/v1/projects/p1/stale"] = { api_version: 1, stale: [{ name: "Button" }] };
+    expect(json(await call("list_stale", { project: "web", platform: "ios" })).stale).toEqual([
+      { name: "Button" },
+    ]);
+    expect(fake.seen.at(-1)?.url.searchParams.get("platform")).toBe("ios");
     expect(fake.images).toEqual([]);
   });
 

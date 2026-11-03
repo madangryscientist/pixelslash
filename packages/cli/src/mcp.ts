@@ -132,7 +132,7 @@ const TOOLS: Record<string, Tool> = {
   },
   get_build: {
     description:
-      "One build: counts, and every snapshot in review order with its group, diff numbers, regions, review state, and carried_from / approved_earlier. A build with shots on more than one platform also has `twins`: the shots linked across platforms by name + theme and the unlinked ones (GET /api/v1/builds/:id).",
+      "One build: counts, and every snapshot in review order with its group, diff numbers, regions, review state, and carried_from / approved_earlier. A build with shots on more than one platform also has `twins`: the shots linked across platforms by name + theme and the unlinked ones, with `stale` and `stale_cause` on a twin a web change left unreviewed (GET /api/v1/builds/:id).",
     properties: { build_id: { type: "string", description: "A build id, from list_builds." } },
     required: ["build_id"],
     call: async ({ remote }, args) =>
@@ -186,6 +186,22 @@ const TOOLS: Record<string, Tool> = {
     call: async (ctx, args) => {
       const pid = await projectId(ctx, args);
       return reply(await ctx.remote.client.get(`/api/v1/projects/${pid}/flakes`));
+    },
+  },
+  list_stale: {
+    description:
+      "A project's stale native twins (PS-297, docs/cli.md): a snapshot of android or ios whose web twin changed and was accepted, with no native shot accepted since. Each has the sentence, the web change behind it (build, who, when) and the native shots to review. `platform` narrows to one (GET /api/v1/projects/:id/stale).",
+    properties: {
+      project: PROJECT,
+      platform: { type: "string", description: "Only this platform.", enum: ["android", "ios"] },
+    },
+    call: async (ctx, args) => {
+      const pid = await projectId(ctx, args);
+      return reply(
+        await ctx.remote.client.get(`/api/v1/projects/${pid}/stale`, {
+          platform: arg(args, "platform"),
+        }),
+      );
     },
   },
   list_detection_flags: {

@@ -67,6 +67,7 @@ export function held(raw: Raw, projectName: (id: string) => string): Held {
     projectName: projectName(raw.projectId),
     buildId: raw.buildId,
     hasMetrics: raw.metricsKey !== null,
+    stale: null,
   };
 }
 
@@ -80,10 +81,14 @@ export async function shotsOf(db: Db, buildId: string): Promise<Raw[]> {
 }
 
 /** What makes a shot a current baseline, as in `db/baselines.ts`: a removed marker or a skipped flaky shot never is. */
-function baselineWhere(projectIds: string[], platforms: readonly Platform[], exceptBuild: string) {
+function baselineWhere(
+  projectIds: string[],
+  platforms: readonly Platform[],
+  exceptBuild: string | undefined,
+) {
   return and(
     inArray(builds.projectId, projectIds),
-    ne(builds.id, exceptBuild),
+    exceptBuild === undefined ? undefined : ne(builds.id, exceptBuild),
     inArray(builds.status, ["changes", "passed"]),
     // Accepted: the build passed, or a reviewer accepted the shot; and measured, or accepted as it is.
     or(eq(builds.status, "passed"), eq(snapshots.reviewState, "accepted")),
@@ -96,14 +101,20 @@ function baselineWhere(projectIds: string[], platforms: readonly Platform[], exc
 
 /**
  * The newest accepted shot per snapshot key, in the given projects, on the given platforms and
- * under the given names: what a project's baselines are right now.
+ * under the given names (every name when `names` is left out; the release check, PS-297, reads
+ * them all): what a project's baselines are right now.
  */
 export async function baselinesOf(
   db: Db,
-  input: { projectIds: string[]; platforms: Platform[]; names: string[]; exceptBuild: string },
+  input: {
+    projectIds: string[];
+    platforms: Platform[];
+    names?: string[];
+    exceptBuild?: string;
+  },
 ): Promise<Raw[]> {
   if (input.platforms.length === 0) return [];
-  const rows = await inChunks(input.names, OTHER_PARAMS + input.projectIds.length, (names) =>
+  const read = (names: string[] | undefined) =>
     db
       .select(columns)
       .from(snapshots)
@@ -111,11 +122,14 @@ export async function baselinesOf(
       .where(
         and(
           baselineWhere(input.projectIds, input.platforms, input.exceptBuild),
-          inArray(snapshots.name, names),
+          names === undefined ? undefined : inArray(snapshots.name, names),
         ),
       )
-      .orderBy(desc(builds.createdAt), desc(snapshots.id)),
-  );
+      .orderBy(desc(builds.createdAt), desc(snapshots.id));
+  const rows =
+    input.names === undefined
+      ? await read(undefined)
+      : await inChunks(input.names, OTHER_PARAMS + input.projectIds.length, read);
   const newest = new Map<string, Raw>();
   for (const row of rows.toSorted(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id),

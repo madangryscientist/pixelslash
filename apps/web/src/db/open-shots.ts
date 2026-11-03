@@ -27,6 +27,7 @@ export async function openShotsOf(db: Db, buildId: string): Promise<OpenShot[]> 
       mainDiffStatus: snapshots.mainDiffStatus,
       reviewState: snapshots.reviewState,
       carriedFrom: snapshots.carriedFrom,
+      staleOf: snapshots.staleOf,
       flakeId: snapshots.flakeId,
       flakyPolicy: snapshots.flakyPolicy,
     })
@@ -67,6 +68,7 @@ export async function mostChangedShots(
       diffResult: snapshots.diffResult,
       mainDiffResult: snapshots.mainDiffResult,
       carriedFrom: snapshots.carriedFrom,
+      staleOf: snapshots.staleOf,
     })
     .from(snapshots)
     .where(eq(snapshots.buildId, buildId));

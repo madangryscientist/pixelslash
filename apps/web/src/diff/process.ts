@@ -11,6 +11,7 @@ import {
 import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
 import { refreshBuildStatus } from "#/db/review";
+import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
 import { recordRun, runFields } from "#/db/server-timings";
 import type { BlobStore } from "#/storage/blobs";
@@ -387,6 +388,8 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     await timer.diff(() => measureAll(deps, { build, project }, rows, baselines));
     await markRemoved(deps, build, baselines.removed);
     await assertMeasured(deps.db, build, project);
+    // Before the default branch accepts: a native shot of a stale key is left for a person (PS-297).
+    await markStale(deps.db, build.id);
     await acceptDefaultBranchBuild(deps.db, build, project);
     const status = await refreshBuildStatus(deps.db, build.id);
     await recordRun(deps.db, build.id, timer.ended());

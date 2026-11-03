@@ -9,7 +9,13 @@ import { labelSummary } from "#/components/ai-notes";
 import { FlakyBadge } from "#/components/flake";
 import { ReviewChip } from "#/components/ui";
 import { formatNumber } from "#/lib/format";
-import { awaitsDecision, groupOf, holdsChange, skippedFlaky } from "#/lib/snapshot-groups";
+import {
+  awaitsDecision,
+  awaitsReason,
+  groupOf,
+  holdsChange,
+  skippedFlaky,
+} from "#/lib/snapshot-groups";
 import { type ShotLabel, shotChips } from "#/lib/shot-label";
 import { coversMostOfShot } from "#/lib/thumb-crop";
 
@@ -114,7 +120,11 @@ function approvedEarlierLine(shot: SnapshotView): string | null {
   return `no change since build ${approved.commitSha.slice(0, 7)} · change from ${approved.defaultBranch} approved${by}`;
 }
 
+/** An unchanged native shot of a twin key the web side changed (PS-297): nothing differs here, yet it was not looked at since. */
+const STALE = "no change here; the web twin changed, so this native shot needs a review";
+
 const unchangedLine = (shot: SnapshotView) => {
+  if (awaitsReason(shot) === "stale") return STALE;
   if (awaitsDecision(shot)) return CARRIED;
   const settled = shot.diffResult?.settledBy ? IDENTICAL_NOTE : "no change";
   return approvedEarlierLine(shot) ?? (shot.carriedFrom ? CARRIED : settled);

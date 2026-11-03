@@ -25,6 +25,7 @@ import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
+import { projectStale } from "#/db/stale";
 import { twinsOfBuild } from "#/db/twins";
 import { nextToReviewId } from "#/lib/build-tabs";
 import { buildExpiry } from "#/lib/retention";
@@ -174,8 +175,17 @@ export const getProjectPage = createServerFn()
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const builds = await listBuilds(db, project.id);
     const flags = await listFlags(db, user.id, project.id);
+    const stale = await projectStale(db, project.id);
     // `now` and `serverUrl` for the same reasons as `getOrgs`: one "2 h ago", the URL to upload to.
-    return { org, project, builds, flags, now: new Date(), serverUrl: getRequestUrl().origin };
+    return {
+      org,
+      project,
+      builds,
+      flags,
+      stale,
+      now: new Date(),
+      serverUrl: getRequestUrl().origin,
+    };
   });
 
 export const getBuildPage = createServerFn()

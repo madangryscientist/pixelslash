@@ -1,16 +1,18 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { run } from "../src/run.ts";
-import { capture, cleanup, tmp } from "./support.ts";
-import { SERVER, USER_TOKEN } from "./remote-support.ts";
-import { button, manifestDir, metricsFile, parityApi } from "./parity-support.ts";
+import { capture, cleanup } from "./support.ts";
+import { SERVER } from "./remote-support.ts";
+import {
+  android,
+  button,
+  deps,
+  manifestDir,
+  metricsFile,
+  parityApi,
+  web,
+} from "./parity-support.ts";
 
 afterAll(cleanup);
-
-const deps = async (api: ReturnType<typeof parityApi>, cwd?: string) => ({
-  env: { PIXELSLASH_TOKEN: USER_TOKEN },
-  fetch: api.fetch,
-  cwd: cwd ?? (await tmp()),
-});
 
 const parity = async (api: ReturnType<typeof parityApi>, extra: string[] = [], cwd?: string) => {
   const cap = capture();
@@ -21,17 +23,6 @@ const parity = async (api: ReturnType<typeof parityApi>, extra: string[] = [], c
   );
   return { code, out: cap.stdout, err: cap.stderr };
 };
-
-const web = (over = {}) => ({
-  id: "w1",
-  platform: "web" as const,
-  metrics: metricsFile({ button: button(over) }),
-});
-const android = (over = {}) => ({
-  id: "a1",
-  platform: "android" as const,
-  metrics: metricsFile({ button: button(over) }),
-});
 
 const other = (platform: "web" | "android", id: string, gap: number) => ({
   id,
