@@ -7,6 +7,17 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-03
+
+### Added
+
+- Twin snapshots (PS-295). A web shot and a native shot with the same name and theme are twins; viewport
+  and device are not part of the key, so every match is listed. Twins come from the same build, from a
+  linked twin project's newest build at the same commit, or from the current baselines, and the source is
+  named. `pixelslash build <id>` prints one line per unlinked shot (`Button/loading dark has no android
+  twin`) and a count of linked ones; `--json` and `pixelslash mcp` carry the full `twins` section. A
+  web-only build prints nothing new. See "Twins" in `docs/cli.md`.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
