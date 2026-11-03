@@ -237,6 +237,7 @@ function ApprovedEarlier({ projectId, snapshot }: { projectId: string; snapshot:
 
 export function SidePanel({
   projectId,
+  buildId,
   snapshot,
   options,
   reviewable,
@@ -247,6 +248,7 @@ export function SidePanel({
   children,
 }: {
   projectId: string;
+  buildId: string;
   snapshot: SnapshotView;
   options: DiffOptions;
   reviewable: boolean;
@@ -271,7 +273,7 @@ export function SidePanel({
       <Summary snapshot={snapshot} />
       <Carried projectId={projectId} snapshot={snapshot} />
       <ApprovedEarlier projectId={projectId} snapshot={snapshot} />
-      <TwinsRow entry={twins ?? null} />
+      <TwinsRow projectId={projectId} buildId={buildId} entry={twins ?? null} />
       {children}
       <Stack gap="xs">
         <Disclosure

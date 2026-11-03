@@ -124,6 +124,7 @@ describe("pixelslash mcp", () => {
     expect(read.map((t) => t.name).toSorted()).toEqual([
       "get_build",
       "get_parity",
+      "get_parity_view",
       "get_snapshot",
       "get_snapshot_images",
       "list_builds",
@@ -191,6 +192,24 @@ describe("pixelslash mcp", () => {
     const plain = json(await call("get_snapshot", { snapshot_id: "s1" })).snapshot;
     expect(plain).not.toHaveProperty("metrics");
     expect(fake.images).toEqual(["/images/orgs/o/m.metrics.json"]);
+  });
+
+  test("get_parity_view returns the parity view read for one key and sends the key", async () => {
+    const { call, fake } = await connected();
+    fake.replies["/api/v1/builds/b2/parity"] = {
+      api_version: 1,
+      name: "Button/primary",
+      theme: "dark",
+      columns: [{ kind: "shot", platform: "web" }],
+    };
+    const view = json(
+      await call("get_parity_view", { build_id: "b2", name: "Button/primary", theme: "dark" }),
+    );
+    expect(view).toMatchObject({ name: "Button/primary", theme: "dark" });
+    const query = fake.seen.at(-1)?.url.searchParams;
+    expect([query?.get("name"), query?.get("theme")]).toEqual(["Button/primary", "dark"]);
+    const missing = await call("get_parity_view", { build_id: "b2", name: "Button/primary" });
+    expect(missing.isError).toBe(true);
   });
 
   test("get_parity returns what `pixelslash parity --json` prints, reading the manifest from the cwd", async () => {

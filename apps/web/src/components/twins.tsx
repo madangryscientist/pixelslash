@@ -10,17 +10,55 @@ import {
   unlinkedLine,
 } from "#/lib/twins";
 
+/** The way into the parity view (PS-298): the key's shots on every platform side by side. */
+function CompareLink({
+  projectId,
+  buildId,
+  name,
+  theme,
+}: {
+  projectId: string;
+  buildId: string;
+  name: string;
+  theme: string;
+}) {
+  return (
+    <TextLink
+      data-testid="compare-platforms"
+      render={(p) => (
+        <Link
+          to="/projects/$projectId/builds/$buildId/parity"
+          params={{ projectId, buildId }}
+          search={{ name, theme }}
+          {...p}
+        />
+      )}
+    >
+      Compare platforms
+    </TextLink>
+  );
+}
+
 /**
  * The Twins row of a shot's side panel (PS-295): the same name and theme on another platform, each
  * a link labelled by platform and device. Nothing when no other platform is in play.
  */
-export function TwinsRow({ entry }: { entry: TwinEntry | null }) {
+export function TwinsRow({
+  projectId,
+  buildId,
+  entry,
+}: {
+  projectId: string;
+  buildId: string;
+  entry: TwinEntry | null;
+}) {
   if (!entry) return null;
   return (
     <Stack as="section" gap="xs" data-testid="twins">
       <Overline as="h2" tone="muted">
         Twins
       </Overline>
+      <CompareLink projectId={projectId} buildId={buildId} name={entry.name} theme={entry.theme} />
       <Stack as="ul" gap="xs">
         {entry.twins.map((t) => (
           <li key={t.snapshotId} data-testid="twin">
@@ -95,7 +133,8 @@ export function UnlinkedShots({
               )}
             >
               {unlinkedLine(e)}
-            </TextLink>
+            </TextLink>{" "}
+            <CompareLink projectId={projectId} buildId={buildId} name={e.name} theme={e.theme} />
           </li>
         ))}
       </Stack>

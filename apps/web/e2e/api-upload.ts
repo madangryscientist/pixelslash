@@ -48,6 +48,8 @@ export type Shot = {
   composition?: object;
   /** Fields of the CLI's meta that replace the web defaults (a native shot's platform and device, a theme). */
   meta?: Record<string, unknown>;
+  /** A layout metrics file (PS-296), sent as the CLI sends `--metrics`. */
+  metrics?: string;
 };
 
 /** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
@@ -78,6 +80,8 @@ function shotForm(shot: Shot): FormData {
   }
   form.set("meta", JSON.stringify(meta));
   form.set("file", pngBlob(shot.png), "shot.png");
+  if (shot.metrics !== undefined)
+    form.set("metrics", new Blob([shot.metrics], { type: "application/json" }), "metrics.json");
   return form;
 }
 

@@ -18,6 +18,7 @@ import { authorize, bearer } from "./authorize";
 import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
 import { createProjectByName } from "./project-create";
 import { listFlakes, resolveProjectFlake } from "./flakes";
+import { getParity } from "./parity";
 import { listStale } from "./stale";
 import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines";
 import {
@@ -162,8 +163,9 @@ type Endpoint = {
   run: (ctx: Ctx, params: string[]) => Promise<Response>;
 };
 
-const reads = (ctx: Ctx): ReadCtx => ({
+const reads = (ctx: Ctx): ReadCtx & { store: BlobStore } => ({
   db: ctx.db,
+  store: ctx.store,
   actor: ctx.actor,
   origin: new URL(ctx.request.url).origin,
   imageSecret: ctx.imageSecret,
@@ -174,7 +176,7 @@ const at = (params: string[], i: number) => params[i] ?? "";
 
 /** A route whose one `:id` goes to a read with the token's actor. */
 const byId =
-  (read: (ctx: ReadCtx, id: string) => Promise<Response>): Endpoint["run"] =>
+  (read: (ctx: ReturnType<typeof reads>, id: string) => Promise<Response>): Endpoint["run"] =>
   (ctx, p) =>
     read(reads(ctx), at(p, 0));
 
@@ -255,6 +257,7 @@ export const ENDPOINTS: readonly Endpoint[] = [
     run: async (ctx, p) => resolveProjectFlake(reads(ctx), at(p, 0), await jsonBody(ctx.request)),
   },
   { method: "GET", path: "/api/v1/builds/:id", run: byId(getBuild) },
+  { method: "GET", path: "/api/v1/builds/:id/parity", run: byId(getParity) },
   { method: "GET", path: "/api/v1/snapshots/:id", run: byId(getSnapshot) },
 ];
 

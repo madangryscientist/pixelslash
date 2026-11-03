@@ -138,6 +138,23 @@ const TOOLS: Record<string, Tool> = {
     call: async ({ remote }, args) =>
       reply(await remote.client.get(`/api/v1/builds/${id(need(args, "build_id"))}`)),
   },
+  get_parity_view: {
+    description:
+      "The parity view of one snapshot key (name + theme) of a build: its web, android and ios shots side by side (a platform with no shot is a `missing` column), each with its scale, physical size, source and stale cause; a similarity hint per native column against web (a hint, never a verdict: `score` is null when it cannot be scored); and the metrics comparison, as the sentences `pixelslash parity` prints, with `not_measured` for a side with no metrics file. The server keeps no parity manifest, so declared differences are not applied there: use get_parity for the verdict (GET /api/v1/builds/:id/parity).",
+    properties: {
+      build_id: { type: "string", description: "A build id, from list_builds." },
+      name: { type: "string", description: "The snapshot name, from get_build." },
+      theme: { type: "string", description: "The snapshot theme, from get_build." },
+    },
+    required: ["build_id", "name", "theme"],
+    call: async ({ remote }, args) =>
+      reply(
+        await remote.client.get(`/api/v1/builds/${id(need(args, "build_id"))}/parity`, {
+          name: need(args, "name"),
+          theme: need(args, "theme"),
+        }),
+      ),
+  },
   get_parity: {
     description:
       "Metrics parity of a build's twin pairs (docs/metrics.md): for each snapshot linked across platforms, the parts and fields whose layout metrics differ beyond tolerance, and the pairs with no metrics file (`not measured`, never drift). The same result as `pixelslash parity --build ID --json`; a drift is a verdict the CLI exits 8 on. Reads the manifest at `manifest`, else pixelslash.parity.json in the working directory when it exists.",
