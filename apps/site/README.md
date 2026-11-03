@@ -18,16 +18,15 @@ the code says at that commit:
 
 The pricing page's commitment sentence is `src/content/pricing.ts`.
 
-## Before the repository and the app open
+## Before the app opens
 
-The site goes public before the repository (PS-257) and before the hosted app, so no link may lead
-where a visitor cannot follow. Two switches in `src/content/links.ts`, both `false`:
+No link may lead where a visitor cannot follow. Two switches in `src/content/links.ts`:
 
-- `REPO_PUBLIC`: links to the GitHub repository, its files and its images. Off, they are drawn as
-  text and the site says the source opens at launch.
-- `APP_LIVE`: links to `app.pixelslash.dev`. Off, there is no Sign in link.
+- `REPO_PUBLIC`: links to the GitHub repository, its files and its images. `true` since the
+  repository opened (PS-292). Off, they are drawn as text and the site says the source opens at launch.
+- `APP_LIVE`: links to `app.pixelslash.dev`. `false`: there is no Sign in link.
 
-Flip one, rebuild and deploy. The smoke test checks that nothing links to either while they are off,
+Flip one, rebuild and deploy. The smoke test checks that nothing links to the app while it is off,
 so it needs the same change.
 
 ## Run it

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
 import { Demo, Footer, Header, vars } from "#/components/pages/home-parts";
-import { REPO_PUBLIC } from "#/content/links";
+import { REPO_PUBLIC, REPO_URL } from "#/content/links";
 
 /*
  * The homepage is marketing, not an admin screen, so it is drawn here in plain Tailwind and
@@ -56,9 +56,9 @@ const STEPS = [
 ] as const;
 
 const COMMANDS = [
-  "bun install",
-  "bun run pixelslash -- install-browser   # once, for URL capture",
-  "bun run pixelslash -- --live-png main.png --local-png branch.png --out out",
+  "npm i -D @hackcove/pixelslash",
+  "npx @hackcove/pixelslash --live-png main.png --local-png branch.png --out out",
+  "npx @hackcove/pixelslash install-browser",
 ] as const;
 
 function Hero(): ReactNode {
@@ -145,14 +145,27 @@ function Checkout(): ReactNode {
     <section className="px-5 py-20">
       <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[2fr_3fr]">
         <div className="home-reveal">
-          <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Run it from a checkout</h2>
+          <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Install it from npm</h2>
           <p className="mt-5 text-lg text-(--home-sub)">
-            The CLI runs on{" "}
+            It is on npm as <code>@hackcove/pixelslash</code>, and the command is{" "}
+            <code>pixelslash</code>. The CLI runs on{" "}
             <a href="https://bun.sh" className="home-link">
               Bun
             </a>
-            . It is not on the npm registry yet, so it runs from a checkout of the repository
-            {REPO_PUBLIC ? "." : ", which opens at launch."}
+            , so Bun must be on your PATH; <code>npx</code> starts it. PNG mode needs no browser;
+            for URL capture run <code>install-browser</code> once per machine.
+          </p>
+          <p className="mt-4 text-(--home-sub)">
+            To run it from a clone instead, <code>bun install</code> and then{" "}
+            <code>bun run pixelslash -- …</code> in a checkout of{" "}
+            {REPO_PUBLIC ? (
+              <a href={REPO_URL} className="home-link">
+                the repository
+              </a>
+            ) : (
+              "the repository"
+            )}
+            .
           </p>
         </div>
         <div className="home-reveal home-window home-terminal">

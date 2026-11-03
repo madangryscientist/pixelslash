@@ -4,12 +4,11 @@ import { PAGES } from "../src/content/pages.ts";
 
 /*
  * Every page, on a desktop and a phone: the nav and the footer are there, every internal link and
- * anchor lands on something, nothing links to the repository or the hosted app while both are
- * closed, and nothing scrolls sideways. That the docs and compare pages agree with their source
+ * anchor lands on something, nothing links to the hosted app while it is closed, and nothing scrolls sideways. That the docs and compare pages agree with their source
  * files is checked in the unit tests (src/content/docs.test.tsx, matrix.test.tsx).
  */
 
-const CLOSED = ["github.com/madangryscientist", "ghcr.io/madangryscientist", "app.pixelslash.dev"];
+const CLOSED = ["app.pixelslash.dev"];
 
 async function hrefs(page: Page): Promise<string[]> {
   return page
@@ -37,7 +36,11 @@ for (const { to, label } of PAGES) {
       "href",
       "mailto:hello@hack-cove.com",
     );
-    await expect(footer.getByTestId("source-status")).toHaveText("Source opens at launch");
+    await expect(footer.getByTestId("source-status")).toHaveText("GitHub");
+    await expect(footer.getByTestId("source-status")).toHaveAttribute(
+      "href",
+      "https://github.com/madangryscientist/pixelslash",
+    );
 
     const known = new Set<string>(PAGES.map((item) => item.to));
     for (const href of await hrefs(page)) {
