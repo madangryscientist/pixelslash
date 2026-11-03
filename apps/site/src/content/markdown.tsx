@@ -17,7 +17,10 @@ import {
 } from "@hackcove/ui";
 import { type MarkedToken, type Token, type Tokens, lexer } from "marked";
 import { Fragment, type ReactNode } from "react";
+import { decode, marked, plainText, slugger } from "./doc-text.ts";
 import { resolveHref } from "./links.ts";
+
+export { plainText, slugger };
 
 /*
  * A repo document (docs/cli.md, SECURITY.md, ...) rendered as React at build time. marked lexes
@@ -36,64 +39,11 @@ export type Doc = {
   tokens: MarkedToken[];
   headings: Heading[];
   ids: WeakMap<Token, string>;
+  /** The site page this is shown on, so a `#anchor` link knows whether it leaves the page. */
+  page?: string;
 };
 
-const KNOWN = new Set<string>([
-  "blockquote",
-  "br",
-  "code",
-  "codespan",
-  "def",
-  "del",
-  "em",
-  "escape",
-  "heading",
-  "hr",
-  "html",
-  "image",
-  "link",
-  "list",
-  "list_item",
-  "paragraph",
-  "space",
-  "strong",
-  "table",
-  "text",
-]);
-
-function isMarked(token: Token): token is MarkedToken {
-  return KNOWN.has(token.type);
-}
-
-function marked(tokens: Token[] | undefined): MarkedToken[] {
-  return (tokens ?? []).filter(isMarked);
-}
-
-/** The text of inline tokens, as GitHub reads it for a heading's anchor. */
-export function plainText(tokens: Token[] | undefined): string {
-  return marked(tokens).map(tokenText).join("");
-}
-
-function tokenText(token: MarkedToken): string {
-  if ("tokens" in token && token.tokens) return plainText(token.tokens);
-  return "text" in token ? decode(token.text) : "";
-}
-
-/** GitHub's heading anchor: lower case, punctuation dropped, spaces to `-`, `-1`, `-2` for repeats. */
-export function slugger(): (text: string) => string {
-  const seen = new Map<string, number>();
-  return (text) => {
-    const base = text
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-      .replace(/\s/g, "-");
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count}`;
-  };
-}
-
-export function parseDoc(markdown: string, source: string): Doc {
+export function parseDoc(markdown: string, source: string, page?: string): Doc {
   const all = marked(lexer(markdown));
   const first = all.find((token) => token.type !== "space");
   const title = first?.type === "heading" && first.depth === 1 ? plainText(first.tokens) : "";
@@ -108,7 +58,7 @@ export function parseDoc(markdown: string, source: string): Doc {
     ids.set(token, id);
     headings.push({ depth: token.depth, text, id });
   }
-  return { source, title, tokens, headings, ids };
+  return { source, title, tokens, headings, ids, ...(page === undefined ? {} : { page }) };
 }
 
 function Inline({ tokens, doc }: { tokens: Token[] | undefined; doc: Doc }): ReactNode {
@@ -116,7 +66,7 @@ function Inline({ tokens, doc }: { tokens: Token[] | undefined; doc: Doc }): Rea
 }
 
 function InlineLink({ token, doc }: { token: Tokens.Link; doc: Doc }): ReactNode {
-  const href = resolveHref(token.href, doc.source);
+  const href = resolveHref(token.href, doc.source, undefined, doc.page);
   const children = <Inline tokens={token.tokens} doc={doc} />;
   if (href === null) return <span data-gated-link={token.href}>{children}</span>;
   return (
@@ -155,19 +105,6 @@ function inlineText(token: MarkedToken, doc: Doc): ReactNode {
   if (token.type === "text" && token.tokens) return <Inline tokens={token.tokens} doc={doc} />;
   if (token.type === "image") return token.text;
   return "text" in token ? decode(token.text) : null;
-}
-
-const ENTITIES: Record<string, string> = {
-  "&amp;": "&",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": '"',
-  "&#39;": "'",
-};
-
-/** marked escapes `&`, `<`, `>` and quotes in text; React escapes them again, so undo marked's. */
-function decode(text: string): string {
-  return text.replace(/&(amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity);
 }
 
 const LANGUAGES: readonly CodeLanguage[] = ["tsx", "ts", "json", "bash", "css"];

@@ -62,8 +62,9 @@ export function HowItWorksPage(): ReactNode {
         <Text as="p">
           0 means the run finished, whatever it found in pixels. 1 means a design-system judge found
           new violations on Branch. 2 is a usage error. A crash never exits 1, so CI can read the
-          code. <TextLink href="/docs#exit-codes-and-the-failed-line">The full list</TextLink> is in
-          the docs.
+          code.{" "}
+          <TextLink href="/docs/signing-in#exit-codes-and-the-failed-line">The full list</TextLink>{" "}
+          is in the docs.
         </Text>
       </Section>
       <Section title="Then, if you want a person to decide">
@@ -72,7 +73,7 @@ export function HowItWorksPage(): ReactNode {
           against the default branch, holds the build for review and reports a GitHub check, and
           pixelslash check blocks CI until someone accepts or rejects it.{" "}
           <TextLink href="/self-host">Self-host the server</TextLink> or{" "}
-          <TextLink href="/docs#uploading-to-a-server">read how uploads work</TextLink>.
+          <TextLink href="/docs/upload#uploading-to-a-server">read how uploads work</TextLink>.
         </Text>
       </Section>
     </ProseLayout>

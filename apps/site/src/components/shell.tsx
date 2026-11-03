@@ -63,7 +63,8 @@ export function Shell({
   const items = PAGES.map((page) => ({
     label: page.label,
     href: page.to,
-    active: page.to === pathname,
+    // A docs page (`/docs/upload`) keeps Docs marked in the nav.
+    active: page.to === pathname || (page.to !== "/" && pathname.startsWith(`${page.to}/`)),
   }));
   return (
     <AppShell

@@ -26,6 +26,8 @@ bun run format:check    # oxfmt; `bun run format` fixes it
 bun run test            # Vitest under Bun, and xunit for engines/dotnet
 ```
 
+- **Each script runs through Nx** (`nx run-many -t typecheck`, `lint`, `test`), one project at a time
+  with `bunx nx <target> <project>`. `docs/cli.md` points here for them.
 - **Lint rules are errors.** Fix the code; do not disable a rule.
 - **Tests** live in `packages/*/test/`. A test that makes a temp dir removes it, and a new
   project's `vitest.config.ts` lists the `globalSetup` in `scripts/test-tmp-scope.ts` so a run

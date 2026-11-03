@@ -2,41 +2,137 @@
 
 Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch. Local mlx, else ollama, or opencode when you name a model. A standalone Bun CLI.
 
+## Install
+
+### From npm
+
+As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`).
+
+PNG mode (`--live-png` / `--local-png`) needs no browser.
+
+### From a checkout
+
 ```
 bun install
 bun run pixelslash -- install-browser   # once, for URL capture (Playwright's chromium-headless-shell; `firefox`, `webkit` or `all` add the others)
-bun run typecheck   # nx: tsc on every project
-bun run lint        # nx: oxlint (type-aware) + check-slop
-bun run format:check
-bun run test        # nx: vitest on every project
 bun run pixelslash -- <args below>
 ```
 
-As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`). PNG mode (`--live-png` / `--local-png`) needs no browser.
+The `typecheck`, `lint`, `format:check` and `test` scripts that gate a change are for contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md#the-gate).
+
+## Compare two versions
 
 ```
 bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--browser chromium|firefox|webkit] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...
 ```
 
-`--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up — the command does not start a dev server. Each capture waits for the page to settle before shooting: web fonts, every image, a short network-idle window, then two animation frames — all bounded by the capture timeout, so a page that never settles fails rather than hangs. Main and Branch are shot at once, each in its own page with its own settle. `--browser` (default `chromium`) picks the engine for both pages, so a pair is always shot in one browser; the report's sizes line names it (`firefox · Main 1280x720 · Branch 1280x720`). It applies to `--live` / `--local` only: with PNG inputs the pixels are already shot, and `--browser` there is exit 2. Firefox and WebKit need `pixelslash install-browser firefox` (or `webkit`, or `all`) once per machine; the capture image ships all three.
+### Main and Branch
 
-A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-diffs them, stores `main.png`, `branch.png`, `diff.png`, a manifest (`changedPixels`, `createdAt`, optional `--label`, `timings`), and `report.html`, and exits 0. stdout points at `report.html`. Same store as PNG mode. Identical shots still store a run (`changedPixels` 0). When the two PNGs are byte-equal nothing is decoded or diffed: there is no `diff.png`, the manifest carries `settledBy: "identical-bytes"`, and the report says "identical to baseline: same bytes, not diffed". Two PNGs with equal pixels but different bytes are diffed as usual. The diff is perceptual: a pixel counts toward `changedPixels` only when its colour differs by more than a small YIQ threshold (alpha blended over white) and it is not an anti-aliased edge in either shot, so `changedPixels` is smaller than a raw pixel-difference count. If width or height differs, only the overlapping rectangle is diffed: `changedPixels` is that overlap count, the report states both sizes, the non-overlap is not painted as changed, and the engine's verdict (`changed`) is true because the sizes differ. The changed pixels are then clustered into **regions** (`regions[]` in the manifest and the engine result): boxes with `x`, `y`, `w`, `h`, `changedPixels` and `antialiasedPixels`. Changed pixels and boxes closer than 24px are one region (`mergeDistance`); a box with an area under 4px (`minRegionArea`) is a speck, dropped and counted in `specks`; a region that is faint (90th percentile of colour distance at most 0.25, no pixel above 0.5), uneven (the spread of those distances is at least 0.3 of their mean, so a flat element that moved is never noise), and moves both lighter and darker (minority share at least 0.2), is labelled `noise`, kept in `regions`, and does not make the run `changed`. A region whose content moved by a fraction of a pixel, all alike (`maxShift`, 0 to 1; default 0.9), is labelled `shift`: the region's own box fits one sub-pixel shift on both axes, that fit explains at least a quarter of its colour difference, and the edge tiles in a 24px halo around the box agree with the same shift; a whole pixel moved, or a neighbour that stayed put, keeps it a `change`. `shift` regions are kept in `regions`, are drawn in their own style, and do not make the run `changed`. `changed` is true when the sizes differ or a `change` region survives. The numbers were chosen on `bench/corpus` (see `bench/README.md`). Default `--out` is `.pixelslash`.
+`--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up — the command does not start a dev server.
 
-`--threshold` (per-pixel tolerance, 0 to 1; engine default 0.01), `--min-changed-pixels` and `--min-changed-ratio` (floors on the run), `--merge-distance` (px; default 24), `--min-region-area` (px; default 4), `--noise-amplitude` (0 to 1; default 0.25) and `--max-shift` (pixels, 0 to 1; default 0.9; 0 turns the call off) tune the diff in every mode here. The floors combine with the region verdict, not beside it: they are measured on the pixels of the `change` regions that survive (noise and shift regions and specks never count), so a run is `changed` only when the sizes differ, or those surviving pixels are at least `--min-changed-pixels` and their share of the overlap is at least `--min-changed-ratio`. Out-of-range or non-numeric values exit 2. The counts are still reported when a floor says the shot is not changed. When the options differ from the engine defaults the report states them (`Diff options: threshold 0.2`, and `Not changed: … under the floors above` when a floor decided it) and the run's `manifest.json` records them as `diff`; with none set, the report says nothing and the manifest has no `diff`.
+### How a page is captured
 
-`--ignore x,y,w,h` (repeatable) is an area in image px that the diff skips: the pixels stay in both shots and the report draws a hatch over them, but nothing inside is counted, region-clustered or reported as changed. It is listed in the run's `ignored` and counted in `ignoredPixels`; the ratio floor's denominator is what was measured, so ignored pixels do not dilute it. Use it for a video, an ad, a map or live data — for secrets use a redact mask instead, which never reaches the PNG (see `masks` in the capture config). Pair mode only: it is refused with `--routes`.
+Each capture waits for the page to settle before shooting: web fonts, every image, a short network-idle window, then two animation frames — all bounded by the capture timeout, so a page that never settles fails rather than hangs. Main and Branch are shot at once, each in its own page with its own settle.
+
+### Choosing the browser
+
+`--browser` (default `chromium`) picks the engine for both pages, so a pair is always shot in one browser; the report's sizes line names it (`firefox · Main 1280x720 · Branch 1280x720`). It applies to `--live` / `--local` only: with PNG inputs the pixels are already shot, and `--browser` there is exit 2. Firefox and WebKit need `pixelslash install-browser firefox` (or `webkit`, or `all`) once per machine; the capture image ships all three.
+
+### What a run writes
+
+A URL pair may omit `--ds` and `--file`. PixelSlash captures both pages, pixel-diffs them, stores `main.png`, `branch.png`, `diff.png`, a manifest (`changedPixels`, `createdAt`, optional `--label`, `timings`), and `report.html`, and exits 0. stdout points at `report.html`. Same store as PNG mode.
+
+Identical shots still store a run (`changedPixels` 0). When the two PNGs are byte-equal nothing is decoded or diffed: there is no `diff.png`, the manifest carries `settledBy: "identical-bytes"`, and the report says "identical to baseline: same bytes, not diffed". Two PNGs with equal pixels but different bytes are diffed as usual.
+
+Default `--out` is `.pixelslash`.
+
+### Two PNGs instead of two URLs
 
 `--live-png` / `--local-png` skip Playwright and use existing screenshots. `--ds` / `--file` may be omitted in this mode too: same pixel-diff store and `report.html`.
 
+### Several pages: `--routes`
+
 `--routes FILE` is one path per line (`/` `/pricing` …). `--live` and `--local` are origins. Without `--ds` or `--file`, each path is two captures, a pixel diff (`main.png`, `branch.png`, `diff.png`, manifest), and `report.html`. `--out/index.html` links those reports. Exit 0. With `--ds` or `--file`, each path is still two captures plus the DS judge. `--live-png-dir` / `--local-png-dir` is the GTK form (`index.png` for `/`, `pricing.png` for `/pricing`) and still needs `--ds` or `--file`.
 
-With `--ds` or `--file`, one URL run captures both at the page width, then checks each shot against every DS component raster. Prefers `mlx_vlm.generate` when present (Mac). Else `ollama run qwen2.5vl` with the page shot, the DS raster, then the prompt (`ollama` on PATH; 100% local). PNG mode with `--ds` copies the given files into `--out` as `live.png` / `local.png` and runs the same judge. Reports violations already on Main vs NEW violations on Branch. Exit 1 if any NEW violations, else 0.
+## How the diff works
+
+### A perceptual compare
+
+The diff is perceptual: a pixel counts toward `changedPixels` only when its colour differs by more than a small YIQ threshold (alpha blended over white) and it is not an anti-aliased edge in either shot, so `changedPixels` is smaller than a raw pixel-difference count.
+
+### When the sizes differ
+
+If width or height differs, only the overlapping rectangle is diffed: `changedPixels` is that overlap count, the report states both sizes, the non-overlap is not painted as changed, and the engine's verdict (`changed`) is true because the sizes differ.
+
+### Regions, specks and noise
+
+The changed pixels are then clustered into **regions** (`regions[]` in the manifest and the engine result): boxes with `x`, `y`, `w`, `h`, `changedPixels` and `antialiasedPixels`.
+
+- Changed pixels and boxes closer than 24px are one region (`mergeDistance`)
+- a box with an area under 4px (`minRegionArea`) is a speck, dropped and counted in `specks`
+- a region that is faint (90th percentile of colour distance at most 0.25, no pixel above 0.5), uneven (the spread of those distances is at least 0.3 of their mean, so a flat element that moved is never noise), and moves both lighter and darker (minority share at least 0.2), is labelled `noise`, kept in `regions`, and does not make the run `changed`.
+
+### Sub-pixel shifts
+
+A region whose content moved by a fraction of a pixel, all alike (`maxShift`, 0 to 1; default 0.9), is labelled `shift`: the region's own box fits one sub-pixel shift on both axes, that fit explains at least a quarter of its colour difference, and the edge tiles in a 24px halo around the box agree with the same shift; a whole pixel moved, or a neighbour that stayed put, keeps it a `change`. `shift` regions are kept in `regions`, are drawn in their own style, and do not make the run `changed`.
+
+### When a run is `changed`
+
+`changed` is true when the sizes differ or a `change` region survives. The numbers were chosen on `bench/corpus` (see `bench/README.md`).
+
+## Tuning the diff
+
+These flags tune the diff in every mode here.
+
+| Flag | Range | Default | What it does |
+| --- | --- | --- | --- |
+| `--threshold` | 0 to 1 | 0.01 (engine default) | Per-pixel tolerance. |
+| `--min-changed-pixels` | whole number | 0 (no floor) | Floor on the run: the pixels of the surviving `change` regions must reach it. |
+| `--min-changed-ratio` | 0 to 1 | 0 (no floor) | Floor on the run: the share of the overlap that the surviving `change` regions cover must reach it. |
+| `--merge-distance` | px | 24 | Changed pixels and boxes closer than this are one region. |
+| `--min-region-area` | px | 4 | A box with a smaller area is a speck, dropped and counted. |
+| `--noise-amplitude` | 0 to 1 | 0.25 | How faint a region may be and still be labelled `noise`. |
+| `--max-shift` | 0 to 1 (pixels) | 0.9 | How far a sub-pixel shift may move a region and still be labelled `shift`; 0 turns the call off. |
+
+Out-of-range or non-numeric values exit 2.
+
+### How the floors combine
+
+The floors combine with the region verdict, not beside it: they are measured on the pixels of the `change` regions that survive (noise and shift regions and specks never count), so a run is `changed` only when the sizes differ, or those surviving pixels are at least `--min-changed-pixels` and their share of the overlap is at least `--min-changed-ratio`.
+
+The counts are still reported when a floor says the shot is not changed.
+
+### Options that differ from the defaults
+
+When the options differ from the engine defaults the report states them (`Diff options: threshold 0.2`, and `Not changed: … under the floors above` when a floor decided it) and the run's `manifest.json` records them as `diff`; with none set, the report says nothing and the manifest has no `diff`.
+
+### Skipping an area: `--ignore`
+
+`--ignore x,y,w,h` (repeatable) is an area in image px that the diff skips: the pixels stay in both shots and the report draws a hatch over them, but nothing inside is counted, region-clustered or reported as changed. It is listed in the run's `ignored` and counted in `ignoredPixels`; the ratio floor's denominator is what was measured, so ignored pixels do not dilute it. Use it for a video, an ad, a map or live data — for secrets use a redact mask instead, which never reaches the PNG (see `masks` in the capture config). Pair mode only: it is refused with `--routes`.
+
+## The design-system judge
+
+### Running the judge
+
+With `--ds` or `--file`, one URL run captures both at the page width, then checks each shot against every DS component raster.
+
+PNG mode with `--ds` copies the given files into `--out` as `live.png` / `local.png` and runs the same judge.
+
+Reports violations already on Main vs NEW violations on Branch. Exit 1 if any NEW violations, else 0.
+
+### mlx or ollama
+
+Prefers `mlx_vlm.generate` when present (Mac). Else `ollama run qwen2.5vl` with the page shot, the DS raster, then the prompt (`ollama` on PATH; 100% local).
 
 Install ollama and `ollama pull qwen2.5vl` (7b latest). Fallback if that does not fit: `ollama pull qwen2.5vl:3b && ollama cp qwen2.5vl:3b qwen2.5vl`. The CLI still spawns `qwen2.5vl`.
 
+### When no judge is installed
+
 If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still writes (shots + DS, no fake violations), stdout prints `skip: no judge`, and the process exits 0. DS-match judge is optional and is not required for screenshot pixel runs.
 
-**The opencode judge (ob 1941).** Set `PIXELSLASH_OPENCODE_MODEL=<provider/model>` and every judge (the DS judge, `dev --judge`, `upload --judge`) runs `opencode run -m <model>` instead of mlx or ollama, with the shot and the DS raster as `--file`s. Unset, nothing changes: mlx, else ollama, else `skip: no judge`. No model is built in; the model is your choice, and it must read images. Check the terms of the plan behind it: OpenCode Go, for one, is for personal use only.
+### The opencode judge
+
+Added in ob 1941. Set `PIXELSLASH_OPENCODE_MODEL=<provider/model>` and every judge (the DS judge, `dev --judge`, `upload --judge`) runs `opencode run -m <model>` instead of mlx or ollama, with the shot and the DS raster as `--file`s. Unset, nothing changes: mlx, else ollama, else `skip: no judge`. No model is built in; the model is your choice, and it must read images. Check the terms of the plan behind it: OpenCode Go, for one, is for personal use only.
 
 - **The key** is opencode's own: `OPENCODE_API_KEY` in the environment, or the `auth.json` opencode keeps under `~/.local/share/opencode/` (a mounted file in the capture image). PixelSlash never reads, logs or stores it, and the capture image does not contain one. Unlike mlx and ollama this is a hosted model, so the shot and the DS raster leave the machine for that provider: it is opt-in by the variable, and invariant 4 (`--upload`) is about PixelSlash's own server, not about this.
 - **Tool-less.** A screenshot is untrusted input (text in it may say "run this command"), so the run is not allowed to call any tool. It never passes `--auto`, and it runs a private agent whose permissions deny every action (`{action:"*", resource:"*", effect:"deny"}`, injected through `OPENCODE_CONFIG_CONTENT`), in `--standalone` mode, from the shot's directory. `packages/engine/test/judge-opencode.test.ts` asserts the argv and the config; a prompt that asks that agent to run a shell command creates no file and emits no tool event, where the same prompt under `build --auto` does.
@@ -44,7 +140,17 @@ If both `mlx_vlm.generate` and `ollama` are missing, the HTML report still write
 - The runner is exported from the engine as `askOpencode(prompt, images, { model })` for other callers.
 - **In the capture image** `docker/capture/Dockerfile` installs opencode `2.1.4` (build arg `OPENCODE_VERSION`) from a tarball pinned by sha256, so `opencode` is on the PATH; pass the key at run time (`-e OPENCODE_API_KEY=…`) with `-e PIXELSLASH_OPENCODE_MODEL=…`. Capture does not use it,.
 
-A one-pair run without a design system writes `--out/report.html` (open as `file://`): the changed-pixel count, the region and speck counts, both sizes, and Main, Branch and Diff. A changed shot (a `change` region survives) leads with those three **cropped to the changed region** — the union of the `change` regions plus 24px, clipped to the overlap of the two shots, scaled up with CSS so no extra file is written — and the full frame sits behind a `Full frame` click, where the Diff carries the region boxes (yellow for a change, dashed grey for noise). A shot with no `change` region keeps the full frame as is. With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
+## The report
+
+### A pair without a design system
+
+A one-pair run without a design system writes `--out/report.html` (open as `file://`): the changed-pixel count, the region and speck counts, both sizes, and Main, Branch and Diff. A changed shot (a `change` region survives) leads with those three **cropped to the changed region** — the union of the `change` regions plus 24px, clipped to the overlap of the two shots, scaled up with CSS so no extra file is written — and the full frame sits behind a `Full frame` click, where the Diff carries the region boxes (yellow for a change, dashed grey for noise).
+
+A shot with no `change` region keeps the full frame as is.
+
+### With a design system or routes
+
+With `--ds` or `--file`, that file is header counts, side-by-side Main/Branch shots, DS rasters, and the violation list. With `--routes`, open `--out/index.html`.
 
 ## Step timings
 
