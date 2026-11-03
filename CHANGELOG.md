@@ -7,6 +7,19 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-03
+
+### Added
+
+- `pixelslash parity --build <id>` (PS-296) compares the layout metrics of every twin pair in a build and
+  exits **8** on drift. Lengths match within one physical pixel of the coarser side
+  (`max(1/scale_a, 1/scale_b)` logical px); font size and weight must be equal; colours must be equal unless
+  the web → native pair is allowlisted. A repo-kept `pixelslash.parity.json` (`--manifest`) holds that
+  allowlist and per-platform deliberate differences; a declaration that no longer applies is printed, not
+  failed. A pair without metrics on a side is `not measured`, never drift. Each drift is one sentence
+  (`Button/md-primary dark: button gap 8 web vs 6 android`); `--json` and `pixelslash mcp` carry the full
+  result. See "Parity" in `docs/metrics.md` and `docs/cli.md`.
+
 ## [0.4.0] - 2026-11-03
 
 ### Added
