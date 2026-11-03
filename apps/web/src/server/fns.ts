@@ -40,6 +40,7 @@ import {
 } from "./env";
 import { signFlakeOrNull } from "./flake-images";
 import { imageUrls } from "./image-urls";
+import { snapshotMetrics } from "./snapshot-metrics";
 import { field, noteInput, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
 
@@ -242,6 +243,7 @@ export const getSnapshotPage = createServerFn()
       build: view.build,
       snapshot,
       images,
+      metrics: await snapshotMetrics(project.orgId, snapshot.metricsKey),
       /** The options the config asked for (ob 1494); `snapshot.resolvedDiff` holds what was measured. */
       diffOptions: await snapshotDiffOptions(db, snapshot.id),
       /** The review-UI overrides on this shot's test and variant (ob 1495), each with its snippet. */

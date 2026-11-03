@@ -267,6 +267,8 @@ export async function getSnapshot(ctx: ReadCtx, snapshotId: string): Promise<Res
         baseline: await imageUrl(ctx, orgId, shot.baselineKey),
         diff: await imageUrl(ctx, orgId, shot.diffKey),
       },
+      // The layout metrics file (docs/metrics.md), a short-lived URL like the images; null without one.
+      metrics_url: await imageUrl(ctx, orgId, shot.metricsKey),
     },
   });
 }

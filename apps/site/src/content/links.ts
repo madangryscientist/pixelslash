@@ -18,6 +18,7 @@ export const CONTACT = "hello@hack-cove.com";
 const SITE_PATHS: Record<string, string> = {
   "docs/cli.md": "/docs",
   "docs/getting-started.md": "/docs/getting-started",
+  "docs/metrics.md": "/docs/metrics",
   "apps/web/SELF-HOST.md": "/self-host",
   "SECURITY.md": "/security",
   "docs/capabilities/matrix.html": "/compare",

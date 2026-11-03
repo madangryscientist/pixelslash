@@ -4,6 +4,8 @@ import { UsageError } from "./errors.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
 import { checkPng, identity } from "./manifest.ts";
 import { readPngSize } from "./identical.ts";
+import { METRICS_SUFFIX } from "./metrics-entry.ts";
+import { checkMetrics } from "./metrics-file.ts";
 import { DEVICE_LABEL, expectedPixels, type NativePlatform } from "./native.ts";
 
 export type ImportOptions = {
@@ -44,16 +46,25 @@ const UNKNOWN_FONTS = "unknown";
 
 const PNG_FILE = /\.png$/i;
 
-/** Every `.png` under `dir`, as `/`-separated paths relative to it, sorted. Other files are left alone. */
-async function pngFiles(dir: string): Promise<string[]> {
+/**
+ * Every `.png` under `dir`, and every `<name>.metrics.json` (PS-294), as `/`-separated paths relative
+ * to it, sorted. Other files are left alone.
+ */
+async function scan(dir: string): Promise<{ pngs: string[]; metrics: string[] }> {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => {
     throw new UsageError(`${dir} is not a directory`);
   });
-  return entries
-    .filter((e) => e.isFile() && PNG_FILE.test(e.name))
-    .map((e) => relative(dir, join(e.parentPath, e.name)).split(sep).join("/"))
-    .toSorted();
+  const files = entries
+    .filter((e) => e.isFile())
+    .map((e) => relative(dir, join(e.parentPath, e.name)).split(sep).join("/"));
+  return {
+    pngs: files.filter((f) => PNG_FILE.test(f)).toSorted(),
+    metrics: files.filter((f) => f.endsWith(METRICS_SUFFIX)).toSorted(),
+  };
 }
+
+/** The metrics file that sits beside a PNG: `home.png` has `home.metrics.json`. */
+const metricsBeside = (png: string): string => png.replace(PNG_FILE, METRICS_SUFFIX);
 
 const WEB_DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 
@@ -148,6 +159,32 @@ function refuseOverlap(out: string, dir: string): void {
     throw new UsageError(`--out ${out} overlaps the PNG dir ${dir}`);
 }
 
+/** A metrics file is checked before anything is written: no PNG beside it, or malformed, is exit 2. */
+async function checkMetricsFiles(dir: string, files: string[], metricsFiles: string[]) {
+  const beside = new Set(files.map(metricsBeside));
+  for (const m of metricsFiles)
+    if (!beside.has(m))
+      throw new UsageError(`${m} has no ${m.slice(0, -METRICS_SUFFIX.length)}.png beside it`);
+  for (const m of metricsFiles)
+    checkMetrics(m, new Uint8Array(await Bun.file(join(dir, m)).arrayBuffer()));
+}
+
+/** The entry with its `<name>.metrics.json` beside the PNG, when there is one. */
+function withMetrics(entry: SnapshotEntry, metricsFiles: string[]): SnapshotEntry {
+  const metrics = metricsBeside(entry.file);
+  return metricsFiles.includes(metrics) ? { ...entry, metrics } : entry;
+}
+
+/** The PNGs, and each one's metrics file, copied into the snapshot dir. */
+async function copyShots(dir: string, out: string, snapshots: SnapshotEntry[]) {
+  for (const e of snapshots) {
+    for (const f of e.metrics ? [e.file, e.metrics] : [e.file]) {
+      await mkdir(dirname(join(out, f)), { recursive: true });
+      await copyFile(join(dir, f), join(out, f));
+    }
+  }
+}
+
 /**
  * Turn a dir of PNGs from any screenshot tool into a snapshot dir `upload` accepts: the PNGs
  * copied in and a version 1 manifest. Nothing is measured from the shots, so every entry takes the
@@ -158,8 +195,9 @@ export async function importPngs(options: ImportOptions): Promise<ImportResult> 
   const dir = resolve(options.dir);
   const out = resolve(options.out);
   refuseOverlap(out, dir);
-  const files = await pngFiles(dir);
+  const { pngs: files, metrics: metricsFiles } = await scan(dir);
   if (files.length === 0) throw new UsageError(`no .png files in ${dir}`);
+  await checkMetricsFiles(dir, files, metricsFiles);
   const native = checkNative(options);
   const notes: string[] = [];
   const snapshots: SnapshotEntry[] = [];
@@ -167,7 +205,8 @@ export async function importPngs(options: ImportOptions): Promise<ImportResult> 
     const viewport = native
       ? await nativeViewport(dir, f, native, notes)
       : (options.viewport ?? WEB_DEFAULT_VIEWPORT);
-    snapshots.push(entryFor(f, options, viewport));
+    const entry = entryFor(f, options, viewport);
+    snapshots.push(withMetrics(entry, metricsFiles));
   }
   const seen = new Set<string>();
   for (const e of snapshots) {
@@ -177,10 +216,7 @@ export async function importPngs(options: ImportOptions): Promise<ImportResult> 
     if (seen.has(id)) throw new UsageError(`two PNGs are named ${e.name} (${e.file})`);
     seen.add(id);
   }
-  for (const f of files) {
-    await mkdir(dirname(join(out, f)), { recursive: true });
-    await copyFile(join(dir, f), join(out, f));
-  }
+  await copyShots(dir, out, snapshots);
   const manifest: SnapshotManifest = { version: 1, snapshots };
   const manifestPath = join(out, "manifest.json");
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

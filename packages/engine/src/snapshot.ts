@@ -1,9 +1,10 @@
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { scanA11y } from "./a11y.ts";
 import type { A11y } from "./a11y-entry.ts";
-import { keepNativeRaf } from "./capture.ts";
+import type { Metrics } from "./metrics-entry.ts";
+import { measureMetrics } from "./metrics-walk.ts";
 import { launchSessionBrowsers } from "./capture-browsers.ts";
-import { openPage, type Opened } from "./capture-open.ts";
+import { openPage, pinClock, type Opened } from "./capture-open.ts";
 import {
   loadLibrary,
   measureComposition,
@@ -89,6 +90,12 @@ export type SnapshotEntry = {
    * field existed have none.
    */
   a11y?: A11y;
+  /**
+   * This shot's layout metrics file (PS-294, `docs/metrics.md`), as a path relative to the manifest's
+   * directory, beside the PNG. Present only when the config turns `metrics` on or an import found a
+   * `<name>.metrics.json`; manifests written before the field existed have none.
+   */
+  metrics?: string;
 } & NativeFields; // a native shot's platform, device and scale (PS-293); absent on web
 
 /** `manifest.json` in the snapshot dir. No timestamps: two runs of the same build write the same bytes. */
@@ -153,6 +160,8 @@ type Shot = {
   library: CompositionLibrary | undefined;
   /** Scan the settled page for accessibility violations (PS-238). */
   a11y: boolean;
+  /** Read every `[data-part]` element's box and style into the layout metrics file (PS-294). */
+  metrics: boolean;
   warn: (m: string) => void;
   unmatched: UnmatchedTally;
 };
@@ -176,21 +185,9 @@ export type Shoot = {
   media: MediaBox[];
   composition?: Composition;
   a11y?: A11y;
+  /** The page's layout metrics (PS-294); absent when not asked for or when the page has no `data-part`. */
+  metrics?: Metrics;
 };
-
-/**
- * Pin the page clock before navigation. With `timers` it is fake timers installed and paused at the
- * instant, so nothing the page schedules fires on its own, and the clock is never advanced after
- * (the settle uses the browser's own frames; see `keepNativeRaf`). Without, only Date is fixed and
- * timers run. A real clock is left alone.
- */
-async function pinClock(context: BrowserContext, { clock, timers }: Stabilise): Promise<void> {
-  if (clock === false) return;
-  if (!timers) return context.clock.setFixedTime(clock);
-  await context.addInitScript(keepNativeRaf);
-  await context.clock.install({ time: clock });
-  await context.clock.pauseAt(clock);
-}
 
 /**
  * What is read off the settled page once it is shot: the ignore boxes, media, composition and a11y
@@ -219,11 +216,13 @@ async function measure(page: Page, shot: Shot, png: Buffer, origin?: Crop["origi
       origin,
       warn: shot.warn,
     }));
+  // Read like the boxes above: the settled page, after the shot, before anything is let run.
+  const metrics = shot.metrics ? ((await measureMetrics(page)) ?? undefined) : undefined;
   // After the screenshot and the measurements, so nothing the scan lets run can reach the PNG.
   // axe waits on timers, which `timers` has paused for good: let the page clock run again first.
   if (shot.a11y && stabilise.timers) await page.clock.resume();
   const a11y = shot.a11y ? await scanA11y(page) : undefined;
-  return { ignore, media, composition, a11y };
+  return { ignore, media, composition, a11y, metrics };
 }
 
 /** The settled page shot: cropped to its story when it is one, then measured in the frame it is kept in. */
@@ -248,7 +247,7 @@ async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
     settle: opened.settle,
   };
   const { png, origin } = storyShot(full, story, stabilise.deviceScaleFactor);
-  const { ignore, media, composition, a11y } = await measure(page, shot, png, origin);
+  const { ignore, media, composition, a11y, metrics } = await measure(page, shot, png, origin);
   const rects = route.masks.filter((m) => typeof m !== "string");
   return {
     png: paintRects(png, shiftBoxes(rects, origin), stabilise.deviceScaleFactor),
@@ -258,6 +257,7 @@ async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
     steps,
     ...(composition && { composition }),
     ...(a11y && { a11y }),
+    ...(metrics && { metrics }),
   };
 }
 
@@ -297,7 +297,11 @@ export type CaptureSession = {
   /** How long the browsers took to launch, together (PS-195). */
   browserLaunchMs: number;
   /** `scan` asks for the accessibility scan (PS-238); only `captureInto` keeps its result, so a flake re-capture or a dev loop skips it. */
-  shoot: (route: Route, variant: Variant, scan?: { a11y?: boolean }) => Promise<Shoot>;
+  shoot: (
+    route: Route,
+    variant: Variant,
+    scan?: { a11y?: boolean; metrics?: boolean },
+  ) => Promise<Shoot>;
   /** Print the selectors that matched nothing since the last flush (PS-241); `close` does too. */
   flush: () => void;
   close: () => Promise<void>;
@@ -358,6 +362,7 @@ export async function openCaptureSession(
           session: held.session,
           library,
           a11y: config.a11y && scan?.a11y === true,
+          metrics: config.metrics && scan?.metrics === true,
           warn,
           unmatched,
         });
@@ -373,19 +378,7 @@ export async function openCaptureSession(
   }
 }
 
-/** The shot a manifest entry names, again; `undefined` when the config has no such route or variant. */
-export function recapture(
-  session: CaptureSession,
-  entry: Pick<SnapshotEntry, "name" | "variant">,
-): Promise<Shoot | undefined> {
-  const route = session.routes.find((r) => r.name === entry.name);
-  // A baseline is only ever matched in its own browser: the same name in another is another shot.
-  const variant = session.config.variants.find(
-    (v) => v.name === entry.variant.name && v.browser === entry.variant.browser,
-  );
-  return route && variant ? session.shoot(route, variant) : Promise.resolve(undefined);
-}
-
+export { recapture } from "./recapture.ts";
 /**
  * Capture every route × variant in `config` into `out` and write `out/manifest.json`.
  * Starts the app first when the config has a start command, and stops it after; runs the

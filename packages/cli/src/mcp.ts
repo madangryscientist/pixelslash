@@ -9,7 +9,7 @@ import {
 import { RemoteError, isObj, str, type Reply } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
 import type { DevDeps } from "./dev.ts";
-import { MCP_FLAGS, arg, devTools, text } from "./mcp-dev.ts";
+import { MCP_FLAGS, arg, devTools, pretty, text } from "./mcp-dev.ts";
 import { localTools, watchOf } from "./mcp-local.ts";
 import { servePrompts } from "./mcp-prompts.ts";
 import { connect, resolveProject, type Remote } from "./remote.ts";
@@ -51,15 +51,32 @@ async function projectId({ remote, project }: Ctx, args: Args): Promise<string> 
   return id((await resolveProject(remote, arg(args, "project") ?? project)).id);
 }
 
-/** A signed image URL, fetched only when it is on the configured server. */
-async function image({ remote, fetch }: Ctx, url: string): Promise<string> {
+/** A signed blob URL (an image, a metrics file), fetched only when it is on the configured server. */
+async function blob({ remote, fetch }: Ctx, url: string): Promise<ArrayBuffer> {
   if (new URL(url).origin !== new URL(remote.client.server).origin)
     throw new RemoteError(`image ${url} is not on ${remote.client.server}; not fetched`);
   const res = await fetch(url).catch((e: unknown) => {
     throw new RemoteError(`cannot fetch ${url}: ${e instanceof Error ? e.message : String(e)}`);
   });
   if (!res.ok) throw new RemoteError(`GET ${url} -> ${res.status}`);
-  return Buffer.from(await res.arrayBuffer()).toString("base64");
+  return res.arrayBuffer();
+}
+
+const image = async (ctx: Ctx, url: string): Promise<string> =>
+  Buffer.from(await blob(ctx, url)).toString("base64");
+
+/**
+ * `get_snapshot`: the API's record, plus the layout metrics file (`docs/metrics.md`) inline as
+ * `metrics` when the snapshot has one, so an agent reads the parts without fetching a signed URL.
+ * No metrics, no extra field and no extra request. The file is data, not pixels.
+ */
+async function snapshotRecord(ctx: Ctx, args: Args): Promise<CallToolResult> {
+  const r = await ctx.remote.client.get(`/api/v1/snapshots/${id(need(args, "snapshot_id"))}`);
+  const shot = r.body.snapshot;
+  const url = isObj(shot) ? str(shot.metrics_url) : undefined;
+  if (!isObj(shot) || !url) return reply(r);
+  const metrics: unknown = JSON.parse(new TextDecoder().decode(await blob(ctx, url)));
+  return text(pretty({ ...r.body, snapshot: { ...shot, metrics } }));
 }
 
 /** `get_snapshot_images`: the PNGs the snapshot has, each after a line naming it. */
@@ -130,11 +147,10 @@ const TOOLS: Record<string, Tool> = {
   },
   get_snapshot: {
     description:
-      "One snapshot's record, with signed image URLs that expire after 5 minutes. No pixels; use get_snapshot_images for those (GET /api/v1/snapshots/:id).",
+      "One snapshot's record, with signed image URLs that expire after 5 minutes. No pixels; use get_snapshot_images for those. A snapshot that came with a layout metrics file (docs/metrics.md) also has it inline as `metrics` (GET /api/v1/snapshots/:id).",
     properties: { snapshot_id: SNAPSHOT_ID },
     required: ["snapshot_id"],
-    call: async ({ remote }, args) =>
-      reply(await remote.client.get(`/api/v1/snapshots/${id(need(args, "snapshot_id"))}`)),
+    call: snapshotRecord,
   },
   get_snapshot_images: {
     description:

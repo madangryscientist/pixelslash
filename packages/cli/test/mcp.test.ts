@@ -30,6 +30,10 @@ function api(server = SERVER) {
         },
       },
     },
+    "/api/v1/snapshots/s3": {
+      api_version: 1,
+      snapshot: { id: "s3", images: {}, metrics_url: `${server}/images/orgs/o/m.metrics.json` },
+    },
     "/api/v1/snapshots/s2": {
       api_version: 1,
       snapshot: { id: "s2", images: { head: "https://elsewhere.example/x.png" } },
@@ -46,6 +50,12 @@ function api(server = SERVER) {
     const url = new URL(raw);
     if (!url.pathname.startsWith("/images/")) return base.fetch(raw, init);
     images.push(url.pathname);
+    if (url.pathname.endsWith(".metrics.json"))
+      return Response.json({
+        version: "1.0",
+        root: "a",
+        parts: { a: { box: { x: 0, y: 0, w: 1, h: 2 } } },
+      });
     return new Response(PNG_BYTES, { headers: { "content-type": "image/png" } });
   };
   return { ...base, fetch, images };
@@ -158,6 +168,20 @@ describe("pixelslash mcp", () => {
     expect(fake.images).toEqual(["/images/head", "/images/base"]);
     const one = await call("get_snapshot_images", { snapshot_id: "s1", which: "baseline" });
     expect(one.content.map((c) => c.type)).toEqual(["text", "image"]);
+  });
+
+  test("get_snapshot inlines the layout metrics file when the snapshot has one, and only then", async () => {
+    const { call, fake } = await connected();
+    const shot = json(await call("get_snapshot", { snapshot_id: "s3" })).snapshot;
+    expect(shot).toMatchObject({
+      id: "s3",
+      metrics: { version: "1.0", root: "a", parts: { a: { box: { w: 1, h: 2 } } } },
+    });
+    expect(fake.images).toEqual(["/images/orgs/o/m.metrics.json"]);
+    // No metrics_url: the reply is the API's own, with no `metrics` field and no extra fetch.
+    const plain = json(await call("get_snapshot", { snapshot_id: "s1" })).snapshot;
+    expect(plain).not.toHaveProperty("metrics");
+    expect(fake.images).toEqual(["/images/orgs/o/m.metrics.json"]);
   });
 
   test("an image URL off the configured server is not fetched", async () => {

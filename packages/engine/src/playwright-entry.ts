@@ -4,7 +4,9 @@
 // `Bun` reference.
 export { keepNativeRaf, settleCapture } from "./settle.ts";
 export { fontSetHash, imageId, type Fingerprint } from "./fingerprint.ts";
-export { identity, pngPath } from "./snapshot-paths.ts";
+export { identity, metricsPath, pngPath } from "./snapshot-paths.ts";
+export { METRICS_SUFFIX, metricsText, type Metrics } from "./metrics-entry.ts";
+export { measureMetrics } from "./metrics-walk.ts";
 export { MASK_COLOR, maskLocators, measureIgnore, toImageRects } from "./page-areas.ts";
 export type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
 export { unmatchedTally } from "./unmatched.ts";

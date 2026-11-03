@@ -7,6 +7,7 @@ import { usageCounts } from "#/db/usage";
 import { type ApiDeps, handleApi } from "./handler";
 import { MAX_PNG_BYTES } from "./snapshot-form";
 import { MAX_FLAKE_RUNS } from "./validate";
+import { METRICS_PART_ALLOWANCE as METRICS } from "./validate-metrics";
 import {
   META,
   PNG,
@@ -298,8 +299,8 @@ describe("upload API", () => {
         body: "x",
         headers: {
           authorization: `Bearer ${acme.token}`,
-          // The cap counts the shot and every flake:<run> re-capture it may carry (ob 1724).
-          "content-length": String(MAX_FLAKE_RUNS * MAX_PNG_BYTES + 1_000_000),
+          // The cap counts the shot, every flake:<run> re-capture (ob 1724) and a metrics file (PS-294).
+          "content-length": String(MAX_FLAKE_RUNS * MAX_PNG_BYTES + METRICS + 1e6),
         },
       }),
       deps,

@@ -1,0 +1,1 @@
+ALTER TABLE `snapshots` ADD `metrics_key` text;

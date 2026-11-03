@@ -3,7 +3,6 @@ import {
   type BaselinePick,
   type CiResult,
   type DiffLocation,
-  ENGINE_VERSION,
   type PickedShot,
   measureShot,
 } from "./ci-diff.ts";
@@ -12,14 +11,13 @@ import { DEFAULT_FLAKE_RETRIES } from "./config-flake.ts";
 import { isHttpUrl } from "./routes.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
-import type { FlakeCheck } from "./flake.ts";
 import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
-import { identity, pngPath, readManifest } from "./manifest.ts";
-import { serverBrowser, serverPlatform } from "./native.ts";
+import { identity, readManifest } from "./manifest.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
 import { elapsed, requestLog, timingsToSend, type ShotTiming, type Timings } from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
+import { readShot, snapshotForm } from "./upload-form.ts";
 
 const CONCURRENCY = 4;
 export type UploadOptions = {
@@ -170,44 +168,6 @@ async function openBuild(
   return { id: body.id, diffLocation: at === "ci" || at === "server" ? at : undefined };
 }
 
-/** What a shot sends beside its meta and PNG. */
-type ShotExtras = { results: CiResult[]; flake: FlakeCheck | undefined; note: string | null };
-
-/**
- * One shot's upload: its meta and PNG; in a CI project, what it measured against each baseline;
- * for a flaky shot, the flake record and every re-capture as `flake:<run>` (ob 1737); and the
- * judge's sentence, when it wrote one (ob 1745).
- */
-function snapshotForm(
-  e: SnapshotEntry,
-  png: Buffer,
-  { results, flake, note }: ShotExtras,
-): FormData {
-  const form = new FormData();
-  const meta: Record<string, unknown> = snapshotMeta(e);
-  if (note) meta.changeNote = note;
-  if (results.length > 0) {
-    meta.ci = {
-      engineVersion: ENGINE_VERSION,
-      results: results.map(({ baselineId, status, diffResult }) => ({
-        baselineId,
-        status,
-        diffResult,
-      })),
-    };
-    for (const r of results)
-      form.set(`diff:${r.baselineId}`, new File([new Uint8Array(r.mask)], "diff.png"));
-  }
-  if (flake?.flaky) {
-    meta.flake = flake.record;
-    for (const r of flake.retries)
-      form.set(`flake:${r.run}`, new File([new Uint8Array(r.png)], `run${r.run}.png`));
-  }
-  form.set("meta", JSON.stringify(meta));
-  form.set("file", new File([new Uint8Array(png)], "shot.png"));
-  return form;
-}
-
 /**
  * Send a snapshot dir to a PixelSlash server: open a build, upload each PNG, finalise.
  * The only network this package does for a page shot, and only to `server`. If anything
@@ -257,8 +217,7 @@ export async function uploadSnapshots(
   const worker = async () => {
     for (let next = queue.shift(); next && !stop.on; next = queue.shift()) {
       const { e, pick } = next;
-      const file = pngPath(opts.dir, e);
-      const png = Buffer.from(await Bun.file(file).arrayBuffer());
+      const { file, png, metrics } = await readShot(opts.dir, e);
       // A server project measures at finalise; here its diff only decides whether to re-capture
       // and what the judge describes, and is never sent as the shot's result.
       const mains = new Map<string, Buffer>();
@@ -276,7 +235,7 @@ export async function uploadSnapshots(
         step: `upload ${identity(e)}`,
         method: "PUT",
         path: `/api/v1/builds/${id}/snapshots`,
-        body: snapshotForm(e, png, { results: ci ? results : [], flake, note }),
+        body: snapshotForm(e, png, { results: ci ? results : [], flake, note, metrics }),
       });
       progress.sent++;
     }
@@ -361,21 +320,4 @@ async function measureTimed(
   const results = await measureShot(e, png, pick, fetchMain);
   timing.diffMs = Math.max(0, elapsed(started) - fetching);
   return results;
-}
-
-function snapshotMeta(e: SnapshotEntry) {
-  return {
-    name: e.name,
-    platform: serverPlatform(e),
-    browser: serverBrowser(e),
-    viewport: `${e.variant.viewport.width}x${e.variant.viewport.height}`,
-    theme: e.variant.theme,
-    tags: e.tags,
-    diff: e.diff,
-    ignore: e.ignore,
-    fingerprint: e.fingerprint,
-    flaky: e.flaky,
-    ...(e.composition && { composition: e.composition }),
-    ...(e.a11y && { a11y: e.a11y }),
-  };
 }

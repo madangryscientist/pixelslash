@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { METRICS_SUFFIX } from "@hackcove/pixelslash-engine/metrics-entry";
 import { blobStore, imageSigningSecret } from "#/server/env";
 import { verifySignedImagePath } from "#/storage/signed";
 
 /**
- * Serves one PNG from the private bucket behind a short-lived signature. Every failure is the
+ * Serves one PNG (or a layout metrics file, `.metrics.json`) from the private bucket behind a short-lived signature. Every failure is the
  * same 404: a missing object, a tampered key and an expired signature are indistinguishable, so
  * the route never confirms what the bucket holds.
  */
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/images/$")({
         if (!body) return new Response("not found", { status: 404 });
         return new Response(body, {
           headers: {
-            "content-type": "image/png",
+            "content-type": key.endsWith(METRICS_SUFFIX) ? "application/json" : "image/png",
             // The signature is short-lived; the browser may reuse the bytes for its duration.
             "cache-control": "private, max-age=300",
           },

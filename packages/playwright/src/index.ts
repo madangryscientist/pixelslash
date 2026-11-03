@@ -5,14 +5,19 @@ import {
   MASK_COLOR,
   fontSetHash,
   identity,
+  METRICS_SUFFIX,
   imageId,
   maskLocators,
   measureIgnore,
+  measureMetrics,
+  metricsPath,
+  metricsText,
   pngPath,
   settleCapture,
   toImageRects,
   unmatchedTally,
   type Fingerprint,
+  type Metrics,
   type SnapshotEntry,
   type SnapshotManifest,
 } from "@hackcove/pixelslash-engine/playwright";
@@ -29,6 +34,11 @@ export type SnapshotOptions = {
   /** The variant's name, and the PNG's file name. Default `<width>x<height>-<theme>`. */
   variant?: string;
   tags?: string[];
+  /**
+   * Write the layout metrics (`docs/metrics.md`) of the `[data-part]` elements next to the PNG, as
+   * `pixelslash capture` does with `"metrics": true`. Default false.
+   */
+  metrics?: boolean;
   /** Default true, as `pixelslash capture` shoots. */
   fullPage?: boolean;
   /** Default `PIXELSLASH_SNAPSHOT_DIR`, else `pixelslash-snapshots` in the working dir. */
@@ -85,6 +95,7 @@ export async function snapshot(
   );
   const ignore = toImageRects(boxes, scale, size);
 
+  const metrics = await readMetrics(page, opts.metrics);
   const dir = opts.dir ?? process.env["PIXELSLASH_SNAPSHOT_DIR"] ?? DEFAULT_DIR;
   const entry: SnapshotEntry = {
     name,
@@ -95,14 +106,31 @@ export async function snapshot(
     ignore,
     flaky: "review",
     file: `${name}/${variant}.png`,
+    ...metricsRef(metrics, `${name}/${variant}`),
     fingerprint: await fingerprintOf(browser),
   };
   // The engine's own check: a name or variant that climbs out of the dir is refused.
   const path = pngPath(dir, entry);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, png);
+  await writeMetrics(dir, entry, metrics);
   await locked(dir, () => addEntry(dir, entry));
   return entry;
+}
+
+/** The page's layout metrics (`docs/metrics.md`) when the shot asked for them, else null. */
+async function readMetrics(page: Page, on: boolean | undefined): Promise<Metrics | null> {
+  return on ? await measureMetrics(page) : null;
+}
+
+/** The entry's `metrics` path beside the PNG `stem`, when the shot has metrics. */
+const metricsRef = (metrics: Metrics | null, stem: string) =>
+  metrics ? { metrics: `${stem}${METRICS_SUFFIX}` } : {};
+
+/** Write the metrics file the entry names, when the shot has one. */
+async function writeMetrics(dir: string, entry: SnapshotEntry, metrics: Metrics | null) {
+  if (metrics && entry.metrics)
+    await writeFile(metricsPath(dir, entry.metrics), metricsText(metrics));
 }
 
 /** The theme the page reports for `prefers-color-scheme`, and its device pixel ratio. */

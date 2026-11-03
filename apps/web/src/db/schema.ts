@@ -299,6 +299,11 @@ export const snapshots = sqliteTable(
     envFingerprint: text("env_fingerprint").notNull(),
     imageKey: text("image_key").notNull(),
     /**
+     * The layout metrics file (PS-294, `docs/metrics.md`) as a blob beside the PNG; null when the
+     * upload had none. Shown only, never part of the shot's identity or its diff.
+     */
+    metricsKey: text("metrics_key"),
+    /**
      * The sha256 (hex) of the uploaded PNG's bytes and its size from the IHDR (ob 1948), computed at
      * upload. Two shots with the same hash are the same bytes, so the diff stores them unchanged
      * without reading either blob; the size is what such a result needs of them. Null on a shot

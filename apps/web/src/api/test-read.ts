@@ -72,7 +72,7 @@ export type Reply = {
   projects: ApiProject[];
   builds: ApiBuild[];
   build: ApiBuild & { snapshots: ApiSnapshot[] };
-  snapshot: ApiSnapshot & { images: ApiImages };
+  snapshot: ApiSnapshot & { images: ApiImages; metrics_url: string | null };
   detection_flags: ApiFlag[];
   detection_flag: ApiFlag;
   next_cursor: string | null;

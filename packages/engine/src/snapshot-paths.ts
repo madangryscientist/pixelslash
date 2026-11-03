@@ -19,8 +19,17 @@ export function identity(e: SnapshotEntry): string {
 
 /** A manifest names files relative to its dir; one that climbs out of it is refused. */
 export function pngPath(dir: string, e: SnapshotEntry): string {
+  return inside(dir, e.file);
+}
+
+/** An entry's layout metrics file (PS-294), under the same rule as its PNG. */
+export function metricsPath(dir: string, file: string): string {
+  return inside(dir, file);
+}
+
+function inside(dir: string, file: string): string {
   const root = resolve(dir);
-  const path = resolve(root, e.file);
-  if (!path.startsWith(root + sep)) throw new UsageError(`manifest: ${e.file} is outside ${dir}`);
+  const path = resolve(root, file);
+  if (!path.startsWith(root + sep)) throw new UsageError(`manifest: ${file} is outside ${dir}`);
   return path;
 }

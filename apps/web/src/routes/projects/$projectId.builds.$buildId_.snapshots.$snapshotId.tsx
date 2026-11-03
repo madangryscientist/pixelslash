@@ -164,6 +164,7 @@ function SideColumn({
       options={data.diffOptions}
       reviewable={reviewable}
       status={build.status}
+      metrics={data.metrics}
       tools={hasTools(data) ? <ShotTools data={data} ignore={ignore} /> : null}
     >
       <FlagPanel projectId={project.id} snapshotId={snapshot.id} flags={data.flags} draft={flag} />

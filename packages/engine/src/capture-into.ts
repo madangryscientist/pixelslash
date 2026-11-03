@@ -4,6 +4,7 @@ import { writeGapsReport } from "./composition-report.ts";
 import { resolveDiff, resolveFlaky } from "./config.ts";
 import { clearFlakeOutput } from "./flake-upload.ts";
 import { identity } from "./manifest.ts";
+import { METRICS_SUFFIX, metricsText } from "./metrics-entry.ts";
 import type {
   CaptureSession,
   SnapshotEntry,
@@ -66,12 +67,16 @@ export async function captureInto(
   const taken = await mapLimit(pairs, concurrency, async ({ route, variant }) => {
     const file = `${route.name}/${variant.name}.png`;
     const started = performance.now();
-    const { png, ignore, media, composition, a11y, steps } = await session.shoot(route, variant, {
-      a11y: true,
-    });
+    const { png, ignore, media, composition, a11y, metrics, steps } = await session.shoot(
+      route,
+      variant,
+      { a11y: true, metrics: true },
+    );
     const captureMs = elapsed(started);
     await mkdir(join(out, route.name), { recursive: true });
     await Bun.write(join(out, file), png);
+    const metricsFile = metrics && file.replace(/\.png$/, METRICS_SUFFIX);
+    if (metrics && metricsFile) await Bun.write(join(out, metricsFile), metricsText(metrics));
     const entry: SnapshotEntry = {
       name: route.name,
       path: route.path,
@@ -84,6 +89,7 @@ export async function captureInto(
       fingerprint: session.fingerprintFor(variant.browser),
       ...(composition && { composition }),
       ...(a11y && { a11y }),
+      ...(metricsFile && { metrics: metricsFile }),
     };
     const shot: ShotTiming = { name: identity(entry), captureMs, ...steps };
     return { entry, shot, media };
