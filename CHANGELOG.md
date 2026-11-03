@@ -7,6 +7,17 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-03
+
+### Added
+
+- The side-by-side parity view (PS-298). One review page per snapshot key (name + theme) shows the web,
+  Android and iOS shots next to each other at one physical size, with a column worded `no ios twin` for a
+  missing platform. Under them, the PS-296 metrics mismatches as sentences, and a similarity score per
+  native column that is a hint only: it changes no status, exit code, check or count. Reached from the
+  side panel's Twins row ("Compare platforms"). `pixelslash mcp` exposes it as `get_parity_view`; the read
+  is `GET /api/v1/builds/:id/parity?name&theme`. See "Parity view" in `docs/cli.md`.
+
 ## [0.6.0] - 2026-11-03
 
 ### Added
