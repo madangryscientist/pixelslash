@@ -5,6 +5,7 @@ import { type Db, NotFoundError } from "#/db/db";
 import { type ProjectFlag, flagProjectId, markFlagExported, projectFlags } from "#/db/flags";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
 import { type SnapshotView, buildView } from "#/db/review";
+import { twinsOfBuild } from "#/db/twins";
 import {
   BUILD_STATUSES,
   type BuildStatus,
@@ -14,6 +15,7 @@ import {
 } from "#/db/schema";
 import { awaitsDecision, groupOf, skippedFlaky } from "#/lib/snapshot-groups";
 import { signedImagePath } from "#/storage/signed";
+import { twinsSection } from "./twins-section";
 import { BadRequest, Forbidden } from "./validate";
 
 /**
@@ -210,6 +212,8 @@ export function projectOf(ctx: ReadCtx, p: Awaited<ReturnType<typeof actorProjec
     name: p.name,
     org: p.org,
     default_branch: p.defaultBranch,
+    // The project whose shots this one's are paired with (PS-295); null when none is linked.
+    twin_project_id: p.twinProjectId,
     created_at: iso(p.createdAt),
     web_url: `${ctx.origin}/projects/${p.id}`,
   };
@@ -245,10 +249,13 @@ export async function getBuild(ctx: ReadCtx, buildId: string): Promise<Response>
   const { build: row } = await actorBuild(ctx.db, ctx.actor, buildId);
   const view = await buildView(ctx.db, row.projectId, row.id);
   const c = (await countBuilds(ctx.db, [row.id])).get(row.id) ?? emptyCounts();
+  // A project's own CI token holds one project: it never reads the linked twin project's shots.
+  const twins = await twinsOfBuild(ctx.db, row.id, { crossProject: ctx.actor.kind !== "ci" });
   return reply({
     build: {
       ...build(ctx, row.projectId, view.build, c),
       snapshots: view.snapshots.map((s) => snapshot(ctx, row.projectId, row.id, s)),
+      ...twinsSection(twins),
     },
   });
 }

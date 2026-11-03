@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import type {
   AiReview,
   AiSummary,
@@ -97,6 +98,14 @@ export const projects = sqliteTable(
      * On by default, and for projects from before it.
      */
     githubComment: integer("github_comment", { mode: "boolean" }).notNull().default(true),
+    /**
+     * The project whose shots are this one's twins across platforms (PS-295): the same name and
+     * theme on another platform. Another project of the same org, set on the settings page; null
+     * is none. One-directional: the other project links back only if it sets its own.
+     */
+    twinProjectId: text("twin_project_id").references((): AnySQLiteColumn => projects.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (t) => [unique().on(t.orgId, t.name)],

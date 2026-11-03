@@ -434,6 +434,23 @@ pixelslash compare snaps/android-main snaps/android-branch
 - **Fonts loaded before the shot:** wait for the screen to settle (`assertVisible` on text that comes after the font and images are in) before `takeScreenshot`.
 - **One fixed emulator image per baseline:** the same device, OS version, locale, font scale, display size and dark/light mode. Put what pins it in `--device` (`Pixel 8 API 35`). Changing the image is a re-baseline by design.
 
+### Twins across platforms
+
+A **twin** is the same snapshot name and theme on another platform (`web`, `android` or `ios`): `Button/primary` dark on the web and `Button/primary` dark on a Pixel. The key is **name + theme** and nothing else. The viewport and the device are not part of it, so a web shot at 1280×720 and an android shot on a Pixel 8 are twins; when a side holds several shots under the key (two viewports, two devices) every one is listed. Linking is a read: it changes no snapshot's identity, fingerprint or diff, compares nothing, and sets no exit code.
+
+For a build, each platform other than the shot's own is looked up in this order, and the first source that holds that platform wins:
+
+1. **The same build.** Its own shots on that platform.
+2. **A twin project's build at the same commit.** When the project links a twin project (below): that project's newest build with the same commit sha that was diffed (`changes`, `passed` or `failed`). The source reads `same commit 1a2b3c4`.
+3. **Baselines.** The current accepted baselines of the project and its twin project for that platform: for each name, theme, device and viewport the newest shot that is accepted (its build passed, or it was accepted in review). The source reads `baselines`.
+
+A platform no source holds is not in play: a build with no other platform's shots anywhere has no twins, so its shots are not called unlinked, and a web-only project is read exactly as before.
+
+- **Linked projects.** A project can name one **twin project** of the same org, for the common case of a web app and a native app that live in two projects. Set it on the project's settings page (Twin project, a select of the org's other projects) or with `PUT /api/v1/projects/:id/twin` and `{ "twin_project_id": "…" }` (`null` clears it). Only a member of the org can set it, a project of another org is a 400, and nothing is ever linked across orgs. A project's own CI token never reads its twin project's shots; a personal or org token does.
+- **What a read returns.** `GET /api/v1/builds/:id` gains `twins`: `{ twin_project: { id, name } | null, linked: [entry], unlinked: [entry] }`. Each `entry` is a shot of the build: `snapshot_id`, `name`, `theme`, `platform`, `device`, `viewport`, `has_metrics` (it came with a [layout metrics file](metrics.md)) and `missing` (the platforms in play with no shot under the key; empty when linked), plus `twins`, each `{ snapshot_id, platform, device, viewport, project_id, project_name, build_id, source` (`build`, `commit` or `baselines`)`, source_label, commit_sha, has_metrics }`. `linked` holds the shots that have a twin on every platform in play, `unlinked` the rest; a partly linked shot is unlinked and still lists the twins it has. `twins` is absent on a build with none, and `pixelslash mcp`'s `get_build` returns it as sent.
+- **At the CLI.** `pixelslash build ID` prints `Button/loading dark has no android twin` for each unlinked shot (`has no web or android twin` when two platforms are missing) and `twins: N linked`. `--json` carries the full `twins` section.
+- **In the web app.** The snapshot side panel has a **Twins** row whose links go to each twin snapshot, labelled by platform and device (`android · Pixel 8 API 35`) and named with their source; the build page lists the **Unlinked** shots.
+
 ## Comparing two snapshot dirs
 
 `pixelslash compare` is pair mode for two `capture` outputs: Main's snapshot dir against Branch's, on this machine, with no design system and no server.
@@ -527,7 +544,7 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 - `login` asks for a personal token (`psu_…`; it prints where to make one: Settings → API tokens on the server, `<server>/settings`). On a terminal the token is read with echo off; otherwise it is the first line of stdin (`pixelslash login --server URL < token-file`). It checks the token with `GET /api/v1/me`, then stores it. A CI token (`psci_…` or an org token `psorg_…`) is refused: CI passes its token by `PIXELSLASH_TOKEN` or `--token-path` instead. No token is ever printed.
 - **The credential file** is `~/.config/pixelslash/credentials.json` (`$XDG_CONFIG_HOME/pixelslash/` when that is set), mode 0600 in a 0700 dir, one token per server: `{ "servers": { "https://ps.example": { "token": "psu_…" } } }`. `logout` removes the server's entry and does not revoke the token; revoke it on the settings page.
 - `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), `org token for ORG` with the projects it reaches, or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
-- `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
+- `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). When the build has [twins](#twins-across-platforms) it also prints one `NAME THEME has no PLATFORM twin` line per unlinked shot and a `twins: N linked` line; a build with no second platform prints nothing new. With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
 - `status` prints one build's link and where its review stands (`changes: 2 waiting · 1 accepted · 0 rejected`), then one `skipped flaky: <name> (WxH theme)` line per flaky shot the `skip` policy kept out of review, and exits by the outcome (the table below). The build is `--build ID`; else the newest at a commit `--commit SHA` starts; else the newest on `--branch NAME`; else the one `upload` recorded in `DIR/build.json` (`--dir`, default `pixelslash-snapshots`) for this same server and the checked-out commit; else the newest at the checked-out commit. `--commit` and the commit fallback look among the project's newest 100 builds; an older one is named with `--build`. Picking more than one is exit 2, and no build at the commit or on the branch is exit 3. `--json` prints the build read (`GET /api/v1/builds/:id`) as sent. See [Block CI on review](#block-ci-on-review) for `--wait`.
 - `--version` prints `pixelslash <version>`, the version the User-Agent sends. `install-browser [chromium|firefox|webkit|all]` runs the Playwright that `capture` uses to install that browser (`chromium-headless-shell` by default; an unknown name is exit 2).
 
@@ -606,7 +623,7 @@ It resolves the server, the token and the default project as every remote comman
 | `whoami` | — | `GET /api/v1/me`, with the server and where the token came from |
 | `list_projects` | — | `GET /api/v1/projects` |
 | `list_builds` | `project?`, `branch?`, `status?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/builds` |
-| `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier` |
+| `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier`; and, when a second platform is in play, `twins`: each shot's twins on the other platforms and the shots with none ([Twins](#twins-across-platforms)) |
 | `get_snapshot` | `snapshot_id` | `GET /api/v1/snapshots/:id`, with image URLs but no pixels; a snapshot with [layout metrics](metrics.md) also carries them as `metrics` (the file's JSON, fetched from `metrics_url`) |
 | `get_snapshot_images` | `snapshot_id`, `which?` (`head`, `baseline`, `diff`) | the snapshot's PNGs, as images |
 | `list_flakes` | `project?` | `GET /api/v1/projects/:id/flakes` |
@@ -868,14 +885,15 @@ Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any 
 | `GET /api/v1/projects` | CI, org or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; an org token's org's; a CI token's one project |
 | `POST /api/v1/projects` | org or personal | JSON `{ name, org? }`: `name` is 1 to 100 characters; `org` (an id or exact name) is needed only when a personal token belongs to several orgs, and an org token's is its own | `201 { …project, created: true }` for a new project, `200 { …project, created: false }` for the one of that name already in the org (idempotent). A project's `ci` token is a 403; an unknown `org` a 404 |
 | `GET /api/v1/projects/:id/builds` | CI, org or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
-| `GET /api/v1/builds/:id` | CI, org or personal | — | `200 { build: { …build, snapshots: [snapshot] } }`, snapshots in review order. A snapshot also carries `device` (the device label of a native shot, else `null`) and `scale` (its device pixel ratio, else `null`) |
+| `GET /api/v1/builds/:id` | CI, org or personal | — | `200 { build: { …build, snapshots: [snapshot], twins? } }`, snapshots in review order. A snapshot also carries `device` (the device label of a native shot, else `null`) and `scale` (its device pixel ratio, else `null`). `twins` pairs the build's shots with the same name and theme on another platform ([Twins](#twins-across-platforms)); it is **absent** unless a second platform is in play, so a web-only build's reply is unchanged |
+| `PUT /api/v1/projects/:id/twin` | personal | JSON `{ twin_project_id }`: another project of the same org, or `null` to clear the link | `200 { project }`, with `twin_project_id` set. A project of another org, an unknown project or the project itself is a 400; a project the user is not a member of is a 404; a CI or org token is a 403 |
 | `GET /api/v1/snapshots/:id` | CI, org or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
 | `GET /api/v1/projects/:id/detection-flags` | CI, org or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
 | `POST /api/v1/detection-flags/:id/exported` | personal | — | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
 | `GET /api/v1/projects/:id/flakes` | CI, org or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
 | `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
 
-There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
+There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), linking a twin project (`PUT /api/v1/projects/:id/twin`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
 **The upload endpoints** (`me`, `builds`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`.
 
@@ -887,9 +905,9 @@ There are no write endpoints besides the four upload ones, creating a project by
 
 | Status | `code` | When |
 | --- | --- | --- |
-| 400 | `bad_request` | a bad `status`, `limit` or `cursor` |
+| 400 | `bad_request` | a bad `status`, `limit` or `cursor`, or a `twin_project_id` that is not a project of the same org |
 | 401 | `unauthorized` | a missing, wrong, expired or revoked token |
-| 403 | `forbidden` | a CI token resolving a flake or marking a flag exported (only a person does) |
+| 403 | `forbidden` | a CI or org token resolving a flake, marking a flag exported or linking a twin project (only a person does) |
 | 404 | `not_found` | an unknown path, or an id the token cannot reach |
 | 405 | `method_not_allowed` | a path that exists, with another method |
 | 426 | `cli_outdated` | the CLI is older than the server takes (below) |

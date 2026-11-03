@@ -2,7 +2,7 @@ import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
 import { snapshotDiffOptions } from "#/db/builds";
-import { flagSnapshot, listFlags, snapshotFlags, withdrawFlag } from "#/db/flags";
+import { listFlags, snapshotFlags } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
 import { isMarker } from "#/db/markers";
 import { listOrgModelViews, projectModelSource } from "#/db/models";
@@ -23,12 +23,13 @@ import { listBuilds } from "#/db/build-list";
 import { NotReviewableError, buildView, decideAll, decideShot } from "#/db/review";
 import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
-import { DIFF_LOCATIONS, FLAG_KINDS, type FlagKind, type IgnoreRect } from "#/db/schema";
+import { DIFF_LOCATIONS } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
-import { BadRequest, parseRect } from "#/api/validate";
+import { twinsOfBuild } from "#/db/twins";
 import { nextToReviewId } from "#/lib/build-tabs";
 import { buildExpiry } from "#/lib/retention";
 import { holdsChange, reviewGroupOf } from "#/lib/snapshot-groups";
+import { twinEntryOf } from "#/lib/twins";
 import { THEME_COOKIE, parseTheme } from "#/lib/theme";
 import {
   database,
@@ -41,7 +42,7 @@ import {
 import { signFlakeOrNull } from "./flake-images";
 import { imageUrls } from "./image-urls";
 import { snapshotMetrics } from "./snapshot-metrics";
-import { field, noteInput, or404 } from "./input";
+import { field, or404 } from "./input";
 import { requireViewer, viewer } from "./session";
 
 /** A shot that is no longer reviewable is a conflict the page states, not a 404. */
@@ -204,10 +205,12 @@ export const getBuildPage = createServerFn()
     const modelConfigured = (await projectModelSource(db, user.id, project.id)).source !== "none";
     const recaptures = await flakeRecaptures(db, view.build.id, view.snapshots);
     const expiry = buildExpiry(view.build, project.defaultBranch, retentionDays(), new Date());
+    const twins = await twinsOfBuild(db, view.build.id);
     return {
       org,
       project,
       ...view,
+      twins,
       expiry,
       thumbs,
       firstBuild,
@@ -232,6 +235,7 @@ export const getSnapshotPage = createServerFn()
     if (index === -1) throw notFound();
     const snapshot = view.snapshots[index];
     if (!snapshot) throw notFound();
+    const twins = await twinsOfBuild(db, view.build.id);
     const images = await imageUrls(project.orgId, {
       main: snapshot.baselineKey,
       branch: isMarker(snapshot) ? null : snapshot.imageKey,
@@ -242,6 +246,8 @@ export const getSnapshotPage = createServerFn()
       project,
       build: view.build,
       snapshot,
+      /** This shot's twins on the other platforms (PS-295); null when no other platform is in play. */
+      twins: twinEntryOf(twins, snapshot.id),
       images,
       metrics: await snapshotMetrics(project.orgId, snapshot.metricsKey),
       /** The options the config asked for (ob 1494); `snapshot.resolvedDiff` holds what was measured. */
@@ -310,46 +316,4 @@ export const acceptBuild = createServerFn({ method: "POST" })
     const decided = await orConflict(decideAll(db, { ...data, userId: user.id }));
     await syncChecks(db, decided.buildIds);
     return { status: decided.verdict };
-  });
-
-/* ------------------------------------------------------------ detection flags (ob 1721) */
-
-const isFlagKind = (v: unknown): v is FlagKind => FLAG_KINDS.some((kind) => kind === v);
-
-/** The flag's kind, its optional one-line note and its optional rect, from a server-fn payload. */
-function flagInput(d: unknown): { kind: FlagKind; note: string | null; rect: IgnoreRect | null } {
-  const get = (key: string) => (typeof d === "object" && d !== null ? Reflect.get(d, key) : null);
-  const kind = get("kind");
-  if (!isFlagKind(kind)) throw new Error(`kind is one of ${FLAG_KINDS.join(", ")}`);
-  const note = noteInput(d);
-  const rect = get("rect");
-  try {
-    return { kind, note, rect: rect == null ? null : parseRect(rect, "rect") };
-  } catch (error) {
-    // A server fn has no 400: the message is what the form shows.
-    if (error instanceof BadRequest) throw new Error(error.message, { cause: error });
-    throw error;
-  }
-}
-
-/** Create or replace the viewer's flag on a shot. It decides nothing: review state is untouched. */
-export const flagShot = createServerFn({ method: "POST" })
-  .validator((d: unknown) => ({
-    projectId: field(d, "projectId"),
-    snapshotId: field(d, "snapshotId"),
-    ...flagInput(d),
-  }))
-  .handler(async ({ data }) => {
-    const user = await requireViewer();
-    await or404(flagSnapshot(database(), { ...data, userId: user.id }));
-  });
-
-export const withdrawShotFlag = createServerFn({ method: "POST" })
-  .validator((d: unknown) => ({
-    projectId: field(d, "projectId"),
-    snapshotId: field(d, "snapshotId"),
-  }))
-  .handler(async ({ data }) => {
-    const user = await requireViewer();
-    await or404(withdrawFlag(database(), { ...data, userId: user.id }));
   });
