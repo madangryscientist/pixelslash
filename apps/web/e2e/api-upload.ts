@@ -46,6 +46,8 @@ export type Shot = {
   flaky?: "review" | "skip";
   /** The shot's composition findings, sent as the CLI sends them (ob 1850). */
   composition?: object;
+  /** Fields of the CLI's meta that replace the web defaults (a native shot's platform and device, a theme). */
+  meta?: Record<string, unknown>;
 };
 
 /** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
@@ -60,6 +62,7 @@ function shotForm(shot: Shot): FormData {
     tags: ["web"],
     fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
   };
+  Object.assign(meta, shot.meta);
   if (shot.composition) meta["composition"] = shot.composition;
   if (shot.flaky) {
     meta["flaky"] = shot.flaky;

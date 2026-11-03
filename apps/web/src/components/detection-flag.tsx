@@ -19,7 +19,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import type { ProjectFlag, SnapshotFlag } from "#/db/flags";
 import type { FlagKind, IgnoreRect } from "#/db/schema";
-import { flagShot, withdrawShotFlag } from "#/server/fns";
+import { flagShot, withdrawShotFlag } from "#/server/flag-fns";
 
 const FLAG_LABELS: Record<FlagKind, string> = {
   missed: "Missed change",

@@ -25,19 +25,29 @@ import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { ModelSettings } from "#/components/model-settings";
 import { OverrideSettings } from "#/components/override-trail";
+import { TwinSettings } from "#/components/twin-settings";
 import { DefaultBranch, GithubRepo, UploadCommand } from "#/components/project-cards";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
 import type { DiffLocation } from "#/db/schema";
 import { getProjectSettings, issueToken, revokeToken, saveDiffLocation } from "#/server/fns";
+import { getTwinOptions } from "#/server/twin-fns";
 
 export const Route = createFileRoute("/projects/$projectId/settings")({
-  loader: ({ params }) => getProjectSettings({ data: { projectId: params.projectId } }),
+  loader: async ({ params }) => {
+    const data = { projectId: params.projectId };
+    const [settings, twinOptions] = await Promise.all([
+      getProjectSettings({ data }),
+      getTwinOptions({ data }),
+    ]);
+    return { ...settings, twinOptions };
+  },
   component: ProjectSettings,
 });
 
 function ProjectSettings() {
-  const { project, org, tokens, overrides, model, checks, serverUrl } = Route.useLoaderData();
+  const { project, org, tokens, overrides, model, checks, twinOptions, serverUrl } =
+    Route.useLoaderData();
   const router = useRouter();
   const hydrated = useHydrated();
   const [issued, setIssued] = useState<string | null>(null);
@@ -82,6 +92,12 @@ function ProjectSettings() {
         </Card>
         <DefaultBranch projectId={project.id} branch={project.defaultBranch} />
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
+        <TwinSettings
+          projectId={project.id}
+          saved={project.twinProjectId}
+          options={twinOptions}
+          hydrated={hydrated}
+        />
         <GithubRepo
           projectId={project.id}
           repo={project.githubRepo}

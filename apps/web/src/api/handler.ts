@@ -30,6 +30,7 @@ import {
   listProjects,
   markDetectionFlagExported,
 } from "./read";
+import { putProjectTwin } from "./twins-link";
 import { BadRequest, Forbidden, object, parseFinalise, parseNewBuild } from "./validate";
 import { Unprocessable } from "./errors";
 
@@ -232,6 +233,11 @@ export const ENDPOINTS: readonly Endpoint[] = [
         { ...reads(ctx), defaultDiffLocation: ctx.defaultDiffLocation },
         await jsonBody(ctx.request),
       ),
+  },
+  {
+    method: "PUT",
+    path: "/api/v1/projects/:id/twin",
+    run: async (ctx, p) => putProjectTwin(reads(ctx), at(p, 0), await jsonBody(ctx.request)),
   },
   { method: "GET", path: "/api/v1/projects/:id/builds", run: byId(listBuilds) },
   { method: "GET", path: "/api/v1/projects/:id/detection-flags", run: byId(listDetectionFlags) },

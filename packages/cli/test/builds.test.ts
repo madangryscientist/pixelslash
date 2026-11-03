@@ -75,6 +75,37 @@ describe("pixelslash builds / build", () => {
     expect(cap.stdout).toMatch(/^home\s+1280x720\s+light\s+changed\s+pending$/m);
   });
 
+  test("a build with no twins section prints nothing about twins", async () => {
+    const cap = capture();
+    expect(await run(["build", "b2", "--server", SERVER], cap.io, await deps())).toBe(0);
+    expect(cap.stdout).not.toMatch(/twin/);
+  });
+
+  test("a build with twins prints a line per unlinked shot and a linked count", async () => {
+    const api = fakeApi();
+    const twins = {
+      twin_project: null,
+      linked: [{ name: "Button/primary", theme: "dark", platform: "web", missing: [] }],
+      unlinked: [
+        { name: "Button/loading", theme: "dark", platform: "android", missing: ["web"] },
+        { name: "Card", theme: "light", platform: "ios", missing: ["web", "android"] },
+      ],
+    };
+    const before = JSON.parse(JSON.stringify(api.replies["/api/v1/builds/b2"]));
+    api.replies["/api/v1/builds/b2"] = { ...before, build: { ...before.build, twins } };
+    const cap = capture();
+    expect(await run(["build", "b2", "--server", SERVER], cap.io, await deps(api))).toBe(0);
+    expect(cap.stdout).toContain("Button/loading dark has no web twin\n");
+    expect(cap.stdout).toContain("Card light has no web or android twin\n");
+    expect(cap.stdout).toContain("twins: 1 linked\n");
+    // --json is the reply as sent, twins and all.
+    const json = capture();
+    expect(await run(["build", "b2", "--json", "--server", SERVER], json.io, await deps(api))).toBe(
+      0,
+    );
+    expect(JSON.parse(json.stdout).build.twins.unlinked).toHaveLength(2);
+  });
+
   test("an id the token cannot reach exits 3", async () => {
     const cap = capture();
     expect(await run(["build", "nope", "--server", SERVER], cap.io, await deps())).toBe(3);

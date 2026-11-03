@@ -9,6 +9,7 @@ import { BuildTabs, TabBody } from "#/components/build-shots";
 import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { BuildOverrideChanges } from "#/components/override-trail";
 import { RerunErrored } from "#/components/rerun";
+import { UnlinkedShots } from "#/components/twins";
 import { Page } from "#/components/ui";
 import { BUILD_TABS, type BuildTab, defaultTab, setsBaseline, tabCounts } from "#/lib/build-tabs";
 import { awaitsDecision } from "#/lib/snapshot-groups";
@@ -91,6 +92,24 @@ function RunCard() {
   );
 }
 
+function BuildNotices({
+  project,
+  build,
+  error,
+}: Pick<Loaded, "project" | "build"> & { error: string | null }) {
+  return (
+    <>
+      <RunCard />
+      <BuildError project={project} build={build} />
+      {error && (
+        <Callout tone="danger" role="alert">
+          {error}
+        </Callout>
+      )}
+    </>
+  );
+}
+
 function BuildPage() {
   const {
     project,
@@ -103,6 +122,7 @@ function BuildPage() {
     thresholdChanges,
     modelConfigured,
     expiry,
+    twins,
   } = Route.useLoaderData();
   const counts = tabCounts(snapshots);
   const baseline = setsBaseline(firstBuild, snapshots);
@@ -142,13 +162,7 @@ function BuildPage() {
             />
           )}
         </BuildHeader>
-        <RunCard />
-        <BuildError project={project} build={build} />
-        {error && (
-          <Callout tone="danger" role="alert">
-            {error}
-          </Callout>
-        )}
+        <BuildNotices project={project} build={build} error={error} />
         {snapshots.length === 0 ? (
           <Text as="p" tone="muted">
             This build holds no snapshots yet.
@@ -167,6 +181,7 @@ function BuildPage() {
             />
           </>
         )}
+        <UnlinkedShots projectId={project.id} buildId={build.id} twins={twins} />
         <RejectionNote />
         <BuildOverrideChanges changes={thresholdChanges} />
       </ListLayout>

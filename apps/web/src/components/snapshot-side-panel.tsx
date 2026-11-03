@@ -17,10 +17,12 @@ import { AiExplanation } from "#/components/ai-notes";
 import { MetricsPanel } from "#/components/metrics-panel";
 import { Options } from "#/components/diff-options-list";
 import { Provenance } from "#/components/provenance";
+import { TwinsRow } from "#/components/twins";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions } from "#/db/schema";
 import { formatDateTime, formatNumber } from "#/lib/format";
 import { awaitsDecision } from "#/lib/snapshot-groups";
+import type { TwinEntry } from "#/lib/twins";
 
 function sizeLine(result: NonNullable<SnapshotView["diffResult"]>, main: string, branch: string) {
   if (result.settledBy) return `${IDENTICAL_NOTE}; both shots are ${main}.`;
@@ -240,6 +242,7 @@ export function SidePanel({
   reviewable,
   status,
   metrics,
+  twins,
   tools,
   children,
 }: {
@@ -250,6 +253,8 @@ export function SidePanel({
   status: string;
   /** The layout metrics file (PS-294); null when the shot has none, and then nothing is shown. */
   metrics?: Metrics | null;
+  /** This shot's twins on the other platforms (PS-295); null or absent when none is in play. */
+  twins?: TwinEntry | null;
   /** Re-run, mark flaky, thresholds and ignore areas: collapsed under Tools; null when none apply. */
   tools?: ReactNode;
   /** The detection flags and an open flake, above the fold: a second reviewer reads them before deciding. */
@@ -266,6 +271,7 @@ export function SidePanel({
       <Summary snapshot={snapshot} />
       <Carried projectId={projectId} snapshot={snapshot} />
       <ApprovedEarlier projectId={projectId} snapshot={snapshot} />
+      <TwinsRow entry={twins ?? null} />
       {children}
       <Stack gap="xs">
         <Disclosure

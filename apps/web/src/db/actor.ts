@@ -79,6 +79,7 @@ export async function actorProjects(db: Db, actor: Actor) {
       id: projects.id,
       name: projects.name,
       defaultBranch: projects.defaultBranch,
+      twinProjectId: projects.twinProjectId,
       createdAt: projects.createdAt,
       org: { id: orgs.id, name: orgs.name },
     })

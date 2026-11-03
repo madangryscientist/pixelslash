@@ -139,7 +139,7 @@ const TOOLS: Record<string, Tool> = {
   },
   get_build: {
     description:
-      "One build: counts, and every snapshot in review order with its group, diff numbers, regions, review state, and carried_from / approved_earlier (GET /api/v1/builds/:id).",
+      "One build: counts, and every snapshot in review order with its group, diff numbers, regions, review state, and carried_from / approved_earlier. A build with shots on more than one platform also has `twins`: the shots linked across platforms by name + theme and the unlinked ones (GET /api/v1/builds/:id).",
     properties: { build_id: { type: "string", description: "A build id, from list_builds." } },
     required: ["build_id"],
     call: async ({ remote }, args) =>

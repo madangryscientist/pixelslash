@@ -104,7 +104,22 @@ function describeBuild(b: Record<string, unknown>): string {
   ]);
   if (shots.length > 0)
     lines.push("", table([["SNAPSHOT", "VIEWPORT", "THEME", "GROUP", "REVIEW"], ...shots]));
+  lines.push(...twinLines(b.twins));
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The twin lines of a build (PS-295): one `Button/loading dark has no android twin` per unlinked
+ * shot, then `twins: N linked`. A build whose reply has no `twins` section prints nothing.
+ */
+function twinLines(twins: unknown): string[] {
+  if (!isObj(twins)) return [];
+  const linked = objects(twins.linked).length;
+  const unlinked = objects(twins.unlinked).map((e) => {
+    const missing = Array.isArray(e.missing) ? e.missing.map(str).join(" or ") : "";
+    return `${str(e.name)} ${str(e.theme)} has no ${missing} twin`;
+  });
+  return ["", ...unlinked, `twins: ${linked} linked`];
 }
 
 /** The newest build of the resolved project, on `--branch` when given. */
