@@ -7,6 +7,23 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+### Added
+
+- Layout metrics files (PS-294). An optional `<name>.metrics.json` beside each snapshot records the box,
+  padding, gap, font and colours of each named part, in logical px from the root part's top-left.
+  `docs/metrics.md` (version 1) is the schema. `import` carries the file beside its PNG, a `metrics`
+  config key (default off) makes `capture`, the Storybook path and `@hackcove/pixelslash-playwright`
+  write it, and `upload` sends it. The snapshot read gives a signed `metrics_url`, and `pixelslash mcp`
+  exposes the parsed file. Nothing compares it yet. Without a metrics file or the key, every manifest,
+  stdout line and upload is as before.
+
+### Fixed
+
+- `capture` now honours a per-shot a11y `scan` from config. Its watch and timing wrappers had been
+  dropping the argument.
+
 ## [0.2.0] - 2026-11-03
 
 ### Added
