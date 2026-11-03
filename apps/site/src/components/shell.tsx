@@ -14,7 +14,7 @@ import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/lin
 import { PAGES } from "#/content/pages";
 import { Wordmark } from "#/components/logo";
 
-/** Where the source is: a link once the repository is public (PS-257), a plain sentence until then. */
+/** Where the source is: a link once the repository is public (PS-257, PS-292), a plain sentence before. */
 function SourceLink(): ReactNode {
   if (!REPO_PUBLIC) return <Caption data-testid="source-status">Source opens at launch</Caption>;
   return (

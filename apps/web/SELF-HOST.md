@@ -139,19 +139,24 @@ $EDITOR ~/.config/pixelslash/token
 
 ### 9. Upload with the CLI
 
-The CLI is not on npm yet, so run it from your clone. In the repo you are reviewing (it reads the commit and
-branch from the directory it runs in), with a `pixelslash.config.*` there and Playwright's browser installed
-(`bunx playwright install chromium-headless-shell`):
+The CLI is on npm as `@hackcove/pixelslash` (it runs on Bun, which must be on your PATH). In the repo you are
+reviewing (it reads the commit and branch from the directory it runs in), with a `pixelslash.config.*` there and
+Playwright's browser installed (`npx @hackcove/pixelslash install-browser`):
 
 ```bash
-bun /path/to/pixelslash/packages/cli/src/index.ts capture --upload \
+npm i -D @hackcove/pixelslash
+npx @hackcove/pixelslash capture --upload \
   --server https://<host> --token-path ~/.config/pixelslash/token
 ```
 
-or `… upload <snapshot-dir> --server … --token-path …` for a directory you already have. `PIXELSLASH_SERVER`
+Use `… upload <snapshot-dir> --server … --token-path …` for a directory you already have. `PIXELSLASH_SERVER`
 and `PIXELSLASH_TOKEN` replace the two flags in CI. `docs/cli.md`, "Uploading to a server", has the rest. A build
 on the project's default branch (`main`) is accepted as the baseline; a build on any other branch is diffed
 against it and waits for review.
+
+To run it from your clone instead, replace the `npx` line with
+`bun /path/to/pixelslash/packages/cli/src/index.ts capture --upload …`, and install the browser with
+`bunx playwright install chromium-headless-shell`.
 
 ### 10. Optional: GitHub check runs
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { APP_URL, REPO_URL, resolveHref } from "./links.ts";
+import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL, resolveHref } from "./links.ts";
 
 const CLOSED = { repoPublic: false, appLive: false };
 const OPEN = { repoPublic: true, appLive: true };
@@ -18,6 +18,16 @@ describe("resolveHref", () => {
     expect(resolveHref("README.md", "apps/web/SELF-HOST.md", OPEN)).toBe(
       `${REPO_URL}/blob/main/apps/web/README.md`,
     );
+  });
+
+  test("the shipped switches: the repository is open, the hosted app is not", () => {
+    expect(REPO_PUBLIC).toBe(true);
+    expect(APP_LIVE).toBe(false);
+    expect(resolveHref("README.md", "apps/web/SELF-HOST.md")).toBe(
+      `${REPO_URL}/blob/main/apps/web/README.md`,
+    );
+    expect(resolveHref(`${REPO_URL}/issues`, "README.md")).toBe(`${REPO_URL}/issues`);
+    expect(resolveHref(`${APP_URL}/builds`, "docs/cli.md")).toBeNull();
   });
 
   test("a link to the repository or its images waits for it to open", () => {
