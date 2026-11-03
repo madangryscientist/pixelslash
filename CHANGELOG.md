@@ -7,6 +7,18 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-03
+
+### Added
+
+- Stale twins and the release check (PS-297). Accepting a changed web shot makes each native twin of that
+  name and theme stale, until a reviewer accepts a native shot of it in a native build made after that
+  change; an unchanged native shot carried forward does not clear it and is held for review with the reason
+  `stale`. `pixelslash parity --release <platform> --project <id>` exits **8** while any twin on that platform
+  is stale or its accepted baselines drift from web (with the same `--manifest`); `--json` lists each item's
+  kind, key, platform and cause or mismatches. `pixelslash status` and `pixelslash mcp` show stale twins,
+  and the build read's `twins` section marks them. See "Stale twins" in `docs/cli.md`.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added
