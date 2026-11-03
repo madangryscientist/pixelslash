@@ -74,6 +74,8 @@ export type SnapshotView = {
   name: string;
   platform: string;
   browser: string;
+  /** The device pixel ratio of a native shot (PS-293), from its fingerprint; null for web. */
+  scale: number | null;
   viewport: string;
   theme: string;
   tags: string[];
@@ -142,6 +144,32 @@ export type BuildView = {
   summaryPending: boolean;
 };
 
+type Ordered = Parameters<typeof reviewGroupOf>[0] &
+  Pick<SnapshotView, "name" | "platform" | "browser" | "viewport" | "theme">;
+
+/** The build page's order: by group, then by the shot's identity. */
+function inReviewOrder(a: Ordered, b: Ordered): number {
+  return (
+    SNAPSHOT_GROUPS.indexOf(reviewGroupOf(a)) - SNAPSHOT_GROUPS.indexOf(reviewGroupOf(b)) ||
+    a.name.localeCompare(b.name) ||
+    a.platform.localeCompare(b.platform) ||
+    a.browser.localeCompare(b.browser) ||
+    a.viewport.localeCompare(b.viewport) ||
+    a.theme.localeCompare(b.theme)
+  );
+}
+
+/** The device pixel ratio a native upload's fingerprint recorded (PS-293); null for web and for anything unreadable. */
+function scaleOf(fingerprint: string): number | null {
+  try {
+    const scale: unknown = JSON.parse(fingerprint)?.scale;
+    const n = typeof scale === "string" ? Number(scale) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * One build and its shots, scoped to the project: another project's build is the same 404 as a
  * missing one. Only the fields the screens draw are selected; blobs are not read here.
@@ -158,6 +186,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       name: snapshots.name,
       platform: snapshots.platform,
       browser: snapshots.browser,
+      envFingerprint: snapshots.envFingerprint,
       viewport: snapshots.viewport,
       theme: snapshots.theme,
       tags: snapshots.tags,
@@ -200,25 +229,27 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
   const a11yDiffs = await a11yDiffsOf(db, rows);
   const now = Date.now();
   const ordered = rows
-    .map(({ reviewer, aiQueuedAt, a11y: _scan, baselineSnapshotId: _baseline, ...row }) => ({
-      ...row,
-      a11yDiff: a11yDiffs.get(row.id) ?? { state: "off" as const },
-      aiPending: explaining(aiQueuedAt, now),
-      // Queued so long ago that its consumer died: named, not left explaining.
-      aiError: row.aiError ?? (aiQueuedAt && !explaining(aiQueuedAt, now) ? STALE_FAILURE : null),
-      reviewedBy: reviewer,
-      carriedFromBuild: (row.carriedFrom && roots.get(row.carriedFrom)) ?? null,
-      approvedEarlier: approved.get(row.id) ?? null,
-    }))
-    .toSorted(
-      (a, b) =>
-        SNAPSHOT_GROUPS.indexOf(reviewGroupOf(a)) - SNAPSHOT_GROUPS.indexOf(reviewGroupOf(b)) ||
-        a.name.localeCompare(b.name) ||
-        a.platform.localeCompare(b.platform) ||
-        a.browser.localeCompare(b.browser) ||
-        a.viewport.localeCompare(b.viewport) ||
-        a.theme.localeCompare(b.theme),
-    );
+    .map(
+      ({
+        reviewer,
+        aiQueuedAt,
+        a11y: _scan,
+        baselineSnapshotId: _baseline,
+        envFingerprint,
+        ...row
+      }) => ({
+        ...row,
+        scale: scaleOf(envFingerprint),
+        a11yDiff: a11yDiffs.get(row.id) ?? { state: "off" as const },
+        aiPending: explaining(aiQueuedAt, now),
+        // Queued so long ago that its consumer died: named, not left explaining.
+        aiError: row.aiError ?? (aiQueuedAt && !explaining(aiQueuedAt, now) ? STALE_FAILURE : null),
+        reviewedBy: reviewer,
+        carriedFromBuild: (row.carriedFrom && roots.get(row.carriedFrom)) ?? null,
+        approvedEarlier: approved.get(row.id) ?? null,
+      }),
+    )
+    .toSorted(inReviewOrder);
   return { build, snapshots: ordered, summaryPending: explaining(build.aiSummaryQueuedAt, now) };
 }
 

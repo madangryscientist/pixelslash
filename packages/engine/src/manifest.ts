@@ -5,6 +5,13 @@ import { type MaskRect, parseArea } from "./config-areas.ts";
 import { parseA11yEntry } from "./a11y-entry.ts";
 import { parseCompositionEntry } from "./composition-entry.ts";
 import { parseDiffOptions } from "./diff-options.ts";
+import {
+  DEVICE_LABEL,
+  PLATFORMS,
+  type NativeFields,
+  isNativePlatform,
+  isPlatform,
+} from "./native.ts";
 import { UsageError } from "./errors.ts";
 import { identity, pngPath } from "./snapshot-paths.ts";
 import type { SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
@@ -27,6 +34,15 @@ function posInt(v: unknown, where: string): number {
   if (typeof v !== "number" || !Number.isInteger(v) || v <= 0)
     bad(where, "must be a positive integer");
   return v;
+}
+
+/** A fingerprint field a web shot does not have (PS-293); present only when the manifest holds one. */
+function optionalStr(
+  v: Record<string, unknown>,
+  key: string,
+  where: string,
+): Record<string, string> {
+  return v[key] === undefined ? {} : { [key]: str(v[key], `${where}.${key}`) };
 }
 
 /** Ignore rects in image px; a manifest from before ignore areas has none. */
@@ -57,6 +73,26 @@ function a11yOf(v: unknown, where: string): Pick<SnapshotEntry, "a11y"> {
 function compositionOf(v: unknown, where: string): Pick<SnapshotEntry, "composition"> {
   const composition = parseCompositionEntry(v, where, bad);
   return composition ? { composition } : {};
+}
+
+/**
+ * A native entry's platform, device and scale (PS-293). An entry without `platform`, or with
+ * `"web"`, is a web one and carries neither of the others: that is every manifest from before.
+ */
+function nativeOf(v: Record<string, unknown>, where: string): NativeFields {
+  const { platform, device, scale } = v;
+  if (platform !== undefined && !isPlatform(platform))
+    bad(`${where}.platform`, `must be one of ${PLATFORMS.join(", ")}`);
+  if (!isNativePlatform(platform)) {
+    if (device !== undefined || scale !== undefined)
+      bad(`${where}.device`, "and scale are for android or ios entries only");
+    return {};
+  }
+  if (typeof scale !== "number" || !Number.isFinite(scale) || scale <= 0)
+    bad(`${where}.scale`, "must be a positive number");
+  const label = str(device, `${where}.device`);
+  if (!DEVICE_LABEL.test(label)) bad(`${where}.device`, "is not a device label the server accepts");
+  return { platform, device: label, scale };
 }
 
 function entry(v: unknown, i: number): SnapshotEntry {
@@ -92,7 +128,11 @@ function entry(v: unknown, i: number): SnapshotEntry {
       image: str(fingerprint.image, `${where}.fingerprint.image`),
       browser: str(fingerprint.browser, `${where}.fingerprint.browser`),
       fonts: str(fingerprint.fonts, `${where}.fingerprint.fonts`),
+      ...optionalStr(fingerprint, "platform", `${where}.fingerprint`),
+      ...optionalStr(fingerprint, "device", `${where}.fingerprint`),
+      ...optionalStr(fingerprint, "scale", `${where}.fingerprint`),
     },
+    ...nativeOf(v, where),
     ...compositionOf(v.composition, `${where}.composition`),
     ...a11yOf(v.a11y, `${where}.a11y`),
   };

@@ -1,3 +1,4 @@
+import { WEB_SERVER_PLATFORM } from "../../../../packages/engine/src/native.ts";
 import { pageBuilds } from "#/db/build-list";
 import { type Actor, actorBuild, actorProject, actorProjects, actorSnapshot } from "#/db/actor";
 import { type Db, NotFoundError } from "#/db/db";
@@ -165,6 +166,9 @@ function snapshot(ctx: ReadCtx, projectId: string, buildId: string, s: SnapshotV
     name: s.name,
     platform: s.platform,
     browser: s.browser,
+    // Native only (PS-293): the browser column holds the device's label there, and the device pixel ratio.
+    device: s.platform === WEB_SERVER_PLATFORM ? null : s.browser,
+    scale: s.scale,
     viewport: s.viewport,
     theme: s.theme,
     tags: s.tags,

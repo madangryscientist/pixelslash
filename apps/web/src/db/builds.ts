@@ -39,7 +39,15 @@ export type SnapshotInput = {
   tags: string[];
   diff: DiffOptions;
   ignore: IgnoreRect[];
-  fingerprint: { image: string; browser: string; fonts: string };
+  fingerprint: {
+    image: string;
+    browser: string;
+    fonts: string;
+    /** Native only (PS-293): absent on a web shot, so its stored fingerprint is unchanged. */
+    platform?: string;
+    device?: string;
+    scale?: string;
+  };
   /** The flaky policy the shot's config gives it (ob 1724); absent or null is `review`. */
   flaky?: FlakyPolicy | null;
   /** The judge's sentence on what changed (ob 1745); shown, never used to decide anything. */

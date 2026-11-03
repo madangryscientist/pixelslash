@@ -1,4 +1,4 @@
-import { PLATFORM, baselinePng, fetchBaselines } from "./baselines-client.ts";
+import { baselinePng, fetchBaselines } from "./baselines-client.ts";
 import {
   type BaselinePick,
   type CiResult,
@@ -16,6 +16,7 @@ import type { FlakeCheck } from "./flake.ts";
 import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, pngPath, readManifest } from "./manifest.ts";
+import { serverBrowser, serverPlatform } from "./native.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
 import { elapsed, requestLog, timingsToSend, type ShotTiming, type Timings } from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
@@ -365,8 +366,8 @@ async function measureTimed(
 function snapshotMeta(e: SnapshotEntry) {
   return {
     name: e.name,
-    platform: PLATFORM,
-    browser: e.variant.browser,
+    platform: serverPlatform(e),
+    browser: serverBrowser(e),
     viewport: `${e.variant.viewport.width}x${e.variant.viewport.height}`,
     theme: e.variant.theme,
     tags: e.tags,

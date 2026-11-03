@@ -5,6 +5,7 @@ import {
   isBaselinePick,
 } from "./ci-diff.ts";
 import { UploadError } from "./errors.ts";
+import { serverBrowser, serverPlatform } from "./native.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 import { type Client, isObj, send, sendPng } from "./upload-client.ts";
 
@@ -13,22 +14,32 @@ import { type Client, isObj, send, sendPng } from "./upload-client.ts";
  * read-only `POST /api/v1/baselines`): the shot key, the chunked fetch and the baseline image.
  */
 
-/** The pinned capture image is Linux; the manifest carries no platform of its own. */
-export const PLATFORM = "linux";
-
 /** Keys per baselines request: the server takes up to 2000. */
 const KEYS_PER_REQUEST = 500;
 
 /** What the preview says a build would remove: a key the baseline build has and this one lacks. */
-export type RemovedKey = { name: string; browser: string; viewport: string; theme: string };
+export type RemovedKey = {
+  name: string;
+  /** `linux` for web, else the native platform; a server before PS-293 does not say (read as web). */
+  platform?: string;
+  browser: string;
+  viewport: string;
+  theme: string;
+};
 
 export function snapshotKey(e: SnapshotEntry) {
   const { width, height } = e.variant.viewport;
-  const { browser, theme } = e.variant;
-  return { name: e.name, platform: PLATFORM, browser, viewport: `${width}x${height}`, theme };
+  return {
+    name: e.name,
+    platform: serverPlatform(e),
+    browser: serverBrowser(e),
+    viewport: `${width}x${height}`,
+    theme: e.variant.theme,
+  };
 }
 
-const removedId = (k: RemovedKey) => [k.name, k.browser, k.viewport, k.theme].join(" / ");
+const removedId = (k: RemovedKey) =>
+  [k.name, k.platform ?? "", k.browser, k.viewport, k.theme].join(" / ");
 
 function isRemovedKey(v: unknown): v is RemovedKey {
   return (

@@ -46,6 +46,7 @@ import type { Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
 import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
 import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
+import type { NativeFields } from "./native.ts";
 import { storybookRoutes } from "./storybook.ts";
 import { paintRects } from "./paint-rects.ts";
 import { measureStoryBox, shiftBoxes, storyShot, type Crop } from "./story-crop.ts";
@@ -88,7 +89,7 @@ export type SnapshotEntry = {
    * field existed have none.
    */
   a11y?: A11y;
-};
+} & NativeFields; // a native shot's platform, device and scale (PS-293); absent on web
 
 /** `manifest.json` in the snapshot dir. No timestamps: two runs of the same build write the same bytes. */
 export type SnapshotManifest = { version: 1; snapshots: SnapshotEntry[] };

@@ -3,12 +3,13 @@ import { join, resolve, sep } from "node:path";
 import { diffA11y } from "./a11y-entry.ts";
 import { diffPngs } from "./diff.ts";
 import { UsageError } from "./errors.ts";
-import type { Fingerprint } from "./fingerprint.ts";
+import { FINGERPRINT_KEYS, type Fingerprint } from "./fingerprint.ts";
 import { renderCompareIndex, rowLabel, type CompareRow } from "./compare-report.ts";
 import { withTimings } from "./report-timings.ts";
 import { renderPixelReport } from "./report.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 import { identity, readManifest } from "./manifest.ts";
+import { keyRendererLabel, rendererLabel } from "./native.ts";
 import { buildTimings, elapsed, type ShotTiming, type Timings } from "./timings.ts";
 
 export type SnapshotCompareOptions = {
@@ -35,8 +36,6 @@ export type SnapshotCompareResult = {
   timings: Timings;
 };
 
-const FINGERPRINT_KEYS = ["image", "browser", "fonts"] as const;
-
 /** The fingerprint fields that differ between two sides; empty when the environments agree. */
 function fingerprintDiff(a: Fingerprint, b: Fingerprint): string[] {
   return FINGERPRINT_KEYS.filter((k) => a[k] !== b[k]);
@@ -47,10 +46,12 @@ function segment(s: string): string {
   return s.replace(/[^a-zA-Z0-9_.-]/g, "-").replace(/^(\.+|index\.html)$/, "-$1");
 }
 
-/** `name/chromium-1280x720-light`, unique per identity even when two names sanitise alike. */
+/** `name/chromium-1280x720-light` (`name/android-Pixel-8-API-35-411x914-light`), unique per identity even when two names sanitise alike. */
 function dirFor(e: SnapshotEntry, taken: Set<string>): string {
   const { width, height } = e.variant.viewport;
-  const base = `${segment(e.name)}/${e.variant.browser}-${width}x${height}-${e.variant.theme}`;
+  const renderer =
+    e.platform && e.device ? segment(`${e.platform}-${e.device}`) : e.variant.browser;
+  const base = `${segment(e.name)}/${renderer}-${width}x${height}-${e.variant.theme}`;
   let dir = base;
   for (let n = 2; taken.has(dir); n++) dir = `${base}-${n}`;
   taken.add(dir);
@@ -63,16 +64,17 @@ function dirFor(e: SnapshotEntry, taken: Set<string>): string {
  * everything in one scheme does not print it on every card. A Storybook global shows in the name.
  */
 export function shotKeyLabel(
-  k: { browser: string; viewport: string; theme: string },
+  k: { platform?: string | undefined; browser: string; viewport: string; theme: string },
   varied: boolean,
 ): string {
-  const base = `${k.browser} ${k.viewport}`;
+  const base = `${keyRendererLabel(k)} ${k.viewport}`;
   return varied ? `${base} prefers: ${k.theme}` : base;
 }
 
 function shotLabel(e: SnapshotEntry, varied: boolean): string {
   const { width, height } = e.variant.viewport;
-  return shotKeyLabel({ ...e.variant, viewport: `${width}x${height}` }, varied);
+  const renderer = { platform: e.platform, browser: e.device ?? e.variant.browser };
+  return shotKeyLabel({ ...e.variant, ...renderer, viewport: `${width}x${height}` }, varied);
 }
 
 function rowOf(e: SnapshotEntry, varied: boolean): CompareRow {
@@ -153,7 +155,7 @@ async function diffMatch(
       specks: diff.specks,
       ignoredPixels: diff.ignoredPixels,
       ignored: diff.ignored,
-      browser: branch.variant.browser,
+      browser: rendererLabel(branch),
       main: { width: diff.mainWidth, height: diff.mainHeight },
       branch: { width: diff.branchWidth, height: diff.branchHeight },
     }),
@@ -189,7 +191,7 @@ function refuseOverlap(out: string, dirs: string[]): void {
 
 /**
  * Diff two `capture` snapshot dirs, no design system and no server. Entries match on the identity
- * the server keeps a snapshot under (name + browser + viewport + theme). A matched pair goes through
+ * the server keeps a snapshot under (name + platform + device or browser + viewport + theme). A matched pair goes through
  * the engine's `diffPngs` with the same inputs the server gives it, and a changed one gets a
  * `report.html`. Different fingerprints are warned about by name and still diffed.
  */

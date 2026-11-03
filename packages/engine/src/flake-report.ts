@@ -1,10 +1,11 @@
+import { rendererLabel } from "./native.ts";
 import { esc } from "./report.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 import type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 
 function shotLabel(e: SnapshotEntry): string {
   const { width, height } = e.variant.viewport;
-  return `${e.variant.browser} ${width}x${height} ${e.variant.theme}`;
+  return `${rendererLabel(e)} ${width}x${height} ${e.variant.theme}`;
 }
 
 function flakySection({ entry, record, files }: FlakyShot): string {
