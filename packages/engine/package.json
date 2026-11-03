@@ -23,7 +23,10 @@
     "./a11y-entry": "./src/a11y-entry.ts",
     "./metrics-entry": "./src/metrics-entry.ts",
     "./parity": "./src/parity.ts",
+    "./parity-fields": "./src/parity-fields.ts",
     "./parity-manifest": "./src/parity-manifest.ts",
+    "./similarity": "./src/similarity.ts",
+    "./similarity-png": "./src/similarity-png.ts",
     "./sentry-scrub": "./src/sentry-scrub.ts",
     "./brief": "./src/brief.ts"
   },

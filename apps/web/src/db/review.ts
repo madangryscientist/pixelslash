@@ -165,7 +165,7 @@ function inReviewOrder(a: Ordered, b: Ordered): number {
 }
 
 /** The device pixel ratio a native upload's fingerprint recorded (PS-293); null for web and for anything unreadable. */
-function scaleOf(fingerprint: string): number | null {
+export function scaleOf(fingerprint: string): number | null {
   try {
     const scale: unknown = JSON.parse(fingerprint)?.scale;
     const n = typeof scale === "string" ? Number(scale) : NaN;

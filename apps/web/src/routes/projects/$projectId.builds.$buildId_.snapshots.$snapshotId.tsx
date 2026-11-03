@@ -160,6 +160,7 @@ function SideColumn({
   return (
     <SidePanel
       projectId={project.id}
+      buildId={build.id}
       snapshot={snapshot}
       options={data.diffOptions}
       reviewable={reviewable}
