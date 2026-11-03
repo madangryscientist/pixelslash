@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Caption, ListRow, Stack, SubsectionHeading, Text } from "@hackcove/ui";
+import { Caption, Legend, ListRow, Stack, SubsectionHeading, Text } from "@hackcove/ui";
 import {
   GAP_COLOUR,
   MAX_FINDINGS,
@@ -55,26 +55,17 @@ const isFocused = (focus: Finding | null, kind: Finding["kind"], index: number) 
 /** Hex colour `hex` at `alpha` (0-255) as an 8-digit hex. */
 const tint = (hex: string, alpha: number) => `${hex}${alpha.toString(16).padStart(2, "0")}`;
 
-const swatch = (colour: string, dashed: boolean): CSSProperties => ({
-  borderColor: colour,
-  borderStyle: dashed ? "dashed" : "solid",
-  backgroundColor: tint(colour, 0x30),
-});
-
 /** The legend for the boxes: what each colour is, with how many on this shot. */
 export function CompositionLegend({ composition }: { composition: Composition }) {
   const { library, gaps, special } = composition;
   return (
-    <ul aria-label="Composition legend" className="flex flex-wrap items-center gap-3 text-xs">
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block size-3 border-2" style={swatch(GAP_COLOUR, false)} />
-        Not from {library} ({gaps.length})
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block size-3 border-2" style={swatch(SPECIAL_COLOUR, true)} />
-        Special case ({special.length})
-      </li>
-    </ul>
+    <Legend
+      aria-label="Composition legend"
+      items={[
+        { label: `Not from ${library}`, tone: "warn", detail: gaps.length },
+        { label: "Special case", tone: "violet", swatch: "dashed", detail: special.length },
+      ]}
+    />
   );
 }
 

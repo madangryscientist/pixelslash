@@ -15,8 +15,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@hackcove/theme-catppuccin-mocha": "0.2.12",
-    "@hackcove/ui": "^0.7.0",
+    "@hackcove/theme-catppuccin-mocha": "0.2.13",
+    "@hackcove/ui": "^0.7.1",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-router": "1.170.46",
     "@tanstack/react-start": "1.169.4",
