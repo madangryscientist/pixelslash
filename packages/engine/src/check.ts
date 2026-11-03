@@ -11,7 +11,7 @@ import {
 } from "./compare-snapshots.ts";
 import { UploadError, UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
-import type { Fingerprint } from "./fingerprint.ts";
+import { FINGERPRINT_KEYS, type Fingerprint } from "./fingerprint.ts";
 import { type FlakyShot, flakePass } from "./flake-upload.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, pngPath } from "./manifest.ts";
@@ -81,10 +81,17 @@ function preview(
 
 function fingerprintOf(v: unknown, at: string): Fingerprint {
   const fp = isObj(v) ? v : {};
-  const { image, browser, fonts } = fp;
+  const { image, browser, fonts, platform, device, scale } = fp;
   if (typeof image !== "string" || typeof browser !== "string" || typeof fonts !== "string")
     throw new UploadError(`check failed: ${at}: the server's baseline has no fingerprint`);
-  return { image, browser, fonts };
+  return {
+    image,
+    browser,
+    fonts,
+    ...(typeof platform === "string" && { platform }),
+    ...(typeof device === "string" && { device }),
+    ...(typeof scale === "string" && { scale }),
+  };
 }
 
 /**
@@ -101,8 +108,7 @@ async function settle(
   const { baseline } = pick;
   if (!baseline || !pick.carry) return baseline;
   const same = fingerprintOf(baseline.fingerprint, identity(e));
-  const env = ["image", "browser", "fonts"] as const;
-  if (env.every((k) => same[k] === e.fingerprint[k])) {
+  if (FINGERPRINT_KEYS.every((k) => same[k] === e.fingerprint[k])) {
     const [measured] = await measureShot(e, png, { ...pick, accepted: null }, fetchPng);
     if (measured?.status === "unchanged") return baseline;
   }

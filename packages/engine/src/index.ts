@@ -31,6 +31,7 @@ export {
   type ProcLike,
   type SpawnProc,
 } from "./judge.ts";
+export { PLATFORMS, type NativePlatform } from "./native.ts";
 export { importPngs, type ImportOptions, type ImportResult } from "./import-pngs.ts";
 export { isHttpUrl, loadRoutes } from "./routes.ts";
 export type { RunManifest } from "./run.ts";

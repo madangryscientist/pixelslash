@@ -13,7 +13,24 @@ export type Fingerprint = {
   browser: string;
   /** `sha256:…` over every font file fontconfig can see (path + bytes), or `unknown` without fontconfig. */
   fonts: string;
+  /**
+   * A native shot's platform, device label and device pixel ratio (PS-293), so a new emulator
+   * image, device or scale is a re-baseline. Absent on a web shot: its fingerprint is unchanged.
+   */
+  platform?: string;
+  device?: string;
+  scale?: string;
 };
+
+/** Every field a fingerprint can carry, in the order they are compared and printed. */
+export const FINGERPRINT_KEYS = [
+  "image",
+  "browser",
+  "fonts",
+  "platform",
+  "device",
+  "scale",
+] as const;
 
 export const BARE = "bare";
 

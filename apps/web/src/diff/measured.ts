@@ -19,7 +19,7 @@ type Unmeasured = Pick<
   "diffStatus" | "rebaselineNeeded" | "envFingerprint" | "baselineSnapshotId"
 >;
 
-const FIELDS = ["image", "browser", "fonts"] as const;
+const FIELDS = ["image", "browser", "fonts", "platform", "device", "scale"] as const;
 
 /** Shots captured in another environment than their baselines: what the upload held, not a fault. */
 export class UnmeasuredError extends Error {

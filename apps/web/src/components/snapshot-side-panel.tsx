@@ -11,6 +11,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
+import { WEB_SERVER_PLATFORM } from "../../../../packages/engine/src/native.ts";
 import { AiExplanation } from "#/components/ai-notes";
 import { Options } from "#/components/diff-options-list";
 import { Provenance } from "#/components/provenance";
@@ -138,8 +139,12 @@ function Environment({ snapshot }: { snapshot: SnapshotView }) {
       </Overline>
       <KeyValueList>
         <KeyValue label="Platform">{snapshot.platform}</KeyValue>
-        <KeyValue label="Browser">{snapshot.browser}</KeyValue>
+        {/* A native shot's renderer is a device, never a browser (PS-293). */}
+        <KeyValue label={snapshot.platform === WEB_SERVER_PLATFORM ? "Browser" : "Device"}>
+          {snapshot.browser}
+        </KeyValue>
         <KeyValue label="Viewport">{snapshot.viewport}</KeyValue>
+        {snapshot.scale !== null && <KeyValue label="Scale">{snapshot.scale}×</KeyValue>}
         <KeyValue label="Colour scheme">
           <Caption data-testid="color-scheme" mono>
             prefers-color-scheme: {snapshot.theme}

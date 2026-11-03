@@ -30,6 +30,7 @@ const view = (name: string, over: Partial<SnapshotView> = {}): SnapshotView => (
   name,
   platform: "linux",
   browser: "chromium",
+  scale: null,
   viewport: "1280x720",
   theme: "light",
   tags: [],

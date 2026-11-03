@@ -1,6 +1,7 @@
 import { brief } from "#/api/validate-brief";
 import { a11y } from "#/api/validate-a11y";
 import { composition } from "#/api/validate-composition";
+import { fingerprint, platformAndBrowser } from "#/api/validate-native";
 import type { SnapshotKey } from "#/db/baselines";
 import type { NewBuild, SnapshotInput } from "#/db/builds";
 import type { FlakeInput } from "#/db/flakes";
@@ -138,8 +139,7 @@ export function parseSnapshotKey(raw: unknown, at = ""): SnapshotKey {
   if (theme !== "light" && theme !== "dark") bad(`${at}theme`, 'must be "light" or "dark"');
   return {
     name: text(m.name, `${at}name`, 200),
-    platform: text(m.platform, `${at}platform`, 40, TOKEN),
-    browser: text(m.browser, `${at}browser`, 40, TOKEN),
+    ...platformAndBrowser(m, at),
     viewport: text(m.viewport, `${at}viewport`, 11, /^\d{1,5}x\d{1,5}$/),
     theme,
   };
@@ -170,11 +170,7 @@ export function parseSnapshotInput(raw: unknown): SnapshotInput {
     tags: tags.map((t, i) => text(t, `tags[${i}]`, 100)),
     diff: parseDiff(m.diff),
     ignore: parseIgnore(m.ignore),
-    fingerprint: {
-      image: text(fp.image, "fingerprint.image", 300),
-      browser: text(fp.browser, "fingerprint.browser", 300),
-      fonts: text(fp.fonts, "fingerprint.fonts", 300),
-    },
+    fingerprint: fingerprint(fp),
     changeNote: changeNote(m.changeNote),
     composition: composition(m.composition, bad),
     a11y: a11y(m.a11y, bad),

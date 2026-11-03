@@ -59,7 +59,7 @@
       "label": "Works without Storybook",
       "ps": {
         "v": "y",
-        "note": "pages and PNG dirs, nothing to wrap; a Storybook is read over HTTP, never imported",
+        "note": "pages and PNG dirs (including Maestro android and ios screenshots, filed by platform and device), nothing to wrap; a Storybook is read over HTTP, never imported",
         "commit": "2082085"
       },
       "t": {
