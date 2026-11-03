@@ -6,19 +6,20 @@ import {
   ListToolsRequestSchema,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { RemoteError, isObj, str, type Reply } from "./api.ts";
+import { RemoteError, fetchBlob, isObj, str, type Reply } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
 import type { DevDeps } from "./dev.ts";
 import { MCP_FLAGS, arg, devTools, pretty, text } from "./mcp-dev.ts";
 import { localTools, watchOf } from "./mcp-local.ts";
 import { servePrompts } from "./mcp-prompts.ts";
+import { loadManifest, parityReport } from "./parity.ts";
 import { connect, resolveProject, type Remote } from "./remote.ts";
 import type { Io } from "./run.ts";
 
 type Args = Record<string, unknown>;
 type Fetch = NonNullable<DevDeps["fetch"]>;
 /** What a tool call runs against: the connection, `--project`, and the fetch for images. */
-type Ctx = { remote: Remote; project: string | undefined; fetch: Fetch };
+type Ctx = { remote: Remote; project: string | undefined; fetch: Fetch; cwd: string | undefined };
 type Tool = {
   description: string;
   properties: Record<string, { type: string; description: string; enum?: string[] }>;
@@ -51,16 +52,8 @@ async function projectId({ remote, project }: Ctx, args: Args): Promise<string> 
   return id((await resolveProject(remote, arg(args, "project") ?? project)).id);
 }
 
-/** A signed blob URL (an image, a metrics file), fetched only when it is on the configured server. */
-async function blob({ remote, fetch }: Ctx, url: string): Promise<ArrayBuffer> {
-  if (new URL(url).origin !== new URL(remote.client.server).origin)
-    throw new RemoteError(`image ${url} is not on ${remote.client.server}; not fetched`);
-  const res = await fetch(url).catch((e: unknown) => {
-    throw new RemoteError(`cannot fetch ${url}: ${e instanceof Error ? e.message : String(e)}`);
-  });
-  if (!res.ok) throw new RemoteError(`GET ${url} -> ${res.status}`);
-  return res.arrayBuffer();
-}
+const blob = ({ remote, fetch }: Ctx, url: string): Promise<ArrayBuffer> =>
+  fetchBlob(remote.client.server, fetch, url);
 
 const image = async (ctx: Ctx, url: string): Promise<string> =>
   Buffer.from(await blob(ctx, url)).toString("base64");
@@ -144,6 +137,26 @@ const TOOLS: Record<string, Tool> = {
     required: ["build_id"],
     call: async ({ remote }, args) =>
       reply(await remote.client.get(`/api/v1/builds/${id(need(args, "build_id"))}`)),
+  },
+  get_parity: {
+    description:
+      "Metrics parity of a build's twin pairs (docs/metrics.md): for each snapshot linked across platforms, the parts and fields whose layout metrics differ beyond tolerance, and the pairs with no metrics file (`not measured`, never drift). The same result as `pixelslash parity --build ID --json`; a drift is a verdict the CLI exits 8 on. Reads the manifest at `manifest`, else pixelslash.parity.json in the working directory when it exists.",
+    properties: {
+      build_id: { type: "string", description: "A build id, from list_builds." },
+      manifest: {
+        type: "string",
+        description: "A parity manifest path. Optional; defaults as above.",
+      },
+    },
+    required: ["build_id"],
+    call: async ({ remote, fetch, cwd }, args) => {
+      const { path, manifest } = await loadManifest(arg(args, "manifest"), cwd ?? process.cwd());
+      const report = await parityReport(remote, fetch, need(args, "build_id"), {
+        manifest,
+        label: path,
+      });
+      return text(pretty(report));
+    },
   },
   get_snapshot: {
     description:
@@ -247,7 +260,7 @@ export function mcpServer(
     if (!tool) return { ...text(`unknown tool: ${req.params.name}`), isError: true };
     try {
       const remote = await connect(flags, { ...deps, fetch });
-      return await tool.call({ remote, project: flags.project, fetch }, args);
+      return await tool.call({ remote, project: flags.project, fetch, cwd: deps.cwd }, args);
     } catch (e) {
       return failed(e);
     }
