@@ -12,6 +12,7 @@ export const IMPORT_USAGE =
   "pixelslash import PNG_DIR [--out DIR] [--viewport WxH] [--theme light|dark] [--renderer LABEL]\n" +
   '  [--platform web|android|ios --device "<label>" --scale N]\n' +
   "PNG_DIR holds PNGs from any screenshot tool; the result is a snapshot dir for `pixelslash upload`.\n" +
+  "A <name>.metrics.json beside <name>.png is layout metrics (docs/metrics.md) and travels with it.\n" +
   "android and ios (Maestro) need --device and --scale; --viewport is then optional (the PNG size / scale).";
 
 const VIEWPORT = /^([1-9]\d*)x([1-9]\d*)$/;
@@ -85,6 +86,8 @@ export async function runImport(argv: string[], io: Io): Promise<number> {
   });
   for (const note of notes) io.stderr.write(`note: ${note}\n`);
   io.stdout.write(`pixelslash: ${manifest.snapshots.length} snapshots\n`);
+  const withMetrics = manifest.snapshots.filter((e) => e.metrics).length;
+  if (withMetrics > 0) io.stdout.write(`metrics: ${withMetrics}\n`);
   io.stdout.write(`manifest: ${manifestPath}\n`);
   return 0;
 }

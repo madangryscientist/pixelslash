@@ -41,7 +41,7 @@ export type DocPageDef = {
   /** Headings of docs/cli.md this page shows (plain text, as the heading reads). */
   sections: readonly string[];
   /** A page that is its own file instead of a cut of cli.md. */
-  file?: "docs/getting-started.md";
+  file?: "docs/getting-started.md" | "docs/metrics.md";
 };
 
 export const DOC_PAGES: readonly DocPageDef[] = [
@@ -76,6 +76,13 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     title: "PNGs and snapshot dirs",
     group: "capture",
     sections: ["Snapshots from PNGs you already have", "Comparing two snapshot dirs"],
+  },
+  {
+    slug: "metrics",
+    title: "Layout metrics file",
+    group: "capture",
+    sections: [],
+    file: "docs/metrics.md",
   },
   {
     slug: "compare",

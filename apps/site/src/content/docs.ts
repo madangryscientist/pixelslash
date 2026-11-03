@@ -1,6 +1,7 @@
 import readme from "../../../../README.md?raw";
 import security from "../../../../SECURITY.md?raw";
 import gettingStarted from "../../../../docs/getting-started.md?raw";
+import metrics from "../../../../docs/metrics.md?raw";
 import selfHost from "../../../web/SELF-HOST.md?raw";
 import { CLI_SPLIT } from "./cli-pages.ts";
 import { plainText } from "./doc-text.ts";
@@ -38,13 +39,17 @@ function cliDoc(tokens: Doc["tokens"], title: string, page?: string): Doc {
 /** What docs/cli.md says before its first section: the index page leads with it. */
 export const CLI_INTRO_DOC = cliDoc(CLI_SPLIT.preamble, CLI_SPLIT.title);
 
-const GETTING_STARTED_DOC = parseDoc(gettingStarted, "docs/getting-started.md", "getting-started");
+/** The docs pages that are a repo file of their own, by the file. */
+const FILE_DOCS = {
+  "docs/getting-started.md": parseDoc(gettingStarted, "docs/getting-started.md", "getting-started"),
+  "docs/metrics.md": parseDoc(metrics, "docs/metrics.md", "metrics"),
+};
 
 /** The document a docs page shows: a cut of cli.md, or the page's own file. */
 export function docOf(slug: string): Doc {
   const page = findPage(slug);
   if (page === undefined) throw new Error(`docs: no page ${slug}`);
-  if (page.file !== undefined) return GETTING_STARTED_DOC;
+  if (page.file !== undefined) return FILE_DOCS[page.file];
   const tokens = CLI_SPLIT.pages.get(slug);
   if (tokens === undefined) throw new Error(`docs: page ${slug} has no sections`);
   return cliDoc(tokens, page.title, slug);

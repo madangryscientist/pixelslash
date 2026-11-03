@@ -43,8 +43,8 @@ export type DevRunOptions = {
 /** The session's `shoot`, adding up how long the page took to settle. */
 function timedSession(session: CaptureSession): { session: CaptureSession; settled: () => number } {
   let settleMs = 0;
-  const shoot: CaptureSession["shoot"] = async (route, variant) => {
-    const got = await session.shoot(route, variant);
+  const shoot: CaptureSession["shoot"] = async (route, variant, scan) => {
+    const got = await session.shoot(route, variant, scan);
     settleMs += got.loadMs ?? 0;
     return got;
   };

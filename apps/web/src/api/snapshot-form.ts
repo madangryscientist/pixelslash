@@ -1,5 +1,6 @@
 import type { DiffLocation } from "#/db/schema";
 import { flakeFields } from "./flakes";
+import { METRICS_PART_ALLOWANCE, checkMetricsBytes } from "./validate-metrics";
 import {
   BadRequest,
   MAX_FLAKE_RUNS,
@@ -24,14 +25,31 @@ async function pngPart(form: FormData, field: string): Promise<ArrayBuffer> {
 }
 
 /**
- * Multipart: `meta` (JSON) and `file` (the PNG). In a `ci` project `meta.ci` carries the CLI's
+ * The optional `metrics` part (PS-294): the layout metrics file, checked. A file over the cap is
+ * refused before it is read; a malformed one is a 400. Absent is null.
+ */
+async function metricsPart(form: FormData): Promise<ArrayBuffer | null> {
+  const file = form.get("metrics");
+  if (file === null) return null;
+  if (!(file instanceof File)) throw new BadRequest("metrics must be a file upload");
+  if (file.size > METRICS_PART_ALLOWANCE) throw new TooLarge();
+  const bytes = await file.arrayBuffer();
+  checkMetricsBytes(bytes);
+  return bytes;
+}
+
+/**
+ * Multipart: `meta` (JSON) and `file` (the PNG), and optionally `metrics` (PS-294). In a `ci` project `meta.ci` carries the CLI's
  * results, and each needs its diff mask as `diff:<baselineId>`; the shot, plus at most two masks.
  * A flaky shot (ob 1737) adds `meta.flake` and its re-captures as `flake:<run>`, at most
  * MAX_FLAKE_RUNS - 1 of them; `meta.flaky` is the shot's policy (ob 1724).
  */
 export async function snapshotForm(request: Request, project: { diffLocation: DiffLocation }) {
   const pngs = (project.diffLocation === "ci" ? 3 : 1) + MAX_FLAKE_RUNS - 1;
-  if (Number(request.headers.get("content-length")) > pngs * MAX_PNG_BYTES + 64 * 1024)
+  if (
+    Number(request.headers.get("content-length")) >
+    pngs * MAX_PNG_BYTES + METRICS_PART_ALLOWANCE + 64 * 1024
+  )
     throw new TooLarge();
   let form: FormData;
   try {
@@ -51,14 +69,21 @@ export async function snapshotForm(request: Request, project: { diffLocation: Di
   const { flaky, flake } = await flakeFields(form, fields, MAX_PNG_BYTES);
   const input = { ...parseSnapshotInput(parsed), flaky };
   const png = await pngPart(form, "file");
+  const metrics = await metricsPart(form);
   // A server project measures at finalise: results sent to it are not stored, so none is trusted.
   const sent = project.diffLocation === "ci" ? parseCiInput(fields.ci) : null;
-  if (!sent) return { input, png, ci: null, flake };
+  if (!sent) return { input, png, metrics, ci: null, flake };
   const results = await Promise.all(
     sent.results.map(async (r) => ({ ...r, mask: await pngPart(form, `diff:${r.baselineId}`) })),
   );
   const image = pngSize(png);
-  return { input, png, ci: { engineVersion: sent.engineVersion, image, results }, flake };
+  return {
+    input,
+    png,
+    metrics,
+    ci: { engineVersion: sent.engineVersion, image, results },
+    flake,
+  };
 }
 
 export class TooLarge extends Error {}

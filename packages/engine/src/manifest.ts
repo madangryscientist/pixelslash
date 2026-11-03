@@ -3,6 +3,8 @@ import { IMAGE_BROWSERS, isBrowserName } from "./config.ts";
 import { type FlakyPolicy, parseFlaky } from "./config-flake.ts";
 import { type MaskRect, parseArea } from "./config-areas.ts";
 import { parseA11yEntry } from "./a11y-entry.ts";
+import { METRICS_SUFFIX } from "./metrics-entry.ts";
+import { readMetricsFile } from "./metrics-file.ts";
 import { parseCompositionEntry } from "./composition-entry.ts";
 import { parseDiffOptions } from "./diff-options.ts";
 import {
@@ -67,6 +69,14 @@ function policy(v: unknown, where: string): FlakyPolicy {
 function a11yOf(v: unknown, where: string): Pick<SnapshotEntry, "a11y"> {
   const a11y = parseA11yEntry(v, where, bad);
   return a11y ? { a11y } : {};
+}
+
+/** An entry's layout metrics file (PS-294): a path beside its PNG; an entry without one has no field. */
+function metricsOf(v: unknown, where: string): Pick<SnapshotEntry, "metrics"> {
+  if (v === undefined) return {};
+  if (typeof v !== "string" || !v.endsWith(METRICS_SUFFIX))
+    bad(where, `must be a path ending ${METRICS_SUFFIX}`);
+  return { metrics: v };
 }
 
 /** A composition-only project's findings; an entry without them (any other project, an older manifest) has no field. */
@@ -135,6 +145,7 @@ function entry(v: unknown, i: number): SnapshotEntry {
     ...nativeOf(v, where),
     ...compositionOf(v.composition, `${where}.composition`),
     ...a11yOf(v.a11y, `${where}.a11y`),
+    ...metricsOf(v.metrics, `${where}.metrics`),
   };
 }
 
@@ -172,6 +183,9 @@ export async function readManifest(dir: string): Promise<SnapshotManifest> {
     );
   }
   const manifest = parseManifest(raw);
-  for (const e of manifest.snapshots) await checkPng(dir, e);
+  for (const e of manifest.snapshots) {
+    await checkPng(dir, e);
+    if (e.metrics !== undefined) await readMetricsFile(dir, e.metrics);
+  }
   return manifest;
 }

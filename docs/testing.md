@@ -76,12 +76,12 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | --- | --- | --- | --- |
 | `packages/cli/smoke` | 1 | smoke | new |
 | `apps/web/smoke` | 1 | smoke | new |
-| `apps/web/e2e` | 23 (was 24) | e2e | one happy path per feature, in a real browser. `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
+| `apps/web/e2e` | 24 (was 25) | e2e | one happy path per feature, in a real browser. `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
 | `apps/site/e2e` | 1 | e2e | nav, footer and dead links on the prerendered pages, desktop and phone (named `smoke.spec.ts`; it is an e2e) |
-| `packages/cli/test` | 29 | integration | the `pixelslash` commands run in-process or as a child, against a fake server and real temp dirs. The `*-support.ts` files are helpers |
-| `packages/engine/test` | 47 | integration + unit | store, upload, capture (real Chromium), report and DS judge are integration; `diff*`, `regions`, `fingerprint`, `sentry-scrub`, `route-names`, `change-note`, `config*` are unit |
+| `packages/cli/test` | 30 | integration | the `pixelslash` commands run in-process or as a child, against a fake server and real temp dirs. The `*-support.ts` files are helpers |
+| `packages/engine/test` | 50 | integration + unit | store, upload, capture (real Chromium), report and DS judge are integration; `diff*`, `regions`, `fingerprint`, `sentry-scrub`, `route-names`, `change-note`, `config*` are unit |
 | `apps/web/src/db` | 17 | integration | every query against real SQLite with the real migrations (`test-db.ts`, `test-d1.ts`) |
-| `apps/web/src/api` | 13 | integration | the `/api/v1` handler over a real `Db` and blob store, including the `ENDPOINTS` / `docs/cli.md` agreement |
+| `apps/web/src/api` | 14 | integration | the `/api/v1` handler over a real `Db` and blob store, including the `ENDPOINTS` / `docs/cli.md` agreement |
 | `apps/web/src/diff` | 21 | integration | `processBuild` end to end on a real `Db`: baselines, retries, resume, timings. `wasm`, `measure`, `identical-bytes` are unit |
 | `apps/web/src/github`, `storage`, `server`, `preview` | 11 | integration | the GitHub client against a local stand-in, R2-shaped blobs, the connection patch |
 | `apps/web/src/lib`, `auth`, `ai` | 28 | unit | pure helpers and the model client against a fake endpoint |

@@ -113,10 +113,28 @@ async function putMasks(blobs: BlobStore, stem: string, ci: CiShot): Promise<CiU
   return { engineVersion: ci.engineVersion, image: ci.image, results };
 }
 
+/**
+ * Store the layout metrics file (PS-294) beside the shot and return its key, or null when the shot
+ * came without one: a re-upload without metrics clears the key, and the old blob stays under the
+ * build and goes with it.
+ */
+async function putMetrics(
+  blobs: BlobStore,
+  stem: string,
+  metrics: ArrayBuffer | null,
+): Promise<string | null> {
+  if (!metrics) return null;
+  const key = `${stem}.metrics.json`;
+  await blobs.put(key, metrics, "application/json");
+  return key;
+}
+
 /** One upload: the shot's meta, its PNG and, from a CI project's CLI, what it measured (ob 1727). */
 export type SentSnapshot = {
   input: SnapshotInput;
   png: ArrayBuffer;
+  /** The layout metrics file's bytes (PS-294), already checked; absent or null is none. */
+  metrics?: ArrayBuffer | null;
   ci?: CiShot | null;
   /** The CLI found the shot flaky (ob 1737): its record and re-captures. */
   flake?: SentFlake | null;
@@ -137,13 +155,14 @@ const shown = (input: SnapshotInput) => ({
 export async function putSnapshot(
   { db, blobs }: { db: Db; blobs: BlobStore },
   build: Build,
-  { input, png, ci = null, flake = null }: SentSnapshot,
+  { input, png, metrics = null, ci = null, flake = null }: SentSnapshot,
 ): Promise<{ id: string }> {
   if (build.status !== "uploading") throw new BuildFinalisedError();
   const { name, platform, browser, viewport, theme } = input;
   const identity = await sha256Hex(JSON.stringify([name, platform, browser, viewport, theme]));
   const stem = `builds/${build.id}/${identity.slice(0, 32)}`;
   const imageKey = `${stem}.png`;
+  const metricsKey = await putMetrics(blobs, stem, metrics);
   await blobs.put(imageKey, png, "image/png");
   const fields = {
     tags: input.tags,
@@ -151,6 +170,7 @@ export async function putSnapshot(
     ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
     imageKey,
+    metricsKey,
     imageSha256: await sha256Bytes(png),
     imageSize: readPngSize(new Uint8Array(png)),
     ciResults: ci && (await putMasks(blobs, stem, ci)),

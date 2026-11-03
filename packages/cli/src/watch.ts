@@ -17,9 +17,9 @@ export function watched(session: CaptureSession, watch: Watch, total?: number): 
   let done = 0;
   return {
     ...session,
-    shoot: async (route, variant) => {
+    shoot: async (route, variant, scan) => {
       if (watch.signal?.aborted) throw new CaptureError("cancelled");
-      const shot = await session.shoot(route, variant);
+      const shot = await session.shoot(route, variant, scan);
       done++;
       // A re-capture of a changed shot goes past the first count; past it, no total is claimed.
       const known = total !== undefined && done <= total ? total : undefined;

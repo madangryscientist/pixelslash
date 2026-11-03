@@ -8,11 +8,13 @@ import {
   TextLink,
   Text,
 } from "@hackcove/ui";
+import type { Metrics } from "@hackcove/pixelslash-engine/metrics-entry";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { WEB_SERVER_PLATFORM } from "../../../../packages/engine/src/native.ts";
 import { AiExplanation } from "#/components/ai-notes";
+import { MetricsPanel } from "#/components/metrics-panel";
 import { Options } from "#/components/diff-options-list";
 import { Provenance } from "#/components/provenance";
 import type { SnapshotView } from "#/db/review";
@@ -237,6 +239,7 @@ export function SidePanel({
   options,
   reviewable,
   status,
+  metrics,
   tools,
   children,
 }: {
@@ -245,6 +248,8 @@ export function SidePanel({
   options: DiffOptions;
   reviewable: boolean;
   status: string;
+  /** The layout metrics file (PS-294); null when the shot has none, and then nothing is shown. */
+  metrics?: Metrics | null;
   /** Re-run, mark flaky, thresholds and ignore areas: collapsed under Tools; null when none apply. */
   tools?: ReactNode;
   /** The detection flags and an open flake, above the fold: a second reviewer reads them before deciding. */
@@ -276,6 +281,7 @@ export function SidePanel({
             <Options snapshot={snapshot} options={options} />
           </Stack>
         </Disclosure>
+        <MetricsPanel metrics={metrics ?? null} />
         {tools && (
           <Disclosure
             summary={

@@ -89,6 +89,8 @@ export type CaptureConfig = {
   composition: CompositionConfig | undefined;
   /** Scan every settled page with axe-core and keep the WCAG A and AA violations with the shot (PS-238). Off unless set. */
   a11y: boolean;
+  /** Write each shot's layout metrics file from its `[data-part]` elements (PS-294, `docs/metrics.md`). Off unless set. */
+  metrics: boolean;
 };
 
 export const CONFIG_NAMES = [
@@ -296,6 +298,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
     ),
     composition: parseComposition(raw.composition, bad),
     a11y: flag(raw.a11y, "a11y", bad),
+    metrics: flag(raw.metrics, "metrics", bad),
   };
 }
 

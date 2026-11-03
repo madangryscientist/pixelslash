@@ -89,6 +89,8 @@ export type SnapshotView = {
   resolvedDiff: (typeof snapshots.$inferSelect)["resolvedDiff"];
   ignore: IgnoreRect[];
   imageKey: string;
+  /** The layout metrics blob (PS-294), when the shot came with one. */
+  metricsKey: string | null;
   baselineKey: string | null;
   diffKey: string | null;
   diffResult: DiffResult | null;
@@ -198,6 +200,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       resolvedDiff: snapshots.resolvedDiff,
       ignore: snapshots.ignore,
       imageKey: snapshots.imageKey,
+      metricsKey: snapshots.metricsKey,
       baselineKey: snapshots.baselineKey,
       diffKey: snapshots.diffKey,
       diffResult: snapshots.diffResult,
