@@ -7,6 +7,23 @@ release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
+### Added
+
+- Native screenshots (PS-293). `pixelslash import PNG_DIR --platform android|ios --device LABEL --scale N`
+  files PNGs from an Android emulator or iOS Simulator (e.g. Maestro's `takeScreenshot`) as native
+  snapshots. Platform and device are part of a snapshot's identity, so native shots never diff against
+  web ones or against another device's. `upload` and `compare` accept them, and the device, platform and
+  scale are in the fingerprint, so a new emulator image or device is a re-baseline. A web import (no
+  `--platform`, or `--platform web`) and its manifest are exactly as before. `docs/cli.md` has the flags,
+  the size rule and a Maestro determinism checklist.
+
+### Changed
+
+- The bundled engine is named `@hackcove/pixelslash-engine` (it was `@pixelslash/engine`). It is still
+  inlined in the bundle and not published on its own, so nothing a user runs changes.
+
 ## [0.1.1] - 2026-10-30
 
 No change to the package. The first release published by `release.yml` through npm trusted

@@ -1,6 +1,6 @@
 {
   "name": "@hackcove/pixelslash",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Visual review from the command line: capture Main and Branch, pixel-diff them, write a report.",
   "keywords": [
     "cli",
