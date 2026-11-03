@@ -36,6 +36,7 @@ import {
 import { REMOTE_EXIT, RemoteError } from "./api.ts";
 import { USAGE, parseArgs, type Cli } from "./args.ts";
 import { BUILDS_USAGE, BUILD_USAGE, runBuild, runBuilds } from "./builds.ts";
+import { PARITY_USAGE, runParity } from "./parity.ts";
 import { CAPTURE_USAGE, runCapture } from "./capture.ts";
 import { CHECK_USAGE, runCheck } from "./check.ts";
 import { COMPARE_USAGE, runCompare } from "./compare.ts";
@@ -183,6 +184,7 @@ const COMMANDS: Record<
   builds: { usage: BUILDS_USAGE, run: runBuilds },
   build: { usage: BUILD_USAGE, run: runBuild },
   status: { usage: STATUS_USAGE, run: runStatus },
+  parity: { usage: PARITY_USAGE, run: runParity },
   // Loaded on demand: no other command may need the MCP SDK installed (ob 1767).
   mcp: {
     usage: MCP_USAGE,

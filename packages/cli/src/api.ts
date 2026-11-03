@@ -23,6 +23,21 @@ export type ApiClient = {
   post(path: string, body: unknown): Promise<Reply>;
 };
 
+/** A signed blob URL (an image, a metrics file), fetched only when it is on the configured server. */
+export async function fetchBlob(
+  server: string,
+  fetch: FetchLike,
+  url: string,
+): Promise<ArrayBuffer> {
+  if (new URL(url).origin !== new URL(server).origin)
+    throw new RemoteError(`${url} is not on ${server}; not fetched`);
+  const res = await fetch(url).catch((e: unknown) => {
+    throw new RemoteError(`cannot fetch ${url}: ${e instanceof Error ? e.message : String(e)}`);
+  });
+  if (!res.ok) throw new RemoteError(`GET ${url} -> ${res.status}`);
+  return res.arrayBuffer();
+}
+
 export function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }

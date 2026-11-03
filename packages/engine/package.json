@@ -22,6 +22,8 @@
     "./composition-entry": "./src/composition-entry.ts",
     "./a11y-entry": "./src/a11y-entry.ts",
     "./metrics-entry": "./src/metrics-entry.ts",
+    "./parity": "./src/parity.ts",
+    "./parity-manifest": "./src/parity-manifest.ts",
     "./sentry-scrub": "./src/sentry-scrub.ts",
     "./brief": "./src/brief.ts"
   },

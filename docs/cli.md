@@ -351,7 +351,7 @@ A project that builds its pages only from one design-system library's components
 - The read happens after the screenshot, so it cannot change the PNG. It reads the boxes in CSS px from the first `[data-part]` element's corner, never device pixels. A page with no `[data-part]` element writes no file and the shot has no `metrics`.
 - The file is carried as the manifest entry's optional `metrics` (its path under the snapshot dir). `upload` sends it with the shot, and the server keeps it with the snapshot; a shot without one is as it was. A manifest whose `metrics` file is missing or malformed is a usage error naming it.
 - The same applies to Storybook stories (they are routes), and `snapshot(page, name, { metrics: true })` in `@hackcove/pixelslash-playwright` writes the file for one shot.
-- It never changes an exit code or a diff: metrics are stored and shown, never compared.
+- It never changes an exit code or a diff: the file is stored and shown, and compared only by [`pixelslash parity`](#parity-between-twins), which has its own exit code.
 
 ## Snapshots from your own Playwright tests
 
@@ -436,7 +436,7 @@ pixelslash compare snaps/android-main snaps/android-branch
 
 ### Twins across platforms
 
-A **twin** is the same snapshot name and theme on another platform (`web`, `android` or `ios`): `Button/primary` dark on the web and `Button/primary` dark on a Pixel. The key is **name + theme** and nothing else. The viewport and the device are not part of it, so a web shot at 1280×720 and an android shot on a Pixel 8 are twins; when a side holds several shots under the key (two viewports, two devices) every one is listed. Linking is a read: it changes no snapshot's identity, fingerprint or diff, compares nothing, and sets no exit code.
+A **twin** is the same snapshot name and theme on another platform (`web`, `android` or `ios`): `Button/primary` dark on the web and `Button/primary` dark on a Pixel. The key is **name + theme** and nothing else. The viewport and the device are not part of it, so a web shot at 1280×720 and an android shot on a Pixel 8 are twins; when a side holds several shots under the key (two viewports, two devices) every one is listed. Linking is a read: it changes no snapshot's identity, fingerprint or diff, compares nothing, and sets no exit code. [`pixelslash parity`](#parity-between-twins) is what compares the layout metrics of a pair.
 
 For a build, each platform other than the shot's own is looked up in this order, and the first source that holds that platform wins:
 
@@ -532,6 +532,7 @@ pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash parity --build ID [--manifest PATH] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash project create NAME [--org NAME] [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash project list [--server URL] [--token-path PATH] [--config FILE] [--json]
@@ -566,6 +567,18 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 | 5 | `status`: the build still waits, for processing or for review. Under `--wait`, still waiting at `--timeout`. |
 | 6 | `flake`: the shot is still unstable here, some run differed from the first. Not 1: 1 stays reserved for new violations. |
 | 7 | **An internal error: a bug in pixelslash**, never a problem with your page or your config. A crash in capture, compare, the report or upload, or a `compare` shot the diff could not measure. A runner that sees 7 must **escalate to the PixelSlash planner**, not retry and not read it as a visual result. |
+| 8 | `parity`: a twin pair's layout metrics differ beyond tolerance and the manifest does not declare it ([Parity between twins](#parity-between-twins)). Not 1, which stays reserved for new violations. |
+
+### Parity between twins
+
+`pixelslash parity --build ID` compares the [layout metrics](metrics.md) of every twin pair in a build, the same snapshot name and theme on two platforms ([Twins across platforms](#twins-across-platforms)), and exits 8 when one drifts. The server and token resolve as for `build`; `--build` is required.
+
+- **What it prints:** one line per snapshot with drift, then what was not measured, then stale declarations, then a count: `Button/md-primary dark: button gap 8 web vs 6 android`, `parity: 12 pairs, 1 with drift, 3 not measured`. A build with no twins prints `parity: no twins`. When a name and theme has several pairs (two viewports, two devices) each line says which shots. `--json` prints the full result: every pair with both snapshot ids, the scale each side used, the tolerance, the mismatches with both values, and `stale_declarations`.
+- **What it compares:** parts by name; lengths within `max(1/scale)` logical px; font size and weight exactly; colours as exact hex, unless the manifest allows the pair. A field either side did not measure is skipped, never read as zero. The rules and the manifest are in [Parity](metrics.md#parity).
+- **`--manifest PATH`** names the parity manifest, `pixelslash.parity.json` in the working directory by default when it exists. With none, there are no allowances.
+- **A pair where either side has no metrics file is `not measured`:** listed and counted, never drift. Shots with no twin are not parity's business.
+- **Exit codes:** 0 no drift (not measured and stale declarations do not fail it), **8** drift, 2 a usage error or a malformed manifest (it names the file and the field), 3 the server did not give what was asked, 7 a crash. It never exits 1.
+- **From your agent:** `get_parity` ([the tools](#your-coding-agent-pixelslash-mcp)) returns the `--json` result.
 
 ### Exit codes and the `FAILED` line
 
@@ -624,6 +637,7 @@ It resolves the server, the token and the default project as every remote comman
 | `list_projects` | — | `GET /api/v1/projects` |
 | `list_builds` | `project?`, `branch?`, `status?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/builds` |
 | `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier`; and, when a second platform is in play, `twins`: each shot's twins on the other platforms and the shots with none ([Twins](#twins-across-platforms)) |
+| `get_parity` | `build_id`, `manifest?` | the same result as `pixelslash parity --build ID --json`: each twin pair's metrics mismatches, the pairs not measured, and stale declarations ([Parity between twins](#parity-between-twins)). Drift is in the result; the tool does not fail on it |
 | `get_snapshot` | `snapshot_id` | `GET /api/v1/snapshots/:id`, with image URLs but no pixels; a snapshot with [layout metrics](metrics.md) also carries them as `metrics` (the file's JSON, fetched from `metrics_url`) |
 | `get_snapshot_images` | `snapshot_id`, `which?` (`head`, `baseline`, `diff`) | the snapshot's PNGs, as images |
 | `list_flakes` | `project?` | `GET /api/v1/projects/:id/flakes` |

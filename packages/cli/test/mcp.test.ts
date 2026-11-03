@@ -6,8 +6,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { isObj } from "../src/api.ts";
 import { mcpServer } from "../src/mcp.ts";
-import { cleanup, tmp } from "./support.ts";
+import { run } from "../src/run.ts";
+import { capture, cleanup, tmp } from "./support.ts";
 import { SERVER, USER_TOKEN, fakeApi } from "./remote-support.ts";
+import { button, manifestDir, metricsFile, parityApi } from "./parity-support.ts";
 
 afterAll(cleanup);
 
@@ -121,6 +123,7 @@ describe("pixelslash mcp", () => {
     const read = tools.filter((t) => !t.name.startsWith("dev_") && !LOCAL.includes(t.name));
     expect(read.map((t) => t.name).toSorted()).toEqual([
       "get_build",
+      "get_parity",
       "get_snapshot",
       "get_snapshot_images",
       "list_builds",
@@ -182,6 +185,44 @@ describe("pixelslash mcp", () => {
     const plain = json(await call("get_snapshot", { snapshot_id: "s1" })).snapshot;
     expect(plain).not.toHaveProperty("metrics");
     expect(fake.images).toEqual(["/images/orgs/o/m.metrics.json"]);
+  });
+
+  test("get_parity returns what `pixelslash parity --json` prints, reading the manifest from the cwd", async () => {
+    const shots = [
+      { id: "w1", platform: "web" as const, metrics: metricsFile({ button: button({ gap: 8 }) }) },
+      {
+        id: "a1",
+        platform: "android" as const,
+        metrics: metricsFile({ button: button({ gap: 6 }) }),
+      },
+    ];
+    const fake = parityApi(shots);
+    // The cwd's manifest declares the gap difference, so a tool that read another directory would see drift.
+    const cwd = await manifestDir({
+      version: 1,
+      differences: {
+        "Button/md-primary": { button: { web: { gap: 8 }, android: { gap: 6 } } },
+      },
+    });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const { server } = mcpServer(
+      { server: SERVER },
+      { env: { PIXELSLASH_TOKEN: USER_TOKEN }, fetch: fake.fetch, cwd },
+      { write: () => {} },
+    );
+    await server.connect(serverSide);
+    const client = new Client({ name: "test", version: "0" });
+    await client.connect(clientSide);
+    const viaMcp = json(await tool(client, "get_parity", { build_id: "b2" }));
+    expect(viaMcp).toMatchObject({ build: "b2", pairs: 1, drift: 0, not_measured: 0 });
+    const cap = capture();
+    await run(["parity", "--build", "b2", "--server", SERVER, "--json"], cap.io, {
+      env: { PIXELSLASH_TOKEN: USER_TOKEN },
+      fetch: fake.fetch,
+      cwd,
+    });
+    expect(viaMcp).toEqual(JSON.parse(cap.stdout));
+    await client.close();
   });
 
   test("an image URL off the configured server is not fetched", async () => {
