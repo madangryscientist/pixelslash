@@ -72,7 +72,7 @@ function ShotColumn({ column }: { column: ParityShotColumn }) {
         alt={`${column.label} shot`}
         data-testid="parity-image"
         style={physical ? { width: physical.width, maxWidth: "none" } : undefined}
-        className="block h-auto border border-neutral-300 dark:border-neutral-700"
+        className="block h-auto border border-current/25"
       />
       {physical && (
         <Caption as="p" tone="muted" data-testid="parity-physical">
