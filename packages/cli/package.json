@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@sentry/bun": "11.9.0",
+    "@sentry/bun": "11.10.0",
     "axe-core": "^4.14.0",
     "pngjs": "^7.0.0"
   },
