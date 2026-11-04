@@ -1,8 +1,8 @@
 name: CI
 
-# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read anywhere in this file, and
-# the trigger is `pull_request` (never `pull_request_target`), so a pull request from a fork runs
-# with a read-only token and no secrets. Actions are pinned to a commit; the tag is in the comment.
+# The gate from AGENTS.md, on a GitHub-hosted runner. The only secrets read are the two Nx Cloud
+# tokens (see `gate`), and the trigger is `pull_request` (never `pull_request_target`), so a pull
+# request from a fork runs with a read-only token, no secrets and no remote cache. Actions are pinned to a commit; the tag is in the comment.
 
 on:
   pull_request:
@@ -28,6 +28,14 @@ jobs:
     name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Nx Cloud remote cache (workspace nxCloudId in nx.json; anonymous access is "none"). A push to
+    # main writes the shared cache with the read-write token; a pull request gets the read token,
+    # which Nx Cloud scopes to a per-PR cache, so a branch can never poison main's. A fork's PR has
+    # no secrets and runs uncached. Called from release.yml (a tag push), no secrets are passed and
+    # NX_NO_CLOUD is on, so a release gate never reads the remote cache.
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
+      NX_NO_CLOUD: ${{ startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,6 +116,10 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The same Nx Cloud tokens as `gate`.
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
+      NX_NO_CLOUD: ${{ startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
