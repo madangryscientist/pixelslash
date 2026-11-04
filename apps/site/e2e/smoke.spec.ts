@@ -146,3 +146,80 @@ test("an unknown docs page is a 404", async ({ page }) => {
   const response = await page.goto("/docs/no-such-page");
   expect(response?.status()).toBe(404);
 });
+
+/*
+ * The type face (PS-307): every page renders in the Inter this site serves, light and dark. The face
+ * is requested from the site's own origin and loads; nothing is requested from another origin. The
+ * browser's own report of the font it drew with (CDP getPlatformFontsForNode) is the proof, not the
+ * computed font-family, which names a stack and says nothing about what was used.
+ */
+for (const scheme of ["light", "dark"] as const) {
+  for (const to of [...PAGES.map((item) => item.to), ...DOC_PATHS]) {
+    test(`${to}: served Inter in ${scheme}, from this origin`, async ({ page, baseURL }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      const origin = new URL(baseURL ?? "").origin;
+      const foreign: string[] = [];
+      const fonts: { url: string; ok: boolean }[] = [];
+      page.on("response", (response) => {
+        const url = response.url();
+        if (/\.woff2?(\?|$)/.test(url)) fonts.push({ url, ok: response.ok() });
+      });
+      page.on("request", (request) => {
+        if (new URL(request.url()).origin !== origin) foreign.push(request.url());
+      });
+
+      await page.goto(to, { waitUntil: "networkidle" });
+      await page.evaluate(() => document.fonts.ready);
+
+      expect(foreign, "a request left the site's own origin").toEqual([]);
+      expect(fonts.map((font) => new URL(font.url).pathname)).toEqual([
+        "/fonts/inter-latin-wght-normal.woff2",
+      ]);
+      expect(fonts.every((font) => font.ok)).toBe(true);
+      await expect(page.locator("html")).toHaveClass(
+        scheme === "dark" ? /\bdark\b/ : /^(?!.*\bdark\b)/,
+      );
+
+      const loaded = await page.evaluate(() =>
+        [...document.fonts].filter((face) => face.status === "loaded").map((face) => face.family),
+      );
+      expect(loaded.map((family) => family.replaceAll('"', ""))).toContain("Inter");
+
+      // What the browser drew with: Inter, the served file, for the page's heading and its body.
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("DOM.enable");
+      await cdp.send("CSS.enable");
+      const { root } = await cdp.send("DOM.getDocument");
+      // The first heading and the first body text (paragraph, list item or cell) with text of its own that
+      // is on screen: a phone hides some copy.
+      await page.evaluate(() => {
+        const probes = { heading: "h1", body: "p, li, td, dd" };
+        for (const [name, selector] of Object.entries(probes)) {
+          const shown = [...document.querySelectorAll(selector)].find((element) => {
+            const box = element.getBoundingClientRect();
+            const ownText = [...element.childNodes].some(
+              (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+            );
+            // checkVisibility is false inside a closed <details>: it has boxes but paints nothing.
+            return element.checkVisibility() && box.width > 1 && box.height > 1 && ownText;
+          });
+          shown?.setAttribute("data-font-probe", name);
+        }
+      });
+      for (const tag of ["heading", "body"]) {
+        const { nodeId } = await cdp.send("DOM.querySelector", {
+          nodeId: root.nodeId,
+          selector: `[data-font-probe="${tag}"]`,
+        });
+        expect(nodeId, `no visible ${tag} on ${to}`).not.toBe(0);
+        const { fonts: used } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+        expect(used.length, `${tag} drew no text`).toBeGreaterThan(0);
+        // Some of it in Inter: a glyph outside the served Latin subset (an arrow) may use another.
+        const inter = used.filter((font) => font.familyName === "Inter" && font.isCustomFont);
+        expect(inter.length, `${tag} on ${to} was not drawn with the served Inter`).toBeGreaterThan(
+          0,
+        );
+      }
+    });
+  }
+}

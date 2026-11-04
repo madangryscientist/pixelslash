@@ -10,6 +10,44 @@
  * theme file, so it is repeated here.
  */
 
+/*
+ * The type face (PS-307): Inter, variable (weights 100-900), served from this origin. The file is
+ * public/fonts/inter-latin-wght-normal.woff2, the Latin subset of @fontsource-variable/inter 5.3.0;
+ * its licence, the SIL OFL 1.1, ships beside it as public/fonts/OFL.txt. Characters outside that
+ * range (arrows, CJK) fall through to the fallback face below and then the system stack. The root route preloads the file.
+ *
+ * "Inter Fallback" is Arial (or its metric twin Liberation Sans) scaled to Inter's metrics (the same figures Next.js ships for Inter), so
+ * the swap from the fallback to Inter moves no line and shifts no layout.
+ */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial"), local("Liberation Sans");
+  size-adjust: 107.4%;
+  ascent-override: 90.2%;
+  descent-override: 22.48%;
+  line-gap-override: 0%;
+}
+
+/* One sans face in light and dark, on every page. The theme sets --font-sans on .dark only (Inter
+   "where installed", then the system stack); this is the same scope, later, so it wins. */
+:root,
+.dark {
+  --font-sans:
+    Inter, "Inter Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
 /* A heading anchor (`/docs#exit-codes-...`) lands clear of the sticky header and the nav row. */
 [id] {
   scroll-margin-top: 7.5rem;
