@@ -25,6 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
+    # A release builds from scratch and never reads the Nx Cloud remote cache: what is published is
+    # what this job built.
+    env:
+      NX_NO_CLOUD: "true"
     permissions:
       contents: read
       # The OIDC token npm trusted publishing and the provenance statement are signed with.

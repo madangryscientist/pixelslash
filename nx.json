@@ -1,6 +1,5 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "neverConnectToCloud": true,
   "analytics": false,
   "useDaemonProcess": false,
   "namedInputs": {
@@ -42,5 +41,6 @@
   ],
   "affected": {
     "legacy": true
-  }
+  },
+  "nxCloudId": "6aeaf0da2ca98cf50b938bc3"
 }

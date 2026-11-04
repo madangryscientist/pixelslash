@@ -72,8 +72,13 @@ only the dotnet ones. A bare `bunx nx ...` skips the wrapper, so on a machine wi
 capture image or on the self-host. A change to `engines/dotnet` needs the SDK to be checked.
 
 One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
-`.nx/`; add `--skip-nx-cache` to force a rerun. There is no Nx Cloud and no
-remote cache. Lint rules are all errors; fix the code, do not disable a rule.
+`.nx/`; add `--skip-nx-cache` to force a rerun. CI also uses an Nx Cloud remote
+cache (workspace `pixelslash` in the `pixelslash` org on cloud.nx.app, Hobby plan;
+`nxCloudId` in `nx.json`): a push to main writes it with the `NX_CLOUD_ACCESS_TOKEN`
+secret, a PR reads it with `NX_CLOUD_READ_TOKEN` (a per-PR cache), and a release
+runs with `NX_NO_CLOUD=true`. Anonymous access is `none`, so a local run without
+credentials prints a harmless `(code: 401)` after the run; `NX_NO_CLOUD=true`
+silences it. Never commit a token. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
 
