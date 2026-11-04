@@ -4,9 +4,6 @@ Audit of our text documentation against Chromatic's public docs. It produces the
 PS-316 (getting started and tutorials), PS-317 (concepts, troubleshooting, FAQ) and PS-318 (the CLI
 reference: task-first, searchable). It writes no docs pages itself.
 
-Why: Jacobus will not sell until the site beats Chromatic in every way that can be read, text
-documentation included (2026-11-04).
-
 ## Sources and method
 
 **Chromatic, fetched 2026-11-05.** Chromatic publishes its docs for machines, so the whole set was
