@@ -1,4 +1,4 @@
-import { Caption, Card, Cluster, ListRow, Pill, Section, Text, TextLink } from "@hackcove/ui";
+import { Caption, Card, Cluster, ListRow, Pill, Section, Text, TextLink } from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import { type StaleItem, staleParts } from "#/lib/stale";
 

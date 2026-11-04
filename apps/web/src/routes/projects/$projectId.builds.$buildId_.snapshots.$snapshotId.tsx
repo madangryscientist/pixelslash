@@ -1,4 +1,4 @@
-import { Breadcrumbs, Callout, FullBleedLayout, Stack } from "@hackcove/ui";
+import { Breadcrumbs, Callout, FullBleedLayout, Stack } from "@hackcove/ui-react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";

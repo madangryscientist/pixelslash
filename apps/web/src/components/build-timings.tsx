@@ -1,4 +1,4 @@
-import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui";
+import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui-react";
 import type { BuildView } from "#/db/review";
 import { formatDuration } from "#/lib/format";
 import { type CardLine, NO_TIMINGS, type RunCardInput, runCard } from "#/lib/run-card";

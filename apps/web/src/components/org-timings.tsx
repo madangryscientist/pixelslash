@@ -9,7 +9,7 @@ import {
   TableRow,
   Text,
   TextLink,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ProjectTimings } from "#/db/timings-stats";
 import { formatDuration } from "#/lib/format";
 import { P95_MIN_BUILDS, STEPS, STEP_LABELS, TOTAL_EXPLAINED, type Step } from "#/lib/timings";

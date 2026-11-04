@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button, Caption, Cluster, Divider, Overline, Pill, Stack, Text } from "@hackcove/ui";
+import { Button, Caption, Cluster, Divider, Overline, Pill, Stack, Text } from "@hackcove/ui-react";
 import { useHydrated } from "#/components/ui";
 import type { AiSummarySentence } from "#/db/diff-json";
 import type { BuildView, SnapshotView } from "#/db/review";

@@ -19,7 +19,7 @@ import {
   TableRow,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { orgCrumb } from "#/components/crumbs";
 import { ProjectFlags } from "#/components/detection-flag";

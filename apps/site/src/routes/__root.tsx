@@ -1,4 +1,4 @@
-import { appShellRootClassFor, colourSchemeScript } from "@hackcove/ui";
+import { appShellRootClassFor, colourSchemeScript } from "@hackcove/ui-react";
 import {
   HeadContent,
   Outlet,

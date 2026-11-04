@@ -7,7 +7,7 @@ import {
   Step,
   Steps,
   TextLink,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 
 /** Each step is what docs/cli.md says the run does, in its order; the numbers are the engine's defaults. */

@@ -7,7 +7,7 @@ import {
   SidebarLayout,
   Tabs,
   TextLink,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { CLI_SPLIT } from "../../content/cli-pages.ts";
 import { CLI_INTRO_DOC, docOf } from "../../content/docs.ts";

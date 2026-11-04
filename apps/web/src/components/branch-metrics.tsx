@@ -1,4 +1,4 @@
-import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui";
+import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui-react";
 import { type BranchMetrics as Metrics, sparkPoints } from "#/lib/branch-metrics";
 import { formatDuration, formatNumber } from "#/lib/format";
 import { statsText } from "#/lib/run-card";

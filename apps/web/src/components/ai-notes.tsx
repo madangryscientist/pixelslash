@@ -1,5 +1,5 @@
 import { type ReactNode, createContext, useContext } from "react";
-import { Caption, Overline, Stack, Text } from "@hackcove/ui";
+import { Caption, Overline, Stack, Text } from "@hackcove/ui-react";
 import type { SnapshotView } from "#/db/review";
 import type { AiRegionNote, DiffRegion } from "#/db/schema";
 

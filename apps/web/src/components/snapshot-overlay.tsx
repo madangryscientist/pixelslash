@@ -1,4 +1,4 @@
-import { Card, Checkbox, Cluster, Legend, type LegendItem, Stack } from "@hackcove/ui";
+import { Card, Checkbox, Cluster, Legend, type LegendItem, Stack } from "@hackcove/ui-react";
 import { useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";

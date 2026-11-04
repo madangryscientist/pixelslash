@@ -13,7 +13,7 @@ import {
   Stack,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";

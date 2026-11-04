@@ -1,4 +1,4 @@
-import { Button, Card, CopyLine, EmptyState, Step, Steps, Text } from "@hackcove/ui";
+import { Button, Card, CopyLine, EmptyState, Step, Steps, Text } from "@hackcove/ui-react";
 
 /** An org with no projects: what a project is, and the two steps to a first build. */
 export function EmptyOrg({

@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Caption, Legend, ListRow, Stack, SubsectionHeading, Text } from "@hackcove/ui";
+import { Caption, Legend, ListRow, Stack, SubsectionHeading, Text } from "@hackcove/ui-react";
 import {
   GAP_COLOUR,
   MAX_FINDINGS,

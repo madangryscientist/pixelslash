@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Caption, Divider, Overline, Stack, Text } from "@hackcove/ui";
+import { Button, Caption, Divider, Overline, Stack, Text } from "@hackcove/ui-react";
 
 /** Past this many lines, or this many characters, the brief opens collapsed. */
 const SHOWN_LINES = 4;

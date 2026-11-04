@@ -1,4 +1,4 @@
-import { Caption, Disclosure, Stack, SubsectionHeading, Text } from "@hackcove/ui";
+import { Caption, Disclosure, Stack, SubsectionHeading, Text } from "@hackcove/ui-react";
 import {
   MAX_VIOLATIONS,
   type A11yDiff,

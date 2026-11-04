@@ -1,4 +1,4 @@
-import { Text, Callout, Card, CardGrid, ProseLayout, Section, TextLink } from "@hackcove/ui";
+import { Text, Callout, Card, CardGrid, ProseLayout, Section, TextLink } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { CONTACT } from "../../content/links.ts";
 import { COMMITMENT, FACTS } from "../../content/pricing.ts";

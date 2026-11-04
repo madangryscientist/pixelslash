@@ -1,4 +1,11 @@
-import { AvatarStack, Button, Cluster, type LinkRenderProps, PageHeader, Tabs } from "@hackcove/ui";
+import {
+  AvatarStack,
+  Button,
+  Cluster,
+  type LinkRenderProps,
+  PageHeader,
+  Tabs,
+} from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import type { OrgOverview } from "#/db/orgs";
 import { plural } from "./org-projects";

@@ -18,7 +18,7 @@ import {
   TableHeaderCell,
   TableRow,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { formatDateTime } from "#/lib/format";
 import { issueOrgTokenFn, revokeOrgTokenFn } from "#/server/org-token-fns";
 

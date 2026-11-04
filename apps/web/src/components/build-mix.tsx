@@ -1,4 +1,4 @@
-import { Caption, StackedBar, type StackedSegment, type TextTone, Text } from "@hackcove/ui";
+import { Caption, StackedBar, type StackedSegment, type TextTone, Text } from "@hackcove/ui-react";
 import type { BuildSummary } from "#/db/build-list";
 import type { BuildCounts } from "#/db/build-counts";
 

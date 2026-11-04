@@ -16,7 +16,7 @@ import {
   TableRow,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { StatusBadge } from "#/components/ui";
 import type { LatestBuild, OrgOverview, ProjectOverview } from "#/db/orgs";

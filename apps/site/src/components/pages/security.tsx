@@ -1,4 +1,4 @@
-import { Callout, ProseLayout, TextLink } from "@hackcove/ui";
+import { Callout, ProseLayout, TextLink } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { SECURITY_DOC } from "../../content/docs.ts";
 import { CONTACT, REPO_PUBLIC } from "../../content/links.ts";

@@ -1,4 +1,4 @@
-import { KeyValue } from "@hackcove/ui";
+import { KeyValue } from "@hackcove/ui-react";
 import type { SnapshotView } from "#/db/review";
 import { formatDuration } from "#/lib/format";
 import { compareMsOf } from "#/lib/run-metrics";

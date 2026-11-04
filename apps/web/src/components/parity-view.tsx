@@ -1,4 +1,4 @@
-import { Caption, Callout, Card, Overline, Stack, Text, TextLink } from "@hackcove/ui";
+import { Caption, Callout, Card, Overline, Stack, Text, TextLink } from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import { StaleBadge } from "#/components/stale";
 import {

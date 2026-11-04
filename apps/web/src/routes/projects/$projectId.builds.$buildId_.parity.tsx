@@ -1,4 +1,4 @@
-import { Breadcrumbs, ListLayout, Text } from "@hackcove/ui";
+import { Breadcrumbs, ListLayout, Text } from "@hackcove/ui-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { ParityBody } from "#/components/parity-view";

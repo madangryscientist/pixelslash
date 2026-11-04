@@ -1,4 +1,12 @@
-import { Caption, Disclosure, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui";
+import {
+  Caption,
+  Disclosure,
+  KeyValue,
+  KeyValueList,
+  Overline,
+  Stack,
+  Text,
+} from "@hackcove/ui-react";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions, OptionSource } from "#/db/schema";
 import { formatDateTime } from "#/lib/format";

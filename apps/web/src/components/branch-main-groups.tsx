@@ -10,7 +10,7 @@ import {
   Stack,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { ShotThumb } from "#/components/shot-card";
 import { ReviewChip, useHydrated } from "#/components/ui";
 import {

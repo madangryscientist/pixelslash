@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Card, SectionHeading, Select, Stack, Text } from "@hackcove/ui";
+import { Button, ButtonGroup, Card, SectionHeading, Select, Stack, Text } from "@hackcove/ui-react";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { saveTwinProject } from "#/server/twin-fns";

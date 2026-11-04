@@ -318,7 +318,7 @@ A project that builds its pages only from one design-system library's components
 ```json
 {
   "composition": {
-    "library": "@hackcove/ui",
+    "library": "@hackcove/ui-react",
     "name": "Hack Cove UI",
     "custom": [{ "selector": ".hero-art", "reason": "the landing art is drawn by hand" }]
   }

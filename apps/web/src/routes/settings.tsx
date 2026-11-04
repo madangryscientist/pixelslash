@@ -21,7 +21,7 @@ import {
   TableHeaderCell,
   TableRow,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
 import { TOKEN_EXPIRY_DAYS } from "#/lib/token-expiry";

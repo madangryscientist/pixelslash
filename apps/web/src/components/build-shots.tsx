@@ -12,7 +12,7 @@ import {
   Stack,
   Tabs,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { aiFiltered } from "#/components/ai-notes";
 import { ShotCard, measured } from "#/components/shot-card";
 import { ReviewChip } from "#/components/ui";

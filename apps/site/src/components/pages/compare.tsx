@@ -15,7 +15,7 @@ import {
   TableHeaderCell,
   TableRow,
   TextLink,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import {
   type Cell,

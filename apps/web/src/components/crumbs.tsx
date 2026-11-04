@@ -1,4 +1,4 @@
-import { Caption, type Crumb } from "@hackcove/ui";
+import { Caption, type Crumb } from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 

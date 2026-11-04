@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Caption, Card, Cluster, ClusterGrow, Pill, Stack, Text } from "@hackcove/ui";
+import { Caption, Card, Cluster, ClusterGrow, Pill, Stack, Text } from "@hackcove/ui-react";
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { a11yLine } from "#/components/a11y";

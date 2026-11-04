@@ -10,7 +10,7 @@ import {
   SubsectionHeading,
   Tabs,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ChangeLine, MainSummary } from "#/lib/branch-review";
 
 export type BranchMode = "main" | "since";

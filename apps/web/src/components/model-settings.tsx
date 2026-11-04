@@ -13,7 +13,7 @@ import {
   Stack,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ModelView, ModelSource } from "#/db/models";
 import { removeOrgModel, removeProjectModel, saveOrgModel, saveProjectModel } from "#/server/model";
 
