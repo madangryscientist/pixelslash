@@ -24,6 +24,15 @@ export const Route = createRootRoute({
       },
     ],
     links: [
+      // The one font file, fetched with the HTML rather than after the CSS (PS-307). A font preload
+      // is always crossorigin, even from the same origin.
+      {
+        rel: "preload",
+        href: "/fonts/inter-latin-wght-normal.woff2",
+        as: "font",
+        type: "font/woff2",
+        crossOrigin: "anonymous",
+      },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],

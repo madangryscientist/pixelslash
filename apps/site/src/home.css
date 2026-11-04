@@ -33,7 +33,7 @@
   overflow-x: clip;
   background: var(--home-crust);
   color: var(--home-text);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 body:has(.home) {

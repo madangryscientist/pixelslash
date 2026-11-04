@@ -18,6 +18,15 @@ the code says at that commit:
 
 The pricing page's commitment sentence is `src/content/pricing.ts`.
 
+## The type face
+
+One sans face on every page, light and dark: Inter, variable, served from this origin. The file is
+`public/fonts/inter-latin-wght-normal.woff2` (the Latin subset of `@fontsource-variable/inter` 5.3.0)
+and its licence, the SIL Open Font License 1.1, ships beside it as `public/fonts/OFL.txt`. The
+`@font-face` and the `--font-sans` stack are in `src/styles.css`, the preload in `src/routes/__root.tsx`.
+The e2e run asserts that every page requests the font from the site's own origin, that it loads, that
+the browser drew the heading and body text with it, and that nothing else leaves the origin.
+
 ## Before the app opens
 
 No link may lead where a visitor cannot follow. Two switches in `src/content/links.ts`:
