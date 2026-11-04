@@ -1,4 +1,4 @@
-import { Callout, ProseLayout } from "@hackcove/ui";
+import { Callout, ProseLayout } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { SELF_HOST_DOC } from "../../content/docs.ts";
 import { REPO_PUBLIC } from "../../content/links.ts";

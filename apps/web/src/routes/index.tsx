@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { Button, CenteredLayout, Stack } from "@hackcove/ui";
+import { Button, CenteredLayout, Stack } from "@hackcove/ui-react";
 import { Page } from "#/components/ui";
 import { getViewer } from "#/server/fns";
 import { getSignInOptions } from "#/server/sign-in";

@@ -5,7 +5,7 @@ import { REPO_PUBLIC, REPO_URL } from "#/content/links";
 
 /*
  * The homepage is marketing, not an admin screen, so it is drawn here in plain Tailwind and
- * home.css rather than with @hackcove/ui, and it carries its own header and footer. The other
+ * home.css rather than with @hackcove/ui-react, and it carries its own header and footer. The other
  * pages keep the shared Shell. The motion is CSS only and stands still for prefers-reduced-motion.
  */
 

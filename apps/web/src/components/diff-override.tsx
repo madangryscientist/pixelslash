@@ -12,7 +12,7 @@ import {
   RadioGroup,
   Stack,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";

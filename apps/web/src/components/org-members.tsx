@@ -9,7 +9,7 @@ import {
   Pill,
   Stack,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { useState } from "react";
 import type { OrgInvite, OrgMember, OrgOverview } from "#/db/orgs";
 import { formatDay } from "#/lib/format";

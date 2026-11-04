@@ -1,4 +1,4 @@
-import { Button, Cluster, ClusterGrow, SegmentedControl } from "@hackcove/ui";
+import { Button, Cluster, ClusterGrow, SegmentedControl } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionLegend } from "#/components/composition";

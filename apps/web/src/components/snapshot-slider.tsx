@@ -1,4 +1,4 @@
-import { Button, Caption, Pill } from "@hackcove/ui";
+import { Button, Caption, Pill } from "@hackcove/ui-react";
 import {
   type KeyboardEvent,
   type PointerEvent,

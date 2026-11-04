@@ -14,7 +14,7 @@ import {
   Stack,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import type { ProjectFlag, SnapshotFlag } from "#/db/flags";

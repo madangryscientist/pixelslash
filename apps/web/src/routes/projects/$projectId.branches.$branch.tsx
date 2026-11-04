@@ -9,7 +9,7 @@ import {
   Stack,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { MainGroups } from "#/components/branch-main-groups";

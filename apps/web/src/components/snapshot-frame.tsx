@@ -1,5 +1,5 @@
 import { type PointerEvent, type ReactNode, useState } from "react";
-import { OutlineRegion } from "@hackcove/ui";
+import { OutlineRegion } from "@hackcove/ui-react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { useRegionNote } from "#/components/ai-notes";
 import type { DiffRegion, IgnoreRect } from "#/db/schema";

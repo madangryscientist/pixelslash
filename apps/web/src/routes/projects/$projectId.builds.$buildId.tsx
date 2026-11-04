@@ -1,4 +1,4 @@
-import { Breadcrumbs, Callout, ListLayout, Stack, Text } from "@hackcove/ui";
+import { Breadcrumbs, Callout, ListLayout, Stack, Text } from "@hackcove/ui-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { BuildBrief } from "#/components/build-brief";

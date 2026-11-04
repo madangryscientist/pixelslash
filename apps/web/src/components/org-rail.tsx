@@ -1,4 +1,4 @@
-import { Avatar, Button, Caption, ListRow, Overline, Pill, Stack } from "@hackcove/ui";
+import { Avatar, Button, Caption, ListRow, Overline, Pill, Stack } from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import type { OrgOverview } from "#/db/orgs";
 

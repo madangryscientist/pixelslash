@@ -1,4 +1,4 @@
-import { ErrorPage, NotFound } from "@hackcove/ui";
+import { ErrorPage, NotFound } from "@hackcove/ui-react";
 import {
   createRouter as createTanStackRouter,
   type ErrorComponentProps,

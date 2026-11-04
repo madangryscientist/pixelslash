@@ -1,4 +1,4 @@
-import { Card, RegionFrame, Text } from "@hackcove/ui";
+import { Card, RegionFrame, Text } from "@hackcove/ui-react";
 import { type ReactNode, type SyntheticEvent, useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { type Composition, CompositionBoxes } from "#/components/composition";

@@ -20,7 +20,7 @@ import {
   TableHeaderCell,
   TableRow,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { orgCrumb, projectCrumb } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { ModelSettings } from "#/components/model-settings";

@@ -7,7 +7,7 @@ import {
   Stack,
   TextLink,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { Metrics } from "@hackcove/pixelslash-engine/metrics-entry";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";

@@ -1,4 +1,12 @@
-import { Button, Card, EmptyState, FieldDialog, SidebarLayout, Stack, Text } from "@hackcove/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  FieldDialog,
+  SidebarLayout,
+  Stack,
+  Text,
+} from "@hackcove/ui-react";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ModelSettings } from "#/components/model-settings";

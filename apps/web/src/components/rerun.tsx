@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Caption, Overline, Stack, Text } from "@hackcove/ui";
+import { Button, ButtonGroup, Caption, Overline, Stack, Text } from "@hackcove/ui-react";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useHydrated } from "#/components/ui";

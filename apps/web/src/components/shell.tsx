@@ -8,7 +8,7 @@ import {
   Cluster,
   ColourSchemeToggle,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { rememberTheme } from "#/lib/theme";
 import { useHydrated } from "#/lib/use-hydrated";
 

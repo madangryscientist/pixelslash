@@ -7,7 +7,7 @@ import {
   Tabs,
   Stack,
   TextLink,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { TRADEMARK } from "#/content/docs";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";

@@ -1,4 +1,4 @@
-import { Caption, Disclosure, Stack, Text } from "@hackcove/ui";
+import { Caption, Disclosure, Stack, Text } from "@hackcove/ui-react";
 import type { Metrics, MetricsPart } from "@hackcove/pixelslash-engine/metrics-entry";
 
 /**

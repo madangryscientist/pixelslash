@@ -12,7 +12,7 @@ import {
   RadioGroup,
   Stack,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { useFlagWrite } from "#/components/detection-flag";

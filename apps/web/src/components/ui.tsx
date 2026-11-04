@@ -1,4 +1,4 @@
-import { AppShell, Button, Caption, Cluster, Input, Pill, Stack, Text } from "@hackcove/ui";
+import { AppShell, Button, Caption, Cluster, Input, Pill, Stack, Text } from "@hackcove/ui-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useHydrated } from "#/lib/use-hydrated";
 import { AppBrand, AppControls } from "./shell";

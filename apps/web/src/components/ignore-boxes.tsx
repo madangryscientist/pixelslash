@@ -11,7 +11,7 @@ import {
   Pill,
   Stack,
   Text,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import type { IgnoreSource } from "#/components/snapshot-frame";

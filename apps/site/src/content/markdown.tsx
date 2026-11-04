@@ -14,7 +14,7 @@ import {
   TableHeaderCell,
   TableRow,
   TextLink,
-} from "@hackcove/ui";
+} from "@hackcove/ui-react";
 import { type MarkedToken, type Token, type Tokens, lexer } from "marked";
 import { Fragment, type ReactNode } from "react";
 import { decode, marked, plainText, slugger } from "./doc-text.ts";
