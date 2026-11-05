@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   UNITS,
+  WATCHDOG_UNITS,
   bunxBody,
   cleanup,
   current,
@@ -45,7 +46,12 @@ describe("update.sh", () => {
       "ct-secret",
     );
     expect(statSync(join(rel, "apps/web/dist/server/.dev.vars")).mode & 0o777).toBe(0o600);
-    expect(readdirSync(s.unitDir).toSorted()).toEqual([...UNITS].toSorted());
+    expect(readdirSync(s.unitDir).toSorted()).toEqual([...UNITS, ...WATCHDOG_UNITS].toSorted());
+    // Root runs it, so it is not the copy in a release, which `pixelslash` owns.
+    expect(readFileSync(join(s.unitDir, "pixelslash-watchdog.service"), "utf8")).toContain(
+      "ExecStart=/usr/local/sbin/pixelslash-watchdog\n",
+    );
+    expect(statSync(join(s.unitDir, "../watchdog-bin")).mode & 0o777).toBe(0o755);
 
     // Install and migrate in the new release, then the sidecar, then the server. Nothing builds.
     const at = (prefix: string) => commands.findIndex((line) => line.startsWith(prefix));
@@ -58,6 +64,27 @@ describe("update.sh", () => {
       at("systemctl restart pixelslash-stub pixelslash-web"),
     );
     expect(commands.filter((line) => /build/.test(line))).toEqual([]);
+  });
+
+  test("the liveness check is off while the units restart, and on once the release serves", () => {
+    const s = setup();
+    const { status, commands } = deploy(s, pack("aaaaaaa"));
+    expect(status).toBe(0);
+    const at = (prefix: string) => commands.findIndex((line) => line.startsWith(prefix));
+    expect(at("systemctl stop pixelslash-watchdog.timer")).toBeLessThan(
+      at("systemctl restart pixelslash-diff"),
+    );
+    expect(at("systemctl restart pixelslash-stub pixelslash-web")).toBeLessThan(
+      at("systemctl enable --now --quiet pixelslash-watchdog.timer"),
+    );
+  });
+
+  test("a rollback to a release with the watchdog turns it back on", () => {
+    const s = setup();
+    expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+    const { status, commands } = deploy(s, pack("bbbbbbb", { broken: true }));
+    expect(status).toBe(1);
+    expect(commands.at(-1)).toMatch(/^systemctl enable --now --quiet pixelslash-watchdog\.timer/);
   });
 
   test("a release that does not come up goes back to the previous one", () => {

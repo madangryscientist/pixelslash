@@ -46,6 +46,15 @@ Check `pct exec $CT -- df -h /` before a run, and do not run 500 again until tha
 - **Cold**: both units are restarted before every N, so N=500 does not inherit N=200's heap.
 - **`GET /` probe** every ~1.5 s through the burst, to see whether the server stays answering.
 
+## Limits since PS-323
+
+The logs below are dated and name the limits of their day. Since PS-323 neither unit has a
+`MemoryHigh`; `apps/web/README.md`, "Memory limits and the watchdog", has the current ones.
+
+`perf/wedge-check.ts` (on demand, desktop only, needs `systemd-run --user`) wedges a real sidecar
+under the old limits in a throwaway user unit, and exits 0 only when `deploy/ssh/watchdog.sh` brings
+it back.
+
 ## Results (MB)
 
 Process columns are the peak `VmHWM` of the phase; `web unit` is the cgroup's peak `memory.current`

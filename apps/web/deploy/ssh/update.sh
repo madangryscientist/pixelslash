@@ -38,10 +38,14 @@
 # file nothing about the helper is installed, and one that was is disabled and removed. See
 # apps/web/README.md, "The AI explain step through opencode".
 #
-# The diff sidecar (PS-203) is always installed: pixelslash-diff runs the server diff with the
-# napi-image codec on 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come
-# up is reported and the update goes on, since the Worker then diffs in-process with pngjs, as it
-# did before the sidecar. See apps/web/README.md, "The diff sidecar".
+# The diff sidecar (PS-203) is always installed: pixelslash-diff runs the server diff on
+# 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come up is reported and
+# the update goes on, since the Worker then diffs in-process, up to a lower pixel limit. See
+# apps/web/README.md, "The diff sidecar".
+#
+# So is the liveness check (PS-323): pixelslash-watchdog is stopped for the restarts, timer and any
+# pass in progress, so it cannot restart a unit mid-update, and started once the release serves. It
+# needs curl, so an update without curl stops before it changes anything.
 set -Eeuo pipefail
 
 # The PIXELSLASH_* overrides are for the test, which runs this against temp directories.
@@ -55,6 +59,7 @@ KEEP_RELEASES=3
 LEGACY=$APP_HOME/pixelslash
 SHARED_WEB=$LEGACY/apps/web
 UNIT_DIR=${PIXELSLASH_UNIT_DIR:-/etc/systemd/system}
+WATCHDOG_BIN=${PIXELSLASH_WATCHDOG_BIN:-/usr/local/sbin/pixelslash-watchdog}
 HELPER_SWITCH=${PIXELSLASH_HELPER_SWITCH:-/etc/pixelslash/opencode-helper}
 HELPER_KEY=$APP_HOME/.config/pixelslash/opencode.key
 HELPER_URL=http://127.0.0.1:4180/v1
@@ -237,6 +242,23 @@ install_units() {
   d=$(deploy_dir "$1")
   install -m 644 "$d"/pixelslash-stub.service "$d"/pixelslash-diff.service \
     "$d"/pixelslash-web.service "$UNIT_DIR"/
+  # A release before the watchdog (PS-323), which a rollback can land on, has none of it: what is
+  # installed stays and keeps working. The script is copied out, owned by root who runs it, because
+  # `pixelslash` owns the release.
+  if [[ -f $d/pixelslash-watchdog.timer ]]; then
+    install -m 644 "$d"/pixelslash-watchdog.service "$d"/pixelslash-watchdog.timer "$UNIT_DIR"/
+    install -m 755 "$d"/watchdog.sh "$WATCHDOG_BIN"
+  fi
+}
+
+# The liveness check is off while units restart on purpose. Stopping one that is not there yet (the
+# first deploy with it, or one before it) is not a failure.
+pause_watchdog() {
+  systemctl stop pixelslash-watchdog.timer pixelslash-watchdog.service 2>/dev/null || true
+}
+
+resume_watchdog() {
+  systemctl enable --now --quiet pixelslash-watchdog.timer
 }
 
 # Points `current` at $1 in one rename, so a unit never sees it missing.
@@ -273,6 +295,7 @@ rollback() {
     exit 1
   fi
   echo "update failed: going back to ${prev##*/}" >&2
+  pause_watchdog
   set_current "$prev"
   install_units "$prev"
   # The helper too, when it is installed: it would otherwise run on from the deleted release.
@@ -290,11 +313,13 @@ rollback() {
   if ! wait_for_port 3000 60 pixelslash-web; then
     echo "the previous release did not come up on :3000 either" >&2
   fi
+  resume_watchdog || true
   exit 1
 }
 
 main() {
   local tarball=${1:?usage: update.sh <release.tar.gz>}
+  command -v curl >/dev/null || { echo "curl is not installed: pixelslash-watchdog needs it" >&2; exit 1; }
   local name=${tarball##*/}
   name=${name%.tar.gz}
   name=${name#pixelslash-}
@@ -338,6 +363,7 @@ main() {
 
   # From here a failure puts `current` back on the previous release and restarts it.
   trap 'rollback "$prev" "$unpacked"' ERR HUP INT TERM
+  pause_watchdog
   install_units "$rel"
   if [[ -n $helper_model ]]; then
     install -m 644 "$rel"/apps/web/deploy/ssh/pixelslash-opencode.service "$UNIT_DIR"/
@@ -353,7 +379,7 @@ main() {
   systemctl restart pixelslash-diff
   if ! wait_for_port 4181; then
     journalctl -u pixelslash-diff -n 5 --no-pager >&2 || true
-    echo "pixelslash-diff did not come up on :4181: server diffs run in-process (pngjs)" >&2
+    echo "pixelslash-diff did not come up on :4181: server diffs run in-process, up to their limit" >&2
   fi
   # The helper is up before any org is pointed at it: a unit that will not start fails the update
   # here, and no row aims at a port with nothing behind it.
@@ -378,6 +404,7 @@ main() {
     echo "pixelslash-web did not come up on :3000" >&2
     rollback "$prev" "$unpacked"
   fi
+  resume_watchdog
   trap - ERR HUP INT TERM
   touch "$rel"
   prune_releases

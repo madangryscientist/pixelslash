@@ -6,14 +6,12 @@ import { reportError } from "#/server/sentry";
 import { SIDECAR_PATH, decodeResponse, encodeRequest } from "./sidecar-wire";
 
 /**
- * The self-host's diff sidecar client (PS-203). workerd cannot load a native addon, so a self-host
- * runs the engine's diff with the napi-image codec in a Bun process on loopback
- * (`deploy/ssh/diff-sidecar.ts`) and the Worker sends it each shot's two PNGs. This file has no
- * codec and no native import: what Cloudflare bundles is a `fetch`. Cloudflare never sets
- * `DIFF_SIDECAR_URL`, so there it is never called.
+ * The self-host's diff sidecar client (PS-203). A self-host runs the engine's diff in a Bun process
+ * on loopback (`deploy/ssh/diff-sidecar.ts`), outside workerd's memory, and the Worker sends it each
+ * shot's two PNGs. Cloudflare never sets `DIFF_SIDECAR_URL`, so there it is never called.
  */
 
-/** The diff the sidecar runs, or a reason it could not (the caller then measures in-process). */
+/** The diff the sidecar runs, or a reason it could not (the caller may then measure in-process). */
 export type SidecarDiff = (
   main: Buffer,
   branch: Buffer,
@@ -22,8 +20,9 @@ export type SidecarDiff = (
 ) => Promise<PixelDiff>;
 
 /**
- * Far above a diff's own time (a 1440x6000 page is ~0.4 s natively) and below the Worker budget's
- * slowest shot: a sidecar that hangs costs this once per shot, then the in-process diff measures it.
+ * Far above a diff's own time (a 1280x16800 page is ~0.5 s, ~4.5 s with every pixel changed) and below the Worker budget's slowest
+ * shot: a sidecar that hangs costs this once per run, then the in-process diff measures what its
+ * limit allows (`compare.ts`).
  */
 const TIMEOUT_MS = 15_000;
 

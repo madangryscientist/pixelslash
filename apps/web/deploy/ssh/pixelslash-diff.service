@@ -1,6 +1,6 @@
-# The diff sidecar on 127.0.0.1:4181 (diff-sidecar.ts, PS-203): the server diff with the napi-image
-# codec, which workerd cannot load. pixelslash-web sends it each shot's two PNGs over loopback
-# (wrangler.jsonc `env.e2e` DIFF_SIDECAR_URL) and measures in-process with pngjs when it is down.
+# The diff sidecar on 127.0.0.1:4181 (diff-sidecar.ts, PS-203): the server diff outside workerd's
+# memory. pixelslash-web sends it each shot's two PNGs over loopback (wrangler.jsonc `env.e2e`
+# DIFF_SIDECAR_URL) and, when it is down, measures in-process up to a lower pixel limit.
 # Installed, enabled and restarted by update.sh. See apps/web/README.md, "The diff sidecar".
 [Unit]
 Description=PixelSlash diff sidecar
@@ -14,12 +14,14 @@ Environment=PATH=/home/pixelslash/.bun/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/pixelslash/.bun/bin/bun deploy/ssh/diff-sidecar.ts
 Restart=on-failure
 RestartSec=2
-# The CT has 2 GiB and pixelslash-web may hold 1.7 GB of it (PS-155). The sidecar idles at ~40 MB,
-# peaked at ~320-340 MB on PS-200's burst (50 shots of 1280x5000) and was back at ~55 MB 10 s later.
-# MemoryHigh reclaims first; MemoryMax kills a runaway before it takes the review app with it, and
-# the Worker then measures in-process until Restart= brings it back.
-MemoryHigh=450M
-MemoryMax=600M
+# 1000M rests on a measurement (PS-323): diffs of 1280x19140, 24.5 Mpx and the largest shot the Worker
+# sends (src/diff/compare.ts), peak at 826 MiB with every pixel changed; 1280x16800 at 763 MiB. The old Max of 600M could not
+# hold one. Over MemoryMax the kernel kills it, the unit fails and Restart= brings it back in ~2 s.
+# See apps/web/README.md, "The diff sidecar". No MemoryHigh and no swap: between a High
+# and a Max with nothing left to reclaim the process sits in D state for good, answering nothing while
+# systemd reads `active`. The heap is anonymous, so nothing is ever reclaimable. Do not add a High.
+MemoryMax=1000M
+MemorySwapMax=0
 OOMPolicy=stop
 PrivateTmp=true
 NoNewPrivileges=true

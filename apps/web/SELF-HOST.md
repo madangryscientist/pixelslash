@@ -218,7 +218,7 @@ are needed.
 | `SENTRY_DSN` | secret | no | Error reporting; off while empty. |
 | `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | var | no | Labels on those reports. |
 | `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS` | var | no | `1` lets a project's model sit on a private network. Never on a deployment strangers sign in to. |
-| `DIFF_SIDECAR_URL` | var | no | A loopback diff process. Not used on Cloudflare; leave unset. |
+| `DIFF_SIDECAR_URL` | var | no | A loopback diff process. Not used on Cloudflare; leave unset. With it set, a shot over 24.5 Mpx ends the build `errored`, naming the limit. |
 
 Bindings (`DB`, `BLOBS`, `EXPLAIN`, `API_RATE_LIMIT`, `SIGNIN_RATE_LIMIT`) come from `wrangler.jsonc`, not from
 `vars`.
@@ -245,7 +245,8 @@ the Cloudflare section above.
 `release.sh` and `update.sh` assume this layout; change it and the scripts' paths together.
 
 1. A Debian-family container with systemd and a **static address**, reachable from your machine by ssh through
-   the Proxmox host as root. The reference one is 2 vCPU, 2 GB, 10 GB.
+   the Proxmox host as root. The reference one is 2 vCPU, 6 GB, 10 GB,
+   which the units' memory limits are sized for. It needs `curl`: `update.sh` stops without it.
 2. A user `pixelslash` with home `/home/pixelslash`, [Bun](https://bun.sh) installed for it
    (`/home/pixelslash/.bun/bin/bun`), and Node 24 in `/usr/local` (wrangler runs under it).
 3. The deployment's secrets, in a mode 600 file owned by `pixelslash` at

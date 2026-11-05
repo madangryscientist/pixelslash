@@ -5,7 +5,7 @@
 # Proxmox server".
 [Unit]
 Description=PixelSlash review app
-# The diff sidecar (PS-203) is wanted, not required: without it the Worker diffs in-process.
+# The diff sidecar (PS-203) is wanted, not required: without it the Worker diffs in-process, up to a limit.
 After=network-online.target pixelslash-stub.service pixelslash-diff.service
 Wants=network-online.target pixelslash-stub.service pixelslash-diff.service
 
@@ -17,13 +17,16 @@ ExecStart=/home/pixelslash/.bun/bin/bun deploy/ssh/serve.ts
 Restart=on-failure
 RestartSec=2
 # workerd steps from ~135 MB to 1.5-1.8 GB on an upload burst and keeps it until a restart (ob 1887,
-# PS-155; apps/web/README.md, "Run it on the Proxmox server"). Under `vite preview` (until PS-220) a
-# ~0.5 GB vite process sat beside it, so on the CT's 2 GiB that was the OOM kill. MemoryHigh makes
-# the unit reclaim and swap its own pages first; MemoryMax kills it before the CT thrashes, and
-# OOMPolicy=stop turns that into a failed unit that Restart= brings back whole, not a server
-# with a dead workerd under it.
-MemoryHigh=1400M
-MemoryMax=1700M
+# PS-155; apps/web/README.md, "Run it on the Proxmox server"). 2500M rests on that 1.8 GB plus the
+# ~465 MiB one in-process diff at its limit added (PS-323, src/diff/compare.ts). Page cache from R2
+# counts too and is reclaimed at the Max. The CT has 6 GiB and the Proxmox host is overcommitted, so
+# this is a ceiling for a burst, not a reservation. Over MemoryMax the kernel
+# kills it, and OOMPolicy=stop turns that into a failed unit that Restart= brings back whole, not a
+# server with a dead workerd under it. No MemoryHigh and no swap (PS-323): over a High with nothing
+# left to reclaim workerd sits in D state, port 3000 accepts connections and answers nothing, and
+# systemd reads `active` so nothing restarts it. Do not add a High back.
+MemoryMax=2500M
+MemorySwapMax=0
 OOMPolicy=stop
 
 [Install]
