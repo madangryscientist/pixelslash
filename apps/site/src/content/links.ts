@@ -1,5 +1,6 @@
 import manifest from "../../../web/github-app/manifest.json";
 import { CLI_SPLIT } from "./cli-pages.ts";
+import { DOC_PAGES } from "./docs-map.ts";
 
 /**
  * No link may lead somewhere a visitor cannot open, so the repository and the hosted app each sit
@@ -17,8 +18,9 @@ export const CONTACT = "hello@hack-cove.com";
 /** A repo file a page renders, and the site path it is shown on. */
 const SITE_PATHS: Record<string, string> = {
   "docs/cli.md": "/docs",
-  "docs/getting-started.md": "/docs/getting-started",
-  "docs/metrics.md": "/docs/metrics",
+  ...Object.fromEntries(
+    DOC_PAGES.flatMap((page) => (page.file ? [[page.file, `/docs/${page.slug}`]] : [])),
+  ),
   "apps/web/SELF-HOST.md": "/self-host",
   "SECURITY.md": "/security",
   "docs/capabilities/matrix.html": "/compare",
@@ -50,6 +52,7 @@ function resolveExternal(href: string, gates: Gates): string | null {
 }
 
 const CLI_DOC_PATH = "docs/cli.md";
+const PUBLIC_DIR = "apps/site/public/";
 
 /** Where a heading of docs/cli.md is shown: the site cuts the file into pages, so an anchor names one. */
 function cliAnchorHref(anchor: string, currentPage?: string): string {
@@ -65,6 +68,15 @@ function resolveRepoFile(href: string, sourcePath: string, gates: Gates): string
   const sitePath = SITE_PATHS[repoPath];
   if (sitePath !== undefined) return anchor === undefined ? sitePath : `${sitePath}#${anchor}`;
   return gates.repoPublic ? `${REPO_URL}/blob/main/${repoPath}` : null;
+}
+
+/**
+ * Where an image in a rendered repo document is served from, or `null` when it is not in the
+ * site's `public` directory. The path stays relative in the file, so GitHub draws it as well.
+ */
+export function resolveImageSrc(href: string, sourcePath: string): string | null {
+  const repoPath = joinRepoPath(sourcePath, href);
+  return repoPath.startsWith(PUBLIC_DIR) ? `/${repoPath.slice(PUBLIC_DIR.length)}` : null;
 }
 
 /**

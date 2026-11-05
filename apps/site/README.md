@@ -9,7 +9,7 @@ the code says at that commit:
 
 | Page | Source |
 | --- | --- |
-| `/docs`, `/docs/<page>` | `docs/cli.md` cut into grouped pages by `src/content/docs-map.ts`, and `docs/getting-started.md` |
+| `/docs`, `/docs/<page>` | `docs/cli.md` cut into grouped pages by `src/content/docs-map.ts`, `docs/getting-started.md`, and the pages under `docs/tutorials/` and `docs/ci/` |
 | `/self-host` | `apps/web/SELF-HOST.md` |
 | `/security` | `SECURITY.md` |
 | `/compare` | `docs/capabilities/data.json` (the behind rows included) |

@@ -26,6 +26,8 @@
         "{workspaceRoot}/apps/web/SELF-HOST.md",
         "{workspaceRoot}/docs/cli.md",
         "{workspaceRoot}/docs/getting-started.md",
+        "{workspaceRoot}/docs/tutorials/**",
+        "{workspaceRoot}/docs/ci/**",
         "{workspaceRoot}/docs/capabilities/data.json",
         "{workspaceRoot}/apps/web/github-app/manifest.json"
       ]
@@ -44,6 +46,8 @@
         "{workspaceRoot}/apps/web/SELF-HOST.md",
         "{workspaceRoot}/docs/cli.md",
         "{workspaceRoot}/docs/getting-started.md",
+        "{workspaceRoot}/docs/tutorials/**",
+        "{workspaceRoot}/docs/ci/**",
         "{workspaceRoot}/docs/capabilities/data.json",
         "{workspaceRoot}/apps/web/github-app/manifest.json"
       ],

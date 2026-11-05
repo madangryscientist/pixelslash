@@ -11,6 +11,16 @@
 export const GROUPS = [
   { id: "start", title: "Get started", summary: "Install it and run a first compare." },
   {
+    id: "tutorials",
+    title: "Tutorials",
+    summary: "One route from nothing to a report, per way of capturing.",
+  },
+  {
+    id: "ci",
+    title: "Run it in CI",
+    summary: "A complete setup per CI provider, pinned versions and the gate.",
+  },
+  {
     id: "capture",
     title: "Capture",
     summary: "Shoot pages in CI, from your tests, or reuse PNGs.",
@@ -41,7 +51,22 @@ export type DocPageDef = {
   /** Headings of docs/cli.md this page shows (plain text, as the heading reads). */
   sections: readonly string[];
   /** A page that is its own file instead of a cut of cli.md. */
-  file?: "docs/getting-started.md" | "docs/metrics.md";
+  file?:
+    | "docs/getting-started.md"
+    | "docs/metrics.md"
+    | "docs/tutorials/choose-capture.md"
+    | "docs/tutorials/storybook.md"
+    | "docs/tutorials/playwright.md"
+    | "docs/tutorials/urls.md"
+    | "docs/tutorials/pngs.md"
+    | "docs/tutorials/first-review.md"
+    | "docs/ci/github-actions.md"
+    | "docs/ci/gitlab.md"
+    | "docs/ci/circleci.md"
+    | "docs/ci/jenkins.md"
+    | "docs/ci/any-ci.md"
+    | "docs/ci/pin-versions.md"
+    | "docs/ci/review-server.md";
 };
 
 export const DOC_PAGES: readonly DocPageDef[] = [
@@ -58,6 +83,97 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     title: "Start a repo",
     group: "start",
     sections: ["Start a repo: pixelslash init"],
+  },
+  {
+    slug: "choose-capture",
+    title: "Choose how to capture",
+    group: "tutorials",
+    sections: [],
+    file: "docs/tutorials/choose-capture.md",
+  },
+  {
+    slug: "tutorial-storybook",
+    title: "A Storybook",
+    group: "tutorials",
+    sections: [],
+    file: "docs/tutorials/storybook.md",
+  },
+  {
+    slug: "tutorial-playwright",
+    title: "Your Playwright tests",
+    group: "tutorials",
+    sections: [],
+    file: "docs/tutorials/playwright.md",
+  },
+  {
+    slug: "tutorial-urls",
+    title: "A site by URL",
+    group: "tutorials",
+    sections: [],
+    file: "docs/tutorials/urls.md",
+  },
+  {
+    slug: "tutorial-pngs",
+    title: "PNGs you already have",
+    group: "tutorials",
+    sections: [],
+    file: "docs/tutorials/pngs.md",
+  },
+  {
+    slug: "tutorial-first-review",
+    title: "Your first review",
+    group: "tutorials",
+    sections: [],
+    file: "docs/tutorials/first-review.md",
+  },
+  {
+    slug: "ci-github-actions",
+    title: "GitHub Actions",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/github-actions.md",
+  },
+  {
+    slug: "ci-gitlab",
+    title: "GitLab CI",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/gitlab.md",
+  },
+  {
+    slug: "ci-circleci",
+    title: "CircleCI",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/circleci.md",
+  },
+  {
+    slug: "ci-jenkins",
+    title: "Jenkins",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/jenkins.md",
+  },
+  {
+    slug: "ci-any",
+    title: "Any other CI",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/any-ci.md",
+  },
+  {
+    slug: "ci-pin-versions",
+    title: "Pin versions in CI",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/pin-versions.md",
+  },
+  {
+    slug: "ci-review-server",
+    title: "Run a review server",
+    group: "ci",
+    sections: [],
+    file: "docs/ci/review-server.md",
   },
   {
     slug: "capture",
