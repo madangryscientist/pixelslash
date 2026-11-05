@@ -22,6 +22,30 @@ const other = (scheme: Scheme): Scheme => (scheme === "dark" ? "light" : "dark")
 
 const toggleOf = (page: Page): Locator => page.getByTestId("theme-toggle");
 
+declare global {
+  interface Window {
+    /** Every value <html>'s scheme has had, recorded by the no-flash test's init script. */
+    seenSchemes?: string[][];
+  }
+}
+
+const backgroundOf = (page: Page, selector: string) =>
+  page
+    .locator(selector)
+    .first()
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+
+/** What home is really drawn with: its canvas, its body, its header and its text. */
+async function homePaint(page: Page) {
+  return {
+    html: await backgroundOf(page, "html"),
+    body: await backgroundOf(page, "body"),
+    home: await backgroundOf(page, ".home"),
+    text: await page.locator(".home").evaluate((element) => getComputedStyle(element).color),
+    header: await backgroundOf(page, "header"),
+  };
+}
+
 async function box(locator: Locator): Promise<{ x: number; y: number; w: number; h: number }> {
   const found = await locator.boundingBox();
   if (!found) throw new Error("no box");
@@ -119,6 +143,52 @@ for (const system of ["light", "dark"] as const) {
       expect(await schemeClasses(page), to).toEqual([SCHEME_CLASS[system]]);
     }
   });
+
+  test(`on a ${system} system, / never shows the other scheme while it loads`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: system });
+    // Every value <html>'s scheme has had since <body> began: from there on the page can paint.
+    await page.addInitScript(() => {
+      const seen: string[][] = [];
+      window.seenSchemes = seen;
+      const record = () => {
+        if (!document.body) return;
+        const now = ["dark", "latte"].filter((name) =>
+          document.documentElement.classList.contains(name),
+        );
+        if (seen.at(-1)?.join() !== now.join()) seen.push(now);
+      };
+      new MutationObserver(record).observe(document, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await hydrated(page);
+    expect(await page.evaluate(() => window.seenSchemes)).toEqual([[SCHEME_CLASS[system]]]);
+  });
+
+  test(`on a ${system} system, the toggle switches all of / and the choice wins on load`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: system });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await hydrated(page);
+    const before = await homePaint(page);
+    await toggleOf(page).click();
+
+    await expect.poll(async () => (await homePaint(page)).home).not.toBe(before.home);
+    const after = await homePaint(page);
+    expect(after.html).toBe(after.home);
+    expect(after.body).toBe(after.home);
+    expect(after.text).not.toBe(before.text);
+    expect(after.header).not.toBe(before.header);
+
+    // Against the system's preference, so only the stored choice can have set it.
+    await page.reload({ waitUntil: "networkidle" });
+    expect(await homePaint(page)).toEqual(after);
+  });
 }
 
 test("the toggle is named, and works from the keyboard", async ({ page }) => {
@@ -154,7 +224,7 @@ for (const scheme of ["light", "dark"] as const) {
     const clip = await page.locator("header").first().boundingBox();
     if (!clip) throw new Error("the header has no box");
 
-    for (const part of [".home-btn", ".home-demo", ".home-readout", ".home-card"]) {
+    for (const part of [".home-rise a", ".home-demo", ".home-readout", ".home-cards a"]) {
       await page
         .locator(part)
         .first()

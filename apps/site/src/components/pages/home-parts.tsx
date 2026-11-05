@@ -1,3 +1,4 @@
+import { TextLink } from "@hackcove/ui-react";
 import type { CSSProperties, ReactNode } from "react";
 import { Wordmark } from "#/components/logo";
 import { TRADEMARK } from "#/content/docs";
@@ -7,7 +8,7 @@ import { CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 // The homepage's footer and hero demo (pages/home.tsx).
 
 /** A style with CSS custom properties, which CSSProperties does not list. */
-export function vars(style: CSSProperties & Record<`--${string}`, number | string>): CSSProperties {
+function vars(style: CSSProperties & Record<`--${string}`, number | string>): CSSProperties {
   return style;
 }
 
@@ -69,16 +70,14 @@ export function Footer(): ReactNode {
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <a href="/" className="flex items-center">
-            <Wordmark onDark />
+            <Wordmark />
           </a>
           <span>MIT licence</span>
-          <a href={`mailto:${CONTACT}`} className="home-link">
-            {CONTACT}
-          </a>
+          <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
           {REPO_PUBLIC ? (
-            <a href={REPO_URL} className="home-link" data-testid="source-status">
+            <TextLink href={REPO_URL} data-testid="source-status">
               GitHub
-            </a>
+            </TextLink>
           ) : (
             <span data-testid="source-status">Source opens at launch</span>
           )}

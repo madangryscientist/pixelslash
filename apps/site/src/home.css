@@ -1,7 +1,9 @@
 /*
- * The homepage's own look (src/components/pages/home.tsx): Catppuccin Mocha, always dark. Every
- * moving part sits under prefers-reduced-motion: no-preference, so a visitor who asks for less
- * motion gets the same page standing still.
+ * The homepage's own look (src/components/pages/home.tsx): gradients, the demo and the band, on
+ * tokens with a value in each theme, Mocha on `.dark` and Latte on `.latte`. The head script sets
+ * that class before first paint, so the page draws in its scheme from the first frame. Every moving
+ * part sits under prefers-reduced-motion: no-preference, so a visitor who asks for less motion gets
+ * the same page standing still.
  */
 
 @property --p {
@@ -16,10 +18,10 @@
   initial-value: 0;
 }
 
-.home {
-  --home-crust: #11111b;
-  --home-mantle: #181825;
-  --home-base: #1e1e2e;
+.dark {
+  --home-page: #11111b;
+  --home-panel: #181825;
+  --home-raised: #1e1e2e;
   --home-line: #313244;
   --home-line-2: #45475a;
   --home-sub: #a6adc8;
@@ -27,113 +29,72 @@
   --home-mauve: #cba6f7;
   --home-blue: #89b4fa;
   --home-peach: #fab387;
-  --home-pink: #f5c2e7;
   --home-green: #a6e3a1;
+  --home-red: #f38ba8;
+  --home-yellow: #f9e2af;
+  --home-on-accent: #11111b;
+  --home-shadow: #000;
+  --home-grid: #cdd6f40d;
+  --home-aurora: 0.2;
+  --home-aurora-soft: 0.12;
+  --home-glow: 0.45;
+}
+
+/* Latte's accents, darkened where they are text on the light ground, as the theme's own are. */
+.latte {
+  --home-page: #eff1f5;
+  --home-panel: #e6e9ef;
+  --home-raised: #fff;
+  --home-line: #ccd0da;
+  --home-line-2: #bcc0cc;
+  --home-sub: #5c5f77;
+  --home-text: #4c4f69;
+  --home-mauve: #8035e1;
+  --home-blue: #1e5bd4;
+  --home-peach: #ad4308;
+  --home-green: #40a02b;
+  --home-red: #d20f39;
+  --home-yellow: #df8e1d;
+  --home-on-accent: #fff;
+  --home-shadow: #4c4f6940;
+  --home-grid: #4c4f6914;
+  --home-aurora: 0.11;
+  --home-aurora-soft: 0.07;
+  --home-glow: 0.16;
+}
+
+/* The same blobs fill a phone's whole width, behind the hero's text. */
+@media (max-width: 640px) {
+  .dark {
+    --home-aurora: 0.13;
+    --home-aurora-soft: 0.08;
+  }
+
+  .latte {
+    --home-aurora: 0.08;
+    --home-aurora-soft: 0.05;
+  }
+}
+
+.home {
   min-height: 100vh;
   overflow-x: clip;
-  background: var(--home-crust);
+  background: var(--home-page);
   color: var(--home-text);
   font-family: var(--font-sans);
 }
 
-/* `.dark` on <html> already gave the canvas its own background; a light page had none, so the
-   body's propagated to it. `.latte` now sets one, so restore that here or a fractional-pixel edge
-   past the body would blend with light. Dark keeps the canvas it always had. */
-html.latte:has(.home),
+/* The canvas past the page's own edges (overscroll, a fractional pixel) matches it, in either theme. */
+html:has(.home),
 body:has(.home) {
-  background: #11111b;
+  background: var(--home-page);
 }
 
-.home code,
-.home pre {
+.home code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.home :focus-visible {
-  outline: 2px solid var(--home-mauve);
-  outline-offset: 3px;
-}
-
-/* Buttons and links */
-
-.home-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s,
-    background 0.2s,
-    border-color 0.2s;
-}
-
-.home-btn-lg {
-  padding: 0.85rem 1.6rem;
-  font-size: 1.05rem;
-}
-
-.home-btn-primary {
-  color: var(--home-crust);
-  background: linear-gradient(120deg, var(--home-mauve), var(--home-blue));
-  box-shadow:
-    0 0 0 1px #ffffff22 inset,
-    0 8px 30px -8px color-mix(in srgb, var(--home-mauve) 70%, transparent);
-}
-
-.home-btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 0 0 1px #ffffff33 inset,
-    0 14px 40px -8px color-mix(in srgb, var(--home-mauve) 90%, transparent);
-}
-
-.home-btn-ghost {
-  color: var(--home-text);
-  border: 1px solid var(--home-line-2);
-  background: color-mix(in srgb, var(--home-base) 60%, transparent);
-}
-
-.home-btn-ghost:hover {
-  transform: translateY(-2px);
-  border-color: var(--home-mauve);
-}
-
-.home-link {
-  color: var(--home-blue);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--home-blue) 40%, transparent);
-  text-underline-offset: 3px;
-}
-
-.home-link:hover {
-  text-decoration-color: currentColor;
-}
-
 /* Hero */
-
-.home-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0.95rem;
-  border-radius: 999px;
-  border: 1px solid var(--home-line-2);
-  background: color-mix(in srgb, var(--home-base) 70%, transparent);
-  color: var(--home-sub);
-  font-size: 0.875rem;
-}
-
-.home-pulse {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  background: var(--home-green);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--home-green) 60%, transparent);
-}
 
 .home-gradient-text {
   background: linear-gradient(
@@ -162,7 +123,7 @@ body:has(.home) {
   height: 42rem;
   border-radius: 999px;
   filter: blur(110px);
-  opacity: 0.35;
+  opacity: var(--home-aurora);
 }
 
 .home-aurora span:nth-child(1) {
@@ -181,7 +142,7 @@ body:has(.home) {
   top: 26rem;
   left: 30%;
   background: var(--home-peach);
-  opacity: 0.18;
+  opacity: var(--home-aurora-soft);
 }
 
 .home-grid {
@@ -189,8 +150,8 @@ body:has(.home) {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(to right, #cdd6f40d 1px, transparent 1px),
-    linear-gradient(to bottom, #cdd6f40d 1px, transparent 1px);
+    linear-gradient(to right, var(--home-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--home-grid) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 70% 55% at 50% 25%, #000 30%, transparent 75%);
 }
@@ -207,14 +168,14 @@ body:has(.home) {
   inset: 6% 4% 10%;
   border-radius: 2rem;
   background: conic-gradient(
-    from var(--home-angle, 0deg),
+    from var(--angle, 0deg),
     var(--home-mauve),
     var(--home-blue),
     var(--home-peach),
     var(--home-mauve)
   );
   filter: blur(60px);
-  opacity: 0.45;
+  opacity: var(--home-glow);
   pointer-events: none;
 }
 
@@ -223,8 +184,8 @@ body:has(.home) {
   overflow: hidden;
   border-radius: 14px;
   border: 1px solid var(--home-line-2);
-  background: var(--home-mantle);
-  box-shadow: 0 40px 120px -30px #000;
+  background: var(--home-panel);
+  box-shadow: 0 40px 120px -30px var(--home-shadow);
 }
 
 .home-window-bar {
@@ -233,18 +194,18 @@ body:has(.home) {
   gap: 0.45rem;
   padding: 0.65rem 0.9rem;
   border-bottom: 1px solid var(--home-line);
-  background: var(--home-base);
+  background: var(--home-raised);
 }
 
 .home-window-bar span {
   width: 0.7rem;
   height: 0.7rem;
   border-radius: 999px;
-  background: #f38ba8;
+  background: var(--home-red);
 }
 
 .home-window-bar span:nth-child(2) {
-  background: #f9e2af;
+  background: var(--home-yellow);
 }
 
 .home-window-bar span:nth-child(3) {
@@ -255,7 +216,7 @@ body:has(.home) {
   margin: 0 auto;
   padding: 0.15rem 1.2rem;
   border-radius: 6px;
-  background: var(--home-mantle);
+  background: var(--home-panel);
   color: var(--home-sub);
   font-size: 0.75rem;
 }
@@ -314,8 +275,8 @@ body:has(.home) {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--home-crust);
-  box-shadow: 0 4px 14px -4px #000;
+  color: var(--home-on-accent);
+  box-shadow: 0 4px 14px -4px var(--home-shadow);
 }
 
 @media (max-width: 640px) {
@@ -355,11 +316,11 @@ body:has(.home) {
   padding: 0.6rem 1.2rem;
   border-radius: 999px;
   border: 1px solid var(--home-line-2);
-  background: color-mix(in srgb, var(--home-base) 88%, transparent);
+  background: color-mix(in srgb, var(--home-raised) 88%, transparent);
   backdrop-filter: blur(10px);
   color: var(--home-sub);
   font-size: 0.9rem;
-  box-shadow: 0 10px 40px -10px #000;
+  box-shadow: 0 10px 40px -10px var(--home-shadow);
 }
 
 .home-count {
@@ -424,93 +385,12 @@ body:has(.home) {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 999px;
-  color: var(--home-crust);
+  color: var(--home-on-accent);
   font-weight: 800;
   background: linear-gradient(135deg, var(--home-mauve), var(--home-blue));
   box-shadow:
-    0 0 0 6px var(--home-crust),
+    0 0 0 6px var(--home-page),
     0 0 30px color-mix(in srgb, var(--home-mauve) 60%, transparent);
-}
-
-/* Feature cards */
-
-.home-card {
-  position: relative;
-  display: block;
-  padding: 1.6rem;
-  border-radius: 1.1rem;
-  border: 1px solid var(--home-line);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--home-base) 90%, transparent),
-    var(--home-mantle)
-  );
-  transition:
-    transform 0.25s,
-    border-color 0.25s,
-    box-shadow 0.25s;
-}
-
-.home-card:hover {
-  transform: translateY(-6px);
-  border-color: color-mix(in srgb, var(--home-mauve) 70%, transparent);
-  box-shadow: 0 20px 60px -20px color-mix(in srgb, var(--home-mauve) 50%, transparent);
-}
-
-.home-card-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.8rem;
-  font-size: 1.3rem;
-  color: var(--home-crust);
-  background: linear-gradient(135deg, var(--home-mauve), var(--home-blue));
-}
-
-.home-card:nth-child(3n + 2) .home-card-icon {
-  background: linear-gradient(135deg, var(--home-blue), var(--home-green));
-}
-
-.home-card:nth-child(3n) .home-card-icon {
-  background: linear-gradient(135deg, var(--home-peach), var(--home-pink));
-}
-
-.home-card-more {
-  display: inline-block;
-  margin-top: 1rem;
-  color: var(--home-mauve);
-  font-size: 0.875rem;
-  font-weight: 600;
-  opacity: 0.7;
-  transition:
-    opacity 0.25s,
-    translate 0.25s;
-}
-
-.home-card:hover .home-card-more {
-  opacity: 1;
-  translate: 4px 0;
-}
-
-/* Terminal */
-
-.home-terminal pre {
-  margin: 0;
-  padding: 1.3rem 1.4rem;
-  overflow-x: auto;
-  font-size: 0.85rem;
-  line-height: 1.9;
-}
-
-.home-type {
-  display: block;
-  white-space: pre;
-  color: var(--home-text);
-}
-
-.home-prompt {
-  color: var(--home-green);
 }
 
 /* The local band */
@@ -528,7 +408,7 @@ body:has(.home) {
       color-mix(in srgb, var(--home-mauve) 22%, transparent),
       transparent 70%
     ),
-    var(--home-mantle);
+    var(--home-panel);
 }
 
 .home-band code {
@@ -542,7 +422,7 @@ body:has(.home) {
 
 /* Motion */
 
-@property --home-angle {
+@property --angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
@@ -588,15 +468,6 @@ body:has(.home) {
   }
 }
 
-@keyframes home-pulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--home-green) 60%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 10px transparent;
-  }
-}
-
 @keyframes home-shimmer {
   to {
     background-position: 300% 0;
@@ -612,7 +483,7 @@ body:has(.home) {
 
 @keyframes home-spin {
   to {
-    --home-angle: 360deg;
+    --angle: 360deg;
   }
 }
 
@@ -621,12 +492,6 @@ body:has(.home) {
     opacity: 0;
     translate: 0 24px;
     filter: blur(6px);
-  }
-}
-
-@keyframes home-type {
-  from {
-    clip-path: inset(0 100% 0 0);
   }
 }
 
@@ -642,10 +507,6 @@ body:has(.home) {
   .home-region {
     animation: home-ping 1.6s ease-out infinite;
     animation-delay: calc(var(--i) * 0.25s);
-  }
-
-  .home-pulse {
-    animation: home-pulse 1.8s ease-out infinite;
   }
 
   .home-gradient-text {
@@ -701,16 +562,11 @@ body:has(.home) {
     translate: 0 32px;
   }
 
-  .home[data-motion] .home-card.home-reveal:nth-child(3n + 2) {
+  .home[data-motion] .home-cards .home-reveal:nth-child(3n + 2) {
     transition-delay: 0.1s;
   }
 
-  .home[data-motion] .home-card.home-reveal:nth-child(3n) {
+  .home[data-motion] .home-cards .home-reveal:nth-child(3n) {
     transition-delay: 0.2s;
-  }
-
-  .home[data-motion] .is-in .home-type {
-    animation: home-type 1.2s steps(var(--n)) both;
-    animation-delay: calc(0.4s + var(--i) * 1.3s);
   }
 }
