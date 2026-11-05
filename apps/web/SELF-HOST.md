@@ -215,6 +215,7 @@ are needed.
 | `GITHUB_APP_PRIVATE_KEY` | secret | no | Check runs: the App's PEM. Both App values must be set or nothing calls GitHub. |
 | `GITHUB_STATUS_TOKEN` | secret | no | Without the App: a fine-grained token (commit statuses and pull requests: write) posts the build verdict as a `PixelSlash` commit status. Ignored when the App is set. See `README.md`. |
 | `PIXELSLASH_PUBLIC_URL` | var | no | Your server's URL, no trailing slash. A check run's "Details" link. |
+| `PIXELSLASH_ADMIN_LOGINS` | var | no | Comma-separated GitHub logins who can open `/_admin`, a read-only page of what the deployment is doing and how long it takes. Empty, or a login not listed, gets a 404. Not linked from anywhere. |
 | `SENTRY_DSN` | secret | no | Error reporting; off while empty. |
 | `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | var | no | Labels on those reports. |
 | `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS` | var | no | `1` lets a project's model sit on a private network. Never on a deployment strangers sign in to. |

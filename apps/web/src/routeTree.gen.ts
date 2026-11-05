@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/[_]admin'
 import { Route as OrgsRouteImport } from './routes/orgs'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthGithubRouteImport } from './routes/auth/github'
@@ -31,6 +32,11 @@ import { Route as ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRouteImport }
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/_admin',
+  path: '/_admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrgsRoute = OrgsRouteImport.update({
@@ -127,6 +133,7 @@ const ProjectsProjectIdBuildsBuildIdSnapshotsSnapshotIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/_admin': typeof AdminRoute
   '/orgs': typeof OrgsRoute
   '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/_admin': typeof AdminRoute
   '/orgs': typeof OrgsRoute
   '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
@@ -168,6 +176,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_admin': typeof AdminRoute
   '/orgs': typeof OrgsRoute
   '/settings': typeof SettingsRoute
   '/auth/github': typeof AuthGithubRouteWithChildren
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/_admin'
     | '/orgs'
     | '/settings'
     | '/auth/github'
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/_admin'
     | '/orgs'
     | '/settings'
     | '/auth/github'
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_admin'
     | '/orgs'
     | '/settings'
     | '/auth/github'
@@ -251,6 +263,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   OrgsRoute: typeof OrgsRoute
   SettingsRoute: typeof SettingsRoute
   AuthGithubRoute: typeof AuthGithubRouteWithChildren
@@ -275,6 +288,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_admin': {
+      id: '/_admin'
+      path: '/_admin'
+      fullPath: '/_admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orgs': {
@@ -425,6 +445,7 @@ const AuthGoogleRouteWithChildren = AuthGoogleRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   OrgsRoute: OrgsRoute,
   SettingsRoute: SettingsRoute,
   AuthGithubRoute: AuthGithubRouteWithChildren,

@@ -84,6 +84,9 @@
     // `true` lets the scheduled sweep delete. Anything else, with the days set, only logs what it would
     // delete (a dry run). Turn it on after reading `bun deploy/retention.ts`'s listing.
     "PIXELSLASH_RETENTION_DELETE": "",
+    // Comma-separated GitHub logins allowed into the operator health page, `/_admin` (PS-330). Empty: the page
+    // is a 404 for everyone. It is read-only and shows no per-customer figure.
+    "PIXELSLASH_ADMIN_LOGINS": "",
   },
   // The retention sweep (PS-239): hourly, and a no-op while PIXELSLASH_RETENTION_DAYS is empty.
   "triggers": { "crons": ["17 * * * *"] },
@@ -161,6 +164,7 @@
         "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "",
         "PIXELSLASH_RETENTION_DAYS": "",
         "PIXELSLASH_RETENTION_DELETE": "",
+        "PIXELSLASH_ADMIN_LOGINS": "",
       },
     },
     "e2e": {
@@ -202,7 +206,9 @@
         // Off here; the Playwright run points it at its own ingest stub (vite.config.ts), and the
         // LAN self-host's `.dev.vars` sets the real DSN, release and `lan`.
         "SENTRY_DSN": "",
-        "SENTRY_RELEASE": "e2e",
+        // Empty: the Playwright run stamps "e2e" (vite.config.ts), the LAN self-host's `.dev.vars` its commit,
+        // so a LAN box without a DSN reads "unavailable" on /_admin, not a made-up release.
+        "SENTRY_RELEASE": "",
         "SENTRY_ENVIRONMENT": "e2e",
         // No App here: the e2e build sends no check run. The LAN self-host's `.dev.vars` sets both.
         "GITHUB_APP_ID": "",
@@ -215,6 +221,10 @@
         // Retention is off in the e2e build; the LAN self-host's `.dev.vars` does not set it either.
         "PIXELSLASH_RETENTION_DAYS": "",
         "PIXELSLASH_RETENTION_DELETE": "",
+        // Empty. The LAN self-host is this build and signs every visitor in as the stub user, so listing
+        // `e2e-octocat` here would open the page to every visitor on the LAN; an operator there names real
+        // logins in `.dev.vars`. The Playwright run lists the stub user (vite.config.ts).
+        "PIXELSLASH_ADMIN_LOGINS": "",
       },
     },
   },
