@@ -19,6 +19,7 @@ export default defineConfig({
         ...PAGES.map((page) => page.to),
         ...DOC_PAGES.map((page) => `/docs/${page.slug}`),
         "/search-index.json",
+        "/sitemap.xml",
       ].map((path) => ({ path })),
       prerender: { enabled: true, crawlLinks: true, failOnError: true },
     }),

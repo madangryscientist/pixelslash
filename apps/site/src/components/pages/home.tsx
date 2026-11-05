@@ -1,7 +1,7 @@
 import { Button, Card, CardGrid, CodeBlock, Pill, TextLink } from "@hackcove/ui-react";
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
-import { Demo, Footer } from "#/components/pages/home-parts";
+import { Demo } from "#/components/pages/home-parts";
 import { REPO_PUBLIC, REPO_URL } from "#/content/links";
 
 /*
@@ -237,7 +237,6 @@ export function HomePage(): ReactNode {
       <Features />
       <Checkout />
       <Local />
-      <Footer />
     </div>
   );
 }

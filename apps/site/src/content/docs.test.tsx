@@ -7,9 +7,10 @@ import { DocPage, DocsIndexPage, OLD_ANCHOR_SCRIPT } from "#/components/pages/do
 import { HomePage } from "#/components/pages/home";
 import { HowItWorksPage } from "#/components/pages/how-it-works";
 import { CLI_SPLIT, splitCli } from "./cli-pages.ts";
-import { CLI_INTRO_DOC, DOC_PAGE_DOCS, SECURITY_DOC, TRADEMARK, trademarkLine } from "./docs.ts";
+import { CLI_INTRO_DOC, DOC_PAGE_DOCS, SECURITY_DOC } from "./docs.ts";
+import { TRADEMARK } from "./trademark.ts";
 import { DOC_PAGES, GROUPS, type DocPageDef, neighbours } from "./docs-map.ts";
-import { resolveImageSrc } from "./links.ts";
+import { resolveImageSrc } from "./resolve-links.ts";
 import { plainText, slugger } from "./markdown.tsx";
 
 /*
@@ -326,10 +327,6 @@ describe("the footer's trademark line", () => {
     const readme = readFileSync(join(ROOT, "README.md"), "utf8").replace(/\s+/g, " ");
     expect(readme).toContain(TRADEMARK);
     expect(TRADEMARK).toMatch(/^PixelSlash is a name of .*; .*\.$/);
-  });
-
-  test("stops the build when the README loses it", () => {
-    expect(() => trademarkLine("# PixelSlash\n\nNo such line.")).toThrow(/trademark line/);
   });
 });
 

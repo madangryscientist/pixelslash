@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL, resolveHref, resolveImageSrc } from "./links.ts";
+import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL } from "./links.ts";
+import { resolveHref, resolveImageSrc } from "./resolve-links.ts";
 
 const CLOSED = { repoPublic: false, appLive: false };
 const OPEN = { repoPublic: true, appLive: true };

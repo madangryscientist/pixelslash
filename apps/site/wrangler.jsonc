@@ -7,6 +7,8 @@
   // The marketing site: every page is prerendered, so the Worker serves static files and holds no
   // data (no D1, no R2, no secrets). It answers on the apex of the pixelslash.dev zone only.
   "workers_dev": false,
+  // `/pricing` is the page; every link, the canonical URL and the sitemap say so, with no redirect.
+  "assets": { "html_handling": "drop-trailing-slash" },
   "routes": [{ "pattern": "pixelslash.dev", "custom_domain": true }],
   "observability": { "enabled": false },
 }

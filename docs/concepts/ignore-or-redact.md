@@ -5,7 +5,7 @@ Both leave part of a page out of the comparison. The difference is what they do 
 - **Ignore** keeps the pixels in the image and doesn't measure them. Use it for things that change by themselves: videos, ads, maps and live data.
 - **Redact** paints over the pixels before the PNG is written, so the content is gone. Use it for secrets and personal data.
 
-| | Pixels in the stored shot | Measured | How you set it |
+| Setting | Pixels in the stored shot | Measured | How you set it |
 | --- | --- | --- | --- |
 | `--ignore x,y,w,h` | kept | no | a flag on a pair run |
 | config `ignore` | kept | no | selectors or rectangles in the config |

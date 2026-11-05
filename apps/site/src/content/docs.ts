@@ -1,4 +1,3 @@
-import readme from "../../../../README.md?raw";
 import security from "../../../../SECURITY.md?raw";
 import gettingStarted from "../../../../docs/getting-started.md?raw";
 import metrics from "../../../../docs/metrics.md?raw";
@@ -176,11 +175,29 @@ export const DOC_PAGE_DOCS: ReadonlyMap<string, Doc> = new Map(
   DOC_PAGES.map((page) => [page.slug, docOf(page.slug)]),
 );
 
-/** The README's trademark sentence, verbatim (line breaks folded), for the footer. */
-export function trademarkLine(markdown: string): string {
-  const match = /PixelSlash is a name of[^.]*;[^.]*\./.exec(markdown.replace(/\s+/g, " "));
-  if (!match) throw new Error("README.md no longer carries the trademark line the footer shows");
-  return match[0];
+const DESCRIPTION_MAX = 155;
+
+/**
+ * A paragraph as one line of plain text, cut at a sentence or else a word to fit a description. A
+ * paragraph that leads into a code block ends in a colon, and a colon with nothing after it does not
+ * read as a description, so it ends in a full stop instead.
+ */
+export function descriptionFrom(text: string): string {
+  const line = text.replace(/\s+/g, " ").trim().replace(/:$/, ".");
+  if (line.length <= DESCRIPTION_MAX) return line;
+  const head = line.slice(0, DESCRIPTION_MAX);
+  const sentence = head.lastIndexOf(". ");
+  if (sentence >= 60) return head.slice(0, sentence + 1);
+  return `${head.slice(0, head.lastIndexOf(" ")).replace(/[,;:]$/, "")}…`;
 }
 
-export const TRADEMARK = trademarkLine(readme);
+/** A docs page's description: its own first paragraph, so it says what the page says. */
+export function describePage(slug: string): string {
+  const page = DOC_PAGES.find((item) => item.slug === slug);
+  const first = docOf(slug).tokens.find((token) => token.type === "paragraph");
+  if (first?.type === "paragraph") {
+    const text = plainText(first.tokens);
+    if (text.length >= 40) return descriptionFrom(text);
+  }
+  return descriptionFrom(`${page?.title ?? slug}: part of the PixelSlash docs.`);
+}

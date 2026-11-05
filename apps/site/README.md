@@ -14,7 +14,7 @@ the code says at that commit:
 | `/security` | `SECURITY.md` |
 | `/compare` | `docs/capabilities/data.json` (the behind rows included) |
 | `/how-it-works` | `public/report.png`, a real report of `fixtures/pages/live.html` against `local.html` |
-| footer | the README's trademark line |
+| footer | the README's trademark line, written out in `src/content/trademark.ts` and held to the README by a test |
 
 The pricing page's commitment sentence is `src/content/pricing.ts`.
 
@@ -38,6 +38,18 @@ working example, then the flags; the long sections are cut into pages at the H3s
 A page that can exit non-zero (`exits: true` in `docs-map.ts`) links the exit codes page. No ticket
 id reaches a rendered page: `stripTicketIds` removes them from the markdown at render time, and a
 test fails if one gets through; `docs/cli.md` keeps them.
+
+## What a search engine and a link preview read
+
+Every page's title and description are in `src/content/pages.ts`; a docs page's description is the
+first paragraph of its own text (`describePage` in `src/content/docs.ts`). `src/content/seo.ts` turns
+them into the head: the description, the canonical URL, the Open Graph and Twitter tags. All pages
+share one card, `public/social-card.png`, drawn by `bun scripts/social-card.ts`; rerun that when the
+headline or the demo's shot changes. `/sitemap.xml` is prerendered from the same page lists
+(`src/content/sitemap.ts`), and `public/robots.txt` names it. `wrangler.jsonc` sets
+`html_handling: "drop-trailing-slash"` so the slashless address the canonical names answers 200, not
+a redirect. `e2e/metadata.spec.ts` checks all of it on every page, and `e2e/a11y.spec.ts` runs axe on
+every page in both themes.
 
 ## The type face
 
