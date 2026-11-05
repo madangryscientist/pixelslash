@@ -1,12 +1,14 @@
+import { Button, Card, CardGrid, CodeBlock, Pill, TextLink } from "@hackcove/ui-react";
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
-import { Demo, Footer, vars } from "#/components/pages/home-parts";
+import { Demo, Footer } from "#/components/pages/home-parts";
 import { REPO_PUBLIC, REPO_URL } from "#/content/links";
 
 /*
- * The homepage is marketing, not an admin screen, so it is drawn here in plain Tailwind and
- * home.css rather than with @hackcove/ui-react, and it carries its own footer. The header is the
- * shared Shell's, as on every page. The motion is CSS only and stands still for prefers-reduced-motion.
+ * The homepage is marketing, not an admin screen: its controls and cards are @hackcove/ui-react
+ * parts, and what no part draws (the gradients, the demo, the steps across the page) is Tailwind and
+ * home.css, in the visitor's scheme. It carries its own footer. The header is the shared Shell's, as
+ * on every page. The motion is CSS only and stands still for prefers-reduced-motion.
  */
 
 /** What the CLI does, each one a section of docs/cli.md; the anchors are checked by the smoke test. */
@@ -15,37 +17,37 @@ const FEATURES = [
     title: "Two pages, one diff",
     body: "Shoot Main and Branch with Playwright, or hand it PNGs you already have. It writes a report.html that shows what changed.",
     href: "/how-it-works",
-    icon: "◧",
+    icon: "capture",
   },
   {
     title: "A perceptual diff",
     body: "Anti-aliasing, faint noise and sub-pixel shifts are told apart from a real change, so a report is about the change.",
     href: "/how-it-works",
-    icon: "◎",
+    icon: "diff",
   },
   {
     title: "Many pages",
     body: "--routes compares a list of paths, and compare diffs two snapshot directories.",
     href: "/docs/pngs#comparing-two-snapshot-dirs",
-    icon: "▦",
+    icon: "baseline",
   },
   {
     title: "Snapshots in CI",
     body: "pixelslash capture shoots every route in a pinned image, so the same commit renders the same pixels on any runner.",
     href: "/docs/capture#snapshot-capture-the-pinned-image",
-    icon: "⟳",
+    icon: "ci",
   },
   {
     title: "A review server",
     body: "pixelslash upload sends shots to a PixelSlash server, which holds the build for a person to review and reports a GitHub check.",
     href: "/docs/upload#uploading-to-a-server",
-    icon: "✓",
+    icon: "review",
   },
   {
     title: "A design-system judge",
     body: "--ds checks each shot against your component rasters with a vision model. With no judge installed it says so and invents nothing.",
     href: "/docs/judge",
-    icon: "◈",
+    icon: "theme",
   },
 ] as const;
 
@@ -71,9 +73,10 @@ function Hero(): ReactNode {
       </div>
       <div className="home-grid" aria-hidden="true" />
       <div className="relative mx-auto max-w-4xl text-center">
-        <p className="home-pill home-rise">
-          <span className="home-pulse" />
-          Open source · MIT · Local first
+        <p className="home-rise">
+          <Pill tone="emerald" dot round>
+            Open source · MIT · Local first
+          </Pill>
         </p>
         <h1 className="home-rise mt-6 text-5xl leading-[1.05] font-bold tracking-tight md:text-[4.25rem]">
           See what your change <span className="home-gradient-text">did to the page.</span>
@@ -85,12 +88,12 @@ function Hero(): ReactNode {
           hosted judge.
         </p>
         <div className="home-rise mt-9 flex flex-wrap justify-center gap-3">
-          <a href="/self-host" className="home-btn home-btn-primary home-btn-lg">
+          <Button href="/self-host" size="lg">
             Self-host it <span aria-hidden="true">→</span>
-          </a>
-          <a href="/docs" className="home-btn home-btn-ghost home-btn-lg">
+          </Button>
+          <Button href="/docs" variant="outline" size="lg">
             Read the docs
-          </a>
+          </Button>
         </div>
       </div>
       <Demo />
@@ -121,19 +124,24 @@ function Features(): ReactNode {
         <h2 className="home-reveal text-center text-3xl font-bold tracking-tight md:text-5xl">
           What it does
         </h2>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feature) => (
-            <a key={feature.title} href={feature.href} className="home-reveal home-card">
-              <span className="home-card-icon" aria-hidden="true">
-                {feature.icon}
-              </span>
-              <h3 className="mt-5 text-lg font-semibold">{feature.title}</h3>
-              <p className="mt-2 text-(--home-sub)">{feature.body}</p>
-              <span className="home-card-more" aria-hidden="true">
-                Read more →
-              </span>
-            </a>
-          ))}
+        <div className="home-cards mt-12">
+          <CardGrid columns={3}>
+            {FEATURES.map((feature) => (
+              // A one-cell grid, so the card fills the row's height.
+              <div key={feature.title} className="home-reveal grid">
+                <Card href={feature.href} icon={feature.icon} size="lg">
+                  <h3 className="text-lg font-semibold">{feature.title}</h3>
+                  <p className="mt-2 text-(--home-sub)">{feature.body}</p>
+                  <span
+                    className="mt-4 inline-block text-sm font-semibold text-violet-600"
+                    aria-hidden="true"
+                  >
+                    Read more →
+                  </span>
+                </Card>
+              </div>
+            ))}
+          </CardGrid>
         </div>
       </div>
     </section>
@@ -148,45 +156,18 @@ function Checkout(): ReactNode {
           <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Install it from npm</h2>
           <p className="mt-5 text-lg text-(--home-sub)">
             It is on npm as <code>@hackcove/pixelslash</code>, and the command is{" "}
-            <code>pixelslash</code>. The CLI runs on{" "}
-            <a href="https://bun.sh" className="home-link">
-              Bun
-            </a>
-            , so Bun must be on your PATH; <code>npx</code> starts it. PNG mode needs no browser;
-            for URL capture run <code>install-browser</code> once per machine.
+            <code>pixelslash</code>. The CLI runs on <TextLink href="https://bun.sh">Bun</TextLink>,
+            so Bun must be on your PATH; <code>npx</code> starts it. PNG mode needs no browser; for
+            URL capture run <code>install-browser</code> once per machine.
           </p>
           <p className="mt-4 text-(--home-sub)">
             To run it from a clone instead, <code>bun install</code> and then{" "}
             <code>bun run pixelslash -- …</code> in a checkout of{" "}
-            {REPO_PUBLIC ? (
-              <a href={REPO_URL} className="home-link">
-                the repository
-              </a>
-            ) : (
-              "the repository"
-            )}
-            .
+            {REPO_PUBLIC ? <TextLink href={REPO_URL}>the repository</TextLink> : "the repository"}.
           </p>
         </div>
-        <div className="home-reveal home-window home-terminal">
-          <div className="home-window-bar">
-            <span />
-            <span />
-            <span />
-            <p>bash</p>
-          </div>
-          <pre>
-            {COMMANDS.map((command, index) => (
-              <code
-                key={command}
-                className="home-type"
-                style={vars({ "--i": index, "--n": command.length })}
-              >
-                <span className="home-prompt">$ </span>
-                {command}
-              </code>
-            ))}
-          </pre>
+        <div className="home-reveal min-w-0">
+          <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} />
         </div>
       </div>
     </section>
@@ -206,12 +187,12 @@ function Local(): ReactNode {
           project's own AI model, opt-in: the three crops of a changed region, never a whole shot.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
-          <a href="/security" className="home-btn home-btn-ghost">
+          <Button href="/security" variant="outline">
             Security
-          </a>
-          <a href="/how-it-works" className="home-btn home-btn-primary">
+          </Button>
+          <Button href="/how-it-works">
             How it works <span aria-hidden="true">→</span>
-          </a>
+          </Button>
         </div>
       </div>
     </section>

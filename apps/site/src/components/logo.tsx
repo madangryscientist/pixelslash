@@ -37,16 +37,9 @@ export function Logo({ size = 24 }: { size?: number }): ReactNode {
  *
  * It sits straight on the page, so its fills follow the theme: the letters are text-violet-600 and the slash text-blue-600,
  * the accents both Hack Cove themes remap (Mocha mauve and blue on a dark page, Latte's darker mauve and blue on a light
- * one), so nothing here names a palette value. `onDark` is for a surface that is dark whatever the theme (the home page,
- * until PS-309): it pins the Mocha pair.
+ * one), so nothing here names a palette value.
  */
-export function Wordmark({
-  height = 16,
-  onDark = false,
-}: {
-  height?: number;
-  onDark?: boolean;
-}): ReactNode {
+export function Wordmark({ height = 16 }: { height?: number }): ReactNode {
   return (
     <svg
       viewBox="0 0 108 16"
@@ -58,14 +51,14 @@ export function Wordmark({
     >
       <path
         data-testid="wordmark-letters"
-        fill={onDark ? "#cba6f7" : "currentColor"}
-        className={onDark ? undefined : "text-violet-600"}
+        fill="currentColor"
+        className="text-violet-600"
         d={WORDMARK_LETTERS}
       />
       <path
         data-testid="wordmark-slash"
-        fill={onDark ? "#89b4fa" : "currentColor"}
-        className={onDark ? undefined : "text-blue-600"}
+        fill="currentColor"
+        className="text-blue-600"
         d={WORDMARK_SLASH}
       />
     </svg>
