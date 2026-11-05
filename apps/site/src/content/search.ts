@@ -1,7 +1,7 @@
 /*
  * The docs search, as plain functions over a static index. The index is built at prerender
  * (search-index.ts) and served as one file from the site's own origin; the browser fetches it and
- * runs `search` on it. No service, no analytics, no dependency.
+ * runs `search` on it. No service, no dependency.
  */
 
 /** One section of one page: where it is, what it is called and its text. */
