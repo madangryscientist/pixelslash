@@ -55,7 +55,7 @@ function wallLine(build: RunCardInput["build"]): CardLine | null {
   const line: CardLine = {
     key: "wall",
     label: "Wall time",
-    value: formatDuration(ms),
+    value: formatDuration(ms, { exact: true }),
     source: `${SOURCE_LABEL.derived}: uploaded to the last server step`,
   };
   if (build.rerun) line.note = "spans every run of the build";
@@ -94,10 +94,10 @@ function countLines({ build, shots, defaultBranch, recaptures }: RunCardInput): 
 export function statsText(stats: StepStats, unit?: string): string {
   const tail =
     stats.tail === "p95"
-      ? `p95 ${formatDuration(stats.p95)}`
-      : `slowest ${formatDuration(stats.max)}`;
+      ? `p95 ${formatDuration(stats.p95, { exact: true })}`
+      : `slowest ${formatDuration(stats.max, { exact: true })}`;
   const n = unit ? `${formatNumber(stats.n)} ${unit}` : formatNumber(stats.n);
-  return `median ${formatDuration(stats.p50)} · ${tail} (n = ${n})`;
+  return `median ${formatDuration(stats.p50, { exact: true })} · ${tail} (n = ${n})`;
 }
 
 function compareLine(input: RunCardInput): CardLine | null {
@@ -109,7 +109,7 @@ function compareLine(input: RunCardInput): CardLine | null {
     label: "Per-compare time",
     value: statsText(stats),
     source: SOURCE_LABEL[source],
-    note: `slowest: ${slowest.map((s) => `${s.label} ${formatDuration(s.ms)}`).join(", ")}`,
+    note: `slowest: ${slowest.map((s) => `${s.label} ${formatDuration(s.ms, { exact: true })}`).join(", ")}`,
   };
 }
 

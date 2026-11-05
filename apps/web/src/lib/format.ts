@@ -44,16 +44,25 @@ export function formatRelative(then: Date, now: Date): string {
 }
 
 /**
- * A step's length: `340 ms`, `2.4 s`, `18 s`, `2 min 5 s`. Whole numbers where a decimal would be
- * noise, and the same string in the Worker and the browser. The spaces are non-breaking, so a
- * figure never splits from its unit across a line.
+ * A length of time: `340 ms`, `2.4 s`, `18 s`, `2 min 5 s`, `3 h 12 min`, `13 d 3 h`. Whole numbers
+ * where a decimal would be noise, never more than two units, and the same string in the Worker and
+ * the browser. The spaces are non-breaking, so a figure never splits from its unit across a line.
+ *
+ * Past an hour the display is coarse on purpose (hours and minutes, then days and hours, each
+ * truncated within the band): it is for an age or a threshold that a person reads, like the
+ * operator page's. Every figure that is measured and compared (step timings, wall time, compare
+ * times, branch trends) passes `{ exact: true }`: minutes and seconds all the way up, as before.
  */
-export function formatDuration(ms: number): string {
+export function formatDuration(ms: number, options: { exact?: boolean } = {}): string {
   if (ms < 1000) return `${Math.round(ms)}\u00a0ms`;
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)}\u00a0s`;
   const seconds = Math.round(ms / 1000);
   if (seconds < 60) return `${seconds}\u00a0s`;
-  return `${Math.floor(seconds / 60)}\u00a0min\u00a0${seconds % 60}\u00a0s`;
+  if (seconds < 3600 || options.exact)
+    return `${Math.floor(seconds / 60)}\u00a0min\u00a0${seconds % 60}\u00a0s`;
+  if (seconds < 86_400)
+    return `${Math.floor(seconds / 3600)}\u00a0h\u00a0${Math.floor((seconds % 3600) / 60)}\u00a0min`;
+  return `${Math.floor(seconds / 86_400)}\u00a0d\u00a0${Math.floor((seconds % 86_400) / 3600)}\u00a0h`;
 }
 
 /** `0 B`, `812 B`, `4.2 KiB`, `31 MiB`, `1.3 GiB`: one decimal below ten of a unit, none above. */

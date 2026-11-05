@@ -25,7 +25,7 @@ function CompareTime({ snapshot }: { snapshot: SnapshotView }) {
   if (ms === null) return null;
   return (
     <KeyValue label="Compare time">
-      <span data-testid="compare-time">{formatDuration(ms)}</span>
+      <span data-testid="compare-time">{formatDuration(ms, { exact: true })}</span>
     </KeyValue>
   );
 }

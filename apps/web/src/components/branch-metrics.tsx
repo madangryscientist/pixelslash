@@ -19,7 +19,7 @@ function Trend({ trend }: { trend: Metrics["trend"] }) {
   if (trend.length === 2)
     return (
       <Text mono numeric data-testid="branch-metrics-pair">
-        {trend.map((p) => formatDuration(p.ms)).join(" → ")}
+        {trend.map((p) => formatDuration(p.ms, { exact: true })).join(" → ")}
       </Text>
     );
   return (
