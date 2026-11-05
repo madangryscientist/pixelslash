@@ -1,4 +1,4 @@
-import { Card, Caption, SectionHeading, Stack, TableCell, Text } from "@hackcove/ui-react";
+import { Card, Caption, Section, TableCell, Text } from "@hackcove/ui-react";
 import type { Reading } from "#/lib/reading";
 import type { StepStats } from "#/lib/timings";
 import { formatDuration, formatNumber } from "#/lib/format";
@@ -26,7 +26,12 @@ export function Figure<T>({
 export const plural = (n: number, noun: string) =>
   `${formatNumber(n)} ${noun}${n === 1 ? "" : "s"}`;
 
-export function Section({
+/**
+ * One section of the health page: @hackcove/ui-react's `Section` (its heading names the section) inside
+ * a card, with the note that says what the numbers cover as its first line. Not named `Section`, so it
+ * cannot be mistaken for the library's export (the hackcove UI review checks for that).
+ */
+export function HealthSection({
   title,
   note,
   testId,
@@ -39,13 +44,10 @@ export function Section({
 }) {
   return (
     <Card>
-      <Stack data-testid={testId}>
-        <Stack gap="xs">
-          <SectionHeading>{title}</SectionHeading>
-          <Caption as="p">{note}</Caption>
-        </Stack>
+      <Section gap="xs" title={title} data-testid={testId}>
+        <Caption as="p">{note}</Caption>
         {children}
-      </Stack>
+      </Section>
     </Card>
   );
 }

@@ -12,7 +12,7 @@ import {
 import type { OperatorHealth, WindowHealth } from "#/db/admin-health";
 import { formatBytes, formatDateTime, formatNumber } from "#/lib/format";
 import { NowSection } from "./operator-health-now";
-import { Figure, Section, StepCell, plural } from "./operator-health-parts";
+import { Figure, HealthSection, StepCell, plural } from "./operator-health-parts";
 
 /**
  * The operator's health page body (PS-330). Read-only: no control, no badge, no verdict. Every group
@@ -30,7 +30,7 @@ function WindowSection({
 }) {
   const o = w.outcomes;
   return (
-    <Section
+    <HealthSection
       title={w.label}
       note={`Builds whose server step finished since ${formatDateTime(w.since)}${capped ? ", the newest only (the read is capped)" : ""}. Times are median / 95th percentile, or the slowest when under 20 builds; each cell names its own n.`}
       testId={`admin-window-${w.key}`}
@@ -92,14 +92,14 @@ function WindowSection({
           {(v) => formatNumber(v)}
         </Figure>
       </Text>
-    </Section>
+    </HealthSection>
   );
 }
 
 function DeploymentSection({ health }: { health: OperatorHealth }) {
   const d = health.deployment;
   return (
-    <Section
+    <HealthSection
       title="Deployment"
       note="What this Worker instance is running, against the migrations the database has applied."
       testId="admin-deployment"
@@ -124,14 +124,14 @@ function DeploymentSection({ health }: { health: OperatorHealth }) {
           </Figure>
         </Text>
       </Stack>
-    </Section>
+    </HealthSection>
   );
 }
 
 function StorageSection({ health }: { health: OperatorHealth }) {
   const s = health.storage;
   return (
-    <Section
+    <HealthSection
       title="Storage"
       note="Row counts are every row, smoke runs included. Sizes come from the bindings, never an estimate."
       testId="admin-storage"
@@ -168,7 +168,7 @@ function StorageSection({ health }: { health: OperatorHealth }) {
           </Figure>
         </Text>
       </Stack>
-    </Section>
+    </HealthSection>
   );
 }
 

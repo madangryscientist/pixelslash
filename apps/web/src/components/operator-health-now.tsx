@@ -10,7 +10,7 @@ import {
 } from "@hackcove/ui-react";
 import type { OperatorHealth } from "#/db/admin-health";
 import { formatDateTime, formatDuration, formatNumber } from "#/lib/format";
-import { Section, plural } from "./operator-health-parts";
+import { HealthSection, plural } from "./operator-health-parts";
 
 /** The "Now" group of the operator health page (PS-330): every build, what is in flight, what is stuck. */
 
@@ -100,7 +100,7 @@ function StuckTable({ stuck }: { stuck: Now["stuck"] }) {
 export function NowSection({ health }: { health: OperatorHealth }) {
   const { now, asOf } = health;
   return (
-    <Section
+    <HealthSection
       title="Now"
       note={`Every build, as of ${formatDateTime(asOf)}. In flight is uploading or processing.`}
       testId="admin-now"
@@ -113,6 +113,6 @@ export function NowSection({ health }: { health: OperatorHealth }) {
         </Text>
         <StuckTable stuck={now.stuck} />
       </Stack>
-    </Section>
+    </HealthSection>
   );
 }
