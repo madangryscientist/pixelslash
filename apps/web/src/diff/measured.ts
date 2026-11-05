@@ -26,6 +26,14 @@ export class UnmeasuredError extends Error {
   override name = "UnmeasuredError";
 }
 
+/**
+ * Every failed shot was already reported on its own, or deliberately not (`DiffRefusedError`), so
+ * this roll-up is a duplicate and `reportBuildFailure` skips it (PS-328).
+ */
+export class ShotsUnmeasuredError extends Error {
+  override name = "ShotsUnmeasuredError";
+}
+
 function fieldsOf(fingerprint: string): Record<string, string> {
   try {
     const parsed: unknown = JSON.parse(fingerprint);
