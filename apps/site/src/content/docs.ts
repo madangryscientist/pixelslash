@@ -15,6 +15,18 @@ import ciJenkins from "../../../../docs/ci/jenkins.md?raw";
 import ciAny from "../../../../docs/ci/any-ci.md?raw";
 import ciPinVersions from "../../../../docs/ci/pin-versions.md?raw";
 import ciReviewServer from "../../../../docs/ci/review-server.md?raw";
+import conceptComparison from "../../../../docs/concepts/how-a-comparison-works.md?raw";
+import conceptBaselines from "../../../../docs/concepts/baselines-and-branches.md?raw";
+import conceptThresholds from "../../../../docs/concepts/thresholds.md?raw";
+import conceptIgnore from "../../../../docs/concepts/ignore-or-redact.md?raw";
+import conceptFlaky from "../../../../docs/concepts/flaky-shots.md?raw";
+import conceptFingerprints from "../../../../docs/concepts/fingerprints.md?raw";
+import conceptReport from "../../../../docs/concepts/reading-a-report.md?raw";
+import conceptReview from "../../../../docs/concepts/review-flow.md?raw";
+import helpExitCodes from "../../../../docs/help/exit-codes.md?raw";
+import helpTroubleshooting from "../../../../docs/help/troubleshooting.md?raw";
+import helpFaq from "../../../../docs/help/faq.md?raw";
+import helpChromatic from "../../../../docs/help/coming-from-chromatic.md?raw";
 import selfHost from "../../../web/SELF-HOST.md?raw";
 import { CLI_SPLIT } from "./cli-pages.ts";
 import { plainText } from "./doc-text.ts";
@@ -92,6 +104,58 @@ const FILE_DOCS = {
     ciReviewServer,
     "docs/ci/review-server.md",
     "ci-review-server",
+  ),
+  "docs/concepts/how-a-comparison-works.md": parseDoc(
+    conceptComparison,
+    "docs/concepts/how-a-comparison-works.md",
+    "how-a-comparison-works",
+  ),
+  "docs/concepts/baselines-and-branches.md": parseDoc(
+    conceptBaselines,
+    "docs/concepts/baselines-and-branches.md",
+    "baselines-and-branches",
+  ),
+  "docs/concepts/thresholds.md": parseDoc(
+    conceptThresholds,
+    "docs/concepts/thresholds.md",
+    "thresholds",
+  ),
+  "docs/concepts/ignore-or-redact.md": parseDoc(
+    conceptIgnore,
+    "docs/concepts/ignore-or-redact.md",
+    "ignore-or-redact",
+  ),
+  "docs/concepts/flaky-shots.md": parseDoc(
+    conceptFlaky,
+    "docs/concepts/flaky-shots.md",
+    "flaky-shots",
+  ),
+  "docs/concepts/fingerprints.md": parseDoc(
+    conceptFingerprints,
+    "docs/concepts/fingerprints.md",
+    "fingerprints",
+  ),
+  "docs/concepts/reading-a-report.md": parseDoc(
+    conceptReport,
+    "docs/concepts/reading-a-report.md",
+    "reading-a-report",
+  ),
+  "docs/concepts/review-flow.md": parseDoc(
+    conceptReview,
+    "docs/concepts/review-flow.md",
+    "review-flow",
+  ),
+  "docs/help/exit-codes.md": parseDoc(helpExitCodes, "docs/help/exit-codes.md", "exit-codes"),
+  "docs/help/troubleshooting.md": parseDoc(
+    helpTroubleshooting,
+    "docs/help/troubleshooting.md",
+    "troubleshooting",
+  ),
+  "docs/help/faq.md": parseDoc(helpFaq, "docs/help/faq.md", "faq"),
+  "docs/help/coming-from-chromatic.md": parseDoc(
+    helpChromatic,
+    "docs/help/coming-from-chromatic.md",
+    "coming-from-chromatic",
   ),
 };
 
