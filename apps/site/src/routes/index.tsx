@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { HomePage } from "#/components/pages/home";
+import { pageHead } from "#/content/seo";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [{ title: "PixelSlash: visual review for the web" }] }),
+  head: () => pageHead("/"),
   component: HomePage,
 });

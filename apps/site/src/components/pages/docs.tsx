@@ -4,8 +4,8 @@ import {
   Callout,
   Card,
   CardGrid,
-  DetailLayout,
   Disclosure,
+  PageHeader,
   ProseLayout,
   SidebarLayout,
   Tabs,
@@ -221,43 +221,50 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
   const hasRail = doc.headings.some((heading) => heading.depth <= 3);
   return (
     <SidebarLayout rail={<DocsNav current={slug} />} railLabel="Docs">
-      <DetailLayout
-        title={page.title}
-        breadcrumbs={
-          <Breadcrumbs
-            crumbs={[{ label: "Docs", href: "/docs" }, group?.title ?? "", page.title]}
-          />
-        }
-        aside={
-          hasRail ? (
-            <nav
-              aria-label="On this page"
-              data-testid="docs-contents"
-              className="hidden lg:sticky lg:top-32 lg:block"
-            >
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                On this page
-              </p>
-              <OnThisPage headings={doc.headings} track />
-            </nav>
-          ) : null
-        }
-      >
-        <div className="flex flex-col gap-8">
-          {hasRail && (
-            <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
-              <summary className="cursor-pointer text-sm font-medium">On this page</summary>
-              <div className="py-2">
-                <OnThisPage headings={doc.headings} />
-              </div>
-            </details>
-          )}
-          <DocBody doc={doc} />
-          {page.exits === true ? <ExitsLine /> : null}
-          <EditLink source={doc.source} />
-          <PrevNext slug={slug} />
+      <div>
+        <PageHeader
+          title={page.title}
+          breadcrumbs={
+            <Breadcrumbs
+              crumbs={[{ label: "Docs", href: "/docs" }, group?.title ?? "", page.title]}
+            />
+          }
+        />
+        {/* The kit's DetailLayout without its aside: a second unnamed aside beside the rail's, empty on a phone. */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="min-w-0 lg:col-span-2">
+            <div className="flex flex-col gap-8">
+              {hasRail && (
+                <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
+                  <summary className="cursor-pointer text-sm font-medium">On this page</summary>
+                  <div className="py-2">
+                    <OnThisPage headings={doc.headings} />
+                  </div>
+                </details>
+              )}
+              <DocBody doc={doc} />
+              {page.exits === true ? <ExitsLine /> : null}
+              <EditLink source={doc.source} />
+              <PrevNext slug={slug} />
+            </div>
+          </div>
+          {hasRail ? (
+            // The column stretches to the article's height, which is the room the sticky list moves in.
+            <div className="hidden min-w-0 lg:block">
+              <nav
+                aria-label="On this page"
+                data-testid="docs-contents"
+                className="lg:sticky lg:top-32"
+              >
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  On this page
+                </p>
+                <OnThisPage headings={doc.headings} track />
+              </nav>
+            </div>
+          ) : null}
         </div>
-      </DetailLayout>
+      </div>
     </SidebarLayout>
   );
 }
@@ -275,6 +282,8 @@ export function DocsIndexPage(): ReactNode {
   if (first === undefined) throw new Error(`docs: no page ${FIRST_STEP.slug}`);
   return (
     <SidebarLayout rail={<DocsNav />} railLabel="Docs">
+      {/* `/docs#anchor` links from before the split land on the page that holds the anchor. */}
+      <script dangerouslySetInnerHTML={{ __html: OLD_ANCHOR_SCRIPT }} />
       <ProseLayout
         title="Docs"
         subtitle="Install PixelSlash, run a first compare, then look up whatever you are doing next."

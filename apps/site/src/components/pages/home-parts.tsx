@@ -1,11 +1,7 @@
-import { TextLink } from "@hackcove/ui-react";
 import type { CSSProperties, ReactNode } from "react";
-import { Wordmark } from "#/components/logo";
-import { TRADEMARK } from "#/content/docs";
 import hero from "#/content/hero.json";
-import { CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 
-// The homepage's footer and hero demo (pages/home.tsx).
+// The homepage's hero demo (pages/home.tsx).
 
 /** A style with CSS custom properties, which CSSProperties does not list. */
 function vars(style: CSSProperties & Record<`--${string}`, number | string>): CSSProperties {
@@ -61,29 +57,5 @@ export function Demo(): ReactNode {
         regions: the price, the button, the storage bar and its label.
       </figcaption>
     </figure>
-  );
-}
-
-export function Footer(): ReactNode {
-  return (
-    <footer data-testid="footer" className="home-footer px-5 py-12 text-sm" role="contentinfo">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <a href="/" className="flex items-center">
-            <Wordmark />
-          </a>
-          <span>MIT licence</span>
-          <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
-          {REPO_PUBLIC ? (
-            <TextLink href={REPO_URL} data-testid="source-status">
-              GitHub
-            </TextLink>
-          ) : (
-            <span data-testid="source-status">Source opens at launch</span>
-          )}
-        </div>
-        <span data-testid="trademark">{TRADEMARK}</span>
-      </div>
-    </footer>
   );
 }

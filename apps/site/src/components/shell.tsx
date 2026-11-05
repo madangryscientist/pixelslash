@@ -11,7 +11,8 @@ import {
   TextLink,
 } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
-import { TRADEMARK } from "#/content/docs";
+import { useKeyboardScrollers } from "#/components/keyboard-scrollers";
+import { TRADEMARK } from "#/content/trademark";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 import { PAGES } from "#/content/pages";
 import { Wordmark } from "#/components/logo";
@@ -58,6 +59,23 @@ function Footer(): ReactNode {
   );
 }
 
+/** The home's footer: the inner pages' lines, with the wordmark in front. */
+function HomeFooter(): ReactNode {
+  return (
+    <div data-testid="footer" className="home-footer flex flex-col gap-4 py-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <a href="/" className="flex items-center" aria-label="PixelSlash home">
+          <Wordmark />
+        </a>
+        <span>MIT licence</span>
+        <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
+        <SourceLink />
+      </div>
+      <span data-testid="trademark">{TRADEMARK}</span>
+    </div>
+  );
+}
+
 /**
  * An inner page's ground: the home's canvas with the same aurora and grid fading out over the top
  * of the page, so stepping from the home to any page keeps the look. The page itself sits in the
@@ -83,7 +101,7 @@ function PageArt({ children }: { children: ReactNode }): ReactNode {
 
 /**
  * The frame every page sits in: the brand, the nav row, the page, the footer. The homepage's sections
- * run the full width and it draws its own footer, so it takes none from here. Every other page
+ * run the full width and its footer carries the wordmark. Every other page
  * is drawn over the same ground (PageArt), and the shell paints that ground under the footer too.
  */
 export function Shell({
@@ -94,6 +112,7 @@ export function Shell({
   children: ReactNode;
 }): ReactNode {
   const isHome = pathname === "/";
+  useKeyboardScrollers();
   const items = PAGES.map((page) => ({
     label: page.label,
     href: page.to,
@@ -110,7 +129,7 @@ export function Shell({
           <Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />
         </div>
       }
-      footer={isHome ? undefined : <Footer />}
+      footer={isHome ? <HomeFooter /> : <Footer />}
       bleed
       data-art=""
     >

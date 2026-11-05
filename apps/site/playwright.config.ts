@@ -12,7 +12,8 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}` },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile", use: { ...devices["Pixel 7"] } },
+    // The metadata spec reads server responses, so a viewport changes nothing in it.
+    { name: "mobile", use: { ...devices["Pixel 7"] }, testIgnore: "metadata.spec.ts" },
   ],
   webServer: {
     command: `bunx vite preview --port ${PORT} --strictPort`,

@@ -91,7 +91,7 @@ That `report.html` shows each run side by side and lists where they differed. Th
 
 The `flaky` setting says what a flaky shot does to the build. Set it at the top level or on a route. A route's value wins.
 
-| | `"review"` (default) | `"skip"` |
+| What happens | `"review"` (default) | `"skip"` |
 | --- | --- | --- |
 | In the build | badged flaky, and it waits for a decision | marked `skipped: flaky`, and not in the count to review |
 | Blocks the build | yes | no |

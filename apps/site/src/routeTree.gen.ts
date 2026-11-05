@@ -16,6 +16,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as SearchIndexDotjsonRouteImport } from './routes/search-index[.]json'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SelfHostRouteImport } from './routes/self-host'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSlugRouteImport } from './routes/docs.$slug'
 
@@ -54,6 +55,11 @@ const SelfHostRoute = SelfHostRouteImport.update({
   path: '/self-host',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/docs/',
   path: '/docs/',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs': typeof DocsIndexRoute
 }
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
 }
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/search-index.json'
     | '/security'
     | '/self-host'
+    | '/sitemap.xml'
     | '/docs/$slug'
     | '/docs/'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/search-index.json'
     | '/security'
     | '/self-host'
+    | '/sitemap.xml'
     | '/docs/$slug'
     | '/docs'
   id:
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/search-index.json'
     | '/security'
     | '/self-host'
+    | '/sitemap.xml'
     | '/docs/$slug'
     | '/docs/'
   fileRoutesById: FileRoutesById
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   SearchIndexDotjsonRoute: typeof SearchIndexDotjsonRoute
   SecurityRoute: typeof SecurityRoute
   SelfHostRoute: typeof SelfHostRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DocsSlugRoute: typeof DocsSlugRoute
   DocsIndexRoute: typeof DocsIndexRoute
 }
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SelfHostRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/': {
       id: '/docs/'
       path: '/docs'
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchIndexDotjsonRoute: SearchIndexDotjsonRoute,
   SecurityRoute: SecurityRoute,
   SelfHostRoute: SelfHostRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   DocsSlugRoute: DocsSlugRoute,
   DocsIndexRoute: DocsIndexRoute,
 }

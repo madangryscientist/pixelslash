@@ -18,7 +18,7 @@ import {
 import { type MarkedToken, type Token, type Tokens, lexer } from "marked";
 import { Fragment, type ReactNode } from "react";
 import { decode, marked, plainText, slugger, stripTicketIds } from "./doc-text.ts";
-import { resolveHref, resolveImageSrc } from "./links.ts";
+import { resolveHref, resolveImageSrc } from "./resolve-links.ts";
 
 export { plainText, slugger };
 
@@ -129,13 +129,13 @@ function language(lang: string | undefined): CodeLanguage {
 function HeadingBlock({ token, doc }: { token: Tokens.Heading; doc: Doc }): ReactNode {
   const id = doc.ids.get(token);
   const children = <Inline tokens={token.tokens} doc={doc} />;
-  if (token.depth <= 2) return <SectionHeading id={id}>{children}</SectionHeading>;
+  // A page cut from docs/cli.md at an H3 has no H2 under its title, so its levels move up one: the
+  // outline a screen reader walks does not skip a level.
+  const lift = Math.max(0, Math.min(...doc.headings.map((heading) => heading.depth)) - 2);
+  const depth = token.depth - lift;
+  if (depth <= 2) return <SectionHeading id={id}>{children}</SectionHeading>;
   return (
-    <SubsectionHeading
-      as={token.depth === 3 ? "h3" : "h4"}
-      size={token.depth === 3 ? "md" : "sm"}
-      id={id}
-    >
+    <SubsectionHeading as={depth === 3 ? "h3" : "h4"} size={depth === 3 ? "md" : "sm"} id={id}>
       {children}
     </SubsectionHeading>
   );

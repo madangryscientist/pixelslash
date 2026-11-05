@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PricingPage } from "#/components/pages/pricing";
+import { pageHead } from "#/content/seo";
 
 export const Route = createFileRoute("/pricing")({
-  head: () => ({ meta: [{ title: "Pricing · PixelSlash" }] }),
+  head: () => pageHead("/pricing"),
   component: PricingPage,
 });

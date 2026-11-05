@@ -291,11 +291,18 @@ body:has([data-art]) {
   clip-path: polygon(0 0, calc(var(--p) + 8%) 0, calc(var(--p) - 8%) 100%, 0 100%);
 }
 
+/* The bar rides a full-width box: a percentage in translate is of that box's own width, so --p
+   moves it across the shot without a layout, and a moving demo is not a layout shift. */
 .home-slash {
   position: absolute;
-  top: -2%;
-  bottom: -2%;
-  left: var(--p);
+  inset: -2% 0;
+  translate: var(--p) 0;
+}
+
+.home-slash::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
   width: 4px;
   translate: -50% 0;
   transform: skewX(-15.9deg);
@@ -467,7 +474,6 @@ body:has([data-art]) {
 }
 
 .home-footer {
-  border-top: 1px solid var(--home-line);
   color: var(--home-sub);
 }
 
@@ -620,4 +626,11 @@ body:has([data-art]) {
   .home[data-motion] .home-cards .home-reveal:nth-child(3n) {
     transition-delay: 0.2s;
   }
+}
+
+/* A closed fold in the docs rail takes no room. The kit's panel keeps its padding while it is
+   hidden="until-found", which the browser still lays out, so without this the rail grows 12 px a
+   group when the page hydrates and everything under it jumps. */
+[data-testid^="docs-group-"] [hidden="until-found"] {
+  padding-block: 0;
 }
