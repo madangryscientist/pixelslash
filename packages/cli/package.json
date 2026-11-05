@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@sentry/bun": "11.9.0",
+    "@sentry/bun": "11.10.0",
     "axe-core": "^4.14.0",
     "pngjs": "^7.0.0"
   },
@@ -38,7 +38,7 @@
     "@hackcove/pixelslash-engine": "workspace:*",
     "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   },
   "peerDependencies": {
     "playwright": "^1.60.0"
