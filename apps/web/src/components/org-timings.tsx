@@ -46,8 +46,8 @@ function Cell({
       }
     >
       <span data-testid={`timings-${step}`}>
-        {formatDuration(stats.p50)} <Text tone="muted">/</Text>{" "}
-        {formatDuration(stats.tail === "max" ? stats.max : stats.p95)}
+        {formatDuration(stats.p50, { exact: true })} <Text tone="muted">/</Text>{" "}
+        {formatDuration(stats.tail === "max" ? stats.max : stats.p95, { exact: true })}
         {stats.tail === "max" && (
           <>
             {" "}

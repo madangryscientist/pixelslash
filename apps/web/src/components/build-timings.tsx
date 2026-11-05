@@ -33,7 +33,7 @@ function Line({
           <span key={step.key} data-testid={`timing-${scope}-${step.key}`}>
             <Text tone="muted">{step.label}</Text>{" "}
             <Text mono numeric>
-              {formatDuration(step.ms)}
+              {formatDuration(step.ms, { exact: true })}
             </Text>
             {step.note && (
               <Text tone="muted" data-testid={`timing-${scope}-${step.key}-note`}>

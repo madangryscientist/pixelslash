@@ -56,8 +56,8 @@ export function StepCell({ stats }: { stats: StepStats | null }) {
   if (!stats) return <TableCell tone="muted">—</TableCell>;
   return (
     <TableCell numeric secondary={plural(stats.n, "build")}>
-      {formatDuration(stats.p50)} <Text tone="muted">/</Text>{" "}
-      {formatDuration(stats.tail === "max" ? stats.max : stats.p95)}
+      {formatDuration(stats.p50, { exact: true })} <Text tone="muted">/</Text>{" "}
+      {formatDuration(stats.tail === "max" ? stats.max : stats.p95, { exact: true })}
       {stats.tail === "max" && (
         <>
           {" "}
