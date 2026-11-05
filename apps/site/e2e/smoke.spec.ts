@@ -193,7 +193,7 @@ for (const scheme of ["light", "dark"] as const) {
       // The first heading and the first body text (paragraph, list item or cell) with text of its own that
       // is on screen: a phone hides some copy.
       await page.evaluate(() => {
-        const probes = { heading: "h1", body: "p, li, td, dd" };
+        const probes = { heading: "h1, h1 > span", body: "p, li, td, dd" };
         for (const [name, selector] of Object.entries(probes)) {
           const shown = [...document.querySelectorAll(selector)].find((element) => {
             const box = element.getBoundingClientRect();
