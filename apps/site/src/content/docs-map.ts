@@ -5,8 +5,11 @@
  * here is cut out of its H2 and shown on this page instead. A test (docs.test.tsx) fails when an
  * H2 of cli.md is on no page, on two, or a listed heading no longer exists, so this cannot rot.
  *
- * Plain data, no imports: vite.config.ts reads it to prerender a page per entry.
+ * Plain data only: vite.config.ts reads it to prerender a page per entry, and the Concepts and
+ * Help pages live in docs-map-guides.ts so this list stays readable.
  */
+
+import { CONCEPT_PAGES, HELP_PAGES } from "./docs-map-guides.ts";
 
 export const GROUPS = [
   { id: "start", title: "Get started", summary: "Install it and run a first compare." },
@@ -27,6 +30,11 @@ export const GROUPS = [
   },
   { id: "diff", title: "The diff and report", summary: "How two shots are compared and shown." },
   {
+    id: "concepts",
+    title: "Concepts",
+    summary: "The ideas behind a comparison, a baseline and a review.",
+  },
+  {
     id: "judge",
     title: "Design-system judge",
     summary: "Check a page against your design system.",
@@ -39,6 +47,11 @@ export const GROUPS = [
   { id: "build", title: "While you build", summary: "Re-capture a feature as you work on it." },
   { id: "agents", title: "Agents", summary: "Drive PixelSlash from a coding agent." },
   { id: "reference", title: "Reference", summary: "The API, timings and error reporting." },
+  {
+    id: "help",
+    title: "Help",
+    summary: "Exit codes, exact error messages, questions and migration.",
+  },
 ] as const;
 
 export type GroupId = (typeof GROUPS)[number]["id"];
@@ -66,7 +79,19 @@ export type DocPageDef = {
     | "docs/ci/jenkins.md"
     | "docs/ci/any-ci.md"
     | "docs/ci/pin-versions.md"
-    | "docs/ci/review-server.md";
+    | "docs/ci/review-server.md"
+    | "docs/concepts/how-a-comparison-works.md"
+    | "docs/concepts/baselines-and-branches.md"
+    | "docs/concepts/thresholds.md"
+    | "docs/concepts/ignore-or-redact.md"
+    | "docs/concepts/flaky-shots.md"
+    | "docs/concepts/fingerprints.md"
+    | "docs/concepts/reading-a-report.md"
+    | "docs/concepts/review-flow.md"
+    | "docs/help/exit-codes.md"
+    | "docs/help/troubleshooting.md"
+    | "docs/help/faq.md"
+    | "docs/help/coming-from-chromatic.md";
 };
 
 export const DOC_PAGES: readonly DocPageDef[] = [
@@ -213,6 +238,7 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     sections: ["How the diff works", "Tuning the diff"],
   },
   { slug: "report", title: "The report", group: "diff", sections: ["The report"] },
+  ...CONCEPT_PAGES,
   {
     slug: "judge",
     title: "The judge",
@@ -262,6 +288,7 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     group: "reference",
     sections: ["Local-screenshot dogfood (GTK windows)"],
   },
+  ...HELP_PAGES,
 ];
 
 export function findPage(slug: string): DocPageDef | undefined {

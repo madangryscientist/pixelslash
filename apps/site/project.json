@@ -29,7 +29,12 @@
         "{workspaceRoot}/docs/tutorials/**",
         "{workspaceRoot}/docs/ci/**",
         "{workspaceRoot}/docs/capabilities/data.json",
-        "{workspaceRoot}/apps/web/github-app/manifest.json"
+        "{workspaceRoot}/apps/web/github-app/manifest.json",
+        "{workspaceRoot}/docs/metrics.md",
+        "{workspaceRoot}/docs/concepts/**",
+        "{workspaceRoot}/docs/help/**",
+        "{workspaceRoot}/packages/*/src/**",
+        "{workspaceRoot}/apps/web/src/**"
       ]
     },
     "build": {
@@ -49,7 +54,10 @@
         "{workspaceRoot}/docs/tutorials/**",
         "{workspaceRoot}/docs/ci/**",
         "{workspaceRoot}/docs/capabilities/data.json",
-        "{workspaceRoot}/apps/web/github-app/manifest.json"
+        "{workspaceRoot}/apps/web/github-app/manifest.json",
+        "{workspaceRoot}/docs/metrics.md",
+        "{workspaceRoot}/docs/concepts/**",
+        "{workspaceRoot}/docs/help/**"
       ],
       "outputs": ["{projectRoot}/dist"]
     },

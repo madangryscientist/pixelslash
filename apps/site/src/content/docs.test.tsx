@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Token, lexer } from "marked";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -251,6 +251,75 @@ describe("links into the docs", () => {
     expect(CLI_SPLIT.anchorPage.get("exit-codes-and-the-failed-line")).toBe("signing-in");
   });
 });
+
+describe("the troubleshooting page", () => {
+  const md = readFileSync(join(ROOT, "docs/help/troubleshooting.md"), "utf8");
+  const headings = [...md.matchAll(/^## (.+)$/gm)]
+    .map((match) => (match[1] ?? "").replaceAll("`", ""))
+    .filter((heading) => heading !== "Next");
+
+  /*
+   * A heading is checked piece by piece: every literal piece between its `<…>` values must occur
+   * in a source file. Renaming a variable the message interpolates cannot fail this, and a message
+   * that genuinely changed still does. A few messages are composed (`config: <where> <what>`, the
+   * tags joined into one sentence), so the piece the file owns is named instead of the heading.
+   * The search covers the app's own messages too: a 426 or `rebaseline_needed` is the server's to
+   * say and the CLI relays it.
+   */
+  const COMPOSED: Readonly<Record<string, readonly string[]>> = {
+    "--threshold must be a number from 0 to 1": ["must be a number from 0 to 1"],
+    "config: stabilise.timers needs a clock to pause: set stabilise.clock, or timers: false": [
+      "needs a clock to pause: set stabilise.clock, or timers: false",
+    ],
+    'warning: mask "<selector>" matched no shot in this run': [
+      '"${selector}" matched no shot in this run',
+    ],
+    'storybook: story "<id>" tag "<tag>" must be pixelslash-flaky-review or pixelslash-flaky-skip':
+      ['storybook: story "${story.id}" tag "${unknown}" must be'],
+    'storybook: story "<id>" has both pixelslash-flaky-review or pixelslash-flaky-skip': [
+      'storybook: story "${story.id}" has both',
+    ],
+  };
+
+  /** The pieces of a heading that must be found: its literals, or a composed message's own part. */
+  function pieces(heading: string): string[] {
+    const composed = COMPOSED[heading];
+    if (composed !== undefined) return [...composed];
+    return heading
+      .split(/<[^>]+>/)
+      .map((piece) => piece.trim())
+      .filter((piece) => piece.length >= 6);
+  }
+
+  test("every entry is a message the code still writes", () => {
+    expect(headings.length).toBeGreaterThan(10);
+    expect(new Set(headings).size).toBe(headings.length);
+    const sources = messageSources();
+    const missing = headings.flatMap((heading) =>
+      pieces(heading)
+        .filter((piece) => !sources.some((source) => source.includes(piece)))
+        .map((piece) => `${heading} -> ${piece}`),
+    );
+    expect(missing).toEqual([]);
+  });
+});
+
+/** Every `.ts`/`.tsx` under each package's `src` and `apps/web/src`, as text: what can print a message. */
+function messageSources(): string[] {
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) return entry.name === "node_modules" ? [] : walk(path);
+      return /\.tsx?$/.test(entry.name) && !/\.(test|spec)\.tsx?$/.test(entry.name)
+        ? [readFileSync(path, "utf8")]
+        : [];
+    });
+  const packages = readdirSync(join(ROOT, "packages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(ROOT, "packages", entry.name, "src"))
+    .filter((dir) => existsSync(dir));
+  return [...packages.flatMap(walk), ...walk(join(ROOT, "apps/web/src"))];
+}
 
 describe("the footer's trademark line", () => {
   test("is the README's sentence", () => {
