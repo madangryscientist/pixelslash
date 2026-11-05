@@ -1,0 +1,12 @@
+# Every 30 s: `active` does not mean answering (watchdog.sh, PS-323). update.sh stops this while it
+# restarts the units and starts it again when the release is serving.
+[Unit]
+Description=PixelSlash liveness check, every 30 s
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

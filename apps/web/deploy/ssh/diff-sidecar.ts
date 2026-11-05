@@ -8,7 +8,8 @@
  *
  * Bound to 127.0.0.1 and nothing else is served: the shots come from the Worker on the same machine
  * and go nowhere (invariant 4). Nothing is written to disk. Opt-in: the Worker calls it only when
- * `DIFF_SIDECAR_URL` is set, and diffs in-process when it is down or errors. See
+ * `DIFF_SIDECAR_URL` is set, and refuses what is too large to diff before it sends it; when this is
+ * down or errors it diffs in-process up to a lower limit (`src/diff/compare.ts`, PS-323). See
  * apps/web/README.md, "The diff sidecar".
  */
 import { Buffer } from "node:buffer";

@@ -6,6 +6,7 @@ import {
   type PixelDiff,
   diffPngs,
   identicalResult,
+  readPngSize,
   summarizeDiff,
 } from "@hackcove/pixelslash-engine/diff";
 import { release } from "@hackcove/pixelslash-engine/release";
@@ -91,8 +92,36 @@ function sidecarOf(url: string | undefined): SidecarDiff | null {
 }
 
 /**
+ * The largest shot a self-host diffs, by the box both PNGs fit in (PS-323): ~1280x19000, twice the
+ * largest shot in the PS-214 corpus. Memory follows the pixels (~30 MB per Mpx), so this is what
+ * `pixelslash-diff.service`'s MemoryMax is sized from: an admission check, because an allocation
+ * failure inside the diff is already too late.
+ */
+const SIDECAR_LIMIT_MPX = 24.5;
+/**
+ * The largest shot workerd diffs when the sidecar fails (PS-323): 1280x9500 fits. A diff adds ~30 MB
+ * per Mpx on top of everything the app already holds, so a sidecar timeout must not add a full tall
+ * diff to it; on 2026-11-05 that is what kept the review app from answering.
+ */
+const FALLBACK_LIMIT_MPX = 12.5;
+
+/** Refuse a pair above `limit`, in words the build's error shows. A PNG with no size is the diff's to report. */
+function refuseOver(what: string, limit: number, main: Buffer, branch: Buffer): void {
+  const a = readPngSize(main);
+  const b = readPngSize(branch);
+  if (!a || !b) return;
+  const width = Math.max(a.width, b.width);
+  const height = Math.max(a.height, b.height);
+  const mpx = (width * height) / 1_000_000;
+  if (mpx > limit)
+    throw new Error(`${what}: ${width}x${height} = ${mpx.toFixed(1)} Mpx, limit ${limit} Mpx`);
+}
+
+/**
  * One comparer's diffs: in the sidecar when there is one, and in-process when there is none or it
  * fails. Both run the same `diff.wasm` with the same options (PS-210), so the result is the same.
+ * With a sidecar configured both are bounded (PS-323), and a shot over a limit throws, which errors
+ * the build naming it (`diffOrRecord`). Without one nothing changes: Cloudflare has its own limits.
  */
 function measurer(
   diff: typeof diffPngs,
@@ -102,7 +131,9 @@ function measurer(
   args: { options: DiffOptions | undefined; ignore: DiffIgnore },
 ) => Promise<PixelDiff> {
   let sidecar = sidecarOf(url);
+  const bounded = Boolean(url);
   return async ([main, branch], { options, ignore }) => {
+    if (bounded) refuseOver("too large for a server diff", SIDECAR_LIMIT_MPX, main, branch);
     if (sidecar) {
       try {
         return await sidecar(main, branch, options ?? {}, ignore);
@@ -115,6 +146,13 @@ function measurer(
         if (e.kind === "unreachable") sidecar = null;
       }
     }
+    if (bounded)
+      refuseOver(
+        "too large for an in-process diff without the diff sidecar",
+        FALLBACK_LIMIT_MPX,
+        main,
+        branch,
+      );
     return diff(main, branch, options, ignore);
   };
 }

@@ -9,7 +9,7 @@
 #     [PIXELSLASH_PUBLIC_URL=<url>] [PIXELSLASH_DEPLOY_FORCE=1] \
 #     apps/web/deploy/ssh/release.sh <sha>
 #
-# The CT never builds (PS-225): the vite build cannot fit in its 2 GiB beside a running workerd (ob
+# The CT never builds (PS-225): the vite build did not fit in its memory beside a running workerd (ob
 # 1887), so it used to stop the server for the build. Here the build runs on this machine, the
 # release (the commit's tracked files and the built dist) goes over ssh to the Proxmox host and in
 # with `pct push`, and the release's own update.sh unpacks, installs and switches it on the CT.

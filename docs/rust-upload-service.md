@@ -323,7 +323,9 @@ estimate, before T7 measures it, is **Q3**.
 ### The memory limit
 
 K alone does not bound memory: K diffs of *any* size can be in flight, and the ~555 MB above
-holds only while no shot is larger than 1280x9500. Nothing caps a shot's pixels today.
+holds only while no shot is larger than 1280x9500. Nothing caps a shot's pixels today. (Since PS-323
+the Worker refuses a shot over 24.5 Mpx, and the sidecar's Max is 1000M with no High: this section is
+the reasoning of its day.)
 `MAX_PNG_BYTES` (`snapshot-form.ts`, 32 MiB) caps the **compressed** size, and a flat page
 compresses well: a 32 MiB PNG can decode to hundreds of Mpx, at 22 B/px several GB. Today such a
 shot OOM-kills the sidecar (`MemoryMax=600M`, `OOMPolicy=stop`) and the Worker re-diffs it

@@ -1,0 +1,12 @@
+# One pass of the liveness check: a unit that is active and has stopped answering HTTP is restarted
+# (watchdog.sh, PS-323). Started by pixelslash-watchdog.timer. Root, because it restarts units, so
+# it runs update.sh's root-owned copy: `pixelslash` owns the releases, and a script root runs from
+# there would hand that user root.
+[Unit]
+Description=PixelSlash liveness check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pixelslash-watchdog
+# Two silent units cost 10 s each, and a restart waits for the old process to go.
+TimeoutStartSec=120

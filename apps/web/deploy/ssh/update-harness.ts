@@ -30,6 +30,7 @@ export const UNITS = [
   "pixelslash-diff.service",
   "pixelslash-web.service",
 ];
+export const WATCHDOG_UNITS = ["pixelslash-watchdog.service", "pixelslash-watchdog.timer"];
 
 let root = "";
 /** Remove the run's temp directory; each test file calls it from `afterEach`. */
@@ -96,11 +97,15 @@ export function pack(
     broken = false,
     sentryDsn = "",
     carried = {},
-  }: { broken?: boolean; sentryDsn?: string; carried?: Record<string, string> } = {},
+  }: {
+    broken?: boolean;
+    sentryDsn?: string;
+    carried?: Record<string, string>;
+  } = {},
 ) {
   const dir = join(root, "pack", sha);
   mkdirSync(join(dir, "apps/web/deploy/ssh"), { recursive: true });
-  for (const unit of [...UNITS, "pixelslash-opencode.service"])
+  for (const unit of [...UNITS, ...WATCHDOG_UNITS, "pixelslash-opencode.service", "watchdog.sh"])
     copyFileSync(join(LAN, unit), join(dir, "apps/web/deploy/ssh", unit));
   mkdirSync(join(dir, "apps/web/dist/server"), { recursive: true });
   writeFileSync(join(dir, "apps/web/dist/server/index.js"), `// ${sha}\n`);
@@ -129,6 +134,7 @@ export function deploy(s: Setup, tarball: string, env: Record<string, string> = 
       PIXELSLASH_HOME: s.home,
       PIXELSLASH_APP_PATH: `${s.stubs}:/usr/bin:/bin`,
       PIXELSLASH_UNIT_DIR: s.unitDir,
+      PIXELSLASH_WATCHDOG_BIN: join(root, "watchdog-bin"),
       PIXELSLASH_HELPER_SWITCH: join(root, "no-helper-switch"),
       PIXELSLASH_D1_RETRY_SLEEP: "0",
       STUB_LOG: s.log,
