@@ -28,9 +28,8 @@ bun run test            # Vitest under Bun, and xunit for engines/dotnet
 
 - **Each script runs through Nx** (`nx run-many -t typecheck`, `lint`, `test`), one project at a time
   with `bunx nx <target> <project>`. `docs/cli.md` points here for them.
-- **CI uses an Nx Cloud remote cache** (`nxCloudId` in `nx.json`). Without credentials, Nx prints
-  "Nx Cloud encountered some problems … (code: 401)" after a run. That is expected: the task still
-  runs locally and the exit code is unaffected. `NX_NO_CLOUD=true` silences it.
+- **CI keeps Nx's local cache with `actions/cache`** (`.nx/cache` and `.nx/workspace-data`, scoped to the PR) and does not
+  use Nx Cloud, so a local run prints no connection message. `NX_NO_CLOUD=true` is set in CI.
 - **Lint rules are errors.** Fix the code; do not disable a rule.
 - **Tests** live in `packages/*/test/`. A test that makes a temp dir removes it, and a new
   project's `vitest.config.ts` lists the `globalSetup` in `scripts/test-tmp-scope.ts` so a run

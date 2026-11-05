@@ -1,8 +1,8 @@
 name: CI
 
-# The gate from AGENTS.md, on a GitHub-hosted runner. The only secrets read are the two Nx Cloud
-# tokens (see `gate`), and the trigger is `pull_request` (never `pull_request_target`), so a pull
-# request from a fork runs with a read-only token, no secrets and no remote cache. Actions are pinned to a commit; the tag is in the comment.
+# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read, and the trigger is
+# `pull_request` (never `pull_request_target`), so a pull request from a fork runs with a read-only
+# token. Actions are pinned to a commit; the tag is in the comment.
 
 on:
   pull_request:
@@ -28,14 +28,20 @@ jobs:
     name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Nx Cloud remote cache (workspace nxCloudId in nx.json; anonymous access is "none"). A push to
-    # main writes the shared cache with the read-write token; a pull request gets the read token,
-    # which Nx Cloud scopes to a per-PR cache, so a branch can never poison main's. A fork's PR has
-    # no secrets and runs uncached. Called from release.yml (a tag push), no secrets are passed and
-    # NX_NO_CLOUD is on, so a release gate never reads the remote cache.
+    # Nx never talks to Nx Cloud from CI: NX_NO_CLOUD is on, so no run starts a pipeline execution
+    # (those are billed in credits). Nx's own local cache is kept between runs with actions/cache
+    # instead, which is free. Nx 24 indexes the cache in a database, so the cache directory alone is
+    # rejected on a fresh runner (0 hits); `.nx/cache` and `.nx/workspace-data` are saved together, and
+    # NX_CACHE_DIRECTORY keeps the cache in the checkout (Nx 24 defaults to ~/.nx). Nx still checks
+    # every entry by its hash. GitHub scopes a cache to the ref that saved it: a pull
+    # request reads and writes only its own, plus the base branch's, and `main` cannot read a PR's, so
+    # a branch can never poison main's cache. The key carries the ref and the sha, so every run saves a
+    # fresh entry; restore-keys fall back to the last entry of the same ref, then to main's.
+    # A tag (a release, which calls this workflow) never restores or saves the cache, so a release
+    # gate always runs uncached.
     env:
-      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
-      NX_NO_CLOUD: ${{ startsWith(github.ref, 'refs/tags/') }}
+      NX_NO_CLOUD: "true"
+      NX_CACHE_DIRECTORY: .nx/cache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,6 +54,17 @@ jobs:
         with:
           global-json-file: global.json
       - run: bun install --frozen-lockfile
+      - name: Restore the Nx cache
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .nx/cache
+            .nx/workspace-data
+          key: nx-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ github.ref }}-
+            nx-${{ runner.os }}-refs/heads/main-
       # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
       - name: Install the Playwright browser
         working-directory: packages/engine
@@ -116,10 +133,9 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # The same Nx Cloud tokens as `gate`.
+    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache.
     env:
-      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
-      NX_NO_CLOUD: ${{ startsWith(github.ref, 'refs/tags/') }}
+      NX_NO_CLOUD: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

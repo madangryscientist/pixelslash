@@ -72,13 +72,13 @@ only the dotnet ones. A bare `bunx nx ...` skips the wrapper, so on a machine wi
 capture image or on the self-host. A change to `engines/dotnet` needs the SDK to be checked.
 
 One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
-`.nx/`; add `--skip-nx-cache` to force a rerun. CI also uses an Nx Cloud remote
-cache (workspace `pixelslash` in the `pixelslash` org on cloud.nx.app, Hobby plan;
-`nxCloudId` in `nx.json`): a push to main writes it with the `NX_CLOUD_ACCESS_TOKEN`
-secret, a PR reads it with `NX_CLOUD_READ_TOKEN` (a per-PR cache), and a release
-runs with `NX_NO_CLOUD=true`. Anonymous access is `none`, so a local run without
-credentials prints a harmless `(code: 401)` after the run; `NX_NO_CLOUD=true`
-silences it. Never commit a token. Lint rules are all errors; fix the code, do not disable a rule.
+`.nx/`; add `--skip-nx-cache` to force a rerun. CI never uses Nx Cloud (`NX_NO_CLOUD=true` in
+every workflow job that runs nx; there is no `nxCloudId`): the gate job keeps `.nx/cache` and `.nx/workspace-data` between
+runs with `actions/cache` (Nx 24 indexes the cache in that database, so the cache directory alone is
+rejected on a fresh runner; `NX_CACHE_DIRECTORY=.nx/cache` pins it, as Nx 24 defaults to `~/.nx`), keyed on
+ref and sha, falling back to the same ref and then to `main`.
+GitHub scopes a PR's cache to that PR, so a branch cannot poison `main`'s, and a tag (a release)
+neither restores nor saves it. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
 
