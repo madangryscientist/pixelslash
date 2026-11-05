@@ -20,14 +20,17 @@ export const COMMITMENT =
 export const FACTS = [
   {
     title: "Free and open source",
+    icon: "branch",
     body: "PixelSlash is MIT-licensed. The CLI, the diff engine and the review app are all in the repository, with nothing held back.",
   },
   {
     title: "Self-host all of it",
+    icon: "self-host",
     body: "The review app runs in Docker, on your own Cloudflare account or on your own box. The self-host guide covers each.",
   },
   {
     title: "Paid hosting is planned, not available",
+    icon: "ci",
     body: "A paid service run by us is planned. It is not on sale: there is nothing to pay.",
   },
 ] as const;

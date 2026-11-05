@@ -50,7 +50,7 @@ export function HowItWorksPage(): ReactNode {
           local.html, shot in Chromium at 1280×720. It printed 19103 changed pixels and one changed
           region.
         </Caption>
-        <CodeBlock language="bash" label="bash">
+        <CodeBlock language="bash" label="bash" copy>
           {[
             "bun run pixelslash -- --live http://localhost:4391/live.html \\",
             "  --local http://localhost:4391/local.html --out out",
