@@ -25,8 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
-    # A release builds from scratch and never reads the Nx Cloud remote cache: what is published is
-    # what this job built.
+    # A release builds from scratch and never restores an Nx cache (the gate it calls skips the cache on a tag too):
+    # what is published is what this job built.
     env:
       NX_NO_CLOUD: "true"
     permissions:
