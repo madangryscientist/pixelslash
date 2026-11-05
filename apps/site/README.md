@@ -1,8 +1,7 @@
 # apps/site: pixelslash.dev
 
 The project site. TanStack Start on a Cloudflare Worker, every page prerendered to static HTML at
-build time: no D1, no R2, no sign-in, no analytics, no cookies, no forms, no third-party fonts or
-scripts. It collects nothing.
+build time: no D1, no R2, no sign-in, no cookies, no forms.
 
 The pages are drawn from the repo's own files, read when the site is built, so the site says what
 the code says at that commit:
@@ -31,7 +30,7 @@ working example, then the flags; the long sections are cut into pages at the H3s
   `src/routes/search-index[.]json.ts` and prerendered to a static file): a record per heading, with
   its text and the exact error strings, for every docs page and `/self-host`. The box in the docs
   rail (`DocsSearch`) fetches it from this origin the first time it is used and queries it in the
-  browser (`src/content/search.ts`). No third party, no analytics, no dependency: the e2e test
+  browser (`src/content/search.ts`). It needs no service and no dependency: the e2e test
   types an error message and asserts that no request leaves the origin.
 - **Edit on GitHub** and **copy** on code blocks: every docs page links its source file.
 

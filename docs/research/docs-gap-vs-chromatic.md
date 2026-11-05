@@ -365,7 +365,7 @@ A new group "Concepts" and a group "Help" in `docs-map.ts`.
    non-zero.
 5. **Static client-side search**: an index built at prerender time from the same docs content
    (headings, text, and the exact error strings), loaded as one static file, queried in the browser,
-   no request to any third party, no analytics, in keeping with the site's collect-nothing rule. A
+   no request to any third party. A
    small build-time dependency is allowed and is named in the PR. Test: a query for an exact error
    string from the troubleshooting page returns that entry; a Playwright test checks the search box
    and that no request leaves the origin.
