@@ -225,7 +225,75 @@ for (const scheme of ["light", "dark"] as const) {
 }
 
 /*
- * The sticky header stays on top (PS-306): a card's links are lifted above the card's own overlay, and
+ * One scheme scope on <html>, and a logo that holds on it (PS-308). Light pages take Latte through the
+ * `latte` class, dark pages Mocha through `dark`; exactly one is ever set, and it is set before first
+ * paint (the inline script runs in <head>, so what is read here is what the first frame had). The
+ * wordmark's fills come from that scope, not from values in the site, so what is asserted is what the
+ * browser drew: the two schemes give different fills, and each reads against the page's own ground
+ * (WCAG contrast of at least 3, the bar for graphics).
+ */
+const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+const channel = (value: number) => {
+  const unit = value / 255;
+  return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+};
+const luminance = (value: string) => {
+  const [r = 0, g = 0, b = 0] = rgb(value);
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+};
+const contrast = (a: string, b: string) => {
+  const [hi = 0, lo = 0] = [luminance(a), luminance(b)].toSorted((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the ${scheme} scope is set alone and the wordmark reads on it`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/pricing", { waitUntil: "networkidle" });
+
+    const html = page.locator("html");
+    await expect(html).toHaveClass(scheme === "dark" ? /\bdark\b/ : /\blatte\b/);
+    await expect(html).not.toHaveClass(scheme === "dark" ? /\blatte\b/ : /\bdark\b/);
+
+    const fills = async () => ({
+      letters: await page
+        .getByTestId("wordmark-letters")
+        .first()
+        .evaluate((el) => getComputedStyle(el).fill),
+      slash: await page
+        .getByTestId("wordmark-slash")
+        .first()
+        .evaluate((el) => getComputedStyle(el).fill),
+    });
+    // The first opaque background behind the wordmark: the header paints one, the body may not.
+    const ground = await page
+      .getByTestId("wordmark-letters")
+      .first()
+      .evaluate((el) => {
+        for (let node: Element | null = el; node; node = node.parentElement) {
+          const colour = getComputedStyle(node).backgroundColor;
+          if (!/rgba\(.*,\s*0\)$|transparent/.test(colour)) return colour;
+        }
+        return "rgb(255, 255, 255)";
+      });
+    const seen = await fills();
+    expect(
+      contrast(seen.letters, ground),
+      `letters ${seen.letters} on ${ground}`,
+    ).toBeGreaterThanOrEqual(3);
+    expect(contrast(seen.slash, ground), `slash ${seen.slash} on ${ground}`).toBeGreaterThanOrEqual(
+      3,
+    );
+
+    // The same two marks drawn in the other scheme are not the same colours.
+    await page.emulateMedia({ colorScheme: scheme === "dark" ? "light" : "dark" });
+    await page.reload({ waitUntil: "networkidle" });
+    expect(await fills()).not.toEqual(seen);
+  });
+}
+
+/*
+ * The sticky header stays on top (PS-306):a card's links are lifted above the card's own overlay, and
  * once scrolled they must still sit under the header. What is asserted is what is painted: the header's
  * band is shot as it is, then again with every link in the page body hidden; the two must match, so no
  * link has drawn a pixel over the header. The page is walked down in steps, so a link crosses the band.

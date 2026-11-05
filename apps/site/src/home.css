@@ -36,6 +36,10 @@
   font-family: var(--font-sans);
 }
 
+/* `.dark` on <html> already gave the canvas its own background; a light page had none, so the
+   body's propagated to it. `.latte` now sets one, so restore that here or a fractional-pixel edge
+   past the body would blend with light. Dark keeps the canvas it always had. */
+html.latte:has(.home),
 body:has(.home) {
   background: #11111b;
 }

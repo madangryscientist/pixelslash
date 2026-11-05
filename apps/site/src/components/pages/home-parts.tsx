@@ -20,7 +20,7 @@ export function Header(): ReactNode {
     <header className="home-header sticky top-0 z-30">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
         <a href="/" className="flex items-center">
-          <Wordmark />
+          <Wordmark onDark />
         </a>
         <nav
           aria-label="Site"
@@ -108,7 +108,7 @@ export function Footer(): ReactNode {
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <a href="/" className="flex items-center">
-            <Wordmark />
+            <Wordmark onDark />
           </a>
           <span>MIT licence</span>
           <a href={`mailto:${CONTACT}`} className="home-link">
