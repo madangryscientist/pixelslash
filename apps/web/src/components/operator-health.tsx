@@ -1,5 +1,7 @@
 import {
   Caption,
+  KeyValue,
+  KeyValueList,
   Stack,
   Table,
   TableBody,
@@ -53,7 +55,7 @@ function WindowSection({
             {w.errored.map((e) => (
               <TableRow key={e.reason} data-testid={`admin-${w.key}-error`}>
                 <TableCell>{e.reason}</TableCell>
-                <TableCell mono align="end">
+                <TableCell numeric align="end">
                   {formatNumber(e.count)}
                 </TableCell>
               </TableRow>
@@ -104,26 +106,23 @@ function DeploymentSection({ health }: { health: OperatorHealth }) {
       note="What this Worker instance is running, against the migrations the database has applied."
       testId="admin-deployment"
     >
-      <Stack gap="xs">
-        <Text as="p">
-          Release commit:{" "}
+      <KeyValueList align="start">
+        <KeyValue label="Release commit">
           <Figure reading={d.sha} testId="admin-sha">
             {(v) => v}
           </Figure>
-        </Text>
-        <Text as="p">
-          Newest migration the database reports:{" "}
+        </KeyValue>
+        <KeyValue label="Newest migration the database reports">
           <Figure reading={d.latestApplied} testId="admin-latest-migration">
             {(v) => v}
           </Figure>
-        </Text>
-        <Text as="p">
-          Migrations the code carries that the database has not applied:{" "}
+        </KeyValue>
+        <KeyValue label="Migrations the code carries that the database has not applied">
           <Figure reading={d.unapplied} testId="admin-unapplied">
             {(v) => (v.length === 0 ? "none" : v.join(", "))}
           </Figure>
-        </Text>
-      </Stack>
+        </KeyValue>
+      </KeyValueList>
     </HealthSection>
   );
 }
@@ -147,27 +146,25 @@ function StorageSection({ health }: { health: OperatorHealth }) {
           {s.rows.map((r) => (
             <TableRow key={r.table} data-testid={`admin-rows-${r.table}`}>
               <TableCell>{r.table}</TableCell>
-              <TableCell mono align="end">
+              <TableCell numeric align="end">
                 {formatNumber(r.count)}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-      <Stack gap="xs">
-        <Text as="p">
-          Database size:{" "}
+      <KeyValueList align="start">
+        <KeyValue label="Database size">
           <Figure reading={s.dbBytes} testId="admin-db-bytes">
             {formatBytes}
           </Figure>
-        </Text>
-        <Text as="p">
-          Blob store (R2):{" "}
+        </KeyValue>
+        <KeyValue label="Blob store (R2)">
           <Figure reading={s.r2} testId="admin-r2">
             {(v) => `${plural(v.objects, "object")}, ${formatBytes(v.bytes)}`}
           </Figure>
-        </Text>
-      </Stack>
+        </KeyValue>
+      </KeyValueList>
     </HealthSection>
   );
 }

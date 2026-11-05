@@ -15,11 +15,11 @@ export function Figure<T>({
   children: (value: T) => string;
   testId: string;
 }) {
-  if (reading.ok) return <span data-testid={testId}>{children(reading.value)}</span>;
+  if (reading.ok) return <Text data-testid={testId}>{children(reading.value)}</Text>;
   return (
-    <span data-testid={testId}>
-      <Text tone="muted">unavailable: {reading.why}</Text>
-    </span>
+    <Text tone="muted" data-testid={testId}>
+      unavailable: {reading.why}
+    </Text>
   );
 }
 
@@ -55,7 +55,7 @@ export function HealthSection({
 export function StepCell({ stats }: { stats: StepStats | null }) {
   if (!stats) return <TableCell tone="muted">—</TableCell>;
   return (
-    <TableCell mono secondary={<span>{plural(stats.n, "build")}</span>}>
+    <TableCell numeric secondary={<span>{plural(stats.n, "build")}</span>}>
       {formatDuration(stats.p50)} <Text tone="muted">/</Text>{" "}
       {formatDuration(stats.tail === "max" ? stats.max : stats.p95)}
       {stats.tail === "max" && (
