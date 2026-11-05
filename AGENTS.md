@@ -254,6 +254,23 @@ a change updates it **in the same commit**: a run-log entry with the table, the 
 the levers table, and the dashboard if the best time moved. Only compare numbers from the same
 run; never mix numbers from different runs into one percentage.
 
+Speed runs are on demand only. Never add `bench:perf` to the gate, a land or a timer: a dev machine
+is always busy with something else, so an unasked run gives noisy numbers. When one is asked for,
+run base against head, interleaved, in one invocation, on one machine. The accuracy guard
+(`bench:check`) is a different thing and stays in the gate.
+
+## Rivals are benchmarks
+
+Do not copy, adapt or vendor code from an open-source competitor, even when its licence allows it.
+Measure against a rival through its own public interface, as `bench` does with Argos, and beat it on
+our own code. Do not offer "borrow their X" as an option.
+
+## The repo is public
+
+Every commit, branch and PR is published as soon as it is pushed. Keep secrets, LAN addresses, home
+paths, ticket internals and commercial plans out of all of them. Prefer permissive or public-domain
+dependencies.
+
 ## Repo invariants
 
 1. **The report never claims more than was measured.** When shot sizes differ,
