@@ -85,8 +85,11 @@ describe("operatorHealth", () => {
       expect(w).toMatchObject({
         finished: 0,
         rerun: 0,
+        snapshots: 0,
         comparesRun: 0,
+        cacheHits: 0,
         explainFailures: 0,
+        builds: [],
         errored: [],
       });
       expect(w.outcomes).toEqual({ passed: 0, changes: 0, failed: 0, errored: 0 });
@@ -122,9 +125,14 @@ describe("operatorHealth", () => {
       explainMs: 2000,
       summaryMs: 500,
     });
-    await shot(db, id, { diffMs: 120, measuredBy: "server" });
-    await shot(db, id, { diffMs: 80, measuredBy: "server", aiError: "model timed out" });
-    await shot(db, id, { measuredBy: "ci" });
+    await shot(db, id, { diffMs: 120, measuredBy: "server", diffStatus: "changed" });
+    await shot(db, id, {
+      diffMs: 80,
+      measuredBy: "server",
+      diffStatus: "changed",
+      aiError: "model timed out",
+    });
+    await shot(db, id, { measuredBy: "ci", diffStatus: "unchanged" });
     await shot(db, id);
     const health = await operatorHealth(db, inputs());
     for (const w of health.windows) {

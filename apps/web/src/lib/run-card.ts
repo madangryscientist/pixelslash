@@ -1,6 +1,6 @@
 import type { AiUsage } from "#/db/schema";
 import { formatDuration, formatNumber } from "./format";
-import type { StepStats } from "./timings";
+import { P99_MIN_COMPARES, type StepStats } from "./timings";
 import {
   type MetricBuild,
   type MetricShot,
@@ -76,6 +76,8 @@ function countLines({ build, shots, defaultBranch, recaptures }: RunCardInput): 
     lines.push(countLine("compares", "Compares on the server", counts.compares.server));
   if (counts.compares.ci > 0)
     lines.push(countLine("compares-ci", "Compares by CI", counts.compares.ci));
+  if (counts.cacheHits > 0)
+    lines.push(countLine("cache-hits", "Cache hits, no compare ran", counts.cacheHits));
   lines.push(countLine("unmeasured", "Shots not measured", counts.notMeasured));
   lines.push(countLine("skipped-flaky", "Shots skipped as flaky", counts.skippedFlaky));
   if (counts.autoAccepted !== null)
@@ -100,16 +102,41 @@ export function statsText(stats: StepStats, unit?: string): string {
   return `median ${formatDuration(stats.p50, { exact: true })} · ${tail} (n = ${n})`;
 }
 
+const COUNTS_ONLY = (shots: number, cacheHits: number) =>
+  cacheHits === shots
+    ? `${plural(shots, "snapshot")} · all cache hits, no compare ran`
+    : `${plural(shots, "snapshot")} · 0 compared · ${plural(cacheHits, "cache hit")}, no compare ran`;
+
+const ms = (v: number) => formatDuration(v, { exact: true });
+
+/** "1,208 snapshots · 612 compared · p50 41 ms · p95 180 ms · p99 610 ms (n = 612)", each named as what it is. */
+function compareText(shots: number, comparedShots: number, stats: StepStats): string {
+  const tail = stats.tail === "p95" ? `p95 ${ms(stats.p95)}` : `slowest ${ms(stats.max)}`;
+  const p99 = stats.p99 === null ? "—" : ms(stats.p99);
+  return `${plural(shots, "snapshot")} · ${formatNumber(comparedShots)} compared · p50 ${ms(stats.p50)} · ${tail} · p99 ${p99} (n = ${formatNumber(stats.n)})`;
+}
+
 function compareLine(input: RunCardInput): CardLine | null {
+  const { shots, compares, cacheHits } = countRun(input.build, input.shots, input.defaultBranch);
+  const comparedShots = compares.server + compares.ci;
+  // Whatever the CLI sent, no compare ran here and no percentile stands for one.
+  if (comparedShots === 0 && cacheHits > 0)
+    return {
+      key: "compare",
+      label: "Per-compare time",
+      value: COUNTS_ONLY(shots, cacheHits),
+      source: COUNTS_SOURCE,
+    };
   const times = compareTimes(input.build, input.shots);
   if (!times) return null;
   const { stats, slowest, source } = times;
+  const gate = stats.p99 === null ? `; p99 from ${formatNumber(P99_MIN_COMPARES)} compares` : "";
   return {
     key: "compare",
     label: "Per-compare time",
-    value: statsText(stats),
+    value: compareText(shots, comparedShots, stats),
     source: SOURCE_LABEL[source],
-    note: `slowest: ${slowest.map((s) => `${s.label} ${formatDuration(s.ms, { exact: true })}`).join(", ")}`,
+    note: `slowest: ${slowest.map((s) => `${s.label} ${formatDuration(s.ms, { exact: true })}`).join(", ")}${gate}`,
   };
 }
 

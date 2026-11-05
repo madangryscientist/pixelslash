@@ -57,6 +57,8 @@ export type Measured = {
    * written. Only the server's own compares carry it: a CI result was not measured here.
    */
   compareMs?: () => number;
+  /** The uploads' hashes matched, so no compare ran: a cache hit is counted and never timed (PS-336). */
+  cacheHit?: true;
 };
 
 export type Comparer = (shot: SnapshotRow, baseline: BaselineSnapshot) => Promise<Measured>;
@@ -186,6 +188,7 @@ export function serverComparer(deps: {
         measuredBy: "server",
         engineVersion: ENGINE_VERSION,
         diffKey: async () => null,
+        cacheHit: true,
       };
     const [main, branch] = await Promise.all([
       readBlob(deps.blobs, baseline.imageKey),
@@ -229,11 +232,13 @@ export function serverComparer(deps: {
  * One shot's comparer, timed (PS-233) from `started`, the moment the budget began the shot: every
  * compare it makes, the carry path's two included, counts from there. Read after the overlay's
  * write: workerd advances its clock only at I/O, so the diff's own CPU time shows up once the next
- * write returns.
+ * write returns. A cache hit stays untimed (PS-336), also when the carry path's first compare ran:
+ * the shot is the same bytes as the baseline it stores, and readers leave those out of every time.
  */
 export function timedComparer(compare: Comparer, now: () => number, started: number): Comparer {
   return async (shot, baseline) => {
     const measured = await compare(shot, baseline);
+    if (measured.cacheHit) return measured;
     return { ...measured, compareMs: () => msBetween(started, now()) };
   };
 }

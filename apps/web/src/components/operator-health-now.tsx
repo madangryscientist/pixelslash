@@ -10,6 +10,7 @@ import {
 } from "@hackcove/ui-react";
 import type { OperatorHealth } from "#/db/admin-health";
 import { formatDateTime, formatDuration, formatNumber } from "#/lib/format";
+import { BuildComparesTable } from "./operator-compares";
 import { HealthSection, plural } from "./operator-health-parts";
 
 /** The "Now" group of the operator health page (PS-330): every build, what is in flight, what is stuck. */
@@ -107,6 +108,9 @@ export function NowSection({ health }: { health: OperatorHealth }) {
     >
       <StatusTable byStatus={now.byStatus} />
       <Oldest now={now} />
+      {now.flying.length > 0 && (
+        <BuildComparesTable rows={now.flying} total={now.inFlight} testId="admin-now-builds" />
+      )}
       <Stack gap="xs">
         <Text as="p" data-testid="admin-stuck-count">
           {stuckLine(now)}

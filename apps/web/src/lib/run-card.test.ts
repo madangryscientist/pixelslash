@@ -12,6 +12,29 @@ const lines = (c: RunCard) =>
   [c.wall, ...c.counts, c.compare, ...c.tokens].filter((l) => l !== null);
 const byKey = (c: RunCard, key: string) => lines(c).find((l) => l.key === key);
 
+const times = (n: number) => Array.from({ length: n }, (_, i) => metricShot({ diffMs: i + 1 }));
+
+describe("the per-compare line and cache hits", () => {
+  const hit = metricShot({ diffMs: 0, cacheHit: true });
+
+  test("a build of cache hits only says so and shows no percentile", () => {
+    const c = card({ shots: [hit, metricShot({ diffMs: null, cacheHit: true })] });
+    expect(c.compare?.value).toBe("2 snapshots · all cache hits, no compare ran");
+    expect(byKey(c, "cache-hits")?.value).toBe("2");
+    expect(byKey(c, "compares")?.value).toBe("0");
+  });
+
+  test("p95 and p99 appear at their gates, and the note names the p99 gate below it", () => {
+    const under = card({ shots: times(499) }).compare;
+    expect(under?.value).toContain(`p95 ${d(475)}`);
+    expect(under?.value).toContain("p99 — (n = 499)");
+    expect(under?.note).toContain("p99 from 500 compares");
+    const at = card({ shots: times(500) }).compare;
+    expect(at?.value).toContain(`p99 ${d(495)} (n = 500)`);
+    expect(at?.note).not.toContain("p99 from");
+  });
+});
+
 describe("runCard with timings", () => {
   const shots = [120, 40, 80].map((diffMs, i) => metricShot({ name: `s${i}`, diffMs }));
   const c = card({ build: metricBuild({ finishedAt: finished }), shots, recaptures: 2 });
@@ -33,7 +56,9 @@ describe("runCard with timings", () => {
   });
 
   test("states the per-compare median, tail and n, and names the slowest", () => {
-    expect(c.compare?.value).toBe(`median ${d(80)} · slowest ${d(120)} (n = 3)`);
+    expect(c.compare?.value).toBe(
+      `3 snapshots · 3 compared · p50 ${d(80)} · slowest ${d(120)} · p99 — (n = 3)`,
+    );
     expect(c.compare?.source).toBe("stored by the server");
     expect(c.compare?.note).toContain(`s0 (1280x720, light) ${d(120)}`);
   });

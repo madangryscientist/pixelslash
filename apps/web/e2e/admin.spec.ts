@@ -46,6 +46,9 @@ test("a listed operator sees the page: every group, and what it cannot read says
   await expect(page.getByTestId("admin-window-24h")).toContainText("Last 24 hours");
   await expect(page.getByTestId("admin-window-7d")).toContainText("Last 7 days");
   await expect(page.getByTestId("admin-24h-finished")).toContainText("finished");
+  // Every step's tail reads p99 only from its gate, and the page names that gate.
+  await expect(page.getByTestId("admin-window-24h")).toContainText("99th percentile");
+  await expect(page.getByTestId("admin-window-24h")).toContainText("when under 100");
 
   // The deployment group: the e2e build is stamped, and its database is migrated to the code.
   await expect(page.getByTestId("admin-sha")).toHaveText("e2e");

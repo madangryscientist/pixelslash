@@ -6,6 +6,7 @@ import {
   cliStepRows,
   percentile,
   serverStepRows,
+  statsOf,
   summarise,
   totalMs,
   type TimedBuild,
@@ -66,9 +67,16 @@ describe("summarise", () => {
       }),
     );
     const stats = summarise(rows);
-    expect(stats.diff).toEqual({ p50: 500, p95: 1000, max: 1000, n: 10, tail: "max" });
-    expect(stats.explain).toEqual({ p50: 2000, p95: 4000, max: 4000, n: 4, tail: "max" });
-    expect(stats.total).toEqual({ p50: 1000, p95: 2000, max: 2000, n: 10, tail: "max" });
+    expect(stats.diff).toEqual({ p50: 500, p95: 1000, p99: null, max: 1000, n: 10, tail: "max" });
+    expect(stats.explain).toEqual({
+      p50: 2000,
+      p95: 4000,
+      p99: null,
+      max: 4000,
+      n: 4,
+      tail: "max",
+    });
+    expect(stats.total).toEqual({ p50: 1000, p95: 2000, p99: null, max: 2000, n: 10, tail: "max" });
     expect(stats.queue).toBeNull();
     expect(stats.summary).toBeNull();
   });
@@ -87,7 +95,7 @@ describe("the Total aggregate", () => {
     const noStart = timed({ finishedAt: at(10) });
     const backwards = timed({ processingStartedAt: at(100), finishedAt: at(40) });
     const stats = summarise([...good, noEnd, noStart, backwards]).total;
-    expect(stats).toEqual({ p50: 2_000, p95: 3_000, max: 3_000, n: 3, tail: "max" });
+    expect(stats).toEqual({ p50: 2_000, p95: 3_000, p99: null, max: 3_000, n: 3, tail: "max" });
   });
 
   test("a project whose only builds have no span has no Total, not 0 / 0", () => {
@@ -159,5 +167,13 @@ describe("the build page's rows", () => {
     expect(cliStepRows(null)).toEqual([]);
     expect(CLI_TOTAL_NOTE).toMatch(/wall-clock/);
     expect(CLI_TOTAL_NOTE).toMatch(/less than/);
+  });
+});
+
+const values = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+
+describe("the p99 gate", () => {
+  test("a step has no p99 under 100 builds, never a stand-in", () => {
+    expect(statsOf(values(99))).toMatchObject({ p99: null, n: 99, p95: 95, tail: "p95" });
   });
 });

@@ -1,5 +1,6 @@
 import { and, count, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { STALE_PROCESSING_MS } from "#/diff/claim";
+import { type BuildCompares, BUILDS_SHOWN, buildCompares } from "./build-compares";
 import type { Db } from "./db";
 import { builds, orgs, projects } from "./schema";
 import { real } from "./synthetic";
@@ -25,6 +26,8 @@ export type NowHealth = {
   byStatus: Record<string, number>;
   inFlight: number;
   oldestInFlight: InFlight | null;
+  /** The oldest in-flight builds, up to `BUILDS_SHOWN`, each with its snapshots and compare times. */
+  flying: BuildCompares[];
   stuckAfterMs: number;
   stuckTotal: number;
   stuck: StuckBuild[];
@@ -42,7 +45,7 @@ export async function nowSection(db: Db, now: Date): Promise<NowHealth> {
   for (const row of grouped) byStatus[row.status] = row.n;
 
   const flying = inArray(builds.status, ["uploading", "processing"]);
-  const [oldest] = await db
+  const flyingRows = await db
     .select({
       id: builds.id,
       projectId: builds.projectId,
@@ -54,7 +57,8 @@ export async function nowSection(db: Db, now: Date): Promise<NowHealth> {
     .innerJoin(orgs, eq(orgs.id, projects.orgId))
     .where(and(isReal(), flying))
     .orderBy(builds.createdAt)
-    .limit(1);
+    .limit(BUILDS_SHOWN);
+  const [oldest] = flyingRows;
 
   const cutoff = new Date(now.getTime() - STALE_PROCESSING_MS);
   const stuckWhere = and(
@@ -99,6 +103,7 @@ export async function nowSection(db: Db, now: Date): Promise<NowHealth> {
     byStatus,
     inFlight: (byStatus["uploading"] ?? 0) + (byStatus["processing"] ?? 0),
     oldestInFlight: oldest ? { ...oldest, ageMs: age(oldest.createdAt) } : null,
+    flying: await buildCompares(db, flyingRows),
     stuckAfterMs: STALE_PROCESSING_MS,
     stuckTotal: stuckCount?.n ?? 0,
     stuck,

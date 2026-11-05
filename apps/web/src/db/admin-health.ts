@@ -4,7 +4,10 @@ import { type Reading, unavailable } from "#/lib/reading";
 import { type StepStats, statsOf } from "#/lib/timings";
 import { type Deployment, type DeploymentInputs, deploymentSection } from "./admin-deployment";
 import { type NowHealth, isReal, nowSection } from "./admin-health-now";
+import { type BuildCompares, BUILDS_SHOWN, buildCompares, ranCompare } from "./build-compares";
+import { cacheHit } from "./cache-hit";
 import type { Db } from "./db";
+import { heldShot } from "./markers";
 import { builds, detectionFlags, flakes, orgs, projects, snapshots } from "./schema";
 
 /**
@@ -45,10 +48,16 @@ export type WindowHealth = {
   diff: StepStats | null;
   explain: StepStats | null;
   summary: StepStats | null;
-  /** Shots compared (`measured_by` set, by the server or by CI) in builds that finished in the window. */
+  /** Shots held by the builds that finished in the window, cache hits included. */
+  snapshots: number;
+  /** Shots of those builds compared by the server or by CI; a cache hit ran no compare. */
   comparesRun: number;
+  /** Shots of those builds whose bytes matched their baseline. */
+  cacheHits: number;
   /** Shots whose model explanation failed (`ai_error`) in those builds. */
   explainFailures: number;
+  /** The newest builds of the window, up to `BUILDS_SHOWN`; `finished` is how many there were. */
+  builds: BuildCompares[];
 };
 
 export type OperatorHealth = {
@@ -81,6 +90,7 @@ function errorReason(error: string | null): string {
 }
 
 type FinishedRow = {
+  id: string;
   status: string;
   error: string | null;
   createdAt: Date;
@@ -98,7 +108,10 @@ function windowOf(
   spec: (typeof HEALTH_WINDOWS)[number],
   now: Date,
   rows: FinishedRow[],
-  shots: { comparesRun: number; explainFailures: number },
+  shots: Pick<
+    WindowHealth,
+    "snapshots" | "comparesRun" | "cacheHits" | "explainFailures" | "builds"
+  >,
 ): WindowHealth {
   const since = new Date(now.getTime() - spec.ms);
   const inside = rows.filter((r) => r.finishedAt >= since);
@@ -132,30 +145,49 @@ function windowOf(
   };
 }
 
-/** Shots compared (server or CI) and shots whose explanation failed, in builds that finished since `since`. */
+/**
+ * The builds that ended since `since`. A CI build whose run died is errored without a `finished_at`
+ * (`heldElsewhere`), so it is placed by when its run started.
+ */
+const endedSince = (since: Date) =>
+  or(
+    gte(builds.finishedAt, since),
+    and(
+      eq(builds.status, "errored"),
+      isNull(builds.finishedAt),
+      gte(builds.processingStartedAt, since),
+    ),
+  );
+
+/** The shots, compares, cache hits and failed explanations of the builds that ended since `since`. */
 async function shotCounts(db: Db, since: Date) {
   const [row] = await db
     .select({
-      measured: count(snapshots.measuredBy),
+      held: sql<number>`sum(case when ${heldShot()} then 1 else 0 end)`,
+      ran: sql<number>`sum(case when ${ranCompare()} then 1 else 0 end)`,
+      hits: sql<number>`sum(${cacheHit()})`,
       failed: count(snapshots.aiError),
     })
     .from(snapshots)
     .innerJoin(builds, eq(builds.id, snapshots.buildId))
     .innerJoin(projects, eq(projects.id, builds.projectId))
     .innerJoin(orgs, eq(orgs.id, projects.orgId))
-    .where(and(isReal(), gte(builds.finishedAt, since)));
-  return { comparesRun: row?.measured ?? 0, explainFailures: row?.failed ?? 0 };
+    .where(and(isReal(), endedSince(since)));
+  return {
+    snapshots: row?.held ?? 0,
+    comparesRun: row?.ran ?? 0,
+    cacheHits: row?.hits ?? 0,
+    explainFailures: row?.failed ?? 0,
+  };
 }
 
-/**
- * The builds that ended in a window. A CI build whose run died is errored without a `finished_at`
- * (`heldElsewhere`), so it is placed by when its run started and has no times (`timed: false`).
- */
+/** The builds that ended in a window. One whose run died has no times (`timed: false`). */
 async function windowsSection(db: Db, now: Date) {
   const widest = new Date(now.getTime() - Math.max(...HEALTH_WINDOWS.map((w) => w.ms)));
   const endedAt = sql`coalesce(${builds.finishedAt}, ${builds.processingStartedAt})`;
   const rows = await db
     .select({
+      id: builds.id,
       status: builds.status,
       error: builds.error,
       createdAt: builds.createdAt,
@@ -170,19 +202,7 @@ async function windowsSection(db: Db, now: Date) {
     .from(builds)
     .innerJoin(projects, eq(projects.id, builds.projectId))
     .innerJoin(orgs, eq(orgs.id, projects.orgId))
-    .where(
-      and(
-        isReal(),
-        or(
-          gte(builds.finishedAt, widest),
-          and(
-            eq(builds.status, "errored"),
-            isNull(builds.finishedAt),
-            gte(builds.processingStartedAt, widest),
-          ),
-        ),
-      ),
-    )
+    .where(and(isReal(), endedSince(widest)))
     .orderBy(sql`${endedAt} desc`)
     .limit(HEALTH_MAX_BUILDS);
   const finished: FinishedRow[] = [];
@@ -190,10 +210,19 @@ async function windowsSection(db: Db, now: Date) {
     const ended = row.finishedAt ?? processingStartedAt;
     if (ended) finished.push({ ...row, finishedAt: ended, timed: row.finishedAt !== null });
   }
+  // Newest first, so every window's newest builds are a prefix of these: one read serves them all.
+  const newest = finished.slice(0, BUILDS_SHOWN);
+  const compares = await buildCompares(db, newest);
   const windows: WindowHealth[] = [];
   for (const spec of HEALTH_WINDOWS) {
     const since = new Date(now.getTime() - spec.ms);
-    windows.push(windowOf(spec, now, finished, await shotCounts(db, since)));
+    const inWindow = new Set(newest.filter((r) => r.finishedAt >= since).map((r) => r.id));
+    windows.push(
+      windowOf(spec, now, finished, {
+        ...(await shotCounts(db, since)),
+        builds: compares.filter((b) => inWindow.has(b.id)),
+      }),
+    );
   }
   return { windows, capped: rows.length >= HEALTH_MAX_BUILDS };
 }

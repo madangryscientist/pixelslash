@@ -42,6 +42,7 @@ describe("countRun", () => {
     expect(countRun(metricBuild(), shots, "main")).toEqual({
       shots: 6,
       compares: { server: 3, ci: 1 },
+      cacheHits: 0,
       notMeasured: 1,
       skippedFlaky: 1,
       autoAccepted: null,
@@ -58,6 +59,20 @@ describe("countRun", () => {
   });
 });
 
+describe("a cache hit", () => {
+  const hit = metricShot({ name: "same", diffMs: 0, cacheHit: true });
+  const legacyNull = metricShot({ name: "older", diffMs: null, cacheHit: true });
+  const real = metricShot({ name: "real", diffMs: 40 });
+
+  test("gives no compare time, whatever its row stored", () => {
+    expect(compareMsOf(hit)).toBeNull();
+    expect(compareTimes(metricBuild(), [hit, legacyNull, real])).toMatchObject({
+      stats: { n: 1, p50: 40 },
+    });
+    expect(compareTimes(metricBuild(), [hit, legacyNull])).toBeNull();
+  });
+});
+
 describe("compareTimes", () => {
   test("reads the server's per-shot times, with the three slowest by name", () => {
     const shots = [10, 40, 20, 30].map((diffMs, i) => metricShot({ name: `s${i}`, diffMs }));
@@ -70,7 +85,9 @@ describe("compareTimes", () => {
 
   test("falls back to the CLI's per-shot times, and is null when nobody timed one", () => {
     const shots = [metricShot({ measuredBy: "ci" })];
-    const sent = metricBuild({ timings: { shots: [{ name: "a", diffMs: 5 }, { name: "b" }] } });
+    const sent = metricBuild({
+      timings: { shots: [{ name: "a", diffMs: 5 }, { name: "b" }, { name: "new", diffMs: 0 }] },
+    });
     expect(compareTimes(sent, shots)).toMatchObject({ source: "cli", stats: { n: 1, p50: 5 } });
     expect(compareTimes(metricBuild(), shots)).toBeNull();
     expect(compareTimes(metricBuild({ timings: { shots: [{ name: "a" }] } }), shots)).toBeNull();

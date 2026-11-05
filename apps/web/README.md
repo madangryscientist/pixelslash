@@ -129,7 +129,8 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
 
 A read-only page for the people who run the deployment: builds by status, the oldest in flight, every
 build stuck past `STALE_PROCESSING_MS`, the last 24 hours and 7 days (outcomes, errored builds grouped by
-the first words of their error, p50 / p95 of wall time and each step), the release commit, the newest
+the first words of their error, p50 / p95 / p99 of wall time and each step, and the newest builds'
+snapshots, compares and compare times, cache hits counted apart and timed nowhere), the release commit, the newest
 migration the database reports against the ones the code carries, and row counts. Set
 `PIXELSLASH_ADMIN_LOGINS=login1,login2` (GitHub logins, case-insensitive). The page is a 404 for
 everyone else, signed out or not, and when the variable is unset; nothing links to it. The LAN stub build lists nobody (every visitor there signs in as `e2e-octocat`), so set `PIXELSLASH_ADMIN_LOGINS` in its `.dev.vars` to open the page. A figure that

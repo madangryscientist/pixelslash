@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { type BranchBuildRow, BRANCH_WINDOW } from "#/lib/branch-metrics";
 import { compareMsOf, compared } from "#/lib/run-metrics";
+import { cacheHit } from "./cache-hit";
 import type { Db } from "./db";
 import { builds, flakes, snapshots } from "./schema";
 
@@ -48,6 +49,7 @@ export async function branchWindow(
       rebaselineNeeded: snapshots.rebaselineNeeded,
       measuredBy: snapshots.measuredBy,
       diffMs: snapshots.diffMs,
+      cacheHit: cacheHit(),
     })
     .from(snapshots)
     .where(
