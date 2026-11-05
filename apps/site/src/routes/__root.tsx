@@ -10,6 +10,13 @@ import type { ReactNode } from "react";
 import { Shell } from "#/components/shell";
 import appCss from "../styles.css?url";
 
+// The class each scheme puts on <html>: Latte's scope for light, Mocha's for dark.
+const SCHEMES = { light: "latte", dark: "dark" } as const;
+
+// colourSchemeScript knows the `dark` class only. The page is prerendered with `latte` on <html>, so
+// once that script has decided, this takes `latte` off a dark page: exactly one scope is ever set.
+const SCOPE_SCRIPT = `${colourSchemeScript};(function(){var r=document.documentElement;r.classList.toggle("${SCHEMES.light}",!r.classList.contains("${SCHEMES.dark}"))})()`;
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -37,7 +44,7 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],
     // Before first paint: the system's light or dark, so a dark-mode visitor sees no light flash. No cookie.
-    scripts: [{ children: colourSchemeScript }],
+    scripts: [{ children: SCOPE_SCRIPT }],
   }),
   shellComponent: RootDocument,
   component: RootLayout,
@@ -57,7 +64,7 @@ function RootLayout() {
 function RootDocument({ children }: { children: ReactNode }) {
   return (
     // The class differs from the server's markup when the script picked the dark scheme.
-    <html lang="en" className={appShellRootClassFor("light")} suppressHydrationWarning>
+    <html lang="en" className={appShellRootClassFor("light", SCHEMES)} suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

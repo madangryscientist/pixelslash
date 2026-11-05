@@ -20,8 +20,9 @@ import {
 } from "../../content/docs-map.ts";
 import { DocBody, type Heading } from "../../content/markdown.tsx";
 
-const NAV_LINK =
-  "text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100";
+// The themes' unlayered rule for text-slate-600 beats any layered hover:text-slate-*, so a slate hover
+// would change nothing but the underline. hover:text-violet-700 is an accent both themes remap.
+const NAV_LINK = "text-slate-600 hover:text-violet-700 hover:underline";
 
 const pageHref = (page: DocPageDef): string => `/docs/${page.slug}`;
 
@@ -38,7 +39,7 @@ function DocsNav({ current }: { current?: string }): ReactNode {
       />
       {GROUPS.map((group) => (
         <div key={group.id} className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
             {group.title}
           </p>
           <Tabs
@@ -133,7 +134,7 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
               data-testid="docs-contents"
               className="hidden lg:sticky lg:top-32 lg:block"
             >
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 On this page
               </p>
               <OnThisPage headings={doc.headings} />
@@ -143,7 +144,7 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
       >
         <div className="flex flex-col gap-8">
           {hasRail && (
-            <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden dark:border-slate-700">
+            <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
               <summary className="cursor-pointer text-sm font-medium">On this page</summary>
               <div className="py-2">
                 <OnThisPage headings={doc.headings} />
@@ -170,7 +171,7 @@ export function DocsIndexPage(): ReactNode {
         <CardGrid columns={2} as="ul" data-testid="docs-index">
           {GROUPS.map((group) => (
             <Card key={group.id} title={group.title}>
-              <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">{group.summary}</p>
+              <p className="mb-2 text-sm text-slate-600">{group.summary}</p>
               <ul className="flex flex-col gap-1">
                 {DOC_PAGES.filter((page) => page.group === group.id).map((page) => (
                   <li key={page.slug}>

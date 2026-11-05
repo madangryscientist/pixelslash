@@ -1,11 +1,12 @@
 @import "tailwindcss";
 @import "@hackcove/theme-catppuccin-mocha/theme.css";
+@import "@hackcove/theme-catppuccin-mocha/latte.css";
 /* Tailwind skips node_modules: scan the design system for the utilities its components use. */
 @source "../node_modules/@hackcove/ui-react/dist";
 @import "./home.css";
 
 /*
- * Catppuccin Mocha palette © 2021 Catppuccin, MIT license (notice in
+ * Catppuccin Mocha and Latte palettes © 2021 Catppuccin, MIT license (notice in
  * @hackcove/theme-catppuccin-mocha/NOTICE). Tailwind's build drops the credit comment from the
  * theme file, so it is repeated here.
  */
@@ -39,10 +40,12 @@
   line-gap-override: 0%;
 }
 
-/* One sans face in light and dark, on every page. The theme sets --font-sans on .dark only (Inter
-   "where installed", then the system stack); this is the same scope, later, so it wins. */
+/* One sans face in light and dark, on every page. Each theme sets --font-sans on its own scope
+   (.dark, .latte: Inter "where installed", then the system stack); this is the same specificity,
+   later, so it wins. */
 :root,
-.dark {
+.dark,
+.latte {
   --font-sans:
     Inter, "Inter Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;

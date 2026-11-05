@@ -11,7 +11,10 @@ const SQUARE_LETTERS =
 const SQUARE_SLASH =
   "M18 0h2v1h-2zM18 1h2v1h-2zM17 2h3v1h-3zM17 3h3v1h-3zM16 4h3v1h-3zM16 5h3v1h-3zM15 6h3v1h-3zM15 7h3v1h-3zM14 8h3v1h-3zM14 9h3v1h-3zM13 10h3v1h-3zM13 11h3v1h-3zM12 12h3v1h-3zM12 13h3v1h-3zM11 14h3v1h-3zM11 15h3v1h-3z";
 
-/** The square mark: P/S in mauve with a blue slash on a dark tile (also public/favicon.svg). */
+/**
+ * The square mark: P/S in mauve with a blue slash on a dark tile (also public/favicon.svg). The tile is its own ground, so
+ * the pale letters read on it whatever page it sits on, white included; it takes no theme.
+ */
 export function Logo({ size = 24 }: { size?: number }): ReactNode {
   return (
     <svg
@@ -31,8 +34,19 @@ export function Logo({ size = 24 }: { size?: number }): ReactNode {
 /**
  * The wordmark: PIXEL / SLASH, sized by height. The 108:16 art sets the width, so keep height a whole multiple of 16
  * (16 is one CSS pixel per art pixel). It is named "PixelSlash" for assistive tech.
+ *
+ * It sits straight on the page, so its fills follow the theme: the letters are text-violet-600 and the slash text-blue-600,
+ * the accents both Hack Cove themes remap (Mocha mauve and blue on a dark page, Latte's darker mauve and blue on a light
+ * one), so nothing here names a palette value. `onDark` is for a surface that is dark whatever the theme (the home page,
+ * until PS-309): it pins the Mocha pair.
  */
-export function Wordmark({ height = 16 }: { height?: number }): ReactNode {
+export function Wordmark({
+  height = 16,
+  onDark = false,
+}: {
+  height?: number;
+  onDark?: boolean;
+}): ReactNode {
   return (
     <svg
       viewBox="0 0 108 16"
@@ -42,8 +56,18 @@ export function Wordmark({ height = 16 }: { height?: number }): ReactNode {
       aria-label="PixelSlash"
       shapeRendering="crispEdges"
     >
-      <path fill="#cba6f7" d={WORDMARK_LETTERS} />
-      <path fill="#89b4fa" d={WORDMARK_SLASH} />
+      <path
+        data-testid="wordmark-letters"
+        fill={onDark ? "#cba6f7" : "currentColor"}
+        className={onDark ? undefined : "text-violet-600"}
+        d={WORDMARK_LETTERS}
+      />
+      <path
+        data-testid="wordmark-slash"
+        fill={onDark ? "#89b4fa" : "currentColor"}
+        className={onDark ? undefined : "text-blue-600"}
+        d={WORDMARK_SLASH}
+      />
     </svg>
   );
 }
