@@ -89,7 +89,7 @@ never told a DSN (so the reporter's chunk is never fetched) and no request goes 
 | Var | Where | Meaning |
 | --- | --- | --- |
 | `SENTRY_DSN` | `.dev.vars` / `wrangler secret put` / the CT's `.dev.vars.e2e` | The Sentry DSN. Server and browser both use it (a DSN is public by design: it can only send events). |
-| `SENTRY_RELEASE` | `wrangler.jsonc` vars; `update.sh` | The deployed sha. `update.sh` stamps it on the CT; `e2e` is `e2e`. |
+| `SENTRY_RELEASE` | `wrangler.jsonc` vars; `update.sh` | The deployed sha. `update.sh` stamps it on the CT; the e2e build leaves it empty, so the health page says it is not stamped (the Playwright run sets `e2e`). |
 | `SENTRY_ENVIRONMENT` | `wrangler.jsonc` vars; `update.sh` | `lan` on the CT, `e2e` under the e2e runs, `dev` otherwise. |
 
 **What is reported.** On the server (`@sentry/cloudflare`): an error the Worker lets out, an `/api/v1`
@@ -124,6 +124,16 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
    (the same command as the deploy above). Or put `SENTRY_DSN=<dsn>` in the CT's
    `apps/web/.dev.vars.e2e` and deploy the current sha again.
 4. For the CLI, set `PIXELSLASH_SENTRY_DSN` where it runs (CI secrets); see "Error reporting" in [`docs/cli.md`](../../docs/cli.md).
+
+## Operator health (`/_admin`, PS-330)
+
+A read-only page for the people who run the deployment: builds by status, the oldest in flight, every
+build stuck past `STALE_PROCESSING_MS`, the last 24 hours and 7 days (outcomes, errored builds grouped by
+the first words of their error, p50 / p95 of wall time and each step), the release commit, the newest
+migration the database reports against the ones the code carries, and row counts. Set
+`PIXELSLASH_ADMIN_LOGINS=login1,login2` (GitHub logins, case-insensitive). The page is a 404 for
+everyone else, signed out or not, and when the variable is unset; nothing links to it. The LAN stub build lists nobody (every visitor there signs in as `e2e-octocat`), so set `PIXELSLASH_ADMIN_LOGINS` in its `.dev.vars` to open the page. A figure that
+cannot be read (R2's total, failed summary calls) says "unavailable" and why instead of a 0.
 
 ## Retention (PS-239)
 

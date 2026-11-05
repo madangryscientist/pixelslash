@@ -7,6 +7,7 @@ import type { Db } from "#/db/db";
 import type { ExplainQueue } from "#/ai/explain-queue";
 import { type ModelFetch, guardedFetch } from "#/ai/model";
 import type { ModelHostPolicy } from "#/ai/model-host";
+import type { Reading } from "#/lib/reading";
 import { retryBusy } from "#/db/busy";
 import { diffLocationOf } from "#/db/orgs";
 import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app";
@@ -149,3 +150,30 @@ export const githubChecksConfigured = (): boolean => githubApp() !== null || git
 /** Bring the builds' check runs up to their state (PS-23); never throws. */
 export const syncChecks = (db: Db, buildIds: Iterable<string>): Promise<void> =>
   syncCheckRuns(checkRunDeps(db), buildIds);
+
+/**
+ * The GitHub logins allowed into the operator health page (PS-330), comma-separated. Unset or empty
+ * switches the page off: `/_admin` is a 404 for everyone.
+ */
+export const adminLogins = (): string | undefined => env.PIXELSLASH_ADMIN_LOGINS || undefined;
+
+/** The commit this release was stamped with at deploy (`SENTRY_RELEASE`); empty when it was not. */
+export const releaseSha = (): string => env.SENTRY_RELEASE?.trim() ?? "";
+
+/**
+ * The database's size, as D1 reports it on a query (`meta.size_after`): no file is walked. A binding
+ * that does not report one (the local emulation may not) says so instead of returning 0.
+ */
+export async function databaseBytes(): Promise<Reading<number>> {
+  try {
+    const result = await env.DB.prepare("select 1").run();
+    const bytes: unknown = result.meta?.size_after;
+    if (typeof bytes === "number" && bytes > 0) return { ok: true, value: bytes };
+    return { ok: false, why: "the D1 binding did not report a size (meta.size_after)" };
+  } catch (error) {
+    return {
+      ok: false,
+      why: `the size query failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}

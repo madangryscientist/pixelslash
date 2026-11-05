@@ -50,6 +50,9 @@ function pointAtStub(config: { vars?: Record<string, unknown> }) {
       GOOGLE_CLIENT_SECRET: "e2e-google-secret",
       GOOGLE_OAUTH_BASE: base,
       DIFF_SIDECAR_URL: sidecar,
+      // The stub GitHub user (e2e/github-stub.ts) is the operator in the Playwright run; the rival and a visitor are not (PS-330).
+      PIXELSLASH_ADMIN_LOGINS: "e2e-octocat",
+      SENTRY_RELEASE: "e2e",
       // The run's own Sentry ingest stand-in (PS-227), so the e2e reports to a sink it can read.
       ...(sentryPort ? { SENTRY_DSN: `http://e2ekey@localhost:${sentryPort}/1` } : {}),
     },
