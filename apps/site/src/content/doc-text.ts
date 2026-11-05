@@ -74,3 +74,25 @@ export function slugger(): (text: string) => string {
     return count === 0 ? base : `${base}-${count}`;
   };
 }
+
+/*
+ * The repo's documents cite the maintainer's private ticket ids (`PS-228`, `ob 1941`) to say why a
+ * line exists. They mean nothing to a reader, so the site drops them when it reads a file; the file
+ * keeps them. A test fails on any that this misses.
+ */
+const TICKET = String.raw`(?:PS-\d+|OB-\d+|ob \d{3,4})`;
+const TICKET_RULES: readonly (readonly [RegExp, string])[] = [
+  [new RegExp(String.raw`\s*\(${TICKET}\)`, "g"), ""],
+  [new RegExp(String.raw`\(${TICKET}; `, "g"), "("],
+  [new RegExp(String.raw`, ${TICKET}\)`, "g"), ")"],
+  [new RegExp(String.raw`Added in ${TICKET}\. `, "g"), ""],
+  [new RegExp(String.raw`before ${TICKET}`, "g"), "before this was added"],
+];
+
+/** A repo document as the site shows it: no private ticket ids. */
+export function stripTicketIds(markdown: string): string {
+  return TICKET_RULES.reduce((text, [pattern, to]) => text.replace(pattern, to), markdown);
+}
+
+/** An id the rules above did not catch; the docs test requires none in any rendered page. */
+export const TICKET_ID = new RegExp(String.raw`\b${TICKET}\b`);

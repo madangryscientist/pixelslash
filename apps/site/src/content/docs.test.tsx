@@ -39,7 +39,7 @@ const unescape = (html: string): string =>
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'");
 
-const cliPages = DOC_PAGES.filter((page) => page.file === undefined);
+const cliPages = DOC_PAGES.filter((page) => page.file === undefined && page.kind === undefined);
 const pageHtml = new Map(
   DOC_PAGES.map((page) => [page.slug, renderToStaticMarkup(<DocPage slug={page.slug} />)]),
 );
@@ -246,7 +246,7 @@ describe("links into the docs", () => {
       expect(OLD_ANCHOR_SCRIPT).toContain(`"${anchor}":"${slug}"`);
     }
     expect(CLI_SPLIT.anchorPage.get("uploading-to-a-server")).toBe("upload");
-    expect(CLI_SPLIT.anchorPage.get("comparing-two-snapshot-dirs")).toBe("pngs");
+    expect(CLI_SPLIT.anchorPage.get("comparing-two-snapshot-dirs")).toBe("compare-dirs");
     expect(CLI_SPLIT.anchorPage.get("snapshot-capture-the-pinned-image")).toBe("capture");
     expect(CLI_SPLIT.anchorPage.get("exit-codes-and-the-failed-line")).toBe("signing-in");
   });

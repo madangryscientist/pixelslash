@@ -2,6 +2,22 @@
 
 Every command ends with a number from 0 to 8, and CI reads that number. The numbers are a contract: none of them changes meaning. This page says what each one tells a runner, and what to do about it.
 
+## At a glance
+
+| Code | What it tells a runner |
+| --- | --- |
+| 0 | It worked. |
+| 1 | New design-system violations on Branch, or a capture or upload that failed. Never "a shot changed". |
+| 2 | The command line was wrong. Nothing was measured. |
+| 3 | The server did not give what was asked: a refused token, an unknown id, a server error, or no answer. |
+| 4 | `status`: a reviewer rejected a shot. |
+| 5 | `status`: the build is still waiting for processing or review. |
+| 6 | `flake`: the shot is still unstable on your machine. |
+| 7 | A bug in PixelSlash. Escalate; do not retry. |
+| 8 | `parity`: a twin pair drifted, or a twin is stale under `--release`. |
+
+The full table, with the `FAILED` line a crash prints, is in the [CLI reference](../cli.md#exit-codes-and-the-failed-line). Each code is explained below.
+
 ## 0: it worked
 
 The command did its job. For a comparison that means the report was written, whether or not anything changed. For `status` it means every changed shot was accepted, or nothing changed at all.

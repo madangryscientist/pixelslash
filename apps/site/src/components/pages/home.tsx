@@ -28,7 +28,7 @@ const FEATURES = [
   {
     title: "Many pages",
     body: "--routes compares a list of paths, and compare diffs two snapshot directories.",
-    href: "/docs/pngs#comparing-two-snapshot-dirs",
+    href: "/docs/compare-dirs#comparing-two-snapshot-dirs",
     icon: "baseline",
   },
   {

@@ -14,11 +14,14 @@ import { CLI_INTRO_DOC, docOf } from "../../content/docs.ts";
 import {
   DOC_PAGES,
   type DocPageDef,
+  EXTRA_NAV,
   GROUPS,
   findPage,
   neighbours,
 } from "../../content/docs-map.ts";
+import { REPO_PUBLIC, REPO_URL } from "../../content/links.ts";
 import { DocBody, type Heading } from "../../content/markdown.tsx";
+import { DocsSearch } from "./docs-search";
 
 // The themes' unlayered rule for text-slate-600 beats any layered hover:text-slate-*, so a slate hover
 // would change nothing but the underline. hover:text-violet-700 is an accent both themes remap.
@@ -26,10 +29,11 @@ const NAV_LINK = "text-slate-600 hover:text-violet-700 hover:underline";
 
 const pageHref = (page: DocPageDef): string => `/docs/${page.slug}`;
 
-/** The rail: every group and every page in it, the current page marked. */
-function DocsNav({ current }: { current?: string }): ReactNode {
+/** The rail: the search box, then every group and every page in it, the current page marked. `current` is a slug or, for a page outside the map, its path. */
+export function DocsNav({ current }: { current?: string }): ReactNode {
   return (
     <nav aria-label="Docs" data-testid="docs-nav" className="flex flex-col gap-4">
+      <DocsSearch />
       <Tabs
         variant="pill"
         orientation="vertical"
@@ -47,11 +51,18 @@ function DocsNav({ current }: { current?: string }): ReactNode {
             orientation="vertical"
             size="sm"
             label={group.title}
-            items={DOC_PAGES.filter((page) => page.group === group.id).map((page) => ({
-              label: page.title,
-              href: pageHref(page),
-              active: page.slug === current,
-            }))}
+            items={[
+              ...DOC_PAGES.filter((page) => page.group === group.id).map((page) => ({
+                label: page.title,
+                href: pageHref(page),
+                active: page.slug === current,
+              })),
+              ...EXTRA_NAV.filter((extra) => extra.group === group.id).map((extra) => ({
+                label: extra.title,
+                href: extra.href,
+                active: extra.href === current,
+              })),
+            ]}
           />
         </div>
       ))}
@@ -73,6 +84,26 @@ function OnThisPage({ headings }: { headings: Heading[] }): ReactNode {
           </li>
         ))}
     </ul>
+  );
+}
+
+/** A page that can end a run non-zero says where the numbers are explained. */
+function ExitsLine(): ReactNode {
+  return (
+    <p className="text-sm/6 text-slate-600" data-testid="docs-exits">
+      This command can end with a non-zero exit code.{" "}
+      <TextLink href="/docs/exit-codes">Exit codes</TextLink> says what each number means.
+    </p>
+  );
+}
+
+/** Edit-on-GitHub for the file a page is cut from. Shown only once the repository is public. */
+export function EditLink({ source }: { source: string }): ReactNode {
+  if (!REPO_PUBLIC) return null;
+  return (
+    <p className="text-sm/6 text-slate-600" data-testid="docs-edit">
+      <TextLink href={`${REPO_URL}/edit/main/${source}`}>Edit this page on GitHub</TextLink>
+    </p>
   );
 }
 
@@ -151,7 +182,9 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
               </div>
             </details>
           )}
+          {page.exits === true && slug !== "exit-codes" ? <ExitsLine /> : null}
           <DocBody doc={doc} />
+          <EditLink source={doc.source} />
           <PrevNext slug={slug} />
         </div>
       </DetailLayout>

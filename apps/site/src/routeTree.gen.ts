@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as SearchIndexDotjsonRouteImport } from './routes/search-index[.]json'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SelfHostRouteImport } from './routes/self-host'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
@@ -36,6 +37,11 @@ const HowItWorksRoute = HowItWorksRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchIndexDotjsonRoute = SearchIndexDotjsonRouteImport.update({
+  id: '/search-index.json',
+  path: '/search-index.json',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurityRoute = SecurityRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/compare': typeof CompareRoute
   '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
+  '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
   '/docs/$slug': typeof DocsSlugRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/compare': typeof CompareRoute
   '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
+  '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
   '/docs/$slug': typeof DocsSlugRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/compare': typeof CompareRoute
   '/how-it-works': typeof HowItWorksRoute
   '/pricing': typeof PricingRoute
+  '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
   '/docs/$slug': typeof DocsSlugRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/compare'
     | '/how-it-works'
     | '/pricing'
+    | '/search-index.json'
     | '/security'
     | '/self-host'
     | '/docs/$slug'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/compare'
     | '/how-it-works'
     | '/pricing'
+    | '/search-index.json'
     | '/security'
     | '/self-host'
     | '/docs/$slug'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/compare'
     | '/how-it-works'
     | '/pricing'
+    | '/search-index.json'
     | '/security'
     | '/self-host'
     | '/docs/$slug'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   CompareRoute: typeof CompareRoute
   HowItWorksRoute: typeof HowItWorksRoute
   PricingRoute: typeof PricingRoute
+  SearchIndexDotjsonRoute: typeof SearchIndexDotjsonRoute
   SecurityRoute: typeof SecurityRoute
   SelfHostRoute: typeof SelfHostRoute
   DocsSlugRoute: typeof DocsSlugRoute
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search-index.json': {
+      id: '/search-index.json'
+      path: '/search-index.json'
+      fullPath: '/search-index.json'
+      preLoaderRoute: typeof SearchIndexDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/security': {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompareRoute: CompareRoute,
   HowItWorksRoute: HowItWorksRoute,
   PricingRoute: PricingRoute,
+  SearchIndexDotjsonRoute: SearchIndexDotjsonRoute,
   SecurityRoute: SecurityRoute,
   SelfHostRoute: SelfHostRoute,
   DocsSlugRoute: DocsSlugRoute,

@@ -17,7 +17,7 @@ import {
 } from "@hackcove/ui-react";
 import { type MarkedToken, type Token, type Tokens, lexer } from "marked";
 import { Fragment, type ReactNode } from "react";
-import { decode, marked, plainText, slugger } from "./doc-text.ts";
+import { decode, marked, plainText, slugger, stripTicketIds } from "./doc-text.ts";
 import { resolveHref, resolveImageSrc } from "./links.ts";
 
 export { plainText, slugger };
@@ -44,7 +44,7 @@ export type Doc = {
 };
 
 export function parseDoc(markdown: string, source: string, page?: string): Doc {
-  const all = marked(lexer(markdown));
+  const all = marked(lexer(stripTicketIds(markdown)));
   const first = all.find((token) => token.type !== "space");
   const title = first?.type === "heading" && first.depth === 1 ? plainText(first.tokens) : "";
   const tokens = title === "" ? all : all.filter((token) => token !== first);
@@ -191,7 +191,11 @@ const BLOCKS: Partial<Record<MarkedToken["type"], BlockRenderer>> = {
     ),
   code: (token) =>
     token.type === "code" && (
-      <CodeBlock language={language(token.lang)} {...(token.lang ? { label: token.lang } : {})}>
+      <CodeBlock
+        language={language(token.lang)}
+        copy
+        {...(token.lang ? { label: token.lang } : {})}
+      >
         {token.text}
       </CodeBlock>
     ),
