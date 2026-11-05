@@ -29,8 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Nx never talks to Nx Cloud from CI: NX_NO_CLOUD is on, so no run starts a pipeline execution
-    # (those are billed in credits). Nx's own local cache, `.nx/cache`, is kept between runs with
-    # actions/cache instead, which is free. GitHub scopes a cache to the ref that saved it: a pull
+    # (those are billed in credits). Nx's own local cache is kept between runs with actions/cache
+    # instead, which is free. Nx 24 indexes the cache in a database, so the cache directory alone is
+    # rejected on a fresh runner (0 hits); `.nx/cache` and `.nx/workspace-data` are saved together, and
+    # NX_CACHE_DIRECTORY keeps the cache in the checkout (Nx 24 defaults to ~/.nx). Nx still checks
+    # every entry by its hash. GitHub scopes a cache to the ref that saved it: a pull
     # request reads and writes only its own, plus the base branch's, and `main` cannot read a PR's, so
     # a branch can never poison main's cache. The key carries the ref and the sha, so every run saves a
     # fresh entry; restore-keys fall back to the last entry of the same ref, then to main's.
@@ -38,6 +41,7 @@ jobs:
     # gate always runs uncached.
     env:
       NX_NO_CLOUD: "true"
+      NX_CACHE_DIRECTORY: .nx/cache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,7 +58,9 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .nx/cache
+          path: |
+            .nx/cache
+            .nx/workspace-data
           key: nx-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
             nx-${{ runner.os }}-${{ github.ref }}-
