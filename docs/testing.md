@@ -77,7 +77,7 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | `packages/cli/smoke` | 1 | smoke | new |
 | `apps/web/smoke` | 1 | smoke | new |
 | `apps/web/e2e` | 25 (was 24) | e2e | one happy path per feature, in a real browser. `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
-| `apps/site/e2e` | 1 | e2e | nav, footer and dead links on the prerendered pages, desktop and phone (named `smoke.spec.ts`; it is an e2e) |
+| `apps/site/e2e` | 2 | e2e | nav, footer and dead links on the prerendered pages, desktop and phone (named `smoke.spec.ts`; it is an e2e); one header on every page and the theme toggle (`header.spec.ts`) |
 | `packages/cli/test` | 30 | integration | the `pixelslash` commands run in-process or as a child, against a fake server and real temp dirs. The `*-support.ts` files are helpers |
 | `packages/engine/test` | 50 | integration + unit | store, upload, capture (real Chromium), report and DS judge are integration; `diff*`, `regions`, `fingerprint`, `sentry-scrub`, `route-names`, `change-note`, `config*` are unit |
 | `apps/web/src/db` | 19 | integration | every query against real SQLite with the real migrations (`test-db.ts`, `test-d1.ts`) |

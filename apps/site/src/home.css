@@ -54,31 +54,6 @@ body:has(.home) {
   outline-offset: 3px;
 }
 
-/* Header */
-
-.home-header {
-  background: color-mix(in srgb, var(--home-crust) 72%, transparent);
-  backdrop-filter: blur(14px) saturate(1.4);
-  border-bottom: 1px solid color-mix(in srgb, var(--home-line) 70%, transparent);
-}
-
-.home-header nav {
-  scrollbar-width: none;
-}
-
-.home-nav-link {
-  color: var(--home-sub);
-  transition:
-    color 0.2s,
-    background 0.2s;
-}
-
-.home-nav-link:hover,
-.home-nav-link[aria-current] {
-  color: var(--home-text);
-  background: color-mix(in srgb, var(--home-line) 70%, transparent);
-}
-
 /* Buttons and links */
 
 .home-btn {

@@ -2,10 +2,9 @@ import type { CSSProperties, ReactNode } from "react";
 import { Wordmark } from "#/components/logo";
 import { TRADEMARK } from "#/content/docs";
 import hero from "#/content/hero.json";
-import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
-import { PAGES } from "#/content/pages";
+import { CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 
-// The homepage's header, footer and hero demo (pages/home.tsx).
+// The homepage's footer and hero demo (pages/home.tsx).
 
 /** A style with CSS custom properties, which CSSProperties does not list. */
 export function vars(style: CSSProperties & Record<`--${string}`, number | string>): CSSProperties {
@@ -14,44 +13,6 @@ export function vars(style: CSSProperties & Record<`--${string}`, number | strin
 
 const CHANGES = hero.regions.filter((region) => region.kind === "change");
 const pct = (value: number, of: number): string => `${(value / of) * 100}%`;
-
-export function Header(): ReactNode {
-  return (
-    <header className="home-header sticky top-0 z-30">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
-        <a href="/" className="flex items-center">
-          <Wordmark onDark />
-        </a>
-        <nav
-          aria-label="Site"
-          data-testid="site-nav"
-          className="order-last -mx-5 flex w-[calc(100%+2.5rem)] gap-1 overflow-x-auto px-5 text-sm md:order-none md:mx-0 md:w-auto md:px-0"
-        >
-          {PAGES.map((page) => (
-            <a
-              key={page.to}
-              href={page.to}
-              aria-current={page.to === "/" ? "page" : undefined}
-              className="home-nav-link whitespace-nowrap rounded-full px-3 py-1.5"
-            >
-              {page.label}
-            </a>
-          ))}
-        </nav>
-        <div className="ml-auto flex items-center gap-2">
-          {APP_LIVE && (
-            <a href={APP_URL} className="home-btn home-btn-ghost text-sm">
-              Sign in
-            </a>
-          )}
-          <a href="/self-host" className="home-btn home-btn-primary text-sm">
-            Get started
-          </a>
-        </div>
-      </div>
-    </header>
-  );
-}
 
 /** Main, wiped into Branch by the slash; the boxes are where the run found its regions. */
 export function Demo(): ReactNode {
@@ -104,7 +65,7 @@ export function Demo(): ReactNode {
 
 export function Footer(): ReactNode {
   return (
-    <footer data-testid="footer" className="home-footer px-5 py-12 text-sm">
+    <footer data-testid="footer" className="home-footer px-5 py-12 text-sm" role="contentinfo">
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <a href="/" className="flex items-center">

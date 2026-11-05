@@ -1,12 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
-import { Demo, Footer, Header, vars } from "#/components/pages/home-parts";
+import { Demo, Footer, vars } from "#/components/pages/home-parts";
 import { REPO_PUBLIC, REPO_URL } from "#/content/links";
 
 /*
  * The homepage is marketing, not an admin screen, so it is drawn here in plain Tailwind and
- * home.css rather than with @hackcove/ui-react, and it carries its own header and footer. The other
- * pages keep the shared Shell. The motion is CSS only and stands still for prefers-reduced-motion.
+ * home.css rather than with @hackcove/ui-react, and it carries its own footer. The header is the
+ * shared Shell's, as on every page. The motion is CSS only and stands still for prefers-reduced-motion.
  */
 
 /** What the CLI does, each one a section of docs/cli.md; the anchors are checked by the smoke test. */
@@ -251,14 +251,11 @@ export function HomePage(): ReactNode {
   const root = useReveal();
   return (
     <div className="home" ref={root}>
-      <Header />
-      <main>
-        <Hero />
-        <Steps />
-        <Features />
-        <Checkout />
-        <Local />
-      </main>
+      <Hero />
+      <Steps />
+      <Features />
+      <Checkout />
+      <Local />
       <Footer />
     </div>
   );

@@ -4,6 +4,7 @@ import {
   Button,
   Caption,
   Cluster,
+  ColourSchemeToggle,
   Tabs,
   Stack,
   TextLink,
@@ -13,6 +14,9 @@ import { TRADEMARK } from "#/content/docs";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 import { PAGES } from "#/content/pages";
 import { Wordmark } from "#/components/logo";
+
+/** The class each scheme puts on <html>: Latte's scope for light, Mocha's for dark. */
+export const SCHEMES = { light: "latte", dark: "dark" } as const;
 
 /** Where the source is: a link once the repository is public (PS-257, PS-292), a plain sentence before. */
 function SourceLink(): ReactNode {
@@ -27,6 +31,7 @@ function SourceLink(): ReactNode {
 function Controls(): ReactNode {
   return (
     <>
+      <ColourSchemeToggle schemes={SCHEMES} size="sm" data-testid="theme-toggle" />
       {APP_LIVE && (
         <Button href={APP_URL} variant="outline" size="sm">
           Sign in
@@ -52,7 +57,10 @@ function Footer(): ReactNode {
   );
 }
 
-/** The frame every page sits in: the brand, the nav row, the page, the footer. */
+/**
+ * The frame every page sits in: the brand, the nav row, the page, the footer. The homepage's sections
+ * run the full width and it draws its own footer, so it bleeds and takes none from here.
+ */
 export function Shell({
   pathname,
   children,
@@ -60,6 +68,7 @@ export function Shell({
   pathname: string;
   children: ReactNode;
 }): ReactNode {
+  const isHome = pathname === "/";
   const items = PAGES.map((page) => ({
     label: page.label,
     href: page.to,
@@ -76,7 +85,8 @@ export function Shell({
           <Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />
         </div>
       }
-      footer={<Footer />}
+      footer={isHome ? undefined : <Footer />}
+      bleed={isHome}
     >
       {children}
     </AppShell>
