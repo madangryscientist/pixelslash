@@ -1,14 +1,17 @@
 import {
   Breadcrumbs,
+  Button,
+  Callout,
   Card,
   CardGrid,
   DetailLayout,
+  Disclosure,
   ProseLayout,
   SidebarLayout,
   Tabs,
   TextLink,
 } from "@hackcove/ui-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { CLI_SPLIT } from "../../content/cli-pages.ts";
 import { CLI_INTRO_DOC, docOf } from "../../content/docs.ts";
 import {
@@ -29,7 +32,27 @@ const NAV_LINK = "text-slate-600 hover:text-violet-700 hover:underline";
 
 const pageHref = (page: DocPageDef): string => `/docs/${page.slug}`;
 
-/** The rail: the search box, then every group and every page in it, the current page marked. `current` is a slug or, for a page outside the map, its path. */
+/** The rail's pages in one group: the map's pages, then the site pages that sit in the same group. */
+function groupItems(groupId: string, current: string | undefined) {
+  return [
+    ...DOC_PAGES.filter((page) => page.group === groupId).map((page) => ({
+      label: page.title,
+      href: pageHref(page),
+      active: page.slug === current,
+    })),
+    ...EXTRA_NAV.filter((extra) => extra.group === groupId).map((extra) => ({
+      label: extra.title,
+      href: extra.href,
+      active: extra.href === current,
+    })),
+  ];
+}
+
+/**
+ * The rail: the search box, then each group as a fold, only the one holding the current page open.
+ * `current` is a slug or, for a page outside the map, its path. Folded, the rail is one screen
+ * tall, so it is not the page's longest column.
+ */
 export function DocsNav({ current }: { current?: string }): ReactNode {
   return (
     <nav aria-label="Docs" data-testid="docs-nav" className="flex flex-col gap-4">
@@ -41,48 +64,95 @@ export function DocsNav({ current }: { current?: string }): ReactNode {
         label="Docs overview"
         items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
       />
-      {GROUPS.map((group) => (
-        <div key={group.id} className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {group.title}
-          </p>
-          <Tabs
-            variant="pill"
-            orientation="vertical"
-            size="sm"
-            label={group.title}
-            items={[
-              ...DOC_PAGES.filter((page) => page.group === group.id).map((page) => ({
-                label: page.title,
-                href: pageHref(page),
-                active: page.slug === current,
-              })),
-              ...EXTRA_NAV.filter((extra) => extra.group === group.id).map((extra) => ({
-                label: extra.title,
-                href: extra.href,
-                active: extra.href === current,
-              })),
-            ]}
-          />
-        </div>
-      ))}
+      <div className="flex flex-col">
+        {GROUPS.map((group) => {
+          const items = groupItems(group.id, current);
+          const open = items.some((item) => item.active);
+          return (
+            // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
+            <Disclosure
+              key={`${group.id}-${open}`}
+              summary={group.title}
+              defaultOpen={open}
+              data-testid={`docs-group-${group.id}`}
+            >
+              <Tabs
+                variant="pill"
+                orientation="vertical"
+                size="sm"
+                label={group.title}
+                items={items}
+              />
+            </Disclosure>
+          );
+        })}
+      </div>
     </nav>
   );
 }
 
-/** The page's own H2 and H3, each linking to its anchor in the body. */
-function OnThisPage({ headings }: { headings: Heading[] }): ReactNode {
+/** The id of the heading the reader is in: the last one whose top has passed the header, the first before any has. */
+function useActiveHeading(key: string, track: boolean): string | undefined {
+  const [active, setActive] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!track) return undefined;
+    // Heading ids are slugs, so `|` never occurs in one; `key` is how a new page is noticed.
+    const ids = key.split("|");
+    // Just under the sticky header and nav row; a heading anchor lands on 7.5rem (styles.css).
+    const line = 140;
+    let frame = 0;
+    const update = (): void => {
+      frame = 0;
+      let found: string | undefined = ids[0];
+      for (const id of ids) {
+        const top = document.getElementById(id)?.getBoundingClientRect().top;
+        if (top === undefined) continue;
+        if (top > line) break;
+        found = id;
+      }
+      setActive(found);
+    };
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
+  }, [key, track]);
+  return active;
+}
+
+/** The page's own H2 and H3, each linking to its anchor in the body. With `track`, the heading being read is marked. */
+function OnThisPage({
+  headings,
+  track = false,
+}: {
+  headings: Heading[];
+  track?: boolean;
+}): ReactNode {
+  const shown = headings.filter((heading) => heading.depth <= 3);
+  const active = useActiveHeading(shown.map((heading) => heading.id).join("|"), track);
   return (
     <ul className="flex flex-col gap-1 text-sm/6">
-      {headings
-        .filter((heading) => heading.depth <= 3)
-        .map((heading) => (
+      {shown.map((heading) => {
+        const here = heading.id === active;
+        return (
           <li key={heading.id} className={heading.depth === 3 ? "pl-3" : undefined}>
-            <a href={`#${heading.id}`} className={NAV_LINK}>
+            <a
+              href={`#${heading.id}`}
+              aria-current={here ? "location" : undefined}
+              className={here ? "font-medium text-violet-700" : NAV_LINK}
+            >
               {heading.text}
             </a>
           </li>
-        ))}
+        );
+      })}
     </ul>
   );
 }
@@ -168,7 +238,7 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 On this page
               </p>
-              <OnThisPage headings={doc.headings} />
+              <OnThisPage headings={doc.headings} track />
             </nav>
           ) : null
         }
@@ -192,14 +262,34 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
   );
 }
 
-/** `/docs`: the group index, led by the blurb docs/cli.md opens with. */
+/** Where a reader who has never run PixelSlash starts. */
+const FIRST_STEP = {
+  slug: "getting-started",
+  action: "Run a first compare",
+  text: "Install PixelSlash, compare two versions of a page and read the report. About fifteen minutes, all on your machine.",
+} as const;
+
+/** `/docs`: one first step, then every group. */
 export function DocsIndexPage(): ReactNode {
+  const first = findPage(FIRST_STEP.slug);
+  if (first === undefined) throw new Error(`docs: no page ${FIRST_STEP.slug}`);
   return (
     <SidebarLayout rail={<DocsNav />} railLabel="Docs">
       <ProseLayout
         title="Docs"
-        subtitle="The CLI reference, split by what you are doing. It is docs/cli.md from the repository, as it is at this commit."
+        subtitle="Install PixelSlash, run a first compare, then look up whatever you are doing next."
       >
+        <Callout
+          title="New here? Start with the first compare"
+          actions={
+            <Button href={pageHref(first)} data-testid="docs-first-step">
+              {FIRST_STEP.action}
+            </Button>
+          }
+          data-testid="docs-start"
+        >
+          {FIRST_STEP.text}
+        </Callout>
         <DocBody doc={CLI_INTRO_DOC} />
         <CardGrid columns={2} as="ul" data-testid="docs-index">
           {GROUPS.map((group) => (
