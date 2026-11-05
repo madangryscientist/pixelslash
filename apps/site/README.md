@@ -18,6 +18,27 @@ the code says at that commit:
 
 The pricing page's commitment sentence is `src/content/pricing.ts`.
 
+## The CLI reference, its index and search
+
+`docs/cli.md` is the reference. Each H2 opens with one sentence on what the section is for and one
+working example, then the flags; the long sections are cut into pages at the H3s listed in
+`src/content/cli-pages.ts`. Three things are generated from it at build time, so they cannot drift:
+
+- **`/docs/cli`**, the command index (`src/content/cli-index.ts`): every command in one line, the
+  page that owns it and a flag table per command, read from the synopsis blocks. A test compares the
+  commands with `COMMANDS` in `packages/cli/src/run.ts` and fails when one is missing.
+- **`/search-index.json`**, the search index (`src/content/search-index.ts`, served by
+  `src/routes/search-index[.]json.ts` and prerendered to a static file): a record per heading, with
+  its text and the exact error strings, for every docs page and `/self-host`. The box in the docs
+  rail (`DocsSearch`) fetches it from this origin the first time it is used and queries it in the
+  browser (`src/content/search.ts`). No third party, no analytics, no dependency: the e2e test
+  types an error message and asserts that no request leaves the origin.
+- **Edit on GitHub** and **copy** on code blocks: every docs page links its source file.
+
+A page that can exit non-zero (`exits: true` in `docs-map.ts`) links the exit codes page. No ticket
+id reaches a rendered page: `stripTicketIds` removes them from the markdown at render time, and a
+test fails if one gets through; `docs/cli.md` keeps them.
+
 ## The type face
 
 One sans face on every page, light and dark: Inter, variable, served from this origin. The file is

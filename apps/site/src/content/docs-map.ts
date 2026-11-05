@@ -9,6 +9,7 @@
  * Help pages live in docs-map-guides.ts so this list stays readable.
  */
 
+import { CAPTURE_PAGES, REVIEW_PAGES } from "./docs-map-cli.ts";
 import { CONCEPT_PAGES, HELP_PAGES } from "./docs-map-guides.ts";
 
 export const GROUPS = [
@@ -63,6 +64,10 @@ export type DocPageDef = {
   group: GroupId;
   /** Headings of docs/cli.md this page shows (plain text, as the heading reads). */
   sections: readonly string[];
+  /** The page can end a run with a non-zero exit, so it links to the exit codes. */
+  exits?: boolean;
+  /** A page the site generates from cli.md instead of cutting it: the command index. */
+  kind?: "cli-index";
   /** A page that is its own file instead of a cut of cli.md. */
   file?:
     | "docs/getting-started.md"
@@ -102,12 +107,13 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     sections: [],
     file: "docs/getting-started.md",
   },
-  { slug: "install", title: "Install", group: "start", sections: ["Install"] },
+  { slug: "install", title: "Install", group: "start", sections: ["Install"], exits: true },
   {
     slug: "init",
     title: "Start a repo",
     group: "start",
     sections: ["Start a repo: pixelslash init"],
+    exits: true,
   },
   {
     slug: "choose-capture",
@@ -200,36 +206,13 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     sections: [],
     file: "docs/ci/review-server.md",
   },
-  {
-    slug: "capture",
-    title: "Capture in CI",
-    group: "capture",
-    sections: ["Snapshot capture (the pinned image)"],
-  },
-  {
-    slug: "playwright",
-    title: "Your own Playwright tests",
-    group: "capture",
-    sections: ["Snapshots from your own Playwright tests"],
-  },
-  {
-    slug: "pngs",
-    title: "PNGs and snapshot dirs",
-    group: "capture",
-    sections: ["Snapshots from PNGs you already have", "Comparing two snapshot dirs"],
-  },
-  {
-    slug: "metrics",
-    title: "Layout metrics file",
-    group: "capture",
-    sections: [],
-    file: "docs/metrics.md",
-  },
+  ...CAPTURE_PAGES,
   {
     slug: "compare",
     title: "Compare two versions",
     group: "diff",
     sections: ["Compare two versions"],
+    exits: true,
   },
   {
     slug: "diff",
@@ -244,30 +227,29 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     title: "The judge",
     group: "judge",
     sections: ["The design-system judge"],
+    exits: true,
   },
-  {
-    slug: "signing-in",
-    title: "Sign in and read builds",
-    group: "review",
-    sections: ["Signing in and reading builds"],
-  },
-  {
-    slug: "upload",
-    title: "Upload and block CI",
-    group: "review",
-    sections: ["Uploading to a server"],
-  },
+  ...REVIEW_PAGES,
   {
     slug: "dev",
     title: "Feature mode",
     group: "build",
     sections: ["Feature mode: pixelslash dev"],
+    exits: true,
   },
   {
     slug: "mcp",
     title: "Your coding agent",
     group: "agents",
     sections: ["Your coding agent: pixelslash mcp"],
+    exits: true,
+  },
+  {
+    slug: "cli",
+    title: "Every command",
+    group: "reference",
+    sections: [],
+    kind: "cli-index",
   },
   { slug: "api", title: "API", group: "reference", sections: ["API"] },
   {
@@ -289,6 +271,11 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     sections: ["Local-screenshot dogfood (GTK windows)"],
   },
   ...HELP_PAGES,
+];
+
+/** Pages of the site that are not docs pages but sit in the docs nav, under the group they belong to. */
+export const EXTRA_NAV: readonly { group: GroupId; title: string; href: string }[] = [
+  { group: "ci", title: "Self-host the review app", href: "/self-host" },
 ];
 
 export function findPage(slug: string): DocPageDef | undefined {

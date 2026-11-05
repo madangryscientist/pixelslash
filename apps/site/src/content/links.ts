@@ -95,6 +95,9 @@ export function resolveHref(
     return cliAnchorHref(href.slice(1), currentPage);
   }
   if (href.startsWith("#") || href.startsWith("mailto:")) return href;
+  // A docs page of this site, as the generated command index writes its links; the e2e run
+  // checks that each one lands on a page.
+  if (/^\/docs\/[a-z0-9-]+$/.test(href)) return href;
   if (/^[a-z]+:\/\//.test(href)) return resolveExternal(href, gates);
   return resolveRepoFile(href, sourcePath, gates);
 }

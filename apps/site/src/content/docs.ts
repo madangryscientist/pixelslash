@@ -29,6 +29,7 @@ import helpFaq from "../../../../docs/help/faq.md?raw";
 import helpChromatic from "../../../../docs/help/coming-from-chromatic.md?raw";
 import selfHost from "../../../web/SELF-HOST.md?raw";
 import { CLI_SPLIT } from "./cli-pages.ts";
+import { commandIndexMarkdown } from "./cli-index.ts";
 import { plainText } from "./doc-text.ts";
 import { DOC_PAGES, findPage } from "./docs-map.ts";
 import { type Doc, type Heading, parseDoc } from "./markdown.tsx";
@@ -164,6 +165,7 @@ export function docOf(slug: string): Doc {
   const page = findPage(slug);
   if (page === undefined) throw new Error(`docs: no page ${slug}`);
   if (page.file !== undefined) return FILE_DOCS[page.file];
+  if (page.kind === "cli-index") return parseDoc(commandIndexMarkdown(), "docs/cli.md", slug);
   const tokens = CLI_SPLIT.pages.get(slug);
   if (tokens === undefined) throw new Error(`docs: page ${slug} has no sections`);
   return cliDoc(tokens, page.title, slug);

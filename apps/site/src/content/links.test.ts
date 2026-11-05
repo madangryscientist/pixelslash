@@ -39,7 +39,7 @@ describe("resolveHref", () => {
       "/docs/upload#uploading-to-a-server",
     );
     expect(resolveHref("#fixing-a-flake-locally", "docs/cli.md", CLOSED, "capture")).toBe(
-      "/docs/upload#fixing-a-flake-locally",
+      "/docs/upload-flaky#fixing-a-flake-locally",
     );
   });
 

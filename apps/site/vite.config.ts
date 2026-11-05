@@ -18,6 +18,7 @@ export default defineConfig({
       pages: [
         ...PAGES.map((page) => page.to),
         ...DOC_PAGES.map((page) => `/docs/${page.slug}`),
+        "/search-index.json",
       ].map((path) => ({ path })),
       prerender: { enabled: true, crawlLinks: true, failOnError: true },
     }),

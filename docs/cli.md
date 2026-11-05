@@ -4,6 +4,14 @@ Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch
 
 ## Install
 
+PixelSlash is one npm package with one command, `pixelslash`. Install it, fetch a browser once, and check that it runs:
+
+```sh
+npm i -D @hackcove/pixelslash
+npx pixelslash install-browser
+npx pixelslash --version
+```
+
 ### From npm
 
 As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`).
@@ -21,6 +29,14 @@ bun run pixelslash -- <args below>
 The `typecheck`, `lint`, `format:check` and `test` scripts that gate a change are for contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md#the-gate).
 
 ## Compare two versions
+
+Compare **Main** (the version that is live) with **Branch** (your change) and get a report of what moved. The quickest run needs no browser, only two PNGs:
+
+```sh
+pixelslash --live-png main.png --local-png branch.png --out out
+```
+
+It prints the number of changed pixels and the path of `out/report.html`; open that file in a browser. The full form, with every flag:
 
 ```
 bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--browser chromium|firefox|webkit] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...
@@ -56,6 +72,15 @@ Default `--out` is `.pixelslash`.
 
 ## How the diff works
 
+The diff counts only the changes a person would see, groups them into regions and says whether the run is `changed`. Run it on two PNGs and read the numbers it prints:
+
+```sh
+pixelslash --live-png main.png --local-png branch.png --out out
+cat out/manifest.json   # changedPixels, regions, specks
+```
+
+`changedPixels` counts the pixels that differ, `regions` groups them into boxes, and a **speck** is a changed spot too small to count (more under "Regions, specks and noise" below).
+
 ### A perceptual compare
 
 The diff is perceptual: a pixel counts toward `changedPixels` only when its colour differs by more than a small YIQ threshold (alpha blended over white) and it is not an anti-aliased edge in either shot, so `changedPixels` is smaller than a raw pixel-difference count.
@@ -84,6 +109,12 @@ A region whose content moved by a fraction of a pixel, all alike (`maxShift`, 0 
 
 These flags tune the diff in every mode here.
 
+Raise the tolerance and set a **floor** (the least change that counts), so a run with a few stray pixels is not called changed:
+
+```sh
+pixelslash --live-png main.png --local-png branch.png --threshold 0.05 --min-changed-pixels 20 --out out
+```
+
 | Flag | Range | Default | What it does |
 | --- | --- | --- | --- |
 | `--threshold` | 0 to 1 | 0.01 (engine default) | Per-pixel tolerance. |
@@ -95,6 +126,8 @@ These flags tune the diff in every mode here.
 | `--max-shift` | 0 to 1 (pixels) | 0.9 | How far a sub-pixel shift may move a region and still be labelled `shift`; 0 turns the call off. |
 
 Out-of-range or non-numeric values exit 2.
+
+A **floor** is a minimum: a run whose surviving `change` regions add up to less than `--min-changed-pixels` or `--min-changed-ratio` is not called changed.
 
 ### How the floors combine
 
@@ -111,6 +144,14 @@ When the options differ from the engine defaults the report states them (`Diff o
 `--ignore x,y,w,h` (repeatable) is an area in image px that the diff skips: the pixels stay in both shots and the report draws a hatch over them, but nothing inside is counted, region-clustered or reported as changed. It is listed in the run's `ignored` and counted in `ignoredPixels`; the ratio floor's denominator is what was measured, so ignored pixels do not dilute it. Use it for a video, an ad, a map or live data — for secrets use a redact mask instead, which never reaches the PNG (see `masks` in the capture config). Pair mode only: it is refused with `--routes`.
 
 ## The design-system judge
+
+The judge checks each page against the component images of your design system and reports the violations that are **new on Branch**, meaning not already on Main. It needs a local vision model; without one it says so and exits 0:
+
+```sh
+pixelslash --live-png main.png --local-png branch.png --ds ./design-system --out judged
+# no judge installed: prints `skip: no judge`, exit 0
+# a violation on Branch that Main did not have: exit 1
+```
 
 ### Running the judge
 
@@ -141,6 +182,13 @@ Added in ob 1941. Set `PIXELSLASH_OPENCODE_MODEL=<provider/model>` and every jud
 - **In the capture image** `docker/capture/Dockerfile` installs opencode `2.1.4` (build arg `OPENCODE_VERSION`) from a tarball pinned by sha256, so `opencode` is on the PATH; pass the key at run time (`-e OPENCODE_API_KEY=…`) with `-e PIXELSLASH_OPENCODE_MODEL=…`. Capture does not use it,.
 
 ## The report
+
+A run writes `report.html`, a page you open as a file: the changed-pixel count, both shots and the diff, cropped to what changed. For several pages it writes `index.html` that links one report each:
+
+```sh
+pixelslash --live-png main.png --local-png branch.png --out out
+# then open out/report.html in a browser
+```
 
 ### A pair without a design system
 
@@ -189,8 +237,15 @@ The hosted app times its own steps on every build, in whole milliseconds, in the
 - Per shot, `snapshots.diff_ms`: how long the server took to compare that shot (both images read and diffed, the carried shot's compare included), written by the run that measured it. A resumed or re-run build rewrites only the shots it measured; a CI result, a new shot, a failed diff or a shot older than the column has none. On Workers the clock moves only at I/O, so the time runs to the compare's last read or write: an unchanged shot's diff after its last read is not in it.
 
 The build page shows them under its header in a **This run** card, with the CLI's step timings when the upload carried them. The card adds the wall time (creation to `finishedAt`), the build's counts (shots, compares on the server or by CI, shots not measured, shots skipped as flaky, flake re-captures the CLI's evidence names, and on the default branch the shots auto-accepted), the per-compare time (median, 95th percentile or slowest, `n`, and the three slowest shots by name), and the model's tokens: in, out and total, from the endpoint's `usage` on each stored explanation and on the summary, with the calls they cover. A reply without `usage` counts as a call that did not report, never as an estimate, and a failed call stores nothing. Each figure says whether the server stored it, the CLI sent it, or it was derived; a build with none of them says so instead. The shot page shows the shot's compare time when it has one. The branch page states, over the branch's last 20 builds, the build count, the median and 95th percentile wall time, the total compares and the median compare time, each with its `n`, and a sparkline of wall time from three finished builds up. The org's **Timings** tab shows, per project, the median and 95th percentile of each step (nearest rank) over builds that finished in the last 30 days, newest 5000 at most; a smoke org has none, and a build that took a second run (`rerun`) is left out, since it holds the numbers of its last run only. Neither changes a verdict, a budget or the 25 s limit.
-
 ## Start a repo: `pixelslash init`
+
+`pixelslash init` writes `pixelslash.config.ts` for you from a few questions, so a first `capture` needs no hand-written config. Answer the questions with flags and it asks nothing:
+
+```sh
+pixelslash init --url http://localhost:3000 --routes /,/pricing --yes
+```
+
+The full form, with every flag:
 
 ```
 pixelslash init [--url URL | --storybook URL] [--routes /,/about] [--viewports 1280x720,375x812] [--themes light,dark] [--server URL] [--project NAME] [--yes] [--force]
@@ -206,10 +261,16 @@ pixelslash init [--url URL | --storybook URL] [--routes /,/about] [--viewports 1
 
 ## Snapshot capture (the pinned image)
 
-`pixelslash capture` shoots every route × variant in a config into a snapshot dir plus `manifest.json`, for upload to a PixelSlash server. Run it inside the pinned capture image: it fixes Bun, Playwright, Chromium, Firefox, WebKit and the font set, so the same commit renders the same pixels on any CI runner.
+`pixelslash capture` shoots every route × variant in a config into a snapshot dir plus `manifest.json`, for upload to a PixelSlash server, which compares each shot with its **baseline**, the earlier accepted shot of the same page ([Baselines and branches](concepts/baselines-and-branches.md)). Run it inside the pinned capture image: it fixes Bun, Playwright, Chromium, Firefox, WebKit and the font set, so the same commit renders the same pixels on any CI runner.
 
 ```
 docker build -f docker/capture/Dockerfile -t pixelslash-capture:dev .
+docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture
+```
+
+The same run with every flag it takes:
+
+```
 docker run --rm --network host -v "$PWD:/work" pixelslash-capture:dev capture [--config FILE] [--out DIR] [--only NAME]... [--json]
 ```
 
@@ -217,72 +278,13 @@ A release also publishes the image: pushing a `v*` tag builds it and pushes `ghc
 
 `--config` defaults to the first `pixelslash.config.{ts,js,mjs,json}` in the working dir (JS/TS: the default export). `--out` defaults to `pixelslash-snapshots`. `--only NAME` (repeatable) captures just those routes or stories, every variant; an unknown name is exit 2. `--json` prints `{ measured: "local", uploaded: false, manifest, shots, timings }` instead of the summary, each shot with its `name`, `variant`, `browser`, `viewport`, `theme`, absolute `file` and `media` (see the media note under `ignore`); it is what the `capture_local` MCP tool returns. Exit 0 on success, 1 when a page cannot be captured or the start command fails, 2 on a bad flag or config.
 
-```json
-{
-  "baseUrl": "http://127.0.0.1:4173",
-  "start": { "command": "bun run preview", "readyUrl": "http://127.0.0.1:4173", "timeoutMs": 60000 },
-  "setup": "./e2e/sign-in.ts",
-  "routes": ["/", { "path": "/pricing", "name": "pricing", "masks": [".clock", { "x": 0, "y": 0, "width": 200, "height": 40 }], "ignore": [".live-chart"], "tags": ["billing"], "diff": { "threshold": 0.05 } }, { "path": "/dashboard", "variants": { "mobile-dark": { "diff": { "minChangedPixels": 50 } } } }],
-  "variants": [
-    { "name": "desktop", "viewport": { "width": 1280, "height": 720 } },
-    { "name": "mobile-dark", "viewport": { "width": 390, "height": 844 }, "theme": "dark", "browser": "chromium" }
-  ],
-  "masks": ["[data-pixelslash-mask]"],
-  "tags": ["web"],
-  "diff": { "threshold": 0.02 },
-  "stabilise": { "animations": true, "caret": true, "clock": "2026-01-01T00:00:00.000Z", "timers": true, "deviceScaleFactor": 1, "timeoutMs": 8000 }
-}
+### The manifest and the fingerprint
+
+Each capture writes `manifest.json` beside the PNGs. It lists every shot and what rendered it, and it is the file `pixelslash upload` reads:
+
+```sh
+cat pixelslash-snapshots/manifest.json
 ```
-
-- `baseUrl` must already be up, unless `start` is given: then the command runs first (in the container, from the working dir), its `readyUrl` (default `baseUrl`) must answer below 400 within `timeoutMs`, and the command's whole process group is stopped after the run. Its output goes to stderr. If `readyUrl` already answers before the command runs (another run on the same port), or the command has exited by the time it answers, the capture fails with exit 1 and writes nothing: the answer would be someone else's server.
-- `setup` is the way in to pages behind sign-in: the path to a JS/TS module (relative to the config file) whose default export is an async function. It runs once, after `start` is ready and before the first shot, with `{ page, context, baseUrl }` (Playwright, in a fresh context whose `baseURL` is `baseUrl`, at the first variant's viewport and on the real clock). It runs in the first variant's browser; whatever it leaves in that context, cookies and local storage, is given to every shot, in whichever browser. The session is held in memory only: it is never written to the snapshot dir, the manifest or an upload. A setup that throws fails the capture with exit 1 and names the file; one that cannot be loaded or does not export a function is exit 2. Type it with `CaptureSetup` from `@hackcove/pixelslash-engine`.
-
-  ```ts
-  // Sign in through the form. The password comes from env, never the config.
-  export default async ({ page }) => {
-    await page.goto("/login");
-    await page.fill("#email", "visual@example.com");
-    await page.fill("#password", process.env.APP_PASSWORD);
-    await page.click("button[type=submit]");
-    await page.waitForURL("**/dashboard");
-  };
-  ```
-
-  ```ts
-  // Reuse a saved session: a Playwright storageState file kept outside git, named in env.
-  export default async ({ context }) => {
-    const { cookies } = JSON.parse(await Bun.file(process.env.APP_SESSION_FILE).text());
-    await context.addCookies(cookies);
-  };
-  ```
-
-  A setup can also seed data (it runs in the CLI's process, so it may spawn a seed script). `apps/web/e2e/dogfood-orgs.config.ts` is a worked example: it starts a local build of the review app, signs in through a GitHub stand-in and seeds fixed rows. There is no separate `storageState` option, because the second example above covers it in three lines.
-- `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`; a query string is slugged too, so `/search?q=a&page=2` is `search-q-a-page-2`). Top-level `masks` and `tags` apply to every route. A route `path` may carry a query string; it is sent as written and recorded as-is in the manifest's `path`.
-- `storybook` shoots a Storybook without a hand-written route list. Once the app is up (after `start`), capture reads `<url>/index.json` (Storybook 7+; `docs` entries are skipped, only `type: "story"`) and adds one route per story × each combination of the listed `globals` (no globals: one per story), each then × the config's `variants`. `url` is required; `baseUrl` defaults to it, so a Storybook-only config needs no `routes`. Example:
-
-  ```json
-  { "start": { "command": "bun e2e/serve.ts", "readyUrl": "http://127.0.0.1:6007" },
-    "storybook": { "url": "http://127.0.0.1:6007", "globals": { "theme": ["default", "catppuccin-mocha", "thrifty-paper"] }, "include": ["**"] } }
-  ```
-
-  - Each story is shot at `/iframe.html?id=<id>&viewMode=story&globals=<k>:<v>;…`. Its snapshot `name` is `<title>-<story name>` lower-cased and slugged, plus `@<k>=<v>` per global in the order the config lists them (`ui-primitives-card-story@theme=thrifty-paper`). The name is built from the index entry alone, so it does not change between runs; the server keys a snapshot on it. A global's name or value may not contain `:` or `;`, and a value may not repeat.
-  - A story that renders every global value itself (an all-themes overview) opts out of the product with the Storybook tag `pixelslash-once`: it is shot once, at the globals' defaults, as `<title>-<story name>` with no `@<k>=<v>`, and every other story is still shot per combination. The tag is read from `index.json` (a story's parameters are not in it), so it is explicit and nothing is de-duplicated by comparing pixels. Set it on the story (`tags: ["pixelslash-once"]`) or on a file's `meta`. Note that the story's snapshot name changes once, so its old per-theme baselines drop out.
-  - A story sets its flaky policy (below) with the tag `pixelslash-flaky-skip` or `pixelslash-flaky-review`. Any other `pixelslash-flaky-…` tag, or both on one story, is a config error naming the story.
-  - `include` (default `["**"]`) and `exclude` (default `[]`) are globs matched against the story id or its title; a story is shot when it matches `include` and not `exclude`. Nothing left after the filter is a config error, so a run that shoots nothing cannot pass.
-  - Top-level `masks`, `tags` and `diff` apply to every story. `start.url` is not read; use `readyUrl` (it defaults to `baseUrl`, so to the Storybook's `url`).
-  - Besides the usual settle, a story waits for Storybook's own signal (the preview shows `#storybook-root` with content), inside the same `timeoutMs`. A story that throws (Storybook's error display) or names no story fails the capture by name, and so does one that never renders.
-  - A story shot is cropped to the story, not the variant's viewport (PS-286). After the settle, capture takes the union of the boxes of everything visible under `#storybook-root` and of every visible element portalled into `<body>` beside it (popovers, menus, dialogs, toasts), grows it by 8 CSS px, rounds it out to whole CSS px, clips it to the page and cuts the PNG to that, so a 50 px button is about 66 px square. A story with `parameters.layout: "fullscreen"` (Storybook marks `<body>` `sb-main-fullscreen`) keeps the full page, as does one whose content box fills it. Ignore and mask rectangles and selectors, media warnings and composition boxes are measured on the same page and shifted by the crop origin, so they sit on the same pixels in the cropped image. Routes (every URL that is not a story) and `@hackcove/pixelslash-playwright` snapshots are never cropped. A crop is part of the PNG, so a baseline taken before it is a different size: the server diffs the overlap and states both sizes.
-  - Storybook routes and hand-written `routes` can be mixed; two that land on the same name are a config error naming both. It reads `index.json` over HTTP and never imports Storybook, so the project needs no Storybook dependency from us.
-- `variants` default to one: Chromium, 1280×720, light. `theme` sets `prefers-color-scheme`. `browser` is `chromium` (the default, so a config that names none shoots as it always did), `firefox` or `webkit`; anything else is a config error. The browser is part of a shot's identity: a variant's default name carries it (`firefox-1280x720-light`), one page × three browsers is three shots, and each is diffed only against the baseline taken in its own browser, never across browsers (a shot whose browser has no baseline is new). Each browser is launched once per run, and each manifest entry's fingerprint names the browser that took it. The same settle applies in all three: a page that never settles fails in each, bounded by `timeoutMs`. Playwright's `launchOptions` (and the Chromium flags the image pins) apply to Chromium only.
-- `masks` are **redact**: CSS selectors (every match) or rectangles in full-page CSS px (scaled by the device scale factor); both are painted `#FF00FF` before the PNG is written, so the content never leaves the machine. A selector that matches nothing prints a warning. Use it for secrets and personal data.
-- `ignore` is the opposite: areas the diff skips while the real pixels stay in the PNG, so the report can hatch them over the shots. Same shapes as `masks` — CSS selectors (every match) or rectangles in full-page CSS px — and every element carrying `data-pixelslash-ignore` is one without a config entry. Selectors are resolved to boxes in the live page at screenshot time, in full-page coordinates, scaled by the device scale factor and clipped to the image; nothing is painted. A selector that matches nothing prints a warning. It is allowed at the same three levels as `diff` (top level, on a route, per variant on a route), but the layers **add up** rather than override: project + route + variant. Use it for videos, ads, maps and live data. Capture only records the boxes: the diff that skips them is the pair-mode CLI's, or the server's once uploaded.
-- **Media is warned about, never fixed** (PS-230). Media renders unreliably: a spinner arc, a poster that arrives late. After the settle, capture measures every `<video>` and `<audio>` on the page (`getBoundingClientRect`, whole CSS px from the top of the document, grown outward so the box pastes into an `ignore` rect as it is) and warns once per shot and rect: `warning: <video> at 580,36 112x118 on overview (desktop) — media renders unreliably; add an exclusion zone (route.ignore) for this shot`. A story's route is not in the config, so its warning says to put `data-pixelslash-ignore` on the element in the story. A medium wholly inside an `ignore` area (a rect, a selector, a `data-pixelslash-ignore` element) is already excluded and does not warn; one only partly inside still does, with its whole box. The same boxes are each shot's `media` in `capture --json` and `check --json` (`[]` for none, otherwise `{ tag, x, y, width, height }`) so CI can act on them, and `pixelslash flake` offers the ignore rect for each as its first suggestion. Nothing is paused, seeked, frozen, masked or ignored for you; the PNG and every diff are as they were, and the manifest does not carry it, so it stays byte-reproducible.
-- `diff` sets the diff tolerance a snapshot is compared with, as `{ threshold?, minChangedPixels?, minChangedRatio?, mergeDistance?, minRegionArea?, noiseAmplitude?, maxShift? }` (the same keys as the pair-mode flags; unknown keys, a threshold, ratio or amplitude outside 0 to 1, or a non-integer pixel count is a config error naming the key). It is allowed at three levels: top level (the project default), on a route, and per variant on a route as `variants: { "<variant name>": { "diff": {…} } }` (the name must be one of the config's `variants`). The most specific wins, key by key: variant > route > project > engine default. So the `/dashboard` route above compares `mobile-dark` with `minChangedPixels: 50` and `threshold: 0.02`, and every other variant of it with `threshold: 0.02` only. The resolved options are written to each manifest entry as `diff` and uploaded; a key nobody set is left out so the engine default still applies to it. The config lives in your repo, so a tolerance is reviewed and versioned with the code.
-- `flaky` is the flaky policy, `"review"` (the default) or `"skip"`. It is set at the top level (the project default) or on a route; a route's own wins. Any other value is a config error naming its path (`routes[2].flaky must be "review" or "skip"`). The resolved policy is written to each manifest entry as `flaky` and sent with a shot found flaky on upload; what it does to the build is the server's call. See "Flaky shots" under "Uploading to a server".
-- `flake: { "retries": N }` is how many more times `--upload` captures a shot that differs from its baseline (default 2; 0 turns it off). It must be a non-negative integer; `--flake-retries` overrides it.
-- `a11y: true` scans every settled page for accessibility violations (PS-238; default `false`, and then nothing is scanned and nothing is claimed; any other value is a config error). See "Accessibility checks" below.
-- `metrics: true` writes each shot's layout metrics file (PS-294; default `false`, and then nothing is read and the output is as before; any other value is a config error). See "Layout metrics per shot" below and [docs/metrics.md](metrics.md).
-- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), page timers (`setInterval` / `setTimeout`) paused so carousels and tickers capture the same every time (`timers: false` lets them run; with `clock: false` they run too, and `timers: true` there is an error), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off. Up to four shots are taken at once, each in its own browser context with its own settle, so the waits overlap and none is shortened; the PNGs and the manifest's order are the same as one at a time. Each shot keeps its own `timeoutMs`, and the four share the CPU: a page that only just settles in time when shot alone can run out of time here. With timers paused the settle never advances the page clock, so no timer fires during it either (a page that needs a delayed timer to render needs `timers: false`; Playwright's paused clock still runs zero-delay timers at load).
 
 `manifest.json` (version 1) lists one entry per PNG; it has no timestamps, so two captures of the same build write the same bytes:
 
@@ -305,11 +307,158 @@ A release also publishes the image: pushing a `v*` tag builds it and pushes `ghc
 }
 ```
 
-The fingerprint says what rendered the snapshot. A server compares a shot only with a baseline of the same fingerprint; `compare` and `check` warn and diff anyway. `image` is `PIXELSLASH_IMAGE_DIGEST` when the run is given it (`-e PIXELSLASH_IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' …)`), else `version:<image version>`. `fonts` hashes every font file fontconfig can see.
+The **fingerprint** says what rendered the snapshot, and the environment it was shot in ([Fingerprints](concepts/fingerprints.md)). A server compares a shot only with a baseline of the same fingerprint; `compare` and `check` warn and diff anyway. `image` is `PIXELSLASH_IMAGE_DIGEST` when the run is given it (`-e PIXELSLASH_IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' …)`), else `version:<image version>`. `fonts` hashes every font file fontconfig can see.
 
-`diff` is the resolved diff options (`{}` when none are set; a manifest written before the field existed reads as `{}`), and `ignore` the resolved ignore boxes in image px (`[]` when none; a manifest written before the field existed reads as `[]`). Nothing in `ignore` is painted: the PNG holds the real pixels. `file` is relative to the manifest's directory and must stay inside it. See "Uploading to a server" for `--upload`.
+`diff` is the resolved diff options (`{}` when none are set; a manifest written before the field existed reads as `{}`), and `ignore` the resolved ignore boxes in image px (`[]` when none; a manifest written before the field existed reads as `[]`). Nothing in `ignore` is painted: the PNG holds the real pixels. `file` is relative to the manifest's directory and must stay inside it. See [Uploading to a server](#uploading-to-a-server) for `--upload`.
 
 Outside the image, `capture` still works but warns on stderr and records `image: "bare"`. Do not baseline from a bare machine: its own fonts and installs shift text and SVG rendering, and every snapshot will differ from the image's.
+
+### The config file
+
+`pixelslash.config.ts` (or `.js`, `.mjs`, `.json`) says what to shoot. This is the smallest one that works, and `pixelslash init` writes it for you:
+
+```json
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "routes": ["/", "/pricing"]
+}
+```
+
+The same file with every key set, the other keys are described on the sections that follow:
+
+```json
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "start": { "command": "bun run preview", "readyUrl": "http://127.0.0.1:4173", "timeoutMs": 60000 },
+  "setup": "./e2e/sign-in.ts",
+  "routes": ["/", { "path": "/pricing", "name": "pricing", "masks": [".clock", { "x": 0, "y": 0, "width": 200, "height": 40 }], "ignore": [".live-chart"], "tags": ["billing"], "diff": { "threshold": 0.05 } }, { "path": "/dashboard", "variants": { "mobile-dark": { "diff": { "minChangedPixels": 50 } } } }],
+  "variants": [
+    { "name": "desktop", "viewport": { "width": 1280, "height": 720 } },
+    { "name": "mobile-dark", "viewport": { "width": 390, "height": 844 }, "theme": "dark", "browser": "chromium" }
+  ],
+  "masks": ["[data-pixelslash-mask]"],
+  "tags": ["web"],
+  "diff": { "threshold": 0.02 },
+  "stabilise": { "animations": true, "caret": true, "clock": "2026-01-01T00:00:00.000Z", "timers": true, "deviceScaleFactor": 1, "timeoutMs": 8000 }
+}
+```
+
+- `baseUrl` must already be up, unless `start` is given: then the command runs first (in the container, from the working dir), its `readyUrl` (default `baseUrl`) must answer below 400 within `timeoutMs`, and the command's whole process group is stopped after the run. Its output goes to stderr. If `readyUrl` already answers before the command runs (another run on the same port), or the command has exited by the time it answers, the capture fails with exit 1 and writes nothing: the answer would be someone else's server.
+
+- `routes` are paths or objects. `name` defaults to the path's slug (`/` is `index`; a query string is slugged too, so `/search?q=a&page=2` is `search-q-a-page-2`). Top-level `masks` and `tags` apply to every route. A route `path` may carry a query string; it is sent as written and recorded as-is in the manifest's `path`.
+- `a11y: true` scans every settled page for accessibility violations (PS-238; default `false`, and then nothing is scanned and nothing is claimed; any other value is a config error). See [Accessibility checks](#accessibility-checks-violations-that-are-new-on-branch).
+- `metrics: true` writes each shot's layout metrics file (PS-294; default `false`, and then nothing is read and the output is as before; any other value is a config error). See [Layout metrics per shot](#layout-metrics-per-shot) and [docs/metrics.md](metrics.md).
+
+### Tolerance, flaky policy and retries
+
+Three keys decide how a snapshot is compared and what happens when it differs from itself. Set them at the top level for every route, or on one route:
+
+```json
+{
+  "diff": { "threshold": 0.02 },
+  "flaky": "review",
+  "flake": { "retries": 2 }
+}
+```
+
+- `diff` sets the diff tolerance a snapshot is compared with, as `{ threshold?, minChangedPixels?, minChangedRatio?, mergeDistance?, minRegionArea?, noiseAmplitude?, maxShift? }` (the same keys as the pair-mode flags; unknown keys, a threshold, ratio or amplitude outside 0 to 1, or a non-integer pixel count is a config error naming the key). It is allowed at three levels: top level (the project default), on a route, and per variant on a route as `variants: { "<variant name>": { "diff": {…} } }` (the name must be one of the config's `variants`). The most specific wins, key by key: variant > route > project > engine default. So the `/dashboard` route above compares `mobile-dark` with `minChangedPixels: 50` and `threshold: 0.02`, and every other variant of it with `threshold: 0.02` only. The resolved options are written to each manifest entry as `diff` and uploaded; a key nobody set is left out so the engine default still applies to it. The config lives in your repo, so a tolerance is reviewed and versioned with the code.
+- `flaky` is the flaky policy, `"review"` (the default) or `"skip"`. It is set at the top level (the project default) or on a route; a route's own wins. Any other value is a config error naming its path (`routes[2].flaky must be "review" or "skip"`). The resolved policy is written to each manifest entry as `flaky` and sent with a shot found flaky on upload; what it does to the build is the server's call. See [Flaky shots](#flaky-shots).
+- `flake: { "retries": N }` is how many more times `--upload` captures a shot that differs from its baseline (default 2; 0 turns it off). It must be a non-negative integer; `--flake-retries` overrides it.
+
+### Variants: browsers, viewports and themes
+
+A variant is one way to shoot every route: a browser, a viewport and a theme. Two variants double the shots:
+
+```json
+{
+  "variants": [
+    { "name": "desktop", "viewport": { "width": 1280, "height": 720 } },
+    { "name": "mobile-dark", "viewport": { "width": 390, "height": 844 }, "theme": "dark", "browser": "chromium" }
+  ]
+}
+```
+
+- `variants` default to one: Chromium, 1280×720, light. `theme` sets `prefers-color-scheme`. `browser` is `chromium` (the default, so a config that names none shoots as it always did), `firefox` or `webkit`; anything else is a config error. The browser is part of a shot's identity: a variant's default name carries it (`firefox-1280x720-light`), one page × three browsers is three shots, and each is diffed only against the baseline taken in its own browser, never across browsers (a shot whose browser has no baseline is new). Each browser is launched once per run, and each manifest entry's fingerprint names the browser that took it. The same settle applies in all three: a page that never settles fails in each, bounded by `timeoutMs`. Playwright's `launchOptions` (and the Chromium flags the image pins) apply to Chromium only.
+
+### Pages behind a sign-in: setup
+
+`setup` runs once before the first shot and signs your capture in, so pages behind a login can be shot. Point it at a module:
+
+```json
+{ "setup": "./e2e/sign-in.ts" }
+```
+
+- `setup` is the way in to pages behind sign-in: the path to a JS/TS module (relative to the config file) whose default export is an async function. It runs once, after `start` is ready and before the first shot, with `{ page, context, baseUrl }` (Playwright, in a fresh context whose `baseURL` is `baseUrl`, at the first variant's viewport and on the real clock). It runs in the first variant's browser; whatever it leaves in that context, cookies and local storage, is given to every shot, in whichever browser. The session is held in memory only: it is never written to the snapshot dir, the manifest or an upload. A setup that throws fails the capture with exit 1 and names the file; one that cannot be loaded or does not export a function is exit 2. Type it with `CaptureSetup` from `@hackcove/pixelslash-engine`.
+
+  ```ts
+  // Sign in through the form. The password comes from env, never the config.
+  export default async ({ page }) => {
+    await page.goto("/login");
+    await page.fill("#email", "visual@example.com");
+    await page.fill("#password", process.env.APP_PASSWORD);
+    await page.click("button[type=submit]");
+    await page.waitForURL("**/dashboard");
+  };
+  ```
+
+  ```ts
+  // Reuse a saved session: a Playwright storageState file kept outside git, named in env.
+  export default async ({ context }) => {
+    const { cookies } = JSON.parse(await Bun.file(process.env.APP_SESSION_FILE).text());
+    await context.addCookies(cookies);
+  };
+  ```
+
+  A setup can also seed data (it runs in the CLI's process, so it may spawn a seed script). `apps/web/e2e/dogfood-orgs.config.ts` is a worked example: it starts a local build of the review app, signs in through a GitHub stand-in and seeds fixed rows. There is no separate `storageState` option, because the second example above covers it in three lines.
+
+### Storybook stories
+
+A Storybook needs no route list: give `storybook` its URL and every story is shot.
+
+```json
+{ "storybook": { "url": "http://127.0.0.1:6007" } }
+```
+
+- `storybook` shoots a Storybook without a hand-written route list. Once the app is up (after `start`), capture reads `<url>/index.json` (Storybook 7+; `docs` entries are skipped, only `type: "story"`) and adds one route per story × each combination of the listed `globals` (no globals: one per story), each then × the config's `variants`. `url` is required; `baseUrl` defaults to it, so a Storybook-only config needs no `routes`. Example:
+
+  ```json
+  { "start": { "command": "bun e2e/serve.ts", "readyUrl": "http://127.0.0.1:6007" },
+    "storybook": { "url": "http://127.0.0.1:6007", "globals": { "theme": ["default", "catppuccin-mocha", "thrifty-paper"] }, "include": ["**"] } }
+  ```
+
+  - Each story is shot at `/iframe.html?id=<id>&viewMode=story&globals=<k>:<v>;…`. Its snapshot `name` is `<title>-<story name>` lower-cased and slugged, plus `@<k>=<v>` per global in the order the config lists them (`ui-primitives-card-story@theme=thrifty-paper`). The name is built from the index entry alone, so it does not change between runs; the server keys a snapshot on it. A global's name or value may not contain `:` or `;`, and a value may not repeat.
+  - A story that renders every global value itself (an all-themes overview) opts out of the product with the Storybook tag `pixelslash-once`: it is shot once, at the globals' defaults, as `<title>-<story name>` with no `@<k>=<v>`, and every other story is still shot per combination. The tag is read from `index.json` (a story's parameters are not in it), so it is explicit and nothing is de-duplicated by comparing pixels. Set it on the story (`tags: ["pixelslash-once"]`) or on a file's `meta`. Note that the story's snapshot name changes once, so its old per-theme baselines drop out.
+  - A story sets its flaky policy (below) with the tag `pixelslash-flaky-skip` or `pixelslash-flaky-review`. Any other `pixelslash-flaky-…` tag, or both on one story, is a config error naming the story.
+  - `include` (default `["**"]`) and `exclude` (default `[]`) are globs matched against the story id or its title; a story is shot when it matches `include` and not `exclude`. Nothing left after the filter is a config error, so a run that shoots nothing cannot pass.
+  - Top-level `masks`, `tags` and `diff` apply to every story. `start.url` is not read; use `readyUrl` (it defaults to `baseUrl`, so to the Storybook's `url`).
+  - Besides the usual settle, a story waits for Storybook's own signal (the preview shows `#storybook-root` with content), inside the same `timeoutMs`. A story that throws (Storybook's error display) or names no story fails the capture by name, and so does one that never renders.
+  - A story shot is cropped to the story, not the variant's viewport (PS-286). After the settle, capture takes the union of the boxes of everything visible under `#storybook-root` and of every visible element portalled into `<body>` beside it (popovers, menus, dialogs, toasts), grows it by 8 CSS px, rounds it out to whole CSS px, clips it to the page and cuts the PNG to that, so a 50 px button is about 66 px square. A story with `parameters.layout: "fullscreen"` (Storybook marks `<body>` `sb-main-fullscreen`) keeps the full page, as does one whose content box fills it. Ignore and mask rectangles and selectors, media warnings and composition boxes are measured on the same page and shifted by the crop origin, so they sit on the same pixels in the cropped image. Routes (every URL that is not a story) and `@hackcove/pixelslash-playwright` snapshots are never cropped. A crop is part of the PNG, so a baseline taken before it is a different size: the server diffs the overlap and states both sizes.
+  - Storybook routes and hand-written `routes` can be mixed; two that land on the same name are a config error naming both. It reads `index.json` over HTTP and never imports Storybook, so the project needs no Storybook dependency from us.
+
+### Masks and ignore areas
+
+A **mask** hides content that must never leave the machine (a secret, a person's data). An **ignore** area keeps the pixels but tells the diff to skip them (a video, an ad, live data). Both are CSS selectors or rectangles:
+
+```json
+{
+  "masks": [".account-email"],
+  "ignore": [".live-chart"]
+}
+```
+
+- `masks` are **redact**: CSS selectors (every match) or rectangles in full-page CSS px (scaled by the device scale factor); both are painted `#FF00FF` before the PNG is written, so the content never leaves the machine. A selector that matches nothing prints a warning. Use it for secrets and personal data.
+- `ignore` is the opposite: areas the diff skips while the real pixels stay in the PNG, so the report can hatch them over the shots. Same shapes as `masks` — CSS selectors (every match) or rectangles in full-page CSS px — and every element carrying `data-pixelslash-ignore` is one without a config entry. Selectors are resolved to boxes in the live page at screenshot time, in full-page coordinates, scaled by the device scale factor and clipped to the image; nothing is painted. A selector that matches nothing prints a warning. It is allowed at the same three levels as `diff` (top level, on a route, per variant on a route), but the layers **add up** rather than override: project + route + variant. Use it for videos, ads, maps and live data. Capture only records the boxes: the diff that skips them is the pair-mode CLI's, or the server's once uploaded.
+- **Media is warned about, never fixed** (PS-230). Media renders unreliably: a spinner arc, a poster that arrives late. After the settle, capture measures every `<video>` and `<audio>` on the page (`getBoundingClientRect`, whole CSS px from the top of the document, grown outward so the box pastes into an `ignore` rect as it is) and warns once per shot and rect: `warning: <video> at 580,36 112x118 on overview (desktop) — media renders unreliably; add an exclusion zone (route.ignore) for this shot`. A story's route is not in the config, so its warning says to put `data-pixelslash-ignore` on the element in the story. A medium wholly inside an `ignore` area (a rect, a selector, a `data-pixelslash-ignore` element) is already excluded and does not warn; one only partly inside still does, with its whole box. The same boxes are each shot's `media` in `capture --json` and `check --json` (`[]` for none, otherwise `{ tag, x, y, width, height }`) so CI can act on them, and `pixelslash flake` offers the ignore rect for each as its first suggestion. Nothing is paused, seeked, frozen, masked or ignored for you; the PNG and every diff are as they were, and the manifest does not carry it, so it stays byte-reproducible.
+
+### Stabilise: what is frozen before a shot
+
+`stabilise` freezes what moves on its own (animations, the caret, the clock, timers), so the same page gives the same pixels twice. The defaults suit most pages; change one when a page needs it:
+
+```json
+{ "stabilise": { "animations": true, "clock": "2026-01-01T00:00:00.000Z", "timers": true } }
+```
+
+- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), page timers (`setInterval` / `setTimeout`) paused so carousels and tickers capture the same every time (`timers: false` lets them run; with `clock: false` they run too, and `timers: true` there is an error), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off. Up to four shots are taken at once, each in its own browser context with its own settle, so the waits overlap and none is shortened; the PNGs and the manifest's order are the same as one at a time. Each shot keeps its own `timeoutMs`, and the four share the CPU: a page that only just settles in time when shot alone can run out of time here. With timers paused the settle never advances the page clock, so no timer fires during it either (a page that needs a delayed timer to render needs `timers: false`; Playwright's paused clock still runs zero-delay timers at load).
 
 ### Composition-only projects: what is styled outside the library
 
@@ -338,6 +487,10 @@ A project that builds its pages only from one design-system library's components
 
 `"a11y": true` in the config scans each page with [axe-core](https://github.com/dequelabs/axe-core) (MPL-2.0, used unmodified as an npm dependency) once the page has settled and the screenshot is taken, so the scan cannot change the PNG. Off by default: with it off nothing runs, the manifest has no `a11y`, and no report says anything about accessibility.
 
+```json
+{ "a11y": true }
+```
+
 - It runs the WCAG 2.0, 2.1 and 2.2 level A and AA rules and keeps the violations only (not "incomplete" or "passed"). axe is evaluated through the browser's debugging protocol, so a page's Content-Security-Policy does not block it, and the page is not sent anywhere. A scan that fails or exceeds 20 s fails the shot like a capture error; it is never skipped silently. With `stabilise.timers` the page clock is let run again for the scan, after the screenshot.
 - Each violation is `{ rule, impact, help, selector }`: axe's rule id, its impact (`minor`, `moderate`, `serious`, `critical` or null), the rule's one-line help and axe's path to the element (frames joined with ` >> `). They are written to the shot's manifest entry as `a11y: { violations, omitted? }` and uploaded with the shot. A shot keeps at most 200 violations and `omitted` counts the rest; a selector or help text longer than 500 characters is cut. A shot that was not scanned has no `a11y`, which is not the same as `{ "violations": [] }`.
 - **New on Branch** is a violation (the same rule on the same selector) that is on Branch's scan and not on the baseline's. `compare` reads it from the two manifests: stdout gains `a11y: N new on Branch in M of K scanned shots` and up to 10 lines `  name (browser WxH): rule (impact) on selector: help`, then `a11y: N shots have no Main scan, so none of their violations is called new` when Main was not scanned, and a note when a scan kept only its first violations. `index.html` has an "Accessibility" section per shot with "New on Branch" and "Already on Main". A run where no shot was scanned prints nothing about it.
@@ -347,6 +500,10 @@ A project that builds its pages only from one design-system library's components
 ### Layout metrics per shot
 
 `"metrics": true` in the config writes, beside each shot's PNG, a `<route>/<variant>.metrics.json`: the box, padding, gap, font and colours of every element that carries a `data-part="<name>"` attribute, read from the settled page at the moment of the shot ([docs/metrics.md](metrics.md) is the file's contract: units, origin, rounding, duplicate names, size cap). Off by default: with it off nothing is read, the manifest has no `metrics` and the PNGs, stdout and upload payloads are exactly as before.
+
+```html
+<button data-part="submit">Pay</button>
+```
 
 - The read happens after the screenshot, so it cannot change the PNG. It reads the boxes in CSS px from the first `[data-part]` element's corner, never device pixels. A page with no `[data-part]` element writes no file and the shot has no `metrics`.
 - The file is carried as the manifest entry's optional `metrics` (its path under the snapshot dir). `upload` sends it with the shot, and the server keeps it with the snapshot; a shot without one is as it was. A manifest whose `metrics` file is missing or malformed is a usage error naming it.
@@ -436,6 +593,14 @@ pixelslash compare snaps/android-main snaps/android-branch
 
 ### Twins across platforms
 
+Check which shots have a twin on the other platforms:
+
+```sh
+pixelslash build latest
+# Button/loading dark has no android twin
+# twins: 12 linked
+```
+
 A **twin** is the same snapshot name and theme on another platform (`web`, `android` or `ios`): `Button/primary` dark on the web and `Button/primary` dark on a Pixel. The key is **name + theme** and nothing else. The viewport and the device are not part of it, so a web shot at 1280×720 and an android shot on a Pixel 8 are twins; when a side holds several shots under the key (two viewports, two devices) every one is listed. Linking is a read: it changes no snapshot's identity, fingerprint or diff, compares nothing, and sets no exit code. [`pixelslash parity`](#parity-between-twins) is what compares the layout metrics of a pair.
 
 For a build, each platform other than the shot's own is looked up in this order, and the first source that holds that platform wins:
@@ -451,17 +616,6 @@ A platform no source holds is not in play: a build with no other platform's shot
 - **At the CLI.** `pixelslash build ID` prints `Button/loading dark has no android twin` for each unlinked shot (`has no web or android twin` when two platforms are missing) and `twins: N linked`. `--json` carries the full `twins` section.
 - **In the web app.** The snapshot side panel has a **Twins** row whose links go to each twin snapshot, labelled by platform and device (`android · Pixel 8 API 35`) and named with their source; the build page lists the **Unlinked** shots. Both also link to the [parity view](#parity-view) (**Compare platforms**).
 
-### Parity view
-
-The **parity view** shows one snapshot key (name + theme) of a build on web, android and ios side by side: `/projects/:id/builds/:id/parity?name=…&theme=…`, reached from the snapshot side panel's Twins row and from each entry of the build's **Unlinked** list (**Compare platforms**). It is a read: it stores nothing and no status, exit code, check run, PR comment or count depends on it.
-
-- **Columns.** Web, android and ios, in that order. The shots are the [twins](#twins-across-platforms) of the build, found by the same pairing (the build, then a twin project's build at the same commit, then baselines), never a second one. A column is headed with platform, device, scale and the build or baseline it came from, and links to that shot's review page. Several shots on one side get one column each. A platform with no shot keeps its column and says `no android twin` (the words of the Unlinked list). A [stale](#stale-twins) native column carries the `stale` badge and its reason.
-- **One physical size.** Each shot is shown at its pixels divided by its scale (`scale` is the device pixel ratio the upload recorded; a shot with none counts as `1x` and says `(not recorded)`), so a 3x shot and a 1x shot of one screen are the same size on the page.
-- **Metrics.** The mismatches of [`pixelslash parity`](#parity-between-twins), as the same sentences, one list per pair of columns (`compareParity` over the stored [metrics files](metrics.md)). A side with no metrics file reads `not measured`, never drift. The parity manifest is kept in the repo and the server has no copy, so the view says so in one line, applies no declarations, and shows the raw per-part numbers side by side; `pixelslash parity` (or `get_parity`) gives the verdict, with declared differences listed as declared.
-- **Similarity hint.** Each native column shows a score against the web column, `similarity 0.93, a hint: fonts render differently by design`. It is the structural similarity of the two shots after both are reduced to the same logical-pixel grid over the rectangle they share (`packages/engine/src/similarity.ts`, no dependency). It is a hint to look at a column, never a verdict: a pair it cannot score (no web shot, a PNG that does not decode, no overlap) says `no score`, not 0. Nothing is pixel-diffed across platforms or painted as changed.
-- **The read.** `GET /api/v1/builds/:id/parity?name=…&theme=…` (both required; 404 when the build holds no shot under the key) answers `{ name, theme, columns, metrics, web_url }`. A `columns` item is `{ kind: "missing", platform, line }` or `{ kind: "shot", platform, device, viewport, label, snapshot_id, build_id, project_id, project_name, source, source_label, commit_sha, scale, size, physical_size, image_url, has_metrics, stale, stale_cause, similarity }`, where `similarity` is `null` on a web column and otherwise `{ against_snapshot_id, score, text }` (`score` is `null` when unscored). `image_url` is signed and expires. `metrics` is `{ manifest, notice, pairs, raw_columns, raw }`: `manifest` is false (no manifest applied) with the `notice` line; each of `pairs` is `{ a, b, status, lacks, mismatches, declared, tolerance }` with `status` `clean`, `drift` or `not_measured`; `raw_columns` and `raw` are the per-part numbers. A CI token reads its own project only, as on the build read.
-- **From your agent:** `get_parity_view` ([the tools](#your-coding-agent-pixelslash-mcp)) returns the same read. There is no CLI command for it.
-
 ### Stale twins
 
 A web change that was accepted leaves its native twins behind. A native twin is **stale** when its web twin (same name and theme) had a change **accepted** (a reviewer's accept, or accept-all, on a `changed` shot) and nobody has since accepted a native shot of that key in a native build created after it. Nothing marks a twin fresh by hand: there is no dismiss, snooze or mark-fresh. A reviewer accepting the native shot in a later native build is the only way out.
@@ -475,6 +629,46 @@ A web change that was accepted leaves its native twins behind. A native twin is 
 - **The sentence** is `Button/md-primary dark on android is stale: web changed in build <link>, accepted by <name> <date>`.
 
 `GET /api/v1/projects/:id/stale` answers `{ stale: [item], next_cursor: null }`, ordered by name, theme and platform. An `item` is `{ name, theme, platform, sentence, cause, shots }`: `cause` is `{ snapshot_id, build_id, project_id, project_name, accepted_by, accepted_at }` (the web snapshot and who accepted it), and `shots` the native shots of that key still stale, each `{ snapshot_id, build_id, project_id, device, viewport }`. With `?platform=` the reply also carries `baselines: { platform, linked: [entry] }`, the accepted baseline pairs of web and that platform in a build's `twins.linked` shape; `parity --release` reads it. A `platform` other than `android` or `ios` is a 400.
+
+### Parity between twins
+
+Compare the layout of two platforms, then fail CI on drift:
+
+```sh
+pixelslash parity --build ID
+# parity: 12 pairs, 1 with drift, 3 not measured   (exit 8)
+```
+
+`pixelslash parity --build ID` compares the [layout metrics](metrics.md) of every twin pair in a build, the same snapshot name and theme on two platforms ([Twins across platforms](#twins-across-platforms)), and exits 8 when one drifts. The server and token resolve as for `build`; `--build` is required.
+
+- **What it prints:** one line per snapshot with drift, then what was not measured, then stale declarations, then a count: `Button/md-primary dark: button gap 8 web vs 6 android`, `parity: 12 pairs, 1 with drift, 3 not measured`. A build with no twins prints `parity: no twins`. When a name and theme has several pairs (two viewports, two devices) each line says which shots. `--json` prints the full result: every pair with both snapshot ids, the scale each side used, the tolerance, the mismatches with both values, and `stale_declarations`.
+- **What it compares:** parts by name; lengths within `max(1/scale)` logical px; font size and weight exactly; colours as exact hex, unless the manifest allows the pair. A field either side did not measure is skipped, never read as zero. The rules and the manifest are in [Parity](metrics.md#parity).
+- **`--manifest PATH`** names the parity manifest, `pixelslash.parity.json` in the working directory by default when it exists. With none, there are no allowances.
+- **A pair where either side has no metrics file is `not measured`:** listed and counted, never drift. Shots with no twin are not parity's business.
+- **Exit codes:** 0 no drift (not measured and stale declarations do not fail it), **8** drift, 2 a usage error or a malformed manifest (it names the file and the field), 3 the server did not give what was asked, 7 a crash. It never exits 1.
+- **From your agent:** `get_parity` ([the tools](#your-coding-agent-pixelslash-mcp)) returns the `--json` result.
+
+### Release check
+
+`pixelslash parity --release android|ios` asks whether a platform is safe to ship against the web: every native twin is fresh, and the accepted baselines still agree. It exits **8** on any [stale twin](#stale-twins) on the platform or any drifting baseline twin pair, else 0.
+
+- **What it checks:** the project's stale twins on that platform (`GET /api/v1/projects/:id/stale?platform=…`, which includes a linked twin project), and every twin pair of the accepted baselines (web against that platform), compared exactly as `parity --build` compares them, with the same `--manifest`. A pair where a side has no metrics file is not measured: counted apart, never drift.
+- **What it prints:** a sentence per stale twin, a line per drifting pair, any stale declarations, then a count: `release android: 2 stale, 1 drifting, 40 pairs checked` (`pairs checked` are the pairs that were measured). The server, token and project resolve as for `build` (`--project` as in [Resolution order](#signing-in-and-reading-builds)).
+- **`--json`** prints one object: `release` (the platform), `project`, `manifest`, `ok`, `exit_code`, `stale`, `drifting`, `pairs_checked`, `not_measured`, `findings` (one entry per reason it fails: `{ kind: "stale", name, theme, platform, sentence, cause }` or `{ kind: "drift", name, theme, platform, sentence, mismatches }`), `stale_twins` (each `{ name, theme, platform, sentence, cause, shots }` as the API sends it), `results` (the pairs, as in `parity --build --json`) and `stale_declarations`.
+- **Exit codes:** 0 clean, **8** stale or drifting, 2 a usage error (`--release` with `--build` is exit 2, as is a platform other than `android` or `ios` or a malformed manifest), 3 the server did not give what was asked, 7 a crash. It never exits 1.
+- **Separate twin projects need a personal or org token.** A project's own CI token reaches its own project only (see Linked projects), so under one a web project in another project is not read and its changes are not seen. Run the release check with a personal or org token when web and native are two projects.
+- **It is a check, not a gate on the build:** a stale twin never fails `pixelslash build`, `parity --build` or a web upload.
+
+### Parity view
+
+The **parity view** shows one snapshot key (name + theme) of a build on web, android and ios side by side: `/projects/:id/builds/:id/parity?name=…&theme=…`, reached from the snapshot side panel's Twins row and from each entry of the build's **Unlinked** list (**Compare platforms**). It is a read: it stores nothing and no status, exit code, check run, PR comment or count depends on it.
+
+- **Columns.** Web, android and ios, in that order. The shots are the [twins](#twins-across-platforms) of the build, found by the same pairing (the build, then a twin project's build at the same commit, then baselines), never a second one. A column is headed with platform, device, scale and the build or baseline it came from, and links to that shot's review page. Several shots on one side get one column each. A platform with no shot keeps its column and says `no android twin` (the words of the Unlinked list). A [stale](#stale-twins) native column carries the `stale` badge and its reason.
+- **One physical size.** Each shot is shown at its pixels divided by its scale (`scale` is the device pixel ratio the upload recorded; a shot with none counts as `1x` and says `(not recorded)`), so a 3x shot and a 1x shot of one screen are the same size on the page.
+- **Metrics.** The mismatches of [`pixelslash parity`](#parity-between-twins), as the same sentences, one list per pair of columns (`compareParity` over the stored [metrics files](metrics.md)). A side with no metrics file reads `not measured`, never drift. The parity manifest is kept in the repo and the server has no copy, so the view says so in one line, applies no declarations, and shows the raw per-part numbers side by side; `pixelslash parity` (or `get_parity`) gives the verdict, with declared differences listed as declared.
+- **Similarity hint.** Each native column shows a score against the web column, `similarity 0.93, a hint: fonts render differently by design`. It is the structural similarity of the two shots after both are reduced to the same logical-pixel grid over the rectangle they share (`packages/engine/src/similarity.ts`, no dependency). It is a hint to look at a column, never a verdict: a pair it cannot score (no web shot, a PNG that does not decode, no overlap) says `no score`, not 0. Nothing is pixel-diffed across platforms or painted as changed.
+- **The read.** `GET /api/v1/builds/:id/parity?name=…&theme=…` (both required; 404 when the build holds no shot under the key) answers `{ name, theme, columns, metrics, web_url }`. A `columns` item is `{ kind: "missing", platform, line }` or `{ kind: "shot", platform, device, viewport, label, snapshot_id, build_id, project_id, project_name, source, source_label, commit_sha, scale, size, physical_size, image_url, has_metrics, stale, stale_cause, similarity }`, where `similarity` is `null` on a web column and otherwise `{ against_snapshot_id, score, text }` (`score` is `null` when unscored). `image_url` is signed and expires. `metrics` is `{ manifest, notice, pairs, raw_columns, raw }`: `manifest` is false (no manifest applied) with the `notice` line; each of `pairs` is `{ a, b, status, lacks, mismatches, declared, tolerance }` with `status` `clean`, `drift` or `not_measured`; `raw_columns` and `raw` are the per-part numbers. A CI token reads its own project only, as on the build read.
+- **From your agent:** `get_parity_view` ([the tools](#your-coding-agent-pixelslash-mcp)) returns the same read. There is no CLI command for it.
 
 ## Comparing two snapshot dirs
 
@@ -548,6 +742,15 @@ A target can name what it is being built against: a markdown spec, and reference
 
 ## Signing in and reading builds
 
+Sign in once, then read your builds from the terminal. In CI, pass the token in the environment instead:
+
+```sh
+PIXELSLASH_SERVER=https://ps.example PIXELSLASH_TOKEN=psci_… pixelslash whoami
+pixelslash builds --limit 5
+```
+
+Every remote command, with every flag:
+
 The remote commands talk to a server's [API](#api) as one token. They read; only `upload` sends page shots, and only `flake --resolve` changes anything else.
 
 ```
@@ -595,28 +798,6 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 | 7 | **An internal error: a bug in pixelslash**, never a problem with your page or your config. A crash in capture, compare, the report or upload, or a `compare` shot the diff could not measure. A runner that sees 7 must **escalate to the PixelSlash planner**, not retry and not read it as a visual result. |
 | 8 | `parity`: a twin pair's layout metrics differ beyond tolerance and the manifest does not declare it ([Parity between twins](#parity-between-twins)); with `--release`, also a [stale twin](#stale-twins) on the platform ([Release check](#release-check)). Not 1, which stays reserved for new violations. |
 
-### Parity between twins
-
-`pixelslash parity --build ID` compares the [layout metrics](metrics.md) of every twin pair in a build, the same snapshot name and theme on two platforms ([Twins across platforms](#twins-across-platforms)), and exits 8 when one drifts. The server and token resolve as for `build`; `--build` is required.
-
-- **What it prints:** one line per snapshot with drift, then what was not measured, then stale declarations, then a count: `Button/md-primary dark: button gap 8 web vs 6 android`, `parity: 12 pairs, 1 with drift, 3 not measured`. A build with no twins prints `parity: no twins`. When a name and theme has several pairs (two viewports, two devices) each line says which shots. `--json` prints the full result: every pair with both snapshot ids, the scale each side used, the tolerance, the mismatches with both values, and `stale_declarations`.
-- **What it compares:** parts by name; lengths within `max(1/scale)` logical px; font size and weight exactly; colours as exact hex, unless the manifest allows the pair. A field either side did not measure is skipped, never read as zero. The rules and the manifest are in [Parity](metrics.md#parity).
-- **`--manifest PATH`** names the parity manifest, `pixelslash.parity.json` in the working directory by default when it exists. With none, there are no allowances.
-- **A pair where either side has no metrics file is `not measured`:** listed and counted, never drift. Shots with no twin are not parity's business.
-- **Exit codes:** 0 no drift (not measured and stale declarations do not fail it), **8** drift, 2 a usage error or a malformed manifest (it names the file and the field), 3 the server did not give what was asked, 7 a crash. It never exits 1.
-- **From your agent:** `get_parity` ([the tools](#your-coding-agent-pixelslash-mcp)) returns the `--json` result.
-
-### Release check
-
-`pixelslash parity --release android|ios` asks whether a platform is safe to ship against the web: every native twin is fresh, and the accepted baselines still agree. It exits **8** on any [stale twin](#stale-twins) on the platform or any drifting baseline twin pair, else 0.
-
-- **What it checks:** the project's stale twins on that platform (`GET /api/v1/projects/:id/stale?platform=…`, which includes a linked twin project), and every twin pair of the accepted baselines (web against that platform), compared exactly as `parity --build` compares them, with the same `--manifest`. A pair where a side has no metrics file is not measured: counted apart, never drift.
-- **What it prints:** a sentence per stale twin, a line per drifting pair, any stale declarations, then a count: `release android: 2 stale, 1 drifting, 40 pairs checked` (`pairs checked` are the pairs that were measured). The server, token and project resolve as for `build` (`--project` as in [Resolution order](#signing-in-and-reading-builds)).
-- **`--json`** prints one object: `release` (the platform), `project`, `manifest`, `ok`, `exit_code`, `stale`, `drifting`, `pairs_checked`, `not_measured`, `findings` (one entry per reason it fails: `{ kind: "stale", name, theme, platform, sentence, cause }` or `{ kind: "drift", name, theme, platform, sentence, mismatches }`), `stale_twins` (each `{ name, theme, platform, sentence, cause, shots }` as the API sends it), `results` (the pairs, as in `parity --build --json`) and `stale_declarations`.
-- **Exit codes:** 0 clean, **8** stale or drifting, 2 a usage error (`--release` with `--build` is exit 2, as is a platform other than `android` or `ios` or a malformed manifest), 3 the server did not give what was asked, 7 a crash. It never exits 1.
-- **Separate twin projects need a personal or org token.** A project's own CI token reaches its own project only (see Linked projects), so under one a web project in another project is not read and its changes are not seen. Run the release check with a personal or org token when web and native are two projects.
-- **It is a check, not a gate on the build:** a stale twin never fails `pixelslash build`, `parity --build` or a web upload.
-
 ### Exit codes and the `FAILED` line
 
 A crash never exits 1. Any error `pixelslash` did not expect writes, to stderr and in this order:
@@ -643,6 +824,12 @@ environment. Unset (the default) the Sentry SDK is never loaded and nothing goes
 for it. Set, it reports two things: a crash (the exit **7** path above) and an `UPLOAD FAILED`
 path. It never reports exit 1 (new violations), a usage error or any other result of a page: those
 are verdicts, not bugs.
+
+```sh
+export PIXELSLASH_SENTRY_DSN=https://<key>@<host>/<project>
+export PIXELSLASH_SENTRY_ENVIRONMENT=ci
+pixelslash capture
+```
 
 | Variable | Meaning |
 | --- | --- |
@@ -747,6 +934,8 @@ What the server stores per snapshot: `name`, `platform`, `browser`, `viewport` (
 
 The endpoints `upload` calls (`POST /api/v1/builds`, `POST /api/v1/builds/:id/baselines`, `PUT /api/v1/builds/:id/snapshots`, `POST /api/v1/builds/:id/finalize`), with their bodies and replies, are in [API](#api).
 
+### Where the diff runs: ci or server
+
 **Where the diff runs (`ci` or `server`).** Each project has a diff location, set on its settings page:
 
 - **`ci`**: the CLI measures each shot in the CI job, with the same engine the server has, and the server only checks and stores what it sent.
@@ -769,11 +958,60 @@ Finalise in a `ci` project runs no diff. Each result is checked for shape and bo
 
 Carries and the default branch's auto-accept work as on the server. A CLI from before this setting sends no results, so a `ci` project refuses it when the build is opened: `426 this project diffs in CI; upgrade the CLI`. A CLI talking to a server from before the setting skips the baselines request and uploads as before. Every snapshot records who measured it (`measured_by`: `ci` or `server`) and the engine version, and the snapshot page shows both.
 
-**Thresholds set in the review UI (server projects).** A member of the project's org can set `threshold`, `minChangedPixels` and `minChangedRatio` from a snapshot's page, for the test (every variant of that snapshot name) or for the test in that one variant. The precedence is, key by key: UI variant > UI test > config (variant > route > project) > engine default. Saving re-diffs the open build's matching shots at once and updates the build status; every later build is measured with it. An empty field is unset, and clearing an override falls back to the config. The snapshot page shows each value's source (`set in the UI by @login on <date> (this test, this variant); config says 0.01`). Every change writes an audit row (who, when, before and after), shown on the project's settings page and, for its tests, on the build page. To keep nothing only in the UI, each override offers its config snippet, and the settings page exports them all as a `pixelslash.config.json` fragment: merge each route's `diff` and `variants` into the route of that name, and the `variants` it names into yours (it names a variant by the config's default name, `chromium-1280x720-light`). Uploaded instead of the overrides, the export gives the same verdicts, unless the config already sets the same key on that variant, which beats a route's value. A `ci` project refuses an override: its diff is the CLI's, measured with the config alone.
+### Thresholds set in the review app
 
-**Ignore boxes drawn in the review UI (server projects).** On a snapshot's page, `Draw ignore box`, drag over the shot, then ignore that area for the test (every variant of that snapshot name) or for the test in that one variant. The box is in image px, as the diff measures. It is added to the shot's uploaded `ignore` areas (the union, never a replacement), saving re-diffs the open build's matching shots at once and updates the build status, and every later build is measured with it. The shot shows every ignored area hatched and labelled with its source: `UI` for a drawn box, `config` for an uploaded area, `manifest` for one uploaded with a PNG import. When a changed region touches an ignored area's edge the page warns that content may have moved out of the ignored area. Each box records who drew it and when; the project's settings list the active boxes, clear one (the box stays in the trail with who cleared it) and include them in the overrides export, under `ignore` on the route or on its variant. Each box also offers its config snippet. The export is in image px while the config's rectangles are in CSS px: divide by the device scale factor when it is not 1. A `ci` project refuses a box. Redact masks are untouched: an ignore box only stops the diff counting the pixels, which stay in the stored PNG.
+This applies to **server** projects. A member of the project's org can set `threshold`, `minChangedPixels` and `minChangedRatio` from a snapshot's page, for the test (every variant of that snapshot name) or for the test in that one variant. The precedence is, key by key: UI variant > UI test > config (variant > route > project) > engine default. Saving re-diffs the open build's matching shots at once and updates the build status; every later build is measured with it. An empty field is unset, and clearing an override falls back to the config. The snapshot page shows each value's source (`set in the UI by @login on <date> (this test, this variant); config says 0.01`). Every change writes an audit row (who, when, before and after), shown on the project's settings page and, for its tests, on the build page. To keep nothing only in the UI, each override offers its config snippet, and the settings page exports them all as a `pixelslash.config.json` fragment: merge each route's `diff` and `variants` into the route of that name, and the `variants` it names into yours (it names a variant by the config's default name, `chromium-1280x720-light`). Uploaded instead of the overrides, the export gives the same verdicts, unless the config already sets the same key on that variant, which beats a route's value. A `ci` project refuses an override: its diff is the CLI's, measured with the config alone.
 
-**Flaky shots.** Before it uploads, the CLI diffs each shot against the baseline the server picked, in a `server` project too. That local diff decides only which shots to capture again, and a `server` project is never sent it. Each shot that differs is captured again `--flake-retries` more times (else `flake.retries` in the config, else 2; 0 captures each shot once). The new captures use the same route, variant and stabilisation as the first, one shot at a time in one browser. An unchanged shot is never captured again.
+### Ignore boxes drawn in the review app
+
+This applies to **server** projects. On a snapshot's page, `Draw ignore box`, drag over the shot, then ignore that area for the test (every variant of that snapshot name) or for the test in that one variant. The box is in image px, as the diff measures. It is added to the shot's uploaded `ignore` areas (the union, never a replacement), saving re-diffs the open build's matching shots at once and updates the build status, and every later build is measured with it. The shot shows every ignored area hatched and labelled with its source: `UI` for a drawn box, `config` for an uploaded area, `manifest` for one uploaded with a PNG import. When a changed region touches an ignored area's edge the page warns that content may have moved out of the ignored area. Each box records who drew it and when; the project's settings list the active boxes, clear one (the box stays in the trail with who cleared it) and include them in the overrides export, under `ignore` on the route or on its variant. Each box also offers its config snippet. The export is in image px while the config's rectangles are in CSS px: divide by the device scale factor when it is not 1. A `ci` project refuses a box. Redact masks are untouched: an ignore box only stops the diff counting the pixels, which stay in the stored PNG.
+
+### A sentence on what changed: the judge on upload
+
+With `--judge`, the local vision model (the same `mlx_vlm.generate` or `ollama` as the DS judge) writes one plain sentence per changed shot, such as "The Save button moved below the form". It is shown the baseline's PNG, the branch's PNG and the boxes the diff measured, and is told to say only what changed, with no verdict and no score.
+
+- To know which shots changed, the CLI diffs each shot against the baseline the server picked, in a `server` project too, as for flaky shots. A `server` project is still never sent that diff.
+- The sentence goes up as `meta.changeNote` (one line, at most 300 characters; the server collapses whitespace, drops a trailing full stop, cuts it to 300 and drops anything that is not a string, never a 400). It is stored in `snapshots.change_note` and shown on the build page's card, labelled as the judge's, and in the branch page's change summary. An unchanged or new shot gets none.
+- The images go only to the local model, which runs on this machine. Nothing is sent to any other model.
+- The sentence decides nothing: not a review state, a threshold, a build's verdict or an exit code.
+- With no local judge, the run prints `skip: no judge` and uploads without sentences. A model that fails on a shot is a warning on stderr (`judge: <shot>: <why>`), and that shot uploads without one.
+- `--judge` on `capture` needs `--upload`.
+
+### AI explanations on the server
+
+A project can name an OpenAI-compatible vision endpoint in its settings (**AI explanations**): a base URL, a model and an API key. An org can name one too, once, on the **AI model** tab of its settings (`/orgs`), with the same form and rules, so each project does not repeat the key. A project's own settings win; a project without any uses its org's; with neither, there is no model. The project's settings page says which applies ("Using the org's model (<model>)", "This project's model", or none), and **Use the org's model instead** clears the project's own back to the org's. Any member of the org can set or clear the org's model. DeepSeek is the documented example (`https://api.deepseek.com`, `deepseek-flash`), and any endpoint that answers `POST {base URL}/chat/completions` with image parts works.
+OpenCode Go (`https://opencode.ai/inference/go/openai/v1`) works for a personal self-host with a Go model that takes images; a deployed service should use OpenCode Zen or the provider's own API, because Go is licensed for coding-agent traffic. Calls to `opencode.ai` carry an `x-opencode-session` header naming the build, which Go requires.
+
+- After a branch build gets its verdict, each `change` region of each changed, undecided shot is sent to that model as three crops: the baseline, the new shot and the diff overlay, cut to the region's box plus 16 px on each side. Nothing else of the shot is sent: one call per region, at most 8 per shot, a shot's regions asked at once. Explaining runs off the finalise request, on a queue (`EXPLAIN`, queue `pixelslash-explain`; miniflare runs it on a self-host), one job per shot, so each call has the whole model timeout however much of the diff budget the run used (ob 1875). While a shot waits, the build and snapshot pages say `explaining…` and reload themselves. A job whose model fails is tried 3 times, then the shot keeps the failure (for example `the model answered 401`) and is reviewed as plain pixels; one still queued after 15 minutes reads `explaining stopped`. A failed call is logged once per shot (never with the key), so a wrong key or base URL can be found.
+- The model answers with a label (`intended`, `unintended` or `noise`) and one sentence. Both are stored on the shot (`snapshots.ai_review`), shown in the snapshot page's side panel and on the region's box, and counted on the build page's card.
+- **Noise is only labelled unless the project opts in.** With **Auto-pass noise** on, a shot whose every changed region the model labels `noise` is accepted with no reviewer; the build page lists it under **AI-filtered**, and a person can still open it and reject it. A shot with a region left unexplained is never auto-passed, and neither is a shot whose size changed: its regions cover only the overlap.
+- With no model set, nothing is sent anywhere. A call that fails or answers in the wrong shape stores nothing for that region. A shot with no region explained shows `skip: no judge`, and the failure when there was one, and is reviewed as plain pixels; the build's verdict never waits on the model.
+- **A summary of the build.** Once every shot is explained or has failed, the same model is asked once, text only, for a short summary of the whole build, shown at the top of the build page. It is given each changed, new and removed shot's name and variants, the changed px and region count, and the stored region explanations; never an image. It groups a change seen in several variants into one sentence and names the new and removed shots, and each sentence links to the shots it describes. The page states the unchanged and not-measured counts and the regions labelled likely noise itself, so a shot that was not compared is never called unchanged. The summary is stored on the build (`builds.ai_summary`) with the model and the time, is written again when a resumed or re-run diff finishes, and **Regenerate** asks again. With no model, or a failed or malformed answer, nothing is stored and the page says `skip: no judge`; a failed Regenerate keeps the summary already stored, since nothing was measured again. Like the explanations, the default branch's builds are not summarised. It changes no verdict, no review and no exit code.
+- **The summary against the brief.** When the build carries a [brief](#uploading-to-a-server), the same one call gets it too, quoted line by line after the shots as untrusted data, and is asked for one more line: whether the changes match the brief, naming anything that changed which it does not explain and anything it describes that did not change. A brief over 4000 characters (only possible past the API, which refuses it) is cut to its first 4000 and the prompt says so. The page shows that sentence after the others, marked `Against the brief:`, and the model line says `read against the brief`. It is the model's read, not a check: nothing reads it. A build with a brief where nothing changed asks no model and says nothing changed, not that it matches. The brief goes to this call only; region explanations and the DS judge never see it. Without a brief the prompt and the summary are what they were before it.
+- The key is stored for the project (or the org) on the server, sealed under `MODEL_KEY_SECRET`, and never shown again; the page shows only that one is set. Changing the base URL needs the key again, so a saved key is never sent to a new host. A model's error reply is never shown or logged with the key in it.
+- A re-run whose result is the same keeps the explanation; one whose result moved is explained again. The default branch's builds are accepted on finalise and are not sent.
+
+### When the server cannot measure a shot
+
+**The server diff has a ceiling.** It runs inline in the finalise request, on a Worker with a 30 s CPU limit and a 128 MB isolate (decided 2026-10-20; no Queue for beta). Measured at 1280×4000: a typical shot takes about 0.8 s, a shot where every pixel differs about 15 s. One whole-page change fits; several do not. When the diff stops itself before the limit, the build ends `errored` and `error` names the limit (`diff ceiling: measured N of M shots…`); no shot is downscaled or cropped to fit. A self-host running the diff sidecar also has a pixel limit: a shot over it ends the build `errored`, naming the size and the limit. The finalise reply still carries `200`, so read `status` and `error`. A build too big for one run is resumed: finalise again and the server keeps what it measured and diffs the rest under the same budget, so repeated runs reach the end. The finalise reply carries `unmeasured`, the count still to measure, and `pixelslash upload` finalises again by itself while that falls (a warning on stderr for each); if it stops with shots left it warns that the build is `errored` and exits 0 as before. A hard kill by the runtime (one shot alone passing 30 s, or the isolate limit) cannot be caught in the request and can leave the build at `processing`; recovering a build stuck that way is a separate ticket. None of this applies to a `ci` project: its finalise reads no PNG and has no budget. An errored `ci` build is never measured again: finalising it again is a 409, and the build page says to re-run the CI job.
+
+**One shot's diff failing does not stop the others.** A shot whose server diff throws (its baseline missing from storage, a PNG that does not decode) keeps the reason in its `diffError` and is left unmeasured; the rest are measured, and the build ends `errored` naming each failed shot (`N of M shots could not be measured…`). The build page of an errored server-diff build has **Re-run errored shots** (the same as sending finalise again: only the shots with no result are measured), and on a build with a verdict each shot's page has **Re-run this shot**, which measures that one shot again. Both work from the PNGs the server holds (nothing is captured), and the build gets its verdict once none is left unmeasured; a picked shot whose re-diff fails loses its review and errors the build. A re-run shot whose result is the same keeps its review; one whose result moved goes back to pending (and is accepted again on the default branch, unless it is flaky). A `ci` project has neither control, and the server refuses the re-run (ob 1738).
+
+**A build never claims a verdict on a shot it did not measure** (PS-282). A shot whose fingerprint differs from its baseline's is not compared (`rebaseline_needed`, counted as `rebaseline`). On the default branch it is accepted and becomes the new baseline. On any other branch the build ends `errored`, naming how many shots and what moved (`fonts sha256:… → sha256:…`), so `pixelslash upload` exits 1: upload the default branch from the new environment, then rebase the branch onto that commit and upload it again (main's shots count only at the merge-base or its ancestors), and the server diff measures each such shot against main's new baseline (an open change from the old environment is not carried across). A `ci` project is not moved to main's baseline: `POST /builds/:id/baselines` is not told the shot's fingerprint, so it still names the branch's own baseline, and that branch's builds stay `errored` after an environment change. A shot left with no result at all errors the build too (`N of M shots have no result`). A build with no result on a shot is never the next build's baseline, so the branch's open changes are still carried past it.
+
+### Sending a shot again and finalising
+
+Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A CI token only reaches its own project's builds, an org token the projects of its org, a personal token the projects of its user's orgs; any other project or build id is a 404. 401 is a missing, wrong, expired or revoked token.
+
+### Flaky shots
+
+A shot is **flaky** when it differs from itself: the same page, captured again, gives different pixels. `upload` finds these before they reach a reviewer, by capturing every changed shot again:
+
+```sh
+pixelslash capture --upload --flake-retries 3
+```
+
+Before it uploads, the CLI diffs each shot against the baseline the server picked, in a `server` project too. That local diff decides only which shots to capture again, and a `server` project is never sent it. Each shot that differs is captured again `--flake-retries` more times (else `flake.retries` in the config, else 2; 0 captures each shot once). The new captures use the same route, variant and stabilisation as the first, one shot at a time in one browser. An unchanged shot is never captured again.
 
 - A shot is **flaky** when any later capture differs from the first under the shot's own diff options and ignore boxes. Flaky means the captures disagreed with each other. It says nothing about whether the change is wanted.
 - When every capture agrees, the shot is a real change, and nothing else happens.
@@ -792,6 +1030,13 @@ Carries and the default branch's auto-accept work as on the server. A CLI from b
 
 ### Fixing a flake locally
 
+Reproduce a flake on your own machine, so a fix can be seen to hold before anyone says it does:
+
+```sh
+pixelslash flakes
+pixelslash flake ID --runs 5
+```
+
 `pixelslash flakes` lists the project's open flakes: id, name, browser, viewport, theme, how many builds detected it, and when it last moved. `--json` prints `GET /api/v1/projects/:id/flakes` as sent.
 
 `pixelslash flake ID` reproduces one on this machine, so a fix can be tried and seen to hold before anyone says it does:
@@ -806,36 +1051,15 @@ Carries and the default branch's auto-accept work as on the server. A CLI from b
 - The runs (`runs/run<N>.png`), each differing run's overlay (`runs/diff<N>.png`) and `report.html` are written to `--out` (default `pixelslash-flake`), whose earlier `runs/` and report are removed first. Nothing is uploaded.
 - Exit 0 stable, 6 unstable, 2 on a usage error, 3 when the server refuses or does not know the flake, 1 when the capture fails.
 
-**What changed, in a sentence (`--judge`).** With `--judge`, the local vision model (the same `mlx_vlm.generate` or `ollama` as the DS judge) writes one plain sentence per changed shot, such as "The Save button moved below the form". It is shown the baseline's PNG, the branch's PNG and the boxes the diff measured, and is told to say only what changed, with no verdict and no score.
+### Baseline rules: what a shot is compared against
 
-- To know which shots changed, the CLI diffs each shot against the baseline the server picked, in a `server` project too, as for flaky shots. A `server` project is still never sent that diff.
-- The sentence goes up as `meta.changeNote` (one line, at most 300 characters; the server collapses whitespace, drops a trailing full stop, cuts it to 300 and drops anything that is not a string, never a 400). It is stored in `snapshots.change_note` and shown on the build page's card, labelled as the judge's, and in the branch page's change summary. An unchanged or new shot gets none.
-- The images go only to the local model, which runs on this machine. Nothing is sent to any other model.
-- The sentence decides nothing: not a review state, a threshold, a build's verdict or an exit code.
-- With no local judge, the run prints `skip: no judge` and uploads without sentences. A model that fails on a shot is a warning on stderr (`judge: <shot>: <why>`), and that shot uploads without one.
-- `--judge` on `capture` needs `--upload`.
+A **baseline** is the earlier shot a new shot is compared with ([Baselines and branches](concepts/baselines-and-branches.md)). A **carry** is an open change that a later build inherits unchanged until someone decides it. Upload a branch and the server picks each shot's baseline by the rules below:
 
-**AI explanations on the server (the project's own or its org's model).** A project can name an OpenAI-compatible vision endpoint in its settings (**AI explanations**): a base URL, a model and an API key. An org can name one too, once, on the **AI model** tab of its settings (`/orgs`), with the same form and rules, so each project does not repeat the key. A project's own settings win; a project without any uses its org's; with neither, there is no model. The project's settings page says which applies ("Using the org's model (<model>)", "This project's model", or none), and **Use the org's model instead** clears the project's own back to the org's. Any member of the org can set or clear the org's model. DeepSeek is the documented example (`https://api.deepseek.com`, `deepseek-flash`), and any endpoint that answers `POST {base URL}/chat/completions` with image parts works.
-OpenCode Go (`https://opencode.ai/inference/go/openai/v1`) works for a personal self-host with a Go model that takes images; a deployed service should use OpenCode Zen or the provider's own API, because Go is licensed for coding-agent traffic. Calls to `opencode.ai` carry an `x-opencode-session` header naming the build, which Go requires.
+```sh
+pixelslash upload pixelslash-snapshots --branch my-branch --base main
+```
 
-- After a branch build gets its verdict, each `change` region of each changed, undecided shot is sent to that model as three crops: the baseline, the new shot and the diff overlay, cut to the region's box plus 16 px on each side. Nothing else of the shot is sent: one call per region, at most 8 per shot, a shot's regions asked at once. Explaining runs off the finalise request, on a queue (`EXPLAIN`, queue `pixelslash-explain`; miniflare runs it on a self-host), one job per shot, so each call has the whole model timeout however much of the diff budget the run used (ob 1875). While a shot waits, the build and snapshot pages say `explaining…` and reload themselves. A job whose model fails is tried 3 times, then the shot keeps the failure (for example `the model answered 401`) and is reviewed as plain pixels; one still queued after 15 minutes reads `explaining stopped`. A failed call is logged once per shot (never with the key), so a wrong key or base URL can be found.
-- The model answers with a label (`intended`, `unintended` or `noise`) and one sentence. Both are stored on the shot (`snapshots.ai_review`), shown in the snapshot page's side panel and on the region's box, and counted on the build page's card.
-- **Noise is only labelled unless the project opts in.** With **Auto-pass noise** on, a shot whose every changed region the model labels `noise` is accepted with no reviewer; the build page lists it under **AI-filtered**, and a person can still open it and reject it. A shot with a region left unexplained is never auto-passed, and neither is a shot whose size changed: its regions cover only the overlap.
-- With no model set, nothing is sent anywhere. A call that fails or answers in the wrong shape stores nothing for that region. A shot with no region explained shows `skip: no judge`, and the failure when there was one, and is reviewed as plain pixels; the build's verdict never waits on the model.
-- **A summary of the build.** Once every shot is explained or has failed, the same model is asked once, text only, for a short summary of the whole build, shown at the top of the build page. It is given each changed, new and removed shot's name and variants, the changed px and region count, and the stored region explanations; never an image. It groups a change seen in several variants into one sentence and names the new and removed shots, and each sentence links to the shots it describes. The page states the unchanged and not-measured counts and the regions labelled likely noise itself, so a shot that was not compared is never called unchanged. The summary is stored on the build (`builds.ai_summary`) with the model and the time, is written again when a resumed or re-run diff finishes, and **Regenerate** asks again. With no model, or a failed or malformed answer, nothing is stored and the page says `skip: no judge`; a failed Regenerate keeps the summary already stored, since nothing was measured again. Like the explanations, the default branch's builds are not summarised. It changes no verdict, no review and no exit code.
-- **The summary against the brief.** When the build carries a [brief](#uploading-to-a-server), the same one call gets it too, quoted line by line after the shots as untrusted data, and is asked for one more line: whether the changes match the brief, naming anything that changed which it does not explain and anything it describes that did not change. A brief over 4000 characters (only possible past the API, which refuses it) is cut to its first 4000 and the prompt says so. The page shows that sentence after the others, marked `Against the brief:`, and the model line says `read against the brief`. It is the model's read, not a check: nothing reads it. A build with a brief where nothing changed asks no model and says nothing changed, not that it matches. The brief goes to this call only; region explanations and the DS judge never see it. Without a brief the prompt and the summary are what they were before it.
-- The key is stored for the project (or the org) on the server, sealed under `MODEL_KEY_SECRET`, and never shown again; the page shows only that one is set. Changing the base URL needs the key again, so a saved key is never sent to a new host. A model's error reply is never shown or logged with the key in it.
-- A re-run whose result is the same keeps the explanation; one whose result moved is explained again. The default branch's builds are accepted on finalise and are not sent.
-
-**The server diff has a ceiling.** It runs inline in the finalise request, on a Worker with a 30 s CPU limit and a 128 MB isolate (decided 2026-10-20; no Queue for beta). Measured at 1280×4000: a typical shot takes about 0.8 s, a shot where every pixel differs about 15 s. One whole-page change fits; several do not. When the diff stops itself before the limit, the build ends `errored` and `error` names the limit (`diff ceiling: measured N of M shots…`); no shot is downscaled or cropped to fit. A self-host running the diff sidecar also has a pixel limit: a shot over it ends the build `errored`, naming the size and the limit. The finalise reply still carries `200`, so read `status` and `error`. A build too big for one run is resumed: finalise again and the server keeps what it measured and diffs the rest under the same budget, so repeated runs reach the end. The finalise reply carries `unmeasured`, the count still to measure, and `pixelslash upload` finalises again by itself while that falls (a warning on stderr for each); if it stops with shots left it warns that the build is `errored` and exits 0 as before. A hard kill by the runtime (one shot alone passing 30 s, or the isolate limit) cannot be caught in the request and can leave the build at `processing`; recovering a build stuck that way is a separate ticket. None of this applies to a `ci` project: its finalise reads no PNG and has no budget. An errored `ci` build is never measured again: finalising it again is a 409, and the build page says to re-run the CI job.
-
-**One shot's diff failing does not stop the others.** A shot whose server diff throws (its baseline missing from storage, a PNG that does not decode) keeps the reason in its `diffError` and is left unmeasured; the rest are measured, and the build ends `errored` naming each failed shot (`N of M shots could not be measured…`). The build page of an errored server-diff build has **Re-run errored shots** (the same as sending finalise again: only the shots with no result are measured), and on a build with a verdict each shot's page has **Re-run this shot**, which measures that one shot again. Both work from the PNGs the server holds (nothing is captured), and the build gets its verdict once none is left unmeasured; a picked shot whose re-diff fails loses its review and errors the build. A re-run shot whose result is the same keeps its review; one whose result moved goes back to pending (and is accepted again on the default branch, unless it is flaky). A `ci` project has neither control, and the server refuses the re-run (ob 1738).
-
-**A build never claims a verdict on a shot it did not measure** (PS-282). A shot whose fingerprint differs from its baseline's is not compared (`rebaseline_needed`, counted as `rebaseline`). On the default branch it is accepted and becomes the new baseline. On any other branch the build ends `errored`, naming how many shots and what moved (`fonts sha256:… → sha256:…`), so `pixelslash upload` exits 1: upload the default branch from the new environment, then rebase the branch onto that commit and upload it again (main's shots count only at the merge-base or its ancestors), and the server diff measures each such shot against main's new baseline (an open change from the old environment is not carried across). A `ci` project is not moved to main's baseline: `POST /builds/:id/baselines` is not told the shot's fingerprint, so it still names the branch's own baseline, and that branch's builds stay `errored` after an environment change. A shot left with no result at all errors the build too (`N of M shots have no result`). A build with no result on a shot is never the next build's baseline, so the branch's open changes are still carried past it.
-
-Sending a snapshot again (same name, platform, browser, viewport, theme) replaces it. Finalising checks the server holds exactly N snapshots (409 otherwise) and closes the build: after that every write is a 409, and finalising again with the same N is a harmless retry. A CI token only reaches its own project's builds, an org token the projects of its org, a personal token the projects of its user's orgs; any other project or build id is a 404. 401 is a missing, wrong, expired or revoked token.
-
-**What a shot is compared against (its baseline).** Each shot is matched by name, platform, browser, viewport and theme, and the server picks one earlier shot for it:
+Each shot is matched by name, platform, browser, viewport and theme, and the server picks one earlier shot for it:
 
 1. **The branch's last build.** The same shot from the newest earlier build on the same branch whose build was not rejected, reviewed or not. A second build of an unchanged commit therefore shows 0 changed: a re-run shows only what moved since the last one. A shot accepted on build 1 and unchanged on build 2 passes on build 2.
 2. **Otherwise, the accepted shot on the base.** The accepted shot from a build at the nearest of the merge-base and its ancestor SHAs (up to 200, nearest first; within one commit, the newest build). A project whose last main build is far behind the merge-base, because CI skipped it as unaffected, is fine: that build is the baseline, and a main build after the merge-base never is. A build on the project's default branch (`main` unless changed on the project's settings page) is auto-accepted, so on that branch rule 1 and rule 2 pick the same shot. A build on any other branch, `main` included when it is not the default, waits for review.
@@ -918,7 +1142,13 @@ PIXELSLASH_SERVER=https://<server> PIXELSLASH_TOKEN_FILE=<path to a project's CI
 
 ## API
 
-Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any other integration. Send the token as `Authorization: Bearer <token>`:
+Everything under `/api/v1` is one JSON API, for the CLI, the MCP server and any other integration. Ask who you are:
+
+```sh
+curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" "$PIXELSLASH_SERVER/api/v1/me"
+```
+
+Send the token as `Authorization: Bearer <token>`. There are three kinds:
 
 - A **CI token** (`psci_…`) reaches its one project.
 - An **org token** (`psorg_…`, issued by any member under Organizations → Tokens) reaches every project of its org and nothing else. It names the project in the request, as a personal token does, and can create one by name (`POST /api/v1/projects`). An upload never creates a project: an unknown project is a 404.
