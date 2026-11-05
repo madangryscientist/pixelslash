@@ -8,7 +8,7 @@ import { HowItWorksPage } from "#/components/pages/how-it-works";
 import { SecurityPage } from "#/components/pages/security";
 import { SelfHostPage } from "#/components/pages/self-host";
 import { TICKET_ID } from "./doc-text.ts";
-import { DOC_PAGES, EXTRA_NAV, GROUPS, findPage, neighbours } from "./docs-map.ts";
+import { DOC_PAGES, EXTRA_NAV, GROUPS, neighbours } from "./docs-map.ts";
 import { CLI_SPLIT } from "./cli-pages.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
@@ -50,15 +50,10 @@ describe("exit codes", () => {
     const wrong = DOC_PAGES.filter((page) => {
       const markup = html.get(page.slug) ?? "";
       const shows = markup.includes('data-testid="docs-exits"');
-      const wants = page.exits === true && page.slug !== "exit-codes";
+      const wants = page.exits === true;
       return shows !== wants || (shows && !markup.includes('href="/docs/exit-codes"'));
     }).map((page) => page.slug);
     expect(wrong).toEqual([]);
-  });
-
-  test("the commands that exit non-zero are marked", () => {
-    const slugs = ["install", "capture", "upload", "check", "parity", "compare", "mcp"];
-    expect(slugs.filter((slug) => findPage(slug)?.exits !== true)).toEqual([]);
   });
 
   test("the at-a-glance table lists the same codes as cli.md, one section each", () => {

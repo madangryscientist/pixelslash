@@ -30,15 +30,6 @@ describe("the command index", () => {
     expect(INDEX.map((entry) => entry.command).toSorted()).toEqual(cliCommands().toSorted());
   });
 
-  test("a command the reference does not document fails the build", () => {
-    // The reverse of the check above: the index is built from cli.md, so a command missing from
-    // it is a command whose synopsis cli.md lost.
-    const missing = cliCommands().filter(
-      (command) => !INDEX.some((entry) => entry.command === command),
-    );
-    expect(missing).toEqual([]);
-  });
-
   test("every command has a one-line summary, and none is for a command the CLI lacks", () => {
     expect(Object.keys(COMMAND_SUMMARY).toSorted()).toEqual(cliCommands().toSorted());
     for (const summary of Object.values(COMMAND_SUMMARY)) expect(summary).toMatch(/\.$/);

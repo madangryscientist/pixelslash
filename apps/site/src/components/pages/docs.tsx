@@ -182,8 +182,8 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
               </div>
             </details>
           )}
-          {page.exits === true && slug !== "exit-codes" ? <ExitsLine /> : null}
           <DocBody doc={doc} />
+          {page.exits === true ? <ExitsLine /> : null}
           <EditLink source={doc.source} />
           <PrevNext slug={slug} />
         </div>

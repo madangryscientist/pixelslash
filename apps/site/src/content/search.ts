@@ -31,13 +31,17 @@ function around(text: string, at: number): string {
 
 type Folded = { heading: string; page: string; text: string };
 
-/** How well a folded entry answers the query, or `null` when a word of it is missing. */
+/** How well a folded entry answers the query, or `null` when too many of its words are missing. */
 function scoreOf(
   { heading, page, text }: Folded,
   phrase: string,
   words: readonly string[],
 ): number | null {
-  if (!words.every((word) => `${heading} ${page} ${text}`.includes(word))) return null;
+  const everything = `${heading} ${page} ${text}`;
+  // Two thirds of the words must be there: an error message is printed with its numbers filled in,
+  // so the docs' `<n>/<m>` never matches the `0/1` a reader pastes, and the other words must still find it.
+  const needed = Math.max(1, Math.ceil((words.length * 2) / 3));
+  if (words.filter((word) => everything.includes(word)).length < needed) return null;
   const parts: [string, number, number][] = [
     [heading, 100, 10],
     [text, 60, 1],
@@ -53,7 +57,7 @@ function scoreOf(
 }
 
 /**
- * Every word of the query must appear in the section. A phrase match counts most, then the
+ * Two thirds of the query's words must appear in the section, and more words rank higher. A phrase match counts most, then the
  * heading, then the page title; a section that holds the whole query as written ranks first, which
  * is how an exact error message finds the one entry that prints it.
  */

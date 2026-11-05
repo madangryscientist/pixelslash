@@ -84,7 +84,7 @@ const TICKET = String.raw`(?:PS-\d+|OB-\d+|ob \d{3,4})`;
 const TICKET_RULES: readonly (readonly [RegExp, string])[] = [
   [new RegExp(String.raw`\s*\(${TICKET}\)`, "g"), ""],
   [new RegExp(String.raw`\(${TICKET}; `, "g"), "("],
-  [new RegExp(String.raw`, ${TICKET}\)`, "g"), ")"],
+  [new RegExp(String.raw`[,;] ${TICKET}\)`, "g"), ")"],
   [new RegExp(String.raw`Added in ${TICKET}\. `, "g"), ""],
   [new RegExp(String.raw`before ${TICKET}`, "g"), "before this was added"],
 ];

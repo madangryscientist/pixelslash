@@ -32,6 +32,7 @@ describe("search", () => {
       "rebaseline_needed",
       "do not go with --upload",
       "upload incomplete: <n>/<m> shots sent",
+      "upload incomplete: 0/1 shots sent",
     ].map((message) => [message, search(INDEX, message)[0]?.entry.url.split("#")[0]]);
     expect(found.filter(([, page]) => page !== "/docs/troubleshooting")).toEqual([]);
   });
