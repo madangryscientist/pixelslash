@@ -13,6 +13,8 @@ import {
 } from "@hackcove/ui-react";
 import type { OperatorHealth, WindowHealth } from "#/db/admin-health";
 import { formatBytes, formatDateTime, formatNumber } from "#/lib/format";
+import { P95_MIN_BUILDS, P99_MIN_BUILDS } from "#/lib/timings";
+import { BuildComparesTable } from "./operator-compares";
 import { NowSection } from "./operator-health-now";
 import { Figure, HealthSection, StepCell, plural } from "./operator-health-parts";
 
@@ -34,7 +36,7 @@ function WindowSection({
   return (
     <HealthSection
       title={w.label}
-      note={`Builds whose server step finished since ${formatDateTime(w.since)}${capped ? ", the newest only (the read is capped)" : ""}. Times are median / 95th percentile, or the slowest when under 20 builds; each cell names its own n.`}
+      note={`Builds that ended since ${formatDateTime(w.since)}${capped ? ", the newest only (the read is capped)" : ""}. Times are median / 95th percentile / 99th percentile. The middle figure is the slowest when under ${P95_MIN_BUILDS} builds; the last reads — when under ${P99_MIN_BUILDS}. Each cell names its own n.`}
       testId={`admin-window-${w.key}`}
     >
       <Text as="p" data-testid={`admin-${w.key}-finished`}>
@@ -88,12 +90,14 @@ function WindowSection({
         {w.rerun === 1 ? "is" : "are"} left out of the times.
       </Caption>
       <Text as="p" data-testid={`admin-${w.key}-compares`}>
-        {plural(w.comparesRun, "compare")} run; {plural(w.explainFailures, "model explanation")}{" "}
-        failed. Failed summary calls:{" "}
+        {plural(w.snapshots, "snapshot")} · {formatNumber(w.comparesRun)} compared ·{" "}
+        {plural(w.cacheHits, "cache hit")}; {plural(w.explainFailures, "model explanation")} failed.
+        Failed summary calls:{" "}
         <Figure reading={summaryFailures} testId={`admin-${w.key}-summary-failures`}>
           {(v) => formatNumber(v)}
         </Figure>
       </Text>
+      <BuildComparesTable rows={w.builds} total={w.finished} testId={`admin-${w.key}-builds`} />
     </HealthSection>
   );
 }

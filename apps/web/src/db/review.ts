@@ -4,6 +4,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { SNAPSHOT_GROUPS, awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
+import { cacheHit } from "./cache-hit";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
@@ -113,6 +114,8 @@ export type SnapshotView = {
   engineVersion: string | null;
   /** The server's compare time for it (PS-233); read through `compareMsOf`, which drops a stale one. */
   diffMs: number | null;
+  /** Its bytes matched its baseline, so no compare ran (PS-336). */
+  cacheHit: boolean;
   /** Why the shot could not be measured, when it could not. */
   diffError: string | null;
   /** The flake it is labelled with (ob 1724): detected on upload, open for its key, or marked. */
@@ -213,6 +216,7 @@ export async function buildView(db: Db, projectId: string, buildId: string): Pro
       measuredBy: snapshots.measuredBy,
       engineVersion: snapshots.engineVersion,
       diffMs: snapshots.diffMs,
+      cacheHit: cacheHit(),
       diffError: snapshots.diffError,
       flakeId: snapshots.flakeId,
       flakyPolicy: snapshots.flakyPolicy,

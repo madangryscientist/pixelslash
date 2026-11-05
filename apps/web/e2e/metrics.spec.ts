@@ -41,9 +41,12 @@ test("a diffed build states its wall time, counts and compare time, and the bran
   await expect(card.getByTestId("run-wall-value")).toHaveText(/\d/);
   await expect(card.getByTestId("run-wall-source")).toContainText("derived");
   await expect(card.getByTestId("run-shots-value")).toHaveText("2");
-  await expect(card.getByTestId("run-compares-value")).toHaveText("2");
+  await expect(card.getByTestId("run-compares-value")).toHaveText("1");
+  // "ticker" is the same bytes as main: a snapshot of the build, and no compare ran.
+  await expect(card.getByTestId("run-cache-hits-value")).toHaveText("1");
   await expect(card.getByTestId("run-unmeasured-value")).toHaveText("0");
-  await expect(card.getByTestId("run-compare-value")).toContainText("(n = 2)");
+  await expect(card.getByTestId("run-compare-value")).toContainText("2 snapshots · 1 compared");
+  await expect(card.getByTestId("run-compare-value")).toContainText("p99 — (n = 1)");
   await expect(card.getByTestId("run-compare-source")).toContainText("stored by the server");
   // A feature branch is never auto-accepted, the CLI sent no re-captures, no model ran.
   await expect(card.getByTestId("run-auto-accepted")).toHaveCount(0);
@@ -60,7 +63,7 @@ test("a diffed build states its wall time, counts and compare time, and the bran
     "Over the branch's last 20 builds: 1 build here.",
   );
   await expect(metrics.getByTestId("branch-metrics-wall")).toContainText("(n = 1 finished build)");
-  await expect(metrics.getByTestId("branch-metrics-compare-time")).toContainText("(n = 2 shots)");
+  await expect(metrics.getByTestId("branch-metrics-compare-time")).toContainText("(n = 1 shot)");
   // One build is a value, not a trend.
   await expect(metrics.getByTestId("branch-metrics-sparkline")).toHaveCount(0);
 });

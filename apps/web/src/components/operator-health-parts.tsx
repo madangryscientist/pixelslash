@@ -63,7 +63,9 @@ export function StepCell({ stats }: { stats: StepStats | null }) {
           {" "}
           <Text tone="muted">max</Text>
         </>
-      )}
+      )}{" "}
+      <Text tone="muted">/</Text>{" "}
+      {stats.p99 === null ? "—" : formatDuration(stats.p99, { exact: true })}
     </TableCell>
   );
 }

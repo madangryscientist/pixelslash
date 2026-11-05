@@ -46,6 +46,22 @@ describe("per-shot compare time", () => {
     expect(await onlyShot(ctx, build)).toMatchObject({ diffStatus: "changed", diffMs: 400 });
   });
 
+  test("a cache hit stores no time, and the identical path never reads the clock", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    // Identical bytes write no overlay, so this clock stays at 0: a timed hit would store a 0.
+    const build = await upload(
+      ctx,
+      { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: white }] },
+      timed(ctx, 400),
+    );
+    expect(await onlyShot(ctx, build)).toMatchObject({
+      diffStatus: "unchanged",
+      measuredBy: "server",
+      diffMs: null,
+    });
+  });
+
   test("a shot whose diff failed was never measured, and stays NULL", async () => {
     const ctx = await context();
     await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });

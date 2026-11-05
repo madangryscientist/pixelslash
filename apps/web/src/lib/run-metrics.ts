@@ -8,7 +8,7 @@ import type {
 } from "#/db/schema";
 import { isMarker } from "#/db/markers";
 import { type SnapshotGroup, groupOf, skippedFlaky } from "./snapshot-groups";
-import { type StepStats, statsOf } from "./timings";
+import { P99_MIN_COMPARES, type StepStats, statsOf } from "./timings";
 
 /**
  * The build page's "This run" card (PS-233), free of the database: what the build's stored rows
@@ -28,6 +28,8 @@ export type MetricShot = {
   rebaselineNeeded: boolean;
   measuredBy: DiffLocation | null;
   diffMs: number | null;
+  /** Its bytes matched its baseline (`cacheHit` in `db/cache-hit.ts`): a shot of the build, no compare. */
+  cacheHit: boolean;
   reviewState: string;
   reviewedBy: string | null;
   carriedFrom: string | null;
@@ -48,15 +50,17 @@ export type MetricBuild = {
 /** A shot measured against its baseline: what the card counts as one compare. */
 const MEASURED: ReadonlySet<SnapshotGroup> = new Set(["changed", "unchanged"]);
 
-export const compared = (shot: Pick<MetricShot, "diffStatus" | "rebaselineNeeded">) =>
-  MEASURED.has(groupOf(shot));
+/** A compare that ran. A cache hit has a result and ran none. */
+export const compared = (shot: Pick<MetricShot, "diffStatus" | "rebaselineNeeded" | "cacheHit">) =>
+  MEASURED.has(groupOf(shot)) && !shot.cacheHit;
 
 /**
  * The compare time a shot has: stored when the server measured it and it still holds that result.
- * A result a re-run cleared, or one CI measured, has none.
+ * A result a re-run cleared, or one CI measured, has none, and neither has a cache hit, whatever
+ * its row stored (rows from before PS-336 hold a 0).
  */
 export const compareMsOf = (
-  shot: Pick<MetricShot, "diffStatus" | "rebaselineNeeded" | "measuredBy" | "diffMs">,
+  shot: Pick<MetricShot, "diffStatus" | "rebaselineNeeded" | "measuredBy" | "diffMs" | "cacheHit">,
 ): number | null => (compared(shot) && shot.measuredBy === "server" ? shot.diffMs : null);
 
 /** The build's wall time: created to the last server step, derived from two stored moments. */
@@ -69,6 +73,8 @@ export function wallMs(build: Pick<MetricBuild, "createdAt" | "finishedAt">): nu
 export type RunCounts = {
   shots: number;
   compares: { server: number; ci: number };
+  /** Shots whose bytes matched their baseline: in `shots`, in neither count of `compares`. */
+  cacheHits: number;
   notMeasured: number;
   skippedFlaky: number;
   /** Only on the default branch, where a build is accepted on finalise; null elsewhere. */
@@ -88,6 +94,7 @@ export function countRun(
       server: measured.filter((s) => s.measuredBy === "server").length,
       ci: measured.filter((s) => s.measuredBy === "ci").length,
     },
+    cacheHits: held.filter((s) => s.cacheHit).length,
     notMeasured: held.filter((s) => groupOf(s) === "unmeasured").length,
     skippedFlaky: held.filter(skippedFlaky).length,
     autoAccepted:
@@ -107,7 +114,10 @@ const labelOf = (s: { name: string; viewport?: string; theme?: string }) =>
   s.viewport && s.theme ? `${s.name} (${s.viewport}, ${s.theme})` : s.name;
 
 function timesOf(timed: SlowShot[], source: Source): CompareTimes | null {
-  const stats = statsOf(timed.map((t) => t.ms));
+  const stats = statsOf(
+    timed.map((t) => t.ms),
+    P99_MIN_COMPARES,
+  );
   if (!stats) return null;
   const slowest = timed.toSorted((a, b) => b.ms - a.ms).slice(0, 3);
   return { stats, slowest, source };
@@ -117,6 +127,13 @@ function timesOf(timed: SlowShot[], source: Source): CompareTimes | null {
  * Per-compare time: the server's, stored per shot, or else what the CLI sent per shot (a CI build
  * diffs on the runner). Null when neither recorded one.
  */
+/**
+ * What the CLI sent for a shot as a compare time. It times every shot it picked a baseline for, a
+ * new shot with none too, so a 0 is no compare and never joins a sample (PS-336).
+ */
+export const cliCompareMs = (shot: { diffMs?: number }): number | null =>
+  shot.diffMs ? shot.diffMs : null;
+
 export function compareTimes(
   build: Pick<MetricBuild, "timings">,
   shots: readonly MetricShot[],
@@ -126,9 +143,10 @@ export function compareTimes(
     return ms === null ? [] : [{ label: labelOf(s), ms }];
   });
   if (server.length > 0) return timesOf(server, "server");
-  const cli = (build.timings?.shots ?? []).flatMap((s) =>
-    s.diffMs === undefined ? [] : [{ label: labelOf(s), ms: s.diffMs }],
-  );
+  const cli = (build.timings?.shots ?? []).flatMap((s) => {
+    const ms = cliCompareMs(s);
+    return ms === null ? [] : [{ label: labelOf(s), ms }];
+  });
   return timesOf(cli, "cli");
 }
 

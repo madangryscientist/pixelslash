@@ -37,14 +37,21 @@ export const SUMMARY_SKIPPED_NOTE = "no summary written (skipped or failed)";
 /** The tail of a step's times is a 95th percentile only over this many builds; fewer, and it is the slowest. */
 export const P95_MIN_BUILDS = 20;
 
+/** Under this many builds a p99 is the slowest wearing a percentile's name (PS-336): no number is shown. */
+export const P99_MIN_BUILDS = 100;
+
+/** The same gate for one build's or one window's compares, which come in far larger numbers. */
+export const P99_MIN_COMPARES = 500;
+
 /**
  * One step's median and its tail (ms) over `n` builds that have the step. The tail is the 95th
  * percentile, or the slowest (`max`) when `n` is under `P95_MIN_BUILDS`: with so few builds a p95
- * is the slowest in all but name, and the page says so.
+ * is the slowest in all but name, and the page says so. `p99` is null under its own, harder gate.
  */
 export type StepStats = {
   p50: number;
   p95: number;
+  p99: number | null;
   max: number;
   n: number;
   tail: "p95" | "max";
@@ -59,16 +66,37 @@ export function percentile(sorted: readonly number[], p: number): number {
   return sorted[Math.min(rank, sorted.length) - 1] ?? 0;
 }
 
-export function statsOf(values: (number | null)[]): StepStats | null {
+/** The stats of `n` values from their nearest-rank percentiles, with both gates applied. */
+export function gatedStats(
+  { p50, p95, p99, max, n }: { p50: number; p95: number; p99: number; max: number; n: number },
+  p99Min: number,
+): StepStats {
+  return {
+    p50,
+    p95,
+    p99: n < p99Min ? null : p99,
+    max,
+    n,
+    tail: n < P95_MIN_BUILDS ? "max" : "p95",
+  };
+}
+
+export function statsOf(
+  values: (number | null)[],
+  p99Min: number = P99_MIN_BUILDS,
+): StepStats | null {
   const sorted = values.filter((v): v is number => v !== null).toSorted((a, b) => a - b);
   if (sorted.length === 0) return null;
-  return {
-    p50: percentile(sorted, 0.5),
-    p95: percentile(sorted, 0.95),
-    max: sorted.at(-1) ?? 0,
-    n: sorted.length,
-    tail: sorted.length < P95_MIN_BUILDS ? "max" : "p95",
-  };
+  return gatedStats(
+    {
+      p50: percentile(sorted, 0.5),
+      p95: percentile(sorted, 0.95),
+      p99: percentile(sorted, 0.99),
+      max: sorted.at(-1) ?? 0,
+      n: sorted.length,
+    },
+    p99Min,
+  );
 }
 
 /** A build's server timings, as stored. */

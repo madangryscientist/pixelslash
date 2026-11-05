@@ -15,7 +15,7 @@ export type BranchBuildRow = {
   id: string;
   createdAt: Date;
   finishedAt: Date | null;
-  /** Shots measured against their baseline on this build, by the server or by CI. */
+  /** Shots measured against their baseline on this build, by the server or by CI; no cache hit. */
   compares: number;
   /** The server's compare time of each shot that has one. */
   compareMs: number[];

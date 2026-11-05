@@ -15,6 +15,7 @@ export function metricShot(over: Partial<MetricShot> = {}): MetricShot {
     rebaselineNeeded: false,
     measuredBy: "server",
     diffMs: null,
+    cacheHit: false,
     reviewState: "pending",
     reviewedBy: null,
     carriedFrom: null,
