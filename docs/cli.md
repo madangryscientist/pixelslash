@@ -355,7 +355,7 @@ A project that builds its pages only from one design-system library's components
 
 ## Snapshots from your own Playwright tests
 
-`@hackcove/pixelslash-playwright` (`packages/playwright`; packed with `bun scripts/pack-npm.ts`, not published yet) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a snapshot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
+`@hackcove/pixelslash-playwright` (`packages/playwright`; on npm, `npm install -D @hackcove/pixelslash-playwright`) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a snapshot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
 
 ```ts
 import { test } from "@playwright/test";

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Token, lexer } from "marked";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,6 +9,7 @@ import { HowItWorksPage } from "#/components/pages/how-it-works";
 import { CLI_SPLIT, splitCli } from "./cli-pages.ts";
 import { CLI_INTRO_DOC, DOC_PAGE_DOCS, SECURITY_DOC, TRADEMARK, trademarkLine } from "./docs.ts";
 import { DOC_PAGES, GROUPS, type DocPageDef, neighbours } from "./docs-map.ts";
+import { resolveImageSrc } from "./links.ts";
 import { plainText, slugger } from "./markdown.tsx";
 
 /*
@@ -185,6 +186,28 @@ describe("the docs pages", () => {
     for (const match of html.matchAll(/href="\/docs\/([^"#]+)#([^"]+)"/g)) {
       expect(DOC_PAGES.map((p) => p.slug)).toContain(match[1]);
       expect(CLI_SPLIT.anchorPage.get(match[2] ?? "")).toBe(match[1]);
+    }
+  });
+});
+
+describe("the screenshots in the docs", () => {
+  const images = DOC_PAGES.flatMap((page) => {
+    if (!page.file) return [];
+    const md = readFileSync(join(ROOT, page.file), "utf8");
+    return [...md.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => ({
+      page,
+      file: page.file ?? "",
+      src: match[1] ?? "",
+    }));
+  });
+
+  test("every one is a file the site serves, drawn on its page", () => {
+    expect(images.length).toBeGreaterThan(0);
+    for (const { page, file, src } of images) {
+      const served = resolveImageSrc(src, file);
+      expect(served).not.toBeNull();
+      expect(existsSync(join(ROOT, "apps/site/public", served ?? ""))).toBe(true);
+      expect(pageHtml.get(page.slug)).toContain(`src="${served}"`);
     }
   });
 });

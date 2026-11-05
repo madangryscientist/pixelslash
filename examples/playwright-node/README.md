@@ -3,13 +3,19 @@
 A project outside the workspace that takes PixelSlash snapshots from its own Playwright tests, the way
 a team that has never heard of Bun would: `npx playwright test` on Node, then `pixelslash upload`.
 
-It installs the two **packed** packages, not the workspace:
+It uses the two published packages, not the workspace:
 
 - `@hackcove/pixelslash-playwright`, the helper (`snapshot(page, name, opts)`), which runs under Node;
 - `@hackcove/pixelslash`, the CLI, which uploads the dir and needs Bun (`bun` on the machine that
   uploads, not on the one that runs the tests).
 
-Neither is on npm yet (publishing waits on the open-source decision), so build and install the tarballs:
+Both are on npm:
+
+```bash
+npm install -D @hackcove/pixelslash @hackcove/pixelslash-playwright
+```
+
+To try a change from a checkout, build and install the tarballs instead:
 
 ```bash
 bun scripts/pack-npm.ts packs        # from the repo root: prints the two tarball paths

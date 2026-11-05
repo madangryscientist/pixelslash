@@ -2,6 +2,19 @@ import readme from "../../../../README.md?raw";
 import security from "../../../../SECURITY.md?raw";
 import gettingStarted from "../../../../docs/getting-started.md?raw";
 import metrics from "../../../../docs/metrics.md?raw";
+import chooseCapture from "../../../../docs/tutorials/choose-capture.md?raw";
+import tutorialStorybook from "../../../../docs/tutorials/storybook.md?raw";
+import tutorialPlaywright from "../../../../docs/tutorials/playwright.md?raw";
+import tutorialUrls from "../../../../docs/tutorials/urls.md?raw";
+import tutorialPngs from "../../../../docs/tutorials/pngs.md?raw";
+import tutorialFirstReview from "../../../../docs/tutorials/first-review.md?raw";
+import ciGithubActions from "../../../../docs/ci/github-actions.md?raw";
+import ciGitlab from "../../../../docs/ci/gitlab.md?raw";
+import ciCircleci from "../../../../docs/ci/circleci.md?raw";
+import ciJenkins from "../../../../docs/ci/jenkins.md?raw";
+import ciAny from "../../../../docs/ci/any-ci.md?raw";
+import ciPinVersions from "../../../../docs/ci/pin-versions.md?raw";
+import ciReviewServer from "../../../../docs/ci/review-server.md?raw";
 import selfHost from "../../../web/SELF-HOST.md?raw";
 import { CLI_SPLIT } from "./cli-pages.ts";
 import { plainText } from "./doc-text.ts";
@@ -43,6 +56,43 @@ export const CLI_INTRO_DOC = cliDoc(CLI_SPLIT.preamble, CLI_SPLIT.title);
 const FILE_DOCS = {
   "docs/getting-started.md": parseDoc(gettingStarted, "docs/getting-started.md", "getting-started"),
   "docs/metrics.md": parseDoc(metrics, "docs/metrics.md", "metrics"),
+  "docs/tutorials/choose-capture.md": parseDoc(
+    chooseCapture,
+    "docs/tutorials/choose-capture.md",
+    "choose-capture",
+  ),
+  "docs/tutorials/storybook.md": parseDoc(
+    tutorialStorybook,
+    "docs/tutorials/storybook.md",
+    "tutorial-storybook",
+  ),
+  "docs/tutorials/playwright.md": parseDoc(
+    tutorialPlaywright,
+    "docs/tutorials/playwright.md",
+    "tutorial-playwright",
+  ),
+  "docs/tutorials/urls.md": parseDoc(tutorialUrls, "docs/tutorials/urls.md", "tutorial-urls"),
+  "docs/tutorials/pngs.md": parseDoc(tutorialPngs, "docs/tutorials/pngs.md", "tutorial-pngs"),
+  "docs/tutorials/first-review.md": parseDoc(
+    tutorialFirstReview,
+    "docs/tutorials/first-review.md",
+    "tutorial-first-review",
+  ),
+  "docs/ci/github-actions.md": parseDoc(
+    ciGithubActions,
+    "docs/ci/github-actions.md",
+    "ci-github-actions",
+  ),
+  "docs/ci/gitlab.md": parseDoc(ciGitlab, "docs/ci/gitlab.md", "ci-gitlab"),
+  "docs/ci/circleci.md": parseDoc(ciCircleci, "docs/ci/circleci.md", "ci-circleci"),
+  "docs/ci/jenkins.md": parseDoc(ciJenkins, "docs/ci/jenkins.md", "ci-jenkins"),
+  "docs/ci/any-ci.md": parseDoc(ciAny, "docs/ci/any-ci.md", "ci-any"),
+  "docs/ci/pin-versions.md": parseDoc(ciPinVersions, "docs/ci/pin-versions.md", "ci-pin-versions"),
+  "docs/ci/review-server.md": parseDoc(
+    ciReviewServer,
+    "docs/ci/review-server.md",
+    "ci-review-server",
+  ),
 };
 
 /** The document a docs page shows: a cut of cli.md, or the page's own file. */

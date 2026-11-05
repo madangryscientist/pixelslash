@@ -1,10 +1,25 @@
 import { describe, expect, test } from "vitest";
-import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL, resolveHref } from "./links.ts";
+import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL, resolveHref, resolveImageSrc } from "./links.ts";
 
 const CLOSED = { repoPublic: false, appLive: false };
 const OPEN = { repoPublic: true, appLive: true };
 
+describe("resolveImageSrc", () => {
+  test("anything else is not the site's to serve", () => {
+    expect(resolveImageSrc("../assets/x.png", "docs/tutorials/urls.md")).toBeNull();
+  });
+});
+
 describe("resolveHref", () => {
+  test("a nested doc links to its neighbours' pages", () => {
+    expect(resolveHref("../ci/review-server.md", "docs/tutorials/first-review.md", CLOSED)).toBe(
+      "/docs/ci-review-server",
+    );
+    expect(resolveHref("../../apps/web/SELF-HOST.md", "docs/ci/gitlab.md", CLOSED)).toBe(
+      "/self-host",
+    );
+  });
+
   test("a repo file the site renders goes to its page, anchor kept", () => {
     expect(resolveHref("docs/cli.md#uploading-to-a-server", "README.md", CLOSED)).toBe(
       "/docs/upload#uploading-to-a-server",

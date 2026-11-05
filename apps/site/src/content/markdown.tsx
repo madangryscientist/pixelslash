@@ -18,7 +18,7 @@ import {
 import { type MarkedToken, type Token, type Tokens, lexer } from "marked";
 import { Fragment, type ReactNode } from "react";
 import { decode, marked, plainText, slugger } from "./doc-text.ts";
-import { resolveHref } from "./links.ts";
+import { resolveHref, resolveImageSrc } from "./links.ts";
 
 export { plainText, slugger };
 
@@ -76,6 +76,13 @@ function InlineLink({ token, doc }: { token: Tokens.Link; doc: Doc }): ReactNode
   );
 }
 
+/** A screenshot from the site's `public` directory; any other image stays its alt text. */
+function InlineImage({ token, doc }: { token: Tokens.Image; doc: Doc }): ReactNode {
+  const src = resolveImageSrc(token.href, doc.source);
+  if (src === null) return token.text;
+  return <img src={src} alt={token.text} className="block h-auto max-w-full rounded" />;
+}
+
 function InlineToken({ token, doc }: { token: MarkedToken; doc: Doc }): ReactNode {
   switch (token.type) {
     case "strong":
@@ -95,15 +102,16 @@ function InlineToken({ token, doc }: { token: MarkedToken; doc: Doc }): ReactNod
       return <InlineLink token={token} doc={doc} />;
     case "br":
       return <br />;
+    case "image":
+      return <InlineImage token={token} doc={doc} />;
     default:
       return inlineText(token, doc);
   }
 }
 
-/** Text, an escape, inline HTML (`<name>` in prose is literal text) and an image's alt text. */
+/** Text, an escape and inline HTML (`<name>` in prose is literal text). */
 function inlineText(token: MarkedToken, doc: Doc): ReactNode {
   if (token.type === "text" && token.tokens) return <Inline tokens={token.tokens} doc={doc} />;
-  if (token.type === "image") return token.text;
   return "text" in token ? decode(token.text) : null;
 }
 
