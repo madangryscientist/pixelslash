@@ -65,7 +65,7 @@ const COMMANDS = [
 
 function Hero(): ReactNode {
   return (
-    <section className="relative px-5 pt-12 pb-20 md:pt-16">
+    <section className="relative px-5 pt-12 pb-6 md:pt-16">
       <div className="home-aurora" aria-hidden="true">
         <span />
         <span />
@@ -103,7 +103,7 @@ function Hero(): ReactNode {
 
 function Steps(): ReactNode {
   return (
-    <section className="px-5 py-20">
+    <section className="px-5 pt-10 pb-14">
       <ol className="home-steps mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
         {STEPS.map((step, index) => (
           <li key={step.title} className="home-reveal home-step">
@@ -119,7 +119,7 @@ function Steps(): ReactNode {
 
 function Features(): ReactNode {
   return (
-    <section className="px-5 py-20">
+    <section className="px-5 py-14">
       <div className="mx-auto max-w-6xl">
         <h2 className="home-reveal text-center text-3xl font-bold tracking-tight md:text-5xl">
           What it does
@@ -133,7 +133,7 @@ function Features(): ReactNode {
                   <h3 className="text-lg font-semibold">{feature.title}</h3>
                   <p className="mt-2 text-(--home-sub)">{feature.body}</p>
                   <span
-                    className="mt-4 inline-block text-sm font-semibold text-violet-600"
+                    className="home-more mt-4 inline-block text-sm font-semibold"
                     aria-hidden="true"
                   >
                     Read more →
@@ -150,7 +150,7 @@ function Features(): ReactNode {
 
 function Checkout(): ReactNode {
   return (
-    <section className="px-5 py-20">
+    <section className="px-5 py-14">
       <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[2fr_3fr]">
         <div className="home-reveal">
           <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Install it from npm</h2>
@@ -167,7 +167,7 @@ function Checkout(): ReactNode {
           </p>
         </div>
         <div className="home-reveal min-w-0">
-          <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} />
+          <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} overflow="scroll" copy />
         </div>
       </div>
     </section>
@@ -176,7 +176,7 @@ function Checkout(): ReactNode {
 
 function Local(): ReactNode {
   return (
-    <section className="px-5 py-20">
+    <section className="px-5 pt-14 pb-20">
       <div className="home-reveal home-band mx-auto max-w-6xl">
         <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
           Your pixels stay <span className="home-gradient-text">on your machine.</span>

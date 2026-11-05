@@ -1,5 +1,7 @@
 /*
- * The homepage's own look (src/components/pages/home.tsx): gradients, the demo and the band, on
+ * The site's art direction, set by the homepage (src/components/pages/home.tsx): gradients, the demo
+ * and the band. Every inner page shares its ground (`[data-art]`) and its aurora and grid
+ * (`.page-art`, drawn by `PageArt` in shell.tsx), so there is no step down from the home. All on
  * tokens with a value in each theme, Mocha on `.dark` and Latte on `.latte`. The head script sets
  * that class before first paint, so the page draws in its scheme from the first frame. Every moving
  * part sits under prefers-reduced-motion: no-preference, so a visitor who asks for less motion gets
@@ -27,6 +29,7 @@
   --home-sub: #a6adc8;
   --home-text: #cdd6f4;
   --home-mauve: #cba6f7;
+  --home-link: #cba6f7;
   --home-blue: #89b4fa;
   --home-peach: #fab387;
   --home-green: #a6e3a1;
@@ -47,9 +50,10 @@
   --home-raised: #fff;
   --home-line: #ccd0da;
   --home-line-2: #bcc0cc;
-  --home-sub: #5c5f77;
+  --home-sub: #4a4d65;
   --home-text: #4c4f69;
   --home-mauve: #8035e1;
+  --home-link: #5b21b6;
   --home-blue: #1e5bd4;
   --home-peach: #ad4308;
   --home-green: #40a02b;
@@ -84,9 +88,56 @@
   font-family: var(--font-sans);
 }
 
+/*
+ * Every page stands on the home's ground (the shell marks its root data-art): the same canvas under
+ * the header, the page and the footer in either theme, so there is no step from the home to an
+ * inner page. Unlayered, so it beats the shell's own utility background.
+ */
+[data-art] {
+  background: var(--home-page);
+}
+
+/* An inner page: the aurora and grid over its first screen, fading out, behind the content. */
+.page-art {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow-x: clip;
+}
+
+.page-art > :not(.page-art-bg) {
+  flex: 1;
+}
+
+.latte .page-art-bg {
+  opacity: 0.4;
+}
+
+.page-art-bg {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 32rem;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(#000 45%, transparent);
+}
+
+/* The home's blobs are sized for a hero; here they sit nearer the top edge. */
+.page-art-bg .home-aurora span:nth-child(3) {
+  top: 12rem;
+}
+
+/* The "Read more" line on a card: the accent as text, past 7:1 on a card in either theme. */
+.home-more {
+  color: var(--home-link);
+}
+
 /* The canvas past the page's own edges (overscroll, a fractional pixel) matches it, in either theme. */
-html:has(.home),
-body:has(.home) {
+html:has([data-art]),
+body:has([data-art]) {
   background: var(--home-page);
 }
 

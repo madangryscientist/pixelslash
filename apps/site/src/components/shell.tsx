@@ -5,6 +5,7 @@ import {
   Caption,
   Cluster,
   ColourSchemeToggle,
+  Container,
   Tabs,
   Stack,
   TextLink,
@@ -58,8 +59,32 @@ function Footer(): ReactNode {
 }
 
 /**
+ * An inner page's ground: the home's canvas with the same aurora and grid fading out over the top
+ * of the page, so stepping from the home to any page keeps the look. The page itself sits in the
+ * shell's own Container, over it.
+ */
+function PageArt({ children }: { children: ReactNode }): ReactNode {
+  return (
+    <div className="page-art">
+      <div className="page-art-bg" aria-hidden="true">
+        <div className="home-aurora">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="home-grid" />
+      </div>
+      <div className="py-8">
+        <Container>{children}</Container>
+      </div>
+    </div>
+  );
+}
+
+/**
  * The frame every page sits in: the brand, the nav row, the page, the footer. The homepage's sections
- * run the full width and it draws its own footer, so it bleeds and takes none from here.
+ * run the full width and it draws its own footer, so it takes none from here. Every other page
+ * is drawn over the same ground (PageArt), and the shell paints that ground under the footer too.
  */
 export function Shell({
   pathname,
@@ -86,9 +111,10 @@ export function Shell({
         </div>
       }
       footer={isHome ? undefined : <Footer />}
-      bleed={isHome}
+      bleed
+      data-art=""
     >
-      {children}
+      {isHome ? children : <PageArt>{children}</PageArt>}
     </AppShell>
   );
 }

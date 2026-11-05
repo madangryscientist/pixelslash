@@ -65,7 +65,11 @@ so it needs the same change.
 bun run dev              # vite dev on :3100
 bunx nx build site       # prerenders every page into dist/client
 bunx nx test site        # the docs and compare pages against their source files
-bunx nx test:e2e site    # Playwright on the build, desktop and phone: nav, footer, dead links
+bunx nx test:e2e site    # Playwright on the build, desktop and phone: nav, footer, dead links,
+                         # WCAG AA contrast in both themes (e2e/support/contrast.ts): every text node on a solid ground,
+                         # and the inner pages' heading and lead over the aurora, read from pixels. Text on a
+                         # picture or gradient fill (the demo, the closing band) is not measured,
+                         # every `copy` button, the home's spacing
 ```
 
 `SITE_SHOTS_DIR=<dir> bunx nx test:e2e site` also writes a full-page screenshot of every page.

@@ -30,7 +30,7 @@ export function PricingPage(): ReactNode {
       </Cluster>
       <CardGrid columns={3} data-testid="pricing-facts">
         {FACTS.map((fact) => (
-          <Card key={fact.title} title={fact.title}>
+          <Card key={fact.title} title={fact.title} icon={fact.icon}>
             {fact.body}
           </Card>
         ))}
