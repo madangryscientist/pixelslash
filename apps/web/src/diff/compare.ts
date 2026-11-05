@@ -105,6 +105,14 @@ const SIDECAR_LIMIT_MPX = 24.5;
  */
 const FALLBACK_LIMIT_MPX = 12.5;
 
+/**
+ * A shot over a size limit: an outcome of what was uploaded, not a server fault (PS-328), so it is
+ * stored and shown but never reported. A re-run cannot help it.
+ */
+export class DiffRefusedError extends Error {
+  override name = "DiffRefusedError";
+}
+
 /** Refuse a pair above `limit`, in words the build's error shows. A PNG with no size is the diff's to report. */
 function refuseOver(what: string, limit: number, main: Buffer, branch: Buffer): void {
   const a = readPngSize(main);
@@ -114,7 +122,9 @@ function refuseOver(what: string, limit: number, main: Buffer, branch: Buffer): 
   const height = Math.max(a.height, b.height);
   const mpx = (width * height) / 1_000_000;
   if (mpx > limit)
-    throw new Error(`${what}: ${width}x${height} = ${mpx.toFixed(1)} Mpx, limit ${limit} Mpx`);
+    throw new DiffRefusedError(
+      `${what}: ${width}x${height} = ${mpx.toFixed(1)} Mpx, limit ${limit} Mpx`,
+    );
 }
 
 /**

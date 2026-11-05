@@ -22,6 +22,7 @@ import {
   type Comparer,
   type Measured,
   type SnapshotRow,
+  DiffRefusedError,
   ciComparer,
   diffKeyOf,
   serverComparer,
@@ -38,7 +39,7 @@ import {
   markRemoved,
   projectOf,
 } from "./build-writes";
-import { UnmeasuredError, assertMeasured } from "./measured";
+import { ShotsUnmeasuredError, UnmeasuredError, assertMeasured } from "./measured";
 import { carryOpenFromMain } from "./open-vs-main";
 import { withOverrides } from "./with-overrides";
 import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
@@ -186,6 +187,8 @@ async function diffOne(
   await measureAgainst(deps, compare, shot, baseline.accepted);
 }
 
+type FailedShot = { reason: string; refused: boolean };
+
 export type ProcessResult = {
   status: Build["status"];
   error: string | null;
@@ -226,7 +229,7 @@ async function measure(
   budget: Budget,
 ) {
   const compare = serverComparer(deps);
-  const failed: string[] = [];
+  const failed: FailedShot[] = [];
   let done = 0;
   for (const shot of rows) {
     const baseline = baselineFor(baselines, shot);
@@ -235,17 +238,20 @@ async function measure(
         throw new DiffCeilingError(done, rows.length, budget.used(), budget.slowest);
       await budget.spend(async (began) => {
         const timed = timedComparer(compare, deps.now ?? Date.now, began);
-        const reason = await diffOrRecord(deps, timed, shot, baseline);
-        if (reason) failed.push(reason);
+        const failure = await diffOrRecord(deps, timed, shot, baseline);
+        if (failure) failed.push(failure);
       });
     }
     done++;
   }
-  if (failed.length > 0)
-    throw new Error(
-      `${failed.length} of ${rows.length} shots could not be measured; re-run them from the build ` +
-        `page. ${failed.join("; ")}`,
+  if (failed.length > 0) {
+    // A re-run cannot help a shot over a size limit; say so only when some failed shot could be helped.
+    const rerun = failed.every((f) => f.refused) ? "" : "; re-run them from the build page.";
+    const named = failed.map((f) => f.reason).join("; ");
+    throw new ShotsUnmeasuredError(
+      `${failed.length} of ${rows.length} shots could not be measured${rerun || "."} ${named}`,
     );
+  }
 }
 
 const shotLabel = (shot: SnapshotRow) => `${shot.name} (${shot.viewport}, ${shot.theme})`;
@@ -260,13 +266,14 @@ async function diffOrRecord(
   compare: Comparer,
   shot: SnapshotRow,
   baseline: Baseline | undefined,
-): Promise<string | null> {
+): Promise<FailedShot | null> {
   try {
     await diffOne(deps, compare, shot, baseline);
     return null;
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    reportError(e, { area: "diff", step: "shot" });
+    const refused = e instanceof DiffRefusedError;
+    if (!refused) reportError(e, { area: "diff", step: "shot" });
     await storeSnapshot(deps.db, shot.id, {
       diffStatus: null,
       diffResult: null,
@@ -274,7 +281,7 @@ async function diffOrRecord(
       diffError: reason,
       diffMs: null,
     });
-    return `${shotLabel(shot)}: ${reason}`;
+    return { reason: `${shotLabel(shot)}: ${reason}`, refused };
   }
 }
 
@@ -341,10 +348,16 @@ async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<Process
 
 /**
  * The ceiling is the budget working as designed, not a failure: the next finalise resumes. An
- * unmeasured build is what the upload held, not a fault.
+ * unmeasured build is what the upload held, not a fault; so is a size refusal met outside `measure`.
  */
 function reportBuildFailure(e: unknown): void {
-  if (e instanceof DiffCeilingError || e instanceof UnmeasuredError) return;
+  if (
+    e instanceof DiffCeilingError ||
+    e instanceof UnmeasuredError ||
+    e instanceof ShotsUnmeasuredError ||
+    e instanceof DiffRefusedError
+  )
+    return;
   reportError(e, { area: "diff", step: "build" });
 }
 
