@@ -7,11 +7,8 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Shell } from "#/components/shell";
+import { SCHEMES, Shell } from "#/components/shell";
 import appCss from "../styles.css?url";
-
-// The class each scheme puts on <html>: Latte's scope for light, Mocha's for dark.
-const SCHEMES = { light: "latte", dark: "dark" } as const;
 
 // colourSchemeScript knows the `dark` class only. The page is prerendered with `latte` on <html>, so
 // once that script has decided, this takes `latte` off a dark page: exactly one scope is ever set.
@@ -43,7 +40,8 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],
-    // Before first paint: the system's light or dark, so a dark-mode visitor sees no light flash. No cookie.
+    // Before first paint: the visitor's stored choice (the header's toggle), else the system's light or
+    // dark, so a dark page shows no light flash. No cookie.
     scripts: [{ children: SCOPE_SCRIPT }],
   }),
   shellComponent: RootDocument,
@@ -52,8 +50,6 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  // The homepage draws its own header and footer (components/pages/home.tsx).
-  if (pathname === "/") return <Outlet />;
   return (
     <Shell pathname={pathname}>
       <Outlet />
