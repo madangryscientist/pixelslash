@@ -223,3 +223,42 @@ for (const scheme of ["light", "dark"] as const) {
     });
   }
 }
+
+/*
+ * The sticky header stays on top (PS-306): a card's links are lifted above the card's own overlay, and
+ * once scrolled they must still sit under the header. What is asserted is what is painted: the header's
+ * band is shot as it is, then again with every link in the page body hidden; the two must match, so no
+ * link has drawn a pixel over the header. The page is walked down in steps, so a link crosses the band.
+ */
+for (const scheme of ["light", "dark"] as const) {
+  test(`/docs scrolled: no link paints over the header in ${scheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.goto("/docs", { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
+
+    const clip = await page.locator("header").first().boundingBox();
+    if (!clip) throw new Error("the header has no box");
+    const reach = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    );
+
+    let crossings = 0;
+    for (let y = 0; y <= reach; y += 40) {
+      await page.evaluate((top) => window.scrollTo(0, top), y);
+      // Only the cards' links are lifted, so only they have to cross the band for the check to bite.
+      crossings += await page.evaluate(() => {
+        const bottom = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+        return [...document.querySelectorAll('[data-testid="docs-index"] a')].filter((link) => {
+          const box = link.getBoundingClientRect();
+          return box.top < bottom && box.bottom > 0;
+        }).length;
+      });
+      const drawn = await page.screenshot({ clip });
+      const hide = await page.addStyleTag({ content: "main a { visibility: hidden !important; }" });
+      const bare = await page.screenshot({ clip });
+      await hide.evaluate((node) => node instanceof Element && node.remove());
+      expect(drawn.equals(bare), `a link painted over the header at scroll ${y}`).toBe(true);
+    }
+    expect(crossings, "no card link ever passed under the header").toBeGreaterThan(0);
+  });
+}
