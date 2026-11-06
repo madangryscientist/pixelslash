@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from "@playwright/test";
+import { siteNav } from "./support/site-nav.ts";
 
 /*
  * One header on every page, and the theme toggle in it (PS-329). Each runs on a desktop and a phone
@@ -83,7 +84,7 @@ test("the header, logo, toggle, Get started and nav do not move between pages", 
     await page.goto(to, { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
     const header = page.locator("header").first();
-    const nav = await box(header.getByTestId("site-nav"));
+    const nav = await box((await siteNav(page)).first());
     seen[to] = {
       header: await box(header),
       logo: await box(header.getByRole("img", { name: "PixelSlash" })),
@@ -98,7 +99,7 @@ test("the header, logo, toggle, Get started and nav do not move between pages", 
 
 test("the nav marks the page it is on, Home included", async ({ page }) => {
   await page.goto("/");
-  const nav = page.getByTestId("site-nav");
+  const nav = await siteNav(page);
   await expect(nav.getByRole("link", { name: "Home", exact: true })).toHaveAttribute(
     "aria-current",
     "page",

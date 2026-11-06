@@ -4,6 +4,7 @@ import {
   Callout,
   Card,
   CardGrid,
+  DetailLayout,
   Disclosure,
   PageHeader,
   ProseLayout,
@@ -219,52 +220,53 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
   const doc = docOf(slug);
   const group = GROUPS.find((candidate) => candidate.id === page.group);
   const hasRail = doc.headings.some((heading) => heading.depth <= 3);
+  const breadcrumbs = (
+    <Breadcrumbs crumbs={[{ label: "Docs", href: "/docs" }, group?.title ?? "", page.title]} />
+  );
+  const article = (
+    <div className="flex flex-col gap-8">
+      {hasRail && (
+        <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
+          <summary className="cursor-pointer text-sm font-medium">On this page</summary>
+          <div className="py-2">
+            <OnThisPage headings={doc.headings} />
+          </div>
+        </details>
+      )}
+      <DocBody doc={doc} />
+      {page.exits === true ? <ExitsLine /> : null}
+      <EditLink source={doc.source} />
+      <PrevNext slug={slug} />
+    </div>
+  );
   return (
     <SidebarLayout rail={<DocsNav current={slug} />} railLabel="Docs">
-      <div>
-        <PageHeader
+      {hasRail ? (
+        // The kit sticks the contents under the header from `lg` and scrolls it itself when it is taller than the room left.
+        <DetailLayout
           title={page.title}
-          breadcrumbs={
-            <Breadcrumbs
-              crumbs={[{ label: "Docs", href: "/docs" }, group?.title ?? "", page.title]}
-            />
+          breadcrumbs={breadcrumbs}
+          stickyAside
+          aside={
+            <nav aria-label="On this page" data-testid="docs-contents" className="hidden lg:block">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                On this page
+              </p>
+              <OnThisPage headings={doc.headings} track />
+            </nav>
           }
-        />
-        {/* The kit's DetailLayout without its aside: a second unnamed aside beside the rail's, empty on a phone. */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="min-w-0 lg:col-span-2">
-            <div className="flex flex-col gap-8">
-              {hasRail && (
-                <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
-                  <summary className="cursor-pointer text-sm font-medium">On this page</summary>
-                  <div className="py-2">
-                    <OnThisPage headings={doc.headings} />
-                  </div>
-                </details>
-              )}
-              <DocBody doc={doc} />
-              {page.exits === true ? <ExitsLine /> : null}
-              <EditLink source={doc.source} />
-              <PrevNext slug={slug} />
-            </div>
+        >
+          {article}
+        </DetailLayout>
+      ) : (
+        <div>
+          <PageHeader title={page.title} breadcrumbs={breadcrumbs} />
+          {/* Nothing to stick: the kit's DetailLayout without its aside, so no second unnamed aside beside the rail's. */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="min-w-0 lg:col-span-2">{article}</div>
           </div>
-          {hasRail ? (
-            // The column stretches to the article's height, which is the room the sticky list moves in.
-            <div className="hidden min-w-0 lg:block">
-              <nav
-                aria-label="On this page"
-                data-testid="docs-contents"
-                className="lg:sticky lg:top-32"
-              >
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  On this page
-                </p>
-                <OnThisPage headings={doc.headings} track />
-              </nav>
-            </div>
-          ) : null}
         </div>
-      </div>
+      )}
     </SidebarLayout>
   );
 }
