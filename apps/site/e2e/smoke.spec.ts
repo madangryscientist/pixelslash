@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { DOC_PAGES, neighbours } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
+import { siteNav } from "./support/site-nav.ts";
 
 /*
  * Every page, on a desktop and a phone: the nav and the footer are there, every internal link and
@@ -34,7 +35,7 @@ async function checkPage(
     const response = await page.goto(to);
     expect(response?.status()).toBe(200);
 
-    const nav = page.getByTestId("site-nav");
+    const nav = await siteNav(page);
     for (const item of PAGES)
       await expect(nav.getByRole("link", { name: item.label, exact: true })).toHaveCount(1);
 
@@ -76,6 +77,11 @@ async function checkPage(
       const name = to === "/" ? "home" : to.slice(1).replaceAll("/", "-");
       // Still, and with every scroll reveal shown: a full-page shot does not scroll the page.
       await page.emulateMedia({ reducedMotion: "reduce" });
+      // The phone Menu was opened to read the nav; the shot is of the page, so close it.
+      await page.evaluate(() => {
+        for (const menu of document.querySelectorAll("header details[open]"))
+          menu.removeAttribute("open");
+      });
       await page.screenshot({
         path: join(dir, `${name}-${info.project.name}.png`),
         fullPage: true,
