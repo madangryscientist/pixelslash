@@ -3,6 +3,7 @@ import type { DiffIgnore, DiffOptions, PixelDiff } from "@hackcove/pixelslash-en
 import { release } from "@hackcove/pixelslash-engine/release";
 import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";
+import { callGate } from "./call-gate";
 import { SIDECAR_PATH, decodeResponse, encodeRequest } from "./sidecar-wire";
 
 /**
@@ -25,6 +26,18 @@ export type SidecarDiff = (
  * limit allows (`compare.ts`).
  */
 const TIMEOUT_MS = 15_000;
+
+/**
+ * How many calls wait on the sidecar at once (PS-325). It diffs one at a time, so a call also waits
+ * for every call ahead of it there: a 1280x16800 page with every pixel changed is ~3.9 s, so the
+ * fourth caller's answer took 15.7 s, past `TIMEOUT_MS`, on a sidecar that was working. The queue is
+ * kept here instead, where a wait is not on the call's clock and reads as neither slow nor down.
+ * One, not two: two finished the same load ~10% sooner, but a call's clock then also holds the diff
+ * ahead of it, and two slow diffs under load (7.8 s each, measured) reach `TIMEOUT_MS` again.
+ */
+const MAX_CALLS = 1;
+/** The call's own timeout and a margin: a call cancelled with its request frees its place by then. */
+const gate = callGate(MAX_CALLS, TIMEOUT_MS + 1000);
 
 /**
  * Why the sidecar gave no result. `unreachable` and `error` are logged once per kind; `rejected` is
@@ -59,33 +72,34 @@ export function sidecarEndpoint(url: string): string | null {
 
 /** The sidecar at `endpoint`, as `sidecarEndpoint` gives it. */
 export function sidecarDiff(endpoint: string, deps: { timeoutMs?: number } = {}): SidecarDiff {
-  return async (main, branch, options, ignore) => {
-    const body = encodeRequest({ main, branch, options, ignore });
-    let res: Response;
-    try {
-      res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/octet-stream" },
-        body,
-        signal: AbortSignal.timeout(deps.timeoutMs ?? TIMEOUT_MS),
-      });
-    } catch (e) {
-      throw new SidecarError("unreachable", `${endpoint}: ${messageOf(e)}`);
-    } finally {
-      // A copy of both uploads, sent and dead: freed now, as the uploads are (PS-200).
-      release(body);
-    }
-    if (!res.ok) {
-      const said = (await res.text().catch(() => "")).slice(0, 300);
-      const kind = res.status === 422 ? "rejected" : "error";
-      throw new SidecarError(kind, `${endpoint}: HTTP ${res.status} ${said}`);
-    }
-    try {
-      return decodeResponse(Buffer.from(await res.arrayBuffer()));
-    } catch (e) {
-      throw new SidecarError("error", `${endpoint}: ${messageOf(e)}`);
-    }
-  };
+  return (main, branch, options, ignore) =>
+    gate(async () => {
+      const body = encodeRequest({ main, branch, options, ignore });
+      let res: Response;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/octet-stream" },
+          body,
+          signal: AbortSignal.timeout(deps.timeoutMs ?? TIMEOUT_MS),
+        });
+      } catch (e) {
+        throw new SidecarError("unreachable", `${endpoint}: ${messageOf(e)}`);
+      } finally {
+        // A copy of both uploads, sent and dead: freed now, as the uploads are (PS-200).
+        release(body);
+      }
+      if (!res.ok) {
+        const said = (await res.text().catch(() => "")).slice(0, 300);
+        const kind = res.status === 422 ? "rejected" : "error";
+        throw new SidecarError(kind, `${endpoint}: HTTP ${res.status} ${said}`);
+      }
+      try {
+        return decodeResponse(Buffer.from(await res.arrayBuffer()));
+      } catch (e) {
+        throw new SidecarError("error", `${endpoint}: ${messageOf(e)}`);
+      }
+    });
 }
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));

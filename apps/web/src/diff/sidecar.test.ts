@@ -10,7 +10,7 @@ import {
 } from "@hackcove/pixelslash-engine/diff";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { png } from "../../e2e/png";
-import { resetFallbackLog, sidecarDiff, sidecarEndpoint } from "./sidecar";
+import { SidecarError, resetFallbackLog, sidecarDiff, sidecarEndpoint } from "./sidecar";
 import { context, onlyShot, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 
@@ -53,10 +53,31 @@ afterAll(() => {
 });
 
 /** The client for a sidecar at `base`, which the tests only ever start on loopback. */
-function client(base: string, deps: { timeoutMs?: number } = {}) {
+function client(base: string, deps: Parameters<typeof sidecarDiff>[1] = {}) {
   const endpoint = sidecarEndpoint(base);
   if (!endpoint) throw new Error(`${base} is not a loopback sidecar`);
   return sidecarDiff(endpoint, deps);
+}
+
+/**
+ * A sidecar that answers one request at a time, as the real one's synchronous diff does, but always
+ * after `ms`, so the test does not need a page that takes seconds to diff.
+ */
+function serialStub(ms: number) {
+  let tail: Promise<unknown> = Promise.resolve();
+  let finished = 0;
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: async () => {
+      const turn = tail.then(() => Bun.sleep(ms));
+      tail = turn;
+      await turn;
+      finished++;
+      return new Response("not a diff", { status: 500 });
+    },
+  });
+  return { server, url: `http://127.0.0.1:${server.port}`, finished: () => finished };
 }
 
 const hash = (data: Uint8Array) => new Bun.CryptoHasher("sha256").update(data).digest("hex");
@@ -113,6 +134,52 @@ describe("the sidecar gives the in-process result (PS-203)", () => {
       expect(comparable(got)).toEqual(comparable(diffPngs(main, branch, options, ignore)));
     },
   );
+});
+
+describe("calls queue in the web process, not on the sidecar's clock (PS-325)", () => {
+  const PAIR = [Buffer.from("main"), Buffer.from("branch")] as const;
+  const IGNORE: DiffIgnore = { main: [], branch: [] };
+  // The last of four waits for three ahead of it: past the timeout if that wait were on its clock.
+  const FOUR_CALLS_MS = 150;
+  const TIMEOUT_MS = 400;
+
+  const outcomes = async (call: ReturnType<typeof client>) => {
+    const settled = await Promise.allSettled(
+      Array.from({ length: 4 }, () => call(PAIR[0], PAIR[1], {}, IGNORE)),
+    );
+    return settled.map((s) =>
+      s.status === "rejected" && s.reason instanceof SidecarError ? s.reason.kind : "ok",
+    );
+  };
+
+  test("the fourth caller of a working sidecar is answered, not called unreachable", async () => {
+    const stub = serialStub(FOUR_CALLS_MS);
+    try {
+      expect(await outcomes(client(stub.url, { timeoutMs: TIMEOUT_MS }))).toEqual(
+        Array(4).fill("error"), // The stub's own reply: each call reached it and came back.
+      );
+      expect(stub.finished()).toBe(4);
+    } finally {
+      await stub.server.stop(true);
+    }
+  });
+
+  test("a sidecar that really hangs still times out, once per call, and frees the queue", async () => {
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () => new Promise(() => {}),
+    });
+    try {
+      const call = client(`http://127.0.0.1:${server.port}`, { timeoutMs: 100 });
+      const started = performance.now();
+      expect(await outcomes(call)).toEqual(Array(4).fill("unreachable"));
+      // Each timed from its own turn: four in a row, not four at once.
+      expect(performance.now() - started).toBeGreaterThanOrEqual(390);
+    } finally {
+      await server.stop(true);
+    }
+  });
 });
 
 describe("a build falls back to the in-process diff (PS-203)", () => {

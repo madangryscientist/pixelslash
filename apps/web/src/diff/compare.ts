@@ -154,7 +154,7 @@ function measurer(
         // A file the sidecar could not diff is not its failure: the in-process diff says why, as on Cloudflare.
         if (e.kind !== "rejected") logFallbackOnce(e.kind, e.message);
         // Not reached once, not tried again this run: a hung sidecar costs the diff budget one
-        // timeout, not one per shot.
+        // timeout of this run's, not one per shot, and whatever wait it had behind other runs' calls.
         if (e.kind === "unreachable") sidecar = null;
       }
     }
