@@ -77,7 +77,15 @@ export default defineConfig({
         // And at this sidecar, or at none (`vite.config.ts`).
         PIXELSLASH_E2E_SIDECAR: sidecar ? SIDECAR : "",
       },
-      url: SERVER,
+      // Playwright counts any 2xx-403 answer on the port as "up", and `wrangler d1 migrations apply`
+      // above starts a dozen miniflare servers on random loopback ports, which can be this one
+      // (they answer 200 and 403). The tests then start while vite is still migrating and get
+      // ERR_CONNECTION_REFUSED once that server exits (PS-327). So the dev run is ready when vite
+      // itself says it listens on this port, which nothing else prints. The production run has the
+      // same exposure and keeps the URL check for now.
+      ...(dev
+        ? { wait: { stdout: new RegExp(`Local:\\s+http://localhost:${SERVER_PORT}/`) } }
+        : { url: SERVER }),
       reuseExistingServer: false,
       timeout: 300_000,
     },
