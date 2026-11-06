@@ -10,6 +10,33 @@ import {
 } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 
+/** The four questions a visitor comes with; the figures are bench/results/2026-10-20.md. */
+function WhoFor(): ReactNode {
+  return (
+    <Section title="Who it is for, and what it costs">
+      <Text as="p">
+        PixelSlash is for developers and teams who ship web pages and want to see what a change did
+        to them before it merges, without writing stories or signing up for a service.
+      </Text>
+      <Text as="p">
+        It replaces a hosted visual-review service such as Chromatic, Percy or Argos: the run above
+        on your machine or CI runner, and the review on a server you run.{" "}
+        <TextLink href="/compare">The comparison</TextLink> lists where it is still behind.
+      </Text>
+      <Text as="p">
+        It is free: MIT-licensed, with all of it in the repository and no paid plan to buy. A paid
+        service run by us is planned; it is not on sale.
+      </Text>
+      <Text as="p">
+        It differs in where the work happens: a local run needs no server, and uploads nothing
+        unless you name a hosted judge. On the held-out half of our own benchmark, measured
+        2026-10-20, it caught 42 of 45 real changes and wrongly flagged 11 of 36 noise pairs; Argos,
+        on the same pairs, caught 37 and flagged 24.
+      </Text>
+    </Section>
+  );
+}
+
 /** Each step is what docs/cli.md says the run does, in its order; the numbers are the engine's defaults. */
 export function HowItWorksPage(): ReactNode {
   return (
@@ -27,9 +54,9 @@ export function HowItWorksPage(): ReactNode {
           overlapping rectangle is diffed and the report states both sizes.
         </Step>
         <Step title="Group the change into regions">
-          Changed pixels closer than 24 px are one region; a box under 4 px is a speck and is
-          dropped. A faint, uneven region is labelled noise and a sub-pixel move is labelled shift:
-          both stay in the report, and neither makes the run count as changed.
+          Changed pixels with up to 48 px clear between them are one region; a box under 4 px is a
+          speck and is dropped. A faint, uneven region is labelled noise and a sub-pixel move is
+          labelled shift: both stay in the report, and neither makes the run count as changed.
         </Step>
         <Step title="Write the report">
           report.html shows Main, Branch and the Diff, cropped to the changed region, with the
@@ -71,11 +98,12 @@ export function HowItWorksPage(): ReactNode {
         <Text as="p">
           pixelslash upload sends the shots to a PixelSlash review server you run. It diffs them
           against the default branch, holds the build for review and reports a GitHub check, and
-          pixelslash check blocks CI until someone accepts or rejects it.{" "}
+          pixelslash status --wait blocks CI until someone accepts or rejects it.{" "}
           <TextLink href="/self-host">Self-host the server</TextLink> or{" "}
           <TextLink href="/docs/upload#uploading-to-a-server">read how uploads work</TextLink>.
         </Text>
       </Section>
+      <WhoFor />
     </ProseLayout>
   );
 }

@@ -28,10 +28,14 @@ import {
   type Value,
   groups,
 } from "../../content/matrix.ts";
+import { REPO_PUBLIC, REPO_URL } from "../../content/links.ts";
+
+const BENCH_RESULTS = `${REPO_URL}/blob/main/bench/results/2026-10-20.md`;
 
 /*
- * docs/capabilities/data.json, drawn. Every value, note and link on this page is read from that
- * file; the counts are computed the way build.py computes them. Nothing here is written by hand.
+ * docs/capabilities/data.json, drawn. Every value, note and link in the tables and lists is read
+ * from that file; the counts are computed the way build.py computes them. The paragraphs at the top
+ * are by hand, and each figure in them is from bench/results/2026-10-20.md or a cell in that file.
  */
 
 const GROUP_LABEL: Record<string, string> = {
@@ -139,6 +143,43 @@ function Behind(): ReactNode {
   );
 }
 
+/** The four questions a visitor comes with, in the reading column above the method. */
+function WhoFor(): ReactNode {
+  return (
+    <>
+      <Text as="p">
+        PixelSlash is for developers and teams who want visual review of their pages without writing
+        stories or signing up for a service. It is meant to replace a service such as Chromatic,
+        Percy, Argos or Applitools, or Lost Pixel, whose repository is archived and whose makers are
+        sunsetting it. Today that means running the review server yourself.
+      </Text>
+      <Text as="p">
+        It is free: MIT-licensed, with all of it in the repository and no paid plan to buy. A paid
+        service run by us is planned; it is not on sale.
+      </Text>
+      <Text as="p">
+        No row below is ours alone, so the difference is the mix: a run is local by default, and the
+        whole review app is open source and can be self-hosted. Argos is open source too, but its
+        docs say self-hosting is not officially supported, and it is run as a managed service. Lost
+        Pixel is local and open source, and is being wound down.
+      </Text>
+      <Text as="p">
+        The diff is measured. On the held-out half of{" "}
+        {REPO_PUBLIC ? (
+          <TextLink href={BENCH_RESULTS} external>
+            our own benchmark, run 2026-10-20
+          </TextLink>
+        ) : (
+          "our own benchmark, run 2026-10-20"
+        )}
+        , PixelSlash caught 42 of 45 real changes and wrongly flagged 11 of 36 noise pairs; Argos,
+        on the same pairs, caught 37 and flagged 24. Argos was faster, at a median of 18.0 ms a pair
+        to our 29.3.
+      </Text>
+    </>
+  );
+}
+
 /** The prose in the reading column; the table below it takes the page's full width. */
 export function ComparePage(): ReactNode {
   return (
@@ -163,6 +204,7 @@ export function ComparePage(): ReactNode {
             data-testid="stat-behind"
           />
         </CardGrid>
+        <WhoFor />
         <Text as="p">{METHOD}</Text>
         <Behind />
       </ProseLayout>

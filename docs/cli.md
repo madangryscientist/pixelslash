@@ -93,7 +93,7 @@ If width or height differs, only the overlapping rectangle is diffed: `changedPi
 
 The changed pixels are then clustered into **regions** (`regions[]` in the manifest and the engine result): boxes with `x`, `y`, `w`, `h`, `changedPixels` and `antialiasedPixels`.
 
-- Changed pixels and boxes closer than 24px are one region (`mergeDistance`)
+- Changed pixels with up to 48px clear between them are one region: `mergeDistance` (default 24) grows the changed area that far from each side
 - a box with an area under 4px (`minRegionArea`) is a speck, dropped and counted in `specks`
 - a region that is faint (90th percentile of colour distance at most 0.25, no pixel above 0.5), uneven (the spread of those distances is at least 0.3 of their mean, so a flat element that moved is never noise), and moves both lighter and darker (minority share at least 0.2), is labelled `noise`, kept in `regions`, and does not make the run `changed`.
 
@@ -261,7 +261,7 @@ pixelslash init [--url URL | --storybook URL] [--routes /,/about] [--viewports 1
 
 ## Snapshot capture (the pinned image)
 
-`pixelslash capture` shoots every route × variant in a config into a snapshot dir plus `manifest.json`, for upload to a PixelSlash server, which compares each shot with its **baseline**, the earlier accepted shot of the same page ([Baselines and branches](concepts/baselines-and-branches.md)). Run it inside the pinned capture image: it fixes Bun, Playwright, Chromium, Firefox, WebKit and the font set, so the same commit renders the same pixels on any CI runner.
+`pixelslash capture` shoots every route × variant in a config into a snapshot dir plus `manifest.json`, for upload to a PixelSlash server, which compares each shot with its **baseline**, the earlier accepted shot of the same page ([Baselines and branches](concepts/baselines-and-branches.md)). Run it inside the pinned capture image: it fixes Bun, Playwright, Chromium, Firefox, WebKit and the font set, and each shot records what rendered it, so a shot from a different setup is named as one.
 
 ```
 docker build -f docker/capture/Dockerfile -t pixelslash-capture:dev .

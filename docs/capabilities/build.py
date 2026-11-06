@@ -156,7 +156,7 @@ changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
   <li><b>Lost Pixel is gone.</b> The repository was archived on 22 April 2026; the README says it is joining
     Figma and sunsetting the product. Its column is a historical comparison, not a live competitor.</li>
   <li><b>Argos is the closest thing to us</b>: MIT-licensed, a free hobby tier, merge-base
-    baselines, and a diff its docs call deterministic, with no AI step. Its weakness is capture: it runs in
+    baselines, and a diff its docs call deterministic, with any AI review left to an agent of your own. Its weakness is capture: it runs in
     your CI, so the renderer is whatever your runner has, and its ignore is per change fingerprint, not a
     region you draw.</li>
   <li><b>Chromatic</b> is the benchmark for the review loop (modes, diff inspector, checks, flake filter) and
@@ -164,7 +164,7 @@ changes caught with 12/30 noise flagged, against Argos at 30/37 and 19/30
   <li><b>Percy</b> (BrowserStack) sells cross-browser cloud rendering and Intelli Ignore; sensitivity is set per
     project, per snapshot or per region, and its AI review is paid-plan only.</li>
   <li><b>Applitools</b> has the deepest match-level surface (a level per checkpoint or region, in place of a numeric threshold), accessibility
-    checks, on-premises deployment sold as an add-on, and no free tier: the price is the opening for a cheap, honest diff.</li>
+    checks, on-premises deployment sold as an add-on, and no free tier.</li>
 </ul>
 
 <div class="foot">
