@@ -4,7 +4,14 @@ import type { A11y } from "./a11y-entry.ts";
 import type { Metrics } from "./metrics-entry.ts";
 import { measureMetrics } from "./metrics-walk.ts";
 import { launchSessionBrowsers } from "./capture-browsers.ts";
-import { openPage, pinClock, type Opened } from "./capture-open.ts";
+import {
+  newShotContext,
+  openPage,
+  pinClock,
+  type Opened,
+  type ShotProgress,
+} from "./capture-open.ts";
+import { attemptFailure, retryOnCrash } from "./crash-retry.ts";
 import {
   loadLibrary,
   measureComposition,
@@ -22,7 +29,6 @@ import {
   type Variant,
 } from "./config.ts";
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
-import { CaptureError } from "./errors.ts";
 import {
   BARE,
   fcList,
@@ -261,27 +267,28 @@ async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
   };
 }
 
-async function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
+/** One attempt at a shot, in a context of its own. It throws `PageCrash` for a crash, a `CaptureError` for anything else. */
+async function attempt(browser: Browser, shot: Shot): Promise<Shoot> {
   const { variant, stabilise, route, url } = shot;
-  const context = await browser.newContext({
-    viewport: variant.viewport,
-    deviceScaleFactor: stabilise.deviceScaleFactor,
-    colorScheme: variant.theme,
-    ...(shot.session && { storageState: shot.session }),
-  });
+  const context = await newShotContext(browser, variant, stabilise, shot.session);
+  const progress: ShotProgress = { step: "goto", crashed: false };
   try {
     await pinClock(context, stabilise);
     const page = await context.newPage();
-    const opened = await openPage(page, url, route, stabilise.timeoutMs);
+    page.on("crash", () => (progress.crashed = true));
+    const opened = await openPage(page, url, route, { timeoutMs: stabilise.timeoutMs, progress });
+    progress.step = "screenshot";
     return await capture(page, shot, opened);
   } catch (e) {
-    if (e instanceof CaptureError) throw e;
-    throw new CaptureError(
-      `capture failed for ${url}: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    throw attemptFailure(e, url, progress);
   } finally {
     await context.close();
   }
+}
+
+/** One shot, retried once in a fresh context when its page crashes (PS-332). */
+function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
+  return retryOnCrash(() => attempt(browser, shot), shot);
 }
 
 /**
