@@ -21,7 +21,7 @@ const FEATURES = [
   },
   {
     title: "A perceptual diff",
-    body: "Anti-aliasing, faint noise and sub-pixel shifts are told apart from a real change, so a report is about the change.",
+    body: "Anti-aliasing, faint noise and sub-pixel shifts are told apart from a real change. On the held-out half of our own benchmark, run 2026-10-20, it caught 42 of 45 real changes and wrongly flagged 11 of 36 noise pairs; Argos caught 37 and flagged 24.",
     href: "/how-it-works",
     icon: "diff",
   },
@@ -33,13 +33,13 @@ const FEATURES = [
   },
   {
     title: "Snapshots in CI",
-    body: "pixelslash capture shoots every route in a pinned image, so the same commit renders the same pixels on any runner.",
+    body: "pixelslash capture shoots every route in a pinned image and records what rendered each shot, so a shot from a different setup is named as one.",
     href: "/docs/capture#snapshot-capture-the-pinned-image",
     icon: "ci",
   },
   {
     title: "A review server",
-    body: "pixelslash upload sends shots to a PixelSlash server, which holds the build for a person to review and reports a GitHub check.",
+    body: "pixelslash upload sends shots to a PixelSlash server you run, which holds the build for a person to review and reports a GitHub check.",
     href: "/docs/upload#uploading-to-a-server",
     icon: "review",
   },
@@ -75,17 +75,20 @@ function Hero(): ReactNode {
       <div className="relative mx-auto max-w-4xl text-center">
         <p className="home-rise">
           <Pill tone="emerald" dot round>
-            Open source · MIT · Local first
+            Free · Open source · MIT · Local first
           </Pill>
         </p>
         <h1 className="home-rise mt-6 text-5xl leading-[1.05] font-bold tracking-tight md:text-[4.25rem]">
           See what your change <span className="home-gradient-text">did to the page.</span>
         </h1>
         <p className="home-rise mx-auto mt-6 max-w-2xl text-lg text-(--home-sub) md:text-xl">
-          PixelSlash takes two versions of a page, Main and Branch, pixel-diffs them and writes a
-          report that shows what changed. It is a standalone CLI: no Storybook and no account.
-          Nothing leaves your machine unless you ask it to, by uploading to a server or naming a
-          hosted judge.
+          For developers and teams who want to see what a change did to their pages before it
+          merges, in place of a hosted visual-review service such as Chromatic, Percy or Argos (
+          <TextLink href="/compare">where it is still behind</TextLink>). PixelSlash takes two
+          versions of a page, Main and Branch, pixel-diffs them and writes a report that shows what
+          changed. It is free, with no paid plan to buy: an MIT-licensed CLI that needs no Storybook
+          and no account. Nothing leaves your machine unless you ask it to, by uploading to a server
+          or naming a hosted judge.
         </p>
         <div className="home-rise mt-9 flex flex-wrap justify-center gap-3">
           <Button href="/self-host" size="lg">
@@ -182,9 +185,10 @@ function Local(): ReactNode {
           Your pixels stay <span className="home-gradient-text">on your machine.</span>
         </h2>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-(--home-sub)">
-          Without <code>--upload</code>, no page shot leaves the machine. With it, shots go only to
-          the server the project names, ours or your own. The one other place pixels can go is a
-          project's own AI model, opt-in: the three crops of a changed region, never a whole shot.
+          A page shot leaves the machine only when you ask. An upload goes only to the server the
+          project names, which today is one you run; a service run by us is planned. A hosted judge
+          you name gets the shots it judges. On that server, a project's own AI model, if you set
+          one, gets the three crops of a changed region, never a whole shot.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <Button href="/security" variant="outline">

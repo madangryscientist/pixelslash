@@ -55,14 +55,14 @@ code.
   local vision model (mlx on a Mac, or ollama), or a hosted one you name through opencode. With no
   judge installed the run prints `skip: no judge` and invents no violations.
 - **Snapshots in CI:** [`pixelslash capture`](docs/cli.md#snapshot-capture-the-pinned-image) shoots
-  every route in a config inside a pinned image, so the same commit renders the same pixels on any
-  runner. A `v*` tag publishes it to `ghcr.io/madangryscientist/pixelslash-capture`.
+  every route in a config inside a pinned image and records what rendered each shot, so a shot from
+  a different setup is named as one. A `v*` tag publishes it to `ghcr.io/madangryscientist/pixelslash-capture`.
 - **Your own Playwright tests:** [snapshots from the tests you already
   have](docs/cli.md#snapshots-from-your-own-playwright-tests).
 - **A review server:** [`pixelslash upload`](docs/cli.md#uploading-to-a-server) sends shots to a
   PixelSlash server, which diffs them against the default branch, holds the build for review and
-  reports a GitHub check. [`pixelslash check`](docs/cli.md#block-ci-on-review) blocks CI until a
-  person decides.
+  reports a GitHub check. [`pixelslash status --wait`](docs/cli.md#block-ci-on-review) blocks CI until
+  a person decides.
 - **While you build:** [`pixelslash dev`](docs/cli.md#feature-mode-pixelslash-dev) re-captures a
   page or component on every save and diffs it with the previous iteration, uploading nothing.
 - **Your coding agent:** [`pixelslash mcp`](docs/cli.md#your-coding-agent-pixelslash-mcp) is a
