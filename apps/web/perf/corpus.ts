@@ -24,10 +24,15 @@ function block(n: number, at: number): Block {
 
 export type Shot = { name: string; viewport: string; png: Buffer };
 
-/** `count` shots cycling the sizes, three busy PNGs per size (as the e2e burst does). */
-export function shots(mix: string, count: number, blockAt: number): Shot[] {
+/**
+ * `count` shots cycling the sizes, three busy PNGs per size (as the e2e burst does). Two calls with
+ * the same `seed` differ only by the block; a different `seed` changes every pixel.
+ */
+export function shots(mix: string, count: number, blockAt: number, seed = 0): Shot[] {
   const sizes = sizesOf(mix);
-  const pool = sizes.map(([w, h]) => [0, 1, 2].map((n) => png(w, h, [block(n, blockAt)], n)));
+  const pool = sizes.map(([w, h]) =>
+    [0, 1, 2].map((n) => png(w, h, [block(n, blockAt)], seed + n)),
+  );
   return Array.from({ length: count }, (_, i) => {
     const size = i % sizes.length;
     const [w, h] = sizes[size] ?? [0, 0];

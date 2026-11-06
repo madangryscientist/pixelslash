@@ -1,3 +1,27 @@
+# Diff sidecar under load (PS-325)
+
+`perf/sidecar-load.ts` runs N background uploaders of 1280x16800 shots (default 3) and one foreground
+20-shot build against a local production server with the sidecar, finalising as the CLI does until
+nothing is left unmeasured. On demand only: it is not in the gate, its numbers are proof for the
+change that ran it, and it runs on a development machine, **never against the review server**.
+
+```bash
+cd apps/web
+CLOUDFLARE_ENV=e2e bun run build                                 # again after any change to the server
+bun perf/sidecar-load.ts --uploaders 3 --fresh 1 --out run.json  # ~6 min; 5 uploaders ~10 min
+```
+
+It needs `systemd-run --user`; it starts its own `ps-sidecar-load-web` and `-diff` units with the
+shipped memory limits, and stops them at the end. **`--fresh 1` deletes `apps/web/.wrangler/state`**;
+without it a run refuses to start on state it did not make. A run writes about 5.5 MB a shot there.
+
+Every pixel changes by default, a diff's slowest case (~3.9 s on this size) and the load that shows
+the failure; `--change small` diffs in ~0.3 s and does not. The other flags (`--shots`, `--bg-shots`,
+`--size`, `--concurrency`, `--port`) are in the file's header. The result is read from the server's
+D1 file and the units' journals: the foreground's verdict and measured count, every build's state,
+the slowest `GET /` of a probe that runs throughout, and each unit's restarts and memory, with anon
+and page cache apart because the cgroup's peak counts the local R2 files' cache too.
+
 # Server memory during an upload burst (PS-214)
 
 How much memory the LAN self-host (a Proxmox CT, `$CT`: `pixelslash-web.service` = `vite preview` in front of
