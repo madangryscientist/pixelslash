@@ -170,6 +170,17 @@ counts drop with the builds. With retention on, a PR build's page says "expires 
 - Deletion is permanent; read a dry-run listing before turning it on. Enabling it on a server with real
   data is the operator's decision.
 
+### Abandoned builds (PS-324)
+
+Always on, with no setting. A build still `uploading` or `processing` whose last activity is older than
+6 hours is ended at `errored` with the reason `no activity for 6 hours: the uploader or its run went away;
+send the build again`, so a build whose uploader went away stops counting as in flight. Last activity is the
+latest of the build's creation, its `processingStartedAt` and its newest shot's upload. Only `status` and
+`error` are written: nothing is deleted and no time is recorded, so an ended build is never in the timing
+numbers. Sending finalise again resumes a server-diff build, as for any `errored` build; a CI-diff project's gets the
+409 that build recovery gives, and a build that never finalised is completed only by sending it again. The hourly cron runs the sweep for
+every project; a self-host fires no cron, so there a project is swept only when it next creates a build.
+
 ## GitHub check runs (PS-23)
 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a

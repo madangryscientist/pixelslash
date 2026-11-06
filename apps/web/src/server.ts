@@ -12,8 +12,10 @@ import {
   sweepStore,
 } from "#/server/env";
 import { withOptionalSentry } from "#/server/sentry";
+import { sweepAbandoned } from "#/db/abandoned";
 import { sweepRetention } from "#/db/retention";
 import { sweepSummary } from "#/lib/retention";
+import { syncEnded } from "#/api/abandoned";
 import { warn } from "#/lib/log";
 import { orgBlobs, orgSweepBlobs } from "#/storage/blobs";
 
@@ -28,20 +30,28 @@ const SWEEP_BATCH = 100;
 /**
  * The Worker's entry: TanStack Start's `fetch`, the explain queue's consumer (ob 1875), which
  * explains each finalised build's changed shots with the project's model off the request, and the
- * retention sweep (PS-239), which does nothing until `PIXELSLASH_RETENTION_DAYS` is set and only logs
+ * hourly sweep: abandoned builds end `errored` first (PS-324, always on), then the retention sweep (PS-239), which does nothing until `PIXELSLASH_RETENTION_DAYS` is set and only logs
  * what it would delete until `PIXELSLASH_RETENTION_DELETE` is `true`. All report their errors to Sentry when `SENTRY_DSN` is set (PS-227) and run unwrapped when it is not.
  */
 export default withOptionalSentry({
   fetch: (request) => handler.fetch(request),
   async scheduled(): Promise<void> {
+    // Before the retention early return: ending abandoned builds needs no retention window.
+    const db = database();
+    const ended = await sweepAbandoned(db, { now: new Date(), limit: SWEEP_BATCH });
+    if (ended.length > 0) {
+      warn(`ended ${ended.length} abandoned build(s): ${ended.join(", ")}`);
+      await syncEnded(checkRunDeps(db), ended);
+    }
     const days = retentionDays();
     if (days === undefined) return;
     const store = sweepStore();
-    const { plan, result } = await sweepRetention(
-      database(),
-      (orgId) => orgSweepBlobs(store, orgId),
-      { days, now: new Date(), limit: SWEEP_BATCH, dryRun: !retentionDelete() },
-    );
+    const { plan, result } = await sweepRetention(db, (orgId) => orgSweepBlobs(store, orgId), {
+      days,
+      now: new Date(),
+      limit: SWEEP_BATCH,
+      dryRun: !retentionDelete(),
+    });
     warn(sweepSummary(plan, result));
   },
   async queue(batch: { messages: readonly ExplainDelivery[] }): Promise<void> {

@@ -1,6 +1,7 @@
 import { diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
+import { ABANDONED_REASON } from "#/db/abandoned";
 import { getBuild } from "#/db/builds";
 import { reviewSnapshot } from "#/db/review";
 import { builds, projects, snapshots } from "#/db/schema";
@@ -67,6 +68,17 @@ describe("partial re-runs (ob 1738)", () => {
       status: "changes",
       error: null,
     });
+  });
+
+  test("a build swept before it was finalised is not re-run: its shots are a partial upload (PS-324)", async () => {
+    const ctx = await context();
+    const errored = await tenShots(ctx, counted(2).diff);
+    await ctx.db
+      .update(builds)
+      .set({ error: ABANDONED_REASON, processingStartedAt: null })
+      .where(eq(builds.id, errored.id));
+    const swept = await getBuild(ctx.db, ctx.projectId, errored.id);
+    await expect(rerunShots(deps(ctx), swept, null)).rejects.toThrow(RerunError);
   });
 
   test("a shot that errors again leaves the build errored, naming it", async () => {
