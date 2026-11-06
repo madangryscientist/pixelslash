@@ -194,6 +194,43 @@ function failedUpload(e: unknown, progress: UploadProgress): unknown {
   return e instanceof RemoteError ? new RemoteError(message) : new UploadError(message);
 }
 
+/** How long a stopped upload waits for the recapture browser to close before it exits anyway. */
+const CLOSE_WAIT_MS = 2000;
+
+const STOP_SIGNALS = [
+  ["SIGTERM", 143],
+  ["SIGINT", 130],
+] as const;
+
+/**
+ * While `uploadSnapshots` runs, SIGTERM and SIGINT end the process the way a failure does (PS-343):
+ * the build left unfinished, the upload line and `UPLOAD FAILED: stopped by <signal>` last, exit
+ * 143 or 130. Nothing is sent to the server on the way out. `process.exit` skips the caller's
+ * `finally`, so the recapture browser is closed here, for at most 2 s. `off` removes the handlers.
+ */
+function onStopSignal(io: Io, progress: UploadProgress, own: OwnRecapture | undefined) {
+  const handlers = STOP_SIGNALS.map(([signal, code]) => {
+    const stop = async () => {
+      const left = progress.buildId
+        ? `pixelslash: build ${progress.buildId} is left unfinished\n`
+        : "";
+      io.stderr.write(`${left}${uploadLine(progress)}\nUPLOAD FAILED: stopped by ${signal}\n`);
+      if (own) await Promise.race([own.close().catch(() => undefined), Bun.sleep(CLOSE_WAIT_MS)]);
+      process.exit(code);
+    };
+    const handler = () => {
+      void stop();
+    };
+    process.on(signal, handler);
+    return [signal, handler] as const;
+  });
+  return {
+    off: () => {
+      for (const [signal, handler] of handlers) process.off(signal, handler);
+    },
+  };
+}
+
 /**
  * Send `dir` to the server the flags, env or config name, and record the build in `dir` for
  * `status`. Returns the exit code (0): a flaky shot is said and sent, and what it does to the
@@ -219,24 +256,30 @@ export async function uploadDir(
   try {
     const target = await resolveTarget(flags, deps, cwd);
     own = await chooseRecapture(flags, deps, warn);
-    const result = await uploadSnapshots(
-      {
-        dir: resolve(dir),
-        server: target.server,
-        token: target.token,
-        projectId: target.projectId,
-        flakeRetries: retries ?? own?.retries ?? DEFAULT_FLAKE_RETRIES,
-        timings,
-        brief: flags.brief,
-        git: {
-          cwd,
-          baseBranch: target.baseBranch,
-          branch: flags.branch,
-          pr: prNumber(flags.pr),
+    const stopped = onStopSignal(io, progress, own);
+    let result: UploadResult;
+    try {
+      result = await uploadSnapshots(
+        {
+          dir: resolve(dir),
+          server: target.server,
+          token: target.token,
+          projectId: target.projectId,
+          flakeRetries: retries ?? own?.retries ?? DEFAULT_FLAKE_RETRIES,
+          timings,
+          brief: flags.brief,
+          git: {
+            cwd,
+            baseBranch: target.baseBranch,
+            branch: flags.branch,
+            pr: prNumber(flags.pr),
+          },
         },
-      },
-      { ...deps, warn, progress, ...(own && { recapture: own.recapture }) },
-    );
+        { ...deps, warn, progress, ...(own && { recapture: own.recapture }) },
+      );
+    } finally {
+      stopped.off();
+    }
     const { commitSha, branch } = result.git;
     io.stdout.write(`pixelslash: uploaded ${result.snapshots} snapshots\n`);
     io.stdout.write(`build: ${result.buildId} (${commitSha.slice(0, 7)} on ${branch})\n`);
