@@ -278,6 +278,8 @@ A release also publishes the image: pushing a `v*` tag builds it and pushes `ghc
 
 `--config` defaults to the first `pixelslash.config.{ts,js,mjs,json}` in the working dir (JS/TS: the default export). `--out` defaults to `pixelslash-snapshots`. `--only NAME` (repeatable) captures just those routes or stories, every variant; an unknown name is exit 2. `--json` prints `{ measured: "local", uploaded: false, manifest, shots, timings }` instead of the summary, each shot with its `name`, `variant`, `browser`, `viewport`, `theme`, absolute `file` and `media` (see the media note under `ignore`); it is what the `capture_local` MCP tool returns. Exit 0 on success, 1 when a page cannot be captured or the start command fails, 2 on a bad flag or config.
 
+A shot whose page crashes (Chromium lost it, usually under load) is captured once more in a fresh browser context, after a `warning: <route> (<variant>): the page crashed during goto|settle|screenshot; captured again in a fresh context` line on stderr. A second crash fails the shot as any other capture error does, naming the shot, the step and that the one retry was spent; the run does not continue past it. Only a crash is retried: a timeout, an HTTP error or a page that never settles fails at once. This is separate from `--flake-retries`, which re-shoots pages that render unstably.
+
 ### The manifest and the fingerprint
 
 Each capture writes `manifest.json` beside the PNGs. It lists every shot and what rendered it, and it is the file `pixelslash upload` reads:
