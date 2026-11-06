@@ -20,7 +20,7 @@
     "apps/site": {
       "name": "@pixelslash/site",
       "dependencies": {
-        "@hackcove/theme-catppuccin-mocha": "0.3.1",
+        "@hackcove/themes": "0.1.0",
         "@hackcove/ui-react": "^0.8.3",
         "@tailwindcss/vite": "^4.1.18",
         "@tanstack/react-router": "1.170.46",
@@ -48,7 +48,7 @@
       "name": "@pixelslash/web",
       "dependencies": {
         "@hackcove/pixelslash-engine": "workspace:*",
-        "@hackcove/theme-catppuccin-mocha": "0.3.0",
+        "@hackcove/themes": "0.1.0",
         "@hackcove/ui-react": "^0.8.0",
         "@sentry/cloudflare": "11.9.0",
         "@sentry/react": "11.9.0",
@@ -268,7 +268,7 @@
 
     "@hackcove/pixelslash-playwright": ["@hackcove/pixelslash-playwright@workspace:packages/playwright"],
 
-    "@hackcove/theme-catppuccin-mocha": ["@hackcove/theme-catppuccin-mocha@0.3.1", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-Ubxvct4uA2/DNvheErGnjIGBzOIfdwZoDQxPdI5RaCnQO5UqN4Os58+UeMydFg6j1In1Csg0GxjrGXvj7TS/wQ=="],
+    "@hackcove/themes": ["@hackcove/themes@0.1.0", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-rCT6rZhBrnfg5i+8Yp/B/jRioDhBt5GN6wcdsTREqwnD6Wx/iEKghgA5vM4yMbLJY77BZIyQQ6ZgiBdKU7LG9g=="],
 
     "@hackcove/ui-react": ["@hackcove/ui-react@0.8.3", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-SsNExrAP8kvG3rMgWVQOZyawK0GJjlyhJuxDkabv97K/0UfLsfxg8x9a9eOpAEQVFaCI6KB8Pv+3hREJsAwTwg=="],
 
@@ -1309,8 +1309,6 @@
     "@esbuild-kit/core-utils/esbuild": ["esbuild@0.18.20", "", { "optionalDependencies": { "@esbuild/android-arm": "0.18.20", "@esbuild/android-arm64": "0.18.20", "@esbuild/android-x64": "0.18.20", "@esbuild/darwin-arm64": "0.18.20", "@esbuild/darwin-x64": "0.18.20", "@esbuild/freebsd-arm64": "0.18.20", "@esbuild/freebsd-x64": "0.18.20", "@esbuild/linux-arm": "0.18.20", "@esbuild/linux-arm64": "0.18.20", "@esbuild/linux-ia32": "0.18.20", "@esbuild/linux-loong64": "0.18.20", "@esbuild/linux-mips64el": "0.18.20", "@esbuild/linux-ppc64": "0.18.20", "@esbuild/linux-riscv64": "0.18.20", "@esbuild/linux-s390x": "0.18.20", "@esbuild/linux-x64": "0.18.20", "@esbuild/netbsd-x64": "0.18.20", "@esbuild/openbsd-x64": "0.18.20", "@esbuild/sunos-x64": "0.18.20", "@esbuild/win32-arm64": "0.18.20", "@esbuild/win32-ia32": "0.18.20", "@esbuild/win32-x64": "0.18.20" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-ceqxoedUrcayh7Y7ZX6NdbbDzGROiyVBgC4PriJThBKSVPWnnFHZAkfI1lJT8QFkOwH4qOS2SJkS4wvpGl8BpA=="],
 
     "@img/sharp-wasm32/@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
-
-    "@pixelslash/web/@hackcove/theme-catppuccin-mocha": ["@hackcove/theme-catppuccin-mocha@0.3.0", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-YpPQvSfjqKP2ojfXSQJeyrJvOk+uWQuayySQlXORWDerdNscR+LMUCyHl+gyN1FPDWaDI5wtJut13ohmi1hiWQ=="],
 
     "@poppinss/dumper/supports-color": ["supports-color@10.2.2", "", {}, "sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g=="],
 

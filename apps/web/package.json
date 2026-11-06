@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@hackcove/pixelslash-engine": "workspace:*",
-    "@hackcove/theme-catppuccin-mocha": "0.3.0",
+    "@hackcove/themes": "0.1.0",
     "@hackcove/ui-react": "^0.8.0",
     "@sentry/cloudflare": "11.9.0",
     "@sentry/react": "11.9.0",
