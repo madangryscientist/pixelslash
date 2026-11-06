@@ -42,6 +42,8 @@ export type UploadOptions = {
 export type UploadProgress = {
   /** A build was opened on the server. */
   opened: boolean;
+  /** The id the server gave the build, set when it answers "open build" (PS-343). */
+  buildId?: string;
   /** Shots the server has answered for. */
   sent: number;
   total: number;
@@ -199,6 +201,7 @@ export async function uploadSnapshots(
   };
   const { id, diffLocation } = await openBuild(client, ctx, opts.projectId, opts.brief);
   progress.opened = true;
+  progress.buildId = id;
   // A server from before ob 1727 has no baselines endpoint and diffs every build itself.
   const picked = diffLocation
     ? await fetchBaselines(client, { path: `/api/v1/builds/${id}/baselines` }, manifest.snapshots)

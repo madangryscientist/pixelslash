@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { run } from "../src/run.ts";
 import { capture, cleanup, servePaths, tmp } from "./support.ts";
 import { fakeUploadApi, gitRepo, snapshotDir } from "./upload-support.ts";
@@ -159,6 +160,86 @@ async function captureConfig() {
   await Bun.write(config, JSON.stringify({ baseUrl: origin, routes: ["/"] }));
   return config;
 }
+
+/** Answers "open build" (unless `stallOpen`), then never answers the first shot's upload. */
+function stallingServer(stallOpen: boolean) {
+  const { promise: reached, resolve: hit } = Promise.withResolvers<void>();
+  const server = Bun.serve({
+    port: 0,
+    fetch: (req) => {
+      const { pathname } = new URL(req.url);
+      if (req.method === "POST" && pathname === "/api/v1/builds" && !stallOpen) {
+        return Response.json({ id: "build-7" });
+      }
+      hit();
+      return new Promise<Response>(() => {});
+    },
+  });
+  return { url: `http://127.0.0.1:${server.port}`, reached, stop: () => void server.stop(true) };
+}
+
+/** `upload` killed partway (PS-343): the real CLI as a child, against a server that stalls. */
+describe("pixelslash upload, stopped by a signal", () => {
+  const INDEX = fileURLToPath(new URL("../src/index.ts", import.meta.url));
+
+  async function stopped(signal: "SIGTERM" | "SIGINT", stallOpen: boolean) {
+    const [cwd, dir, api] = [await gitRepo(), await snapshotDir(), stallingServer(stallOpen)];
+    const proc = Bun.spawn([process.execPath, INDEX, "upload", dir, "--server", api.url], {
+      cwd,
+      env: { PATH: process.env.PATH ?? "", HOME: await tmp(), PIXELSLASH_TOKEN: "psci_t" },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    try {
+      await api.reached;
+      proc.kill(signal);
+      const [code, err] = [await proc.exited, await new Response(proc.stderr).text()];
+      return { code, lines: err.trimEnd().split("\n") };
+    } finally {
+      proc.kill("SIGKILL");
+      api.stop();
+    }
+  }
+
+  test("SIGTERM names the unfinished build and exits 143", async () => {
+    const { code, lines } = await stopped("SIGTERM", false);
+    expect(code).toBe(143);
+    expect(lines.slice(-3)).toEqual([
+      "pixelslash: build build-7 is left unfinished",
+      "upload incomplete: 0/1 shots sent",
+      "UPLOAD FAILED: stopped by SIGTERM",
+    ]);
+  }, 30_000);
+
+  test("SIGINT exits 130", async () => {
+    const { code, lines } = await stopped("SIGINT", false);
+    expect(code).toBe(130);
+    expect(lines.slice(-3)).toEqual([
+      "pixelslash: build build-7 is left unfinished",
+      "upload incomplete: 0/1 shots sent",
+      "UPLOAD FAILED: stopped by SIGINT",
+    ]);
+  }, 30_000);
+
+  test("before the build is opened there is no build to name", async () => {
+    const { code, lines } = await stopped("SIGTERM", true);
+    expect(code).toBe(143);
+    expect(lines.some((l) => l.includes("is left unfinished"))).toBe(false);
+    expect(lines.slice(-2)).toEqual(["nothing was uploaded", "UPLOAD FAILED: stopped by SIGTERM"]);
+  }, 30_000);
+
+  test("a normal upload leaves no signal handler behind", async () => {
+    const [cwd, dir, api] = [await gitRepo(), await snapshotDir(), fakeUploadApi()];
+    const before = [process.listenerCount("SIGTERM"), process.listenerCount("SIGINT")];
+    const code = await run(["upload", dir, "--server", SERVER], capture().io, {
+      fetch: api.fetch,
+      cwd,
+      env: { PIXELSLASH_TOKEN: "psci_env" },
+    });
+    expect(code).toBe(0);
+    expect([process.listenerCount("SIGTERM"), process.listenerCount("SIGINT")]).toEqual(before);
+  });
+});
 
 describe("capture --upload", () => {
   const pinned = {
