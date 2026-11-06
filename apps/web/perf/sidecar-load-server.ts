@@ -32,8 +32,6 @@ export const SERVER = `http://127.0.0.1:${PORT}`;
 export const WEB_UNIT = "ps-sidecar-load-web";
 export const DIFF_UNIT = "ps-sidecar-load-diff";
 export const TERMINAL_MISS_MS = 5000;
-/** The CLI retries a failure the API never answered at these delays (`upload-client.ts`). */
-export const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
 
 export const say = (line: string) =>
   process.stderr.write(`${new Date().toISOString().slice(11, 19)} ${line}\n`);
@@ -92,9 +90,15 @@ export function stopUnits(): void {
   }
 }
 
-/** The shipped units' memory limits (`deploy/ssh/pixelslash-{web,diff}.service`). */
+/** The shipped units' limits and restart (`deploy/ssh/pixelslash-{web,diff}.service`). */
 export function startUnit(unit: string, script: string, max: string, env: string[]): void {
-  const properties = [`MemoryMax=${max}`, "MemorySwapMax=0", "OOMPolicy=stop"];
+  const properties = [
+    `MemoryMax=${max}`,
+    "MemorySwapMax=0",
+    "OOMPolicy=stop",
+    "Restart=on-failure",
+    "RestartSec=2",
+  ];
   mustRun(
     "systemd-run",
     "--user",

@@ -1,33 +1,7 @@
-/** One client of PS-325's harness: the CLI's protocol (`packages/engine/src/upload.ts`). */
+/** One client of PS-325's harness: the CLI's protocol, over the engine's own `send`. */
+import { type Client as Api, isObj, send } from "../../../packages/engine/src/upload-client";
 import { form, type Shot } from "./corpus";
-import { CONCURRENCY, RETRY_DELAYS_MS, type Project, SERVER, say } from "./sidecar-load-server";
-
-type Attempt = { retries: number };
-
-/** A failure the API never answered, or a 5xx, is tried again, as `upload-client.ts` does. */
-async function send(
-  call: () => Promise<Response>,
-  what: string,
-  tally: Attempt,
-): Promise<Response> {
-  for (let n = 0; ; n++) {
-    let failure: string;
-    try {
-      const res = await call();
-      if (res.ok) return res;
-      failure = `${res.status} ${(await res.text()).slice(0, 300)}`;
-      if (res.status < 500) throw new Error(`${what}: ${failure}`);
-    } catch (e) {
-      if (e instanceof Error && e.message.startsWith(`${what}:`)) throw e;
-      failure = e instanceof Error ? e.message : String(e);
-    }
-    const delay = RETRY_DELAYS_MS[n];
-    if (delay === undefined) throw new Error(`${what}: ${failure} (after ${n + 1} tries)`);
-    tally.retries++;
-    say(`${what}: ${failure}; trying again`);
-    await Bun.sleep(delay);
-  }
-}
+import { CONCURRENCY, type Project, SERVER, say } from "./sidecar-load-server";
 
 export type Finalise = {
   ms: number;
@@ -37,46 +11,44 @@ export type Finalise = {
 };
 
 export class Client {
-  readonly tally: Attempt = { retries: 0 };
-  private readonly headers: Record<string, string>;
+  retries = 0;
+  private readonly api: Api;
   private readonly project: Project;
   constructor(project: Project) {
     this.project = project;
-    this.headers = { authorization: `Bearer ${project.token}` };
+    this.api = {
+      fetch,
+      base: SERVER,
+      token: project.token,
+      sleep: (ms) => Bun.sleep(ms),
+      warn: (message) => {
+        this.retries++;
+        say(message);
+      },
+    };
   }
 
   async open(body: object): Promise<string> {
-    const res = await send(
-      () =>
-        fetch(`${SERVER}/api/v1/builds`, {
-          method: "POST",
-          headers: { ...this.headers, "content-type": "application/json" },
-          body: JSON.stringify({ ...body, projectId: this.project.id, clientDiff: true }),
-        }),
-      "open build",
-      this.tally,
-    );
-    const opened: { id: string } = await res.json();
-    return opened.id;
+    const reply = await send(this.api, {
+      step: "open build",
+      method: "POST",
+      path: "/api/v1/builds",
+      body: JSON.stringify({ ...body, projectId: this.project.id, clientDiff: true }),
+    });
+    if (!isObj(reply) || typeof reply["id"] !== "string") throw new Error("open build: no id");
+    return reply["id"];
   }
 
   async putAll(id: string, list: Shot[]): Promise<void> {
     const queue = [...list];
     const worker = async () => {
-      for (let shot = queue.shift(); shot; shot = queue.shift()) {
-        const current = shot;
-        const res = await send(
-          () =>
-            fetch(`${SERVER}/api/v1/builds/${id}/snapshots`, {
-              method: "PUT",
-              headers: this.headers,
-              body: form(current),
-            }),
-          `PUT ${current.name}`,
-          this.tally,
-        );
-        await res.arrayBuffer();
-      }
+      for (let shot = queue.shift(); shot; shot = queue.shift())
+        await send(this.api, {
+          step: `upload ${shot.name}`,
+          method: "PUT",
+          path: `/api/v1/builds/${id}/snapshots`,
+          body: form(shot),
+        });
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   }
@@ -87,26 +59,18 @@ export class Client {
     let left = Infinity;
     for (;;) {
       const started = Date.now();
-      const res = await send(
-        () =>
-          fetch(`${SERVER}/api/v1/builds/${id}/finalize`, {
-            method: "POST",
-            headers: { ...this.headers, "content-type": "application/json" },
-            body: JSON.stringify({ snapshots: count }),
-          }),
-        "finalize",
-        this.tally,
-      );
-      const reply: { status: string; unmeasured?: number; error?: string | null } =
-        await res.json();
-      const now = reply.unmeasured ?? null;
-      rounds.push({
-        ms: Date.now() - started,
-        status: reply.status,
-        unmeasured: now,
-        error: reply.error ?? null,
+      const reply = await send(this.api, {
+        step: "finalize",
+        method: "POST",
+        path: `/api/v1/builds/${id}/finalize`,
+        body: JSON.stringify({ snapshots: count }),
       });
-      if (reply.status !== "errored" || now === null || now <= 0 || now >= left) return rounds;
+      if (!isObj(reply) || typeof reply["status"] !== "string")
+        throw new Error("finalize: no status");
+      const now = typeof reply["unmeasured"] === "number" ? reply["unmeasured"] : null;
+      const error = typeof reply["error"] === "string" ? reply["error"] : null;
+      rounds.push({ ms: Date.now() - started, status: reply["status"], unmeasured: now, error });
+      if (reply["status"] !== "errored" || now === null || now <= 0 || now >= left) return rounds;
       left = now;
     }
   }

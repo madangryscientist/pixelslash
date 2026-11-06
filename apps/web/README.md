@@ -494,9 +494,11 @@ that limit's message instead.
 **One call at a time (PS-325, `src/diff/sidecar.ts`).** The sidecar's diff is synchronous, so it
 answers one call at a time and a caller also waits for every call ahead of it. The web process keeps
 that queue itself: a call waits for its turn first, and its 15 s starts only then, so a busy sidecar
-is not taken for a down one. The wait still counts against the run's diff ceiling, whose wall time
-is unchanged: a run that spends its budget waiting stops with shots left, and the next finalise
-carries on. The queue survives a request cancelled mid-call (a lease, `src/diff/call-gate.ts`).
+is not taken for a down one. The wait still counts against the run's diff ceiling: a run that spends
+its budget waiting stops with shots left, and the next finalise carries on. The ceiling is checked
+between shots and a queued call cannot give up, so one finalise can outlast 25 s by its queue. A hung
+sidecar's timeouts now come in turn: with four runs waiting, the last falls back after a minute, not
+15 s. The queue survives a request cancelled mid-call (a lease, `src/diff/call-gate.ts`).
 
 **Pixel limits (PS-323, `src/diff/compare.ts`).** With a sidecar configured, a shot over 24.5 Mpx
 (1280x19140) is not diffed at all, and one over 12.5 Mpx (1280x9765) is not diffed in-process after

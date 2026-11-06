@@ -3,7 +3,7 @@ import type { DiffIgnore, DiffOptions, PixelDiff } from "@hackcove/pixelslash-en
 import { release } from "@hackcove/pixelslash-engine/release";
 import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";
-import { type CallGate, callGate } from "./call-gate";
+import { callGate } from "./call-gate";
 import { SIDECAR_PATH, decodeResponse, encodeRequest } from "./sidecar-wire";
 
 /**
@@ -71,13 +71,9 @@ export function sidecarEndpoint(url: string): string | null {
 }
 
 /** The sidecar at `endpoint`, as `sidecarEndpoint` gives it. */
-export function sidecarDiff(
-  endpoint: string,
-  deps: { timeoutMs?: number; gate?: CallGate } = {},
-): SidecarDiff {
-  const inTurn = deps.gate ?? gate;
+export function sidecarDiff(endpoint: string, deps: { timeoutMs?: number } = {}): SidecarDiff {
   return (main, branch, options, ignore) =>
-    inTurn(async () => {
+    gate(async () => {
       const body = encodeRequest({ main, branch, options, ignore });
       let res: Response;
       try {

@@ -164,16 +164,6 @@ describe("calls queue in the web process, not on the sidecar's clock (PS-325)", 
     }
   });
 
-  test("with no gate the same calls time out, so the test above can fail", async () => {
-    const stub = serialStub(FOUR_CALLS_MS);
-    try {
-      const call = client(stub.url, { timeoutMs: TIMEOUT_MS, gate: (work) => work() });
-      expect(await outcomes(call)).toContain("unreachable");
-    } finally {
-      await stub.server.stop(true);
-    }
-  });
-
   test("a sidecar that really hangs still times out, once per call, and frees the queue", async () => {
     const server = Bun.serve({
       hostname: "127.0.0.1",

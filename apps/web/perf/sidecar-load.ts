@@ -205,7 +205,7 @@ function report(input: {
     home: homeFacts(input.home),
     sidecar: sidecarFacts(diffLog),
     fellBack: [...webLog.matchAll(/server diff: in-process.*$/gm)].map((m) => m[0]),
-    retries: load.clients.reduce((n, c) => n + c.tally.retries, 0),
+    retries: load.clients.reduce((n, c) => n + c.retries, 0),
     units,
     totalSeconds: input.totalMs / 1000,
   };
