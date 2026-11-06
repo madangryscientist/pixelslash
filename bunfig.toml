@@ -1,2 +1,5 @@
 [install]
 linker = "isolated"
+# One package store under the Bun cache; node_modules entries symlink into it.
+# globalStore = false is the project-wide fallback.
+globalStore = true
