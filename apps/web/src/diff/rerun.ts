@@ -3,6 +3,7 @@ import { selectBaselines, snapshotKeyOf } from "#/db/baselines";
 import { chunk, inChunks } from "#/db/chunks";
 import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
+import { ABANDONED_REASON } from "#/db/abandoned";
 import { isMarker } from "#/db/markers";
 import { refreshBuildStatus } from "#/db/review";
 import { markStale } from "#/db/stale-apply";
@@ -140,6 +141,10 @@ export async function rerunShots(
   if (snapshotId === null) {
     if (build.status !== "errored")
       throw new RerunError(`build is ${build.status}: nothing errored`);
+    // Swept before it was ever finalised (PS-324): its shots are a partial upload, and measuring
+    // them would give a verdict on part of the build. Only sending the build again completes it.
+    if (build.error === ABANDONED_REASON && build.processingStartedAt === null)
+      throw new RerunError("this build was never finalised: send it again");
     return processBuild(deps, build);
   }
   return rediffShots(deps, build, [snapshotId]);

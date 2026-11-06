@@ -11,8 +11,10 @@ const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
 /**
  * An in-memory SQLite with the real migrations applied, behind the same async Drizzle API
  * D1 gives in production. Tests only: no network, no Cloudflare account. Runs under Bun (`bun --bun vitest`).
+ * `beforeQuery` sees each statement before it runs and may run SQL of its own, to put a write
+ * between a read and the write that follows it.
  */
-export function testDb() {
+export function testDb(beforeQuery?: (query: string, exec: (sql: string) => void) => void) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec("PRAGMA foreign_keys = ON");
   for (const file of readdirSync(MIGRATIONS)
@@ -25,6 +27,7 @@ export function testDb() {
     }
   }
   return drizzle(async (query, params, method) => {
+    beforeQuery?.(query, (sql) => sqlite.exec(sql));
     const stmt = sqlite.prepare(query);
     // Arrays, not objects: a join selecting two `id` columns must keep both.
     stmt.setReturnArrays(true);

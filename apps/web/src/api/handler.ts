@@ -14,6 +14,7 @@ import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { type RateLimiter, overApiLimit, retryAfter } from "#/server/rate-limit";
 import { reportError } from "#/server/sentry";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
+import { endAbandoned } from "./abandoned";
 import { authorize, bearer } from "./authorize";
 import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
 import { createProjectByName } from "./project-create";
@@ -88,20 +89,19 @@ function projectIdOf(body: unknown, actor: Actor): string {
   return named;
 }
 
-/** Refused at the start of a `ci` project's build when the CLI does not diff (ob 1727). */
-const UPGRADE_FOR_CI = "this project diffs in CI; upgrade the CLI";
-
 /**
  * A CLI that diffs says so with `clientDiff: true`, and is told where its project diffs. One that
- * does not say so cannot send results, so a `ci` project refuses it before any shot is uploaded.
+ * does not say so cannot send results, so a `ci` project refuses it before any shot is uploaded
+ * (ob 1727).
  */
 async function startBuild(ctx: Ctx): Promise<Response> {
   const body = await jsonBody(ctx.request);
   const input = parseNewBuild(body);
   const project = await actorProject(ctx.db, ctx.actor, projectIdOf(body, ctx.actor));
   if (project.diffLocation === "ci" && object(body, "body").clientDiff !== true)
-    return fail(426, UPGRADE_FOR_CI);
+    return fail(426, "this project diffs in CI; upgrade the CLI");
   const id = await createBuild(ctx.db, project.id, input);
+  await endAbandoned(ctx, project.id);
   return json({ id, diffLocation: project.diffLocation }, 201);
 }
 
