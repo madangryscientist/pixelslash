@@ -147,6 +147,13 @@ bunx nx test:e2e site             # Playwright on the build, desktop and phone: 
 (cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-site-dry")
 ```
 
+CI runs the build and `bunx nx test:e2e site` as `Site gate (build, e2e)` on a pull request that touches
+`apps/site/`, `docs/`, a root file the site renders or installs from (`README.md`, `SECURITY.md`,
+`apps/web/SELF-HOST.md`, `apps/web/github-app/manifest.json`, `package.json`, `nx.json`,
+`tsconfig.base.json`, `bun.lock`, `bunfig.toml`, `scripts/test-tmp-scope.ts`) or `ci.yml`, and on every push to
+`main`. A tag (a release) does not run it. The check is not required, so a skipped job blocks nothing; the hand
+run above is no longer the only run, but the wrangler dry run stays yours.
+
 `apps/web` keeps its schema in `src/db/schema.ts`; `bun run db:generate` (in
 `apps/web`) writes the next additive migration to `apps/web/drizzle/`. All
 queries go through `src/db/*` (they take a `Db`, never D1), and blobs through
