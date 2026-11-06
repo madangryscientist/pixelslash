@@ -14,7 +14,7 @@ import {
 import type { OperatorHealth, WindowHealth } from "#/db/admin-health";
 import { formatBytes, formatDateTime, formatNumber } from "#/lib/format";
 import { P95_MIN_BUILDS, P99_MIN_BUILDS } from "#/lib/timings";
-import { BuildComparesTable } from "./operator-compares";
+import { BuildComparesTable, WindowFiguresLine } from "./operator-compares";
 import { NowSection } from "./operator-health-now";
 import { Figure, HealthSection, StepCell, plural } from "./operator-health-parts";
 
@@ -97,6 +97,7 @@ function WindowSection({
           {(v) => formatNumber(v)}
         </Figure>
       </Text>
+      <WindowFiguresLine figures={w.figures} testId={`admin-${w.key}-figures`} />
       <BuildComparesTable rows={w.builds} total={w.finished} testId={`admin-${w.key}-builds`} />
     </HealthSection>
   );
@@ -110,7 +111,7 @@ function DeploymentSection({ health }: { health: OperatorHealth }) {
       note="What this Worker instance is running, against the migrations the database has applied."
       testId="admin-deployment"
     >
-      <KeyValueList align="start">
+      <KeyValueList>
         <KeyValue label="Release commit">
           <Figure reading={d.sha} testId="admin-sha">
             {(v) => v}

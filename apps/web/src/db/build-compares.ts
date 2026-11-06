@@ -40,7 +40,7 @@ export const ranCompare = () =>
  * The value at a nearest-rank percentile of a ranked sample: `ceil(pct/100 · n)`, in integers because
  * SQLite has no `ceil` everywhere. The same rank as `percentile` in `lib/timings.ts`.
  */
-const atRank = (pct: number) =>
+export const atRank = (pct: number) =>
   sql<number>`max(case when rn = (${sql.raw(String(pct))} * n + 99) / 100 then ms end)`;
 
 async function timesByBuild(db: Db, ids: string[]): Promise<Map<string, StepStats>> {
