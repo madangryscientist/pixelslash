@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, provision, uploadBuild } from "./api-upload";
 import { rivalContext, rivalSession } from "./rival";
 
 /**
@@ -61,4 +62,50 @@ test("a listed operator sees the page: every group, and what it cannot read says
 
   // Read-only: nothing on the page acts.
   await expect(page.getByTestId("operator-health").getByRole("button")).toHaveCount(0);
+});
+
+test("each window reads snapshots per build and time per snapshot, in both themes, at desktop and phone width", async ({
+  browser,
+  page,
+}) => {
+  // A real build with a diffed shot, so the window has a build and a server compare to count.
+  const { token } = await provision(page, "Window Figures Co", "figures");
+  await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
+  await uploadBuild(
+    token,
+    { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
+    [{ name: "hero", png: CHANGED }],
+  );
+  const sizes = [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ];
+  for (const colorScheme of ["light", "dark"] as const) {
+    for (const viewport of sizes) {
+      const context = await browser.newContext({ colorScheme, viewport });
+      const view = await context.newPage();
+      await view.goto("/");
+      await view.getByRole("link", { name: "Sign in with GitHub" }).click();
+      await expect(view).toHaveURL(/\/orgs$/);
+      await view.goto("/_admin");
+      await expect(view.locator("html")).toHaveClass(
+        colorScheme === "dark" ? /dark/ : /^(?!.*dark)/,
+      );
+      for (const key of ["24h", "7d"]) {
+        const figures = view.getByTestId(`admin-${key}-figures`);
+        await expect(figures.getByTestId(`admin-${key}-figures-per-build`)).toHaveText(
+          /^\d[\d,]* \/ \d[\d,]*( max)? \/ (—|\d[\d,]*) · n=\d[\d,]* builds$/,
+        );
+        await expect(figures.getByTestId(`admin-${key}-figures-per-snapshot`)).toHaveText(
+          / · n=\d[\d,]* compares$/,
+        );
+        await expect(figures).toContainText("a CI build's times are not in it");
+      }
+      const overflow = await view.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `${colorScheme} at ${viewport.width}`).toBeLessThanOrEqual(0);
+      await context.close();
+    }
+  }
 });

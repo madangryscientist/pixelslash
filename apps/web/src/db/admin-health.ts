@@ -8,6 +8,7 @@ import { type BuildCompares, BUILDS_SHOWN, buildCompares, ranCompare } from "./b
 import { cacheHit } from "./cache-hit";
 import type { Db } from "./db";
 import { heldShot } from "./markers";
+import { type WindowFigures, windowFigures } from "./window-figures";
 import { builds, detectionFlags, flakes, orgs, projects, snapshots } from "./schema";
 
 /**
@@ -56,6 +57,8 @@ export type WindowHealth = {
   cacheHits: number;
   /** Shots whose model explanation failed (`ai_error`) in those builds. */
   explainFailures: number;
+  /** Snapshots per build and time per snapshot over the whole window (PS-342). */
+  figures: WindowFigures;
   /** The newest builds of the window, up to `BUILDS_SHOWN`; `finished` is how many there were. */
   builds: BuildCompares[];
 };
@@ -110,7 +113,7 @@ function windowOf(
   rows: FinishedRow[],
   shots: Pick<
     WindowHealth,
-    "snapshots" | "comparesRun" | "cacheHits" | "explainFailures" | "builds"
+    "snapshots" | "comparesRun" | "cacheHits" | "explainFailures" | "builds" | "figures"
   >,
 ): WindowHealth {
   const since = new Date(now.getTime() - spec.ms);
@@ -220,6 +223,7 @@ async function windowsSection(db: Db, now: Date) {
     windows.push(
       windowOf(spec, now, finished, {
         ...(await shotCounts(db, since)),
+        figures: await windowFigures(db, and(isReal(), endedSince(since))),
         builds: compares.filter((b) => inWindow.has(b.id)),
       }),
     );

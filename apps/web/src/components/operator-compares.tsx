@@ -1,15 +1,18 @@
 import {
   Caption,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeaderCell,
   TableRow,
+  Text,
 } from "@hackcove/ui-react";
 import type { BuildCompares } from "#/db/build-compares";
+import type { WindowFigures } from "#/db/window-figures";
 import { formatDuration, formatNumber } from "#/lib/format";
-import { P95_MIN_BUILDS, P99_MIN_COMPARES } from "#/lib/timings";
+import { P95_MIN_BUILDS, P99_MIN_COMPARES, type StepStats } from "#/lib/timings";
 
 /** Each build's snapshots and compare times on the operator health page (PS-336). */
 
@@ -45,6 +48,68 @@ function Times({ build }: { build: BuildCompares }) {
         {times.p99 === null ? "—" : ms(times.p99)}
       </TableCell>
     </>
+  );
+}
+
+/** `p50 / p95 / p99 · n`: the p95 reads max under its gate and the p99 a dash under its own. */
+function Figures({
+  stats,
+  unit,
+  noun,
+  testId,
+}: {
+  stats: StepStats | null;
+  unit: (v: number) => string;
+  noun: string;
+  testId: string;
+}) {
+  if (!stats)
+    return (
+      <Text tone="muted" data-testid={testId}>
+        — · n=0 {noun}
+      </Text>
+    );
+  return (
+    <Text data-testid={testId}>
+      {unit(stats.p50)} / {unit(stats.tail === "max" ? stats.max : stats.p95)}
+      {stats.tail === "max" && " max"} / {stats.p99 === null ? "—" : unit(stats.p99)} · n=
+      {formatNumber(stats.n)} {noun}
+    </Text>
+  );
+}
+
+/**
+ * The window's two figures above the per-build table (PS-342): how many snapshots a build holds and
+ * how long a snapshot's compare takes, over every build that ended in the window. The per-build
+ * table below cannot say it: a build rarely has the compares a p99 needs.
+ */
+export function WindowFiguresLine({ figures, testId }: { figures: WindowFigures; testId: string }) {
+  return (
+    <Stack gap="xs" data-testid={testId}>
+      <Text as="p">
+        Snapshots per build, p50 / p95 / p99:{" "}
+        <Figures
+          stats={figures.perBuild}
+          unit={formatNumber}
+          noun="builds"
+          testId={`${testId}-per-build`}
+        />
+      </Text>
+      <Text as="p">
+        Time per snapshot, p50 / p95 / p99:{" "}
+        <Figures
+          stats={figures.perSnapshot}
+          unit={ms}
+          noun="compares"
+          testId={`${testId}-per-snapshot`}
+        />
+      </Text>
+      <Caption as="p">
+        Snapshots per build counts cache hits, over builds that hold a snapshot. Time per snapshot
+        is the server's compares with a stored time, no cache hit in it; a CI build's times are not
+        in it, since reading them would mean reading every build of the window.
+      </Caption>
+    </Stack>
   );
 }
 
