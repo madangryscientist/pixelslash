@@ -1,6 +1,6 @@
 # PixelSlash
 
-Page vs design-system, vision-first — plus a pixel dashboard of Main vs Branch. Local mlx, else ollama, or opencode when you name a model. A standalone Bun CLI.
+PixelSlash compares two versions of a page, Main and Branch, pixel by pixel, and writes a report of what changed. It can also check a page against your design system with a vision model, which runs on your machine unless you choose a hosted one. It is a command line tool that runs on Bun.
 
 ## Install
 
