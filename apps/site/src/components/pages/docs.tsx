@@ -12,9 +12,10 @@ import {
   Tabs,
   TextLink,
 } from "@hackcove/ui-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, Suspense } from "react";
 import { OLD_ANCHOR_SCRIPT } from "../../content/old-anchors.ts";
-import { CLI_INTRO_DOC, docOf } from "../../content/docs.ts";
+import { CLI_INTRO_DOC } from "../../content/cli-intro.ts";
+import { useDoc } from "../../content/docs.ts";
 import {
   DOC_PAGES,
   type DocPageDef,
@@ -26,6 +27,7 @@ import {
 import { REPO_PUBLIC, REPO_URL } from "../../content/links.ts";
 import { DocBody, type Heading } from "../../content/markdown.tsx";
 import { DocsSearch } from "./docs-search";
+import { useActiveHeading } from "./use-active-heading";
 
 // The themes' unlayered rule for text-slate-600 beats any layered hover:text-slate-*, so a slate hover
 // would change nothing but the underline. hover:text-violet-700 is an accent both themes remap.
@@ -90,44 +92,6 @@ export function DocsNav({ current }: { current?: string }): ReactNode {
       </div>
     </nav>
   );
-}
-
-/** The id of the heading the reader is in: the last one whose top has passed the header, the first before any has. */
-function useActiveHeading(key: string, track: boolean): string | undefined {
-  const [active, setActive] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!track) return undefined;
-    // Heading ids are slugs, so `|` never occurs in one; `key` is how a new page is noticed.
-    const ids = key.split("|");
-    let frame = 0;
-    const update = (): void => {
-      frame = 0;
-      // Where a heading anchor lands (its scroll-margin-top, styles.css), so the two never disagree.
-      // Read on every update, so a resize that moves the header is picked up.
-      const first = document.getElementById(ids[0] ?? "");
-      const line = first ? Number.parseFloat(getComputedStyle(first).scrollMarginTop) + 1 : 0;
-      let found: string | undefined = ids[0];
-      for (const id of ids) {
-        const top = document.getElementById(id)?.getBoundingClientRect().top;
-        if (top === undefined) continue;
-        if (top > line) break;
-        found = id;
-      }
-      setActive(found);
-    };
-    const schedule = (): void => {
-      if (frame === 0) frame = requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    return () => {
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      if (frame !== 0) cancelAnimationFrame(frame);
-    };
-  }, [key, track]);
-  return active;
 }
 
 /** The page's own H2 and H3, each linking to its anchor in the body. With `track`, the heading being read is marked. */
@@ -215,11 +179,23 @@ function PrevNext({ slug }: { slug: string }): ReactNode {
   );
 }
 
-/** One page of the docs: a cut of docs/cli.md (or getting-started.md), rendered at build time. */
+/** One page of the docs: a cut of docs/cli.md, or a file of its own, rendered at build time. */
 export function DocPage({ slug }: { slug: string }): ReactNode {
+  return (
+    <SidebarLayout rail={<DocsNav current={slug} />} railLabel="Docs">
+      {/* Never shown: the loader has the document before a render. Hydration keeps the server's HTML while its chunk loads. */}
+      <Suspense fallback={null}>
+        <DocArticle slug={slug} />
+      </Suspense>
+    </SidebarLayout>
+  );
+}
+
+/** The page's own column: its title, its text and its contents list. */
+function DocArticle({ slug }: { slug: string }): ReactNode {
   const page = findPage(slug);
   if (page === undefined) throw new Error(`docs: no page ${slug}`);
-  const doc = docOf(slug);
+  const doc = useDoc(slug);
   const group = GROUPS.find((candidate) => candidate.id === page.group);
   const hasRail = doc.headings.some((heading) => heading.depth <= 3);
   const breadcrumbs = (
@@ -241,35 +217,31 @@ export function DocPage({ slug }: { slug: string }): ReactNode {
       <PrevNext slug={slug} />
     </div>
   );
-  return (
-    <SidebarLayout rail={<DocsNav current={slug} />} railLabel="Docs">
-      {hasRail ? (
-        // The kit sticks the contents under the header from `lg` and scrolls it itself when it is taller than the room left.
-        <DetailLayout
-          title={page.title}
-          breadcrumbs={breadcrumbs}
-          stickyAside
-          aside={
-            <nav aria-label="On this page" data-testid="docs-contents" className="hidden lg:block">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                On this page
-              </p>
-              <OnThisPage headings={doc.headings} track />
-            </nav>
-          }
-        >
-          {article}
-        </DetailLayout>
-      ) : (
-        <div>
-          <PageHeader title={page.title} breadcrumbs={breadcrumbs} />
-          {/* Nothing to stick: the kit's DetailLayout without its aside, so no second unnamed aside beside the rail's. */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="min-w-0 lg:col-span-2">{article}</div>
-          </div>
-        </div>
-      )}
-    </SidebarLayout>
+  return hasRail ? (
+    // The kit sticks the contents under the header from `lg` and scrolls it itself when it is taller than the room left.
+    <DetailLayout
+      title={page.title}
+      breadcrumbs={breadcrumbs}
+      stickyAside
+      aside={
+        <nav aria-label="On this page" data-testid="docs-contents" className="hidden lg:block">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            On this page
+          </p>
+          <OnThisPage headings={doc.headings} track />
+        </nav>
+      }
+    >
+      {article}
+    </DetailLayout>
+  ) : (
+    <div>
+      <PageHeader title={page.title} breadcrumbs={breadcrumbs} />
+      {/* Nothing to stick: the kit's DetailLayout without its aside, so no second unnamed aside beside the rail's. */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">{article}</div>
+      </div>
+    </div>
   );
 }
 

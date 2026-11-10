@@ -1,6 +1,6 @@
 import { Callout, ProseLayout, SidebarLayout } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
-import { SELF_HOST_DOC } from "../../content/docs.ts";
+import { SELF_HOST_DOC } from "../../content/repo-docs.ts";
 import { REPO_PUBLIC } from "../../content/links.ts";
 import { DocBody } from "../../content/markdown.tsx";
 import { DocsNav, EditLink } from "./docs";

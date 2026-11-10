@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { buildSearchIndex } from "./search-index.ts";
 import { type SearchEntry, search } from "./search.ts";
 
-const INDEX = buildSearchIndex();
+const INDEX = await buildSearchIndex();
 
 describe("the docs search index", () => {
   test("holds every docs page and the self-host guide", () => {

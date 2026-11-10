@@ -1,6 +1,5 @@
 import type { MarkedToken, Tokens } from "marked";
 import { marked } from "./doc-text.ts";
-import { CLI_SPLIT } from "./cli-pages.ts";
 import { FLAG_NOTES } from "./cli-index-notes.ts";
 import { findPage } from "./docs-map.ts";
 
@@ -157,14 +156,16 @@ function describers(tokens: readonly MarkedToken[]): Map<string, string> {
 
 type Seen = { page: string; line: string };
 
+type CliPages = ReadonlyMap<string, readonly MarkedToken[]>;
+
 function commandOf(line: string): string {
   return BARE.exec(line)?.[1] ?? "";
 }
 
 /** Every synopsis line in cli.md, by command, with the page it is shown on. */
-function collect(): Map<string, Seen[]> {
+function collect(pages: CliPages): Map<string, Seen[]> {
   const seen = new Map<string, Seen[]>();
-  for (const [slug, tokens] of CLI_SPLIT.pages) {
+  for (const [slug, tokens] of pages) {
     for (const block of codeBlocks(tokens)) {
       for (const line of synopsisLines(block.text)) {
         const command = commandOf(line);
@@ -187,11 +188,12 @@ function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)];
 }
 
-export function buildCommandIndex(): CommandEntry[] {
-  const seen = collect();
-  const everywhere = describers([...CLI_SPLIT.pages.values()].flat());
+/** The index, from cli.md cut into its pages (`splitCli`). */
+export function buildCommandIndex(pages: CliPages): CommandEntry[] {
+  const seen = collect(pages);
+  const everywhere = describers([...pages.values()].flat());
   const pageDescribed = new Map(
-    [...CLI_SPLIT.pages].map(([slug, tokens]) => [slug, describers(tokens)] as const),
+    [...pages].map(([slug, tokens]) => [slug, describers(tokens)] as const),
   );
   // A flag several commands take can mean something different to each, so its prose is read only
   // from the pages that show this command's own synopsis; a flag one command owns is read anywhere.
@@ -237,9 +239,7 @@ const title = (slug: string): string => findPage(slug)?.title ?? slug;
 const cell = (text: string): string => text.replace(/\|/g, "\\|");
 
 /** The index page as markdown: one table of commands, then a usage block and a flag table each. */
-export function commandIndexMarkdown(
-  entries: readonly CommandEntry[] = buildCommandIndex(),
-): string {
+export function commandIndexMarkdown(entries: readonly CommandEntry[]): string {
   const lines: string[] = [
     "# Every command",
     "",

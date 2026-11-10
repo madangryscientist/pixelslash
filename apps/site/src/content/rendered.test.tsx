@@ -8,10 +8,13 @@ import { HowItWorksPage } from "#/components/pages/how-it-works";
 import { SecurityPage } from "#/components/pages/security";
 import { SelfHostPage } from "#/components/pages/self-host";
 import { TICKET_ID } from "./doc-text.ts";
+import { loadAllDocs } from "./docs.ts";
 import { DOC_PAGES, EXTRA_NAV, GROUPS, neighbours } from "./docs-map.ts";
-import { CLI_SPLIT } from "./cli-pages.ts";
+import { CLI_SPLIT } from "./cli-split.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
+// The pages render at once only once their documents are loaded, as the route loader does first.
+await loadAllDocs();
 const html = new Map(
   DOC_PAGES.map((page) => [page.slug, renderToStaticMarkup(<DocPage slug={page.slug} />)]),
 );

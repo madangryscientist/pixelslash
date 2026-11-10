@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { COMMAND_SUMMARY, buildCommandIndex, commandIndexMarkdown, flagsOf } from "./cli-index.ts";
-import { CLI_SPLIT } from "./cli-pages.ts";
+import { CLI_SPLIT } from "./cli-split.ts";
 import { findPage } from "./docs-map.ts";
 
 const RUN_TS = readFileSync(
@@ -19,7 +19,7 @@ function cliCommands(): string[] {
   return [...body.matchAll(/^ {2}("?)([a-z][a-z-]*)\1: /gm)].map((m) => m[2] ?? "");
 }
 
-const INDEX = buildCommandIndex();
+const INDEX = buildCommandIndex(CLI_SPLIT.pages);
 
 describe("the command index", () => {
   test("reads the commands from the CLI's own table", () => {

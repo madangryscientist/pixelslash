@@ -1,5 +1,6 @@
 import type { MarkedToken } from "marked";
-import { SELF_HOST_DOC, docOf } from "./docs.ts";
+import { loadDoc } from "./docs.ts";
+import { SELF_HOST_DOC } from "./repo-docs.ts";
 import { DOC_PAGES, EXTRA_NAV } from "./docs-map.ts";
 import type { Doc } from "./markdown.tsx";
 import type { SearchEntry } from "./search.ts";
@@ -60,14 +61,16 @@ export function entriesOf(doc: Doc, base: string, pageTitle: string): SearchEntr
 }
 
 /** Every entry: the docs pages in nav order, then the pages outside the map that the rail links. */
-export function buildSearchIndex(): SearchEntry[] {
-  const docs = DOC_PAGES.flatMap((page) =>
-    entriesOf(docOf(page.slug), `/docs/${page.slug}`, page.title),
+export async function buildSearchIndex(): Promise<SearchEntry[]> {
+  const docs = await Promise.all(
+    DOC_PAGES.map(async (page) =>
+      entriesOf(await loadDoc(page.slug), `/docs/${page.slug}`, page.title),
+    ),
   );
   const extra = EXTRA_NAV.flatMap((item) =>
     item.href === "/self-host"
       ? entriesOf(SELF_HOST_DOC, item.href, "Self-host the review app")
       : [],
   );
-  return [...docs, ...extra];
+  return [...docs.flat(), ...extra];
 }
