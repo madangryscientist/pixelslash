@@ -100,7 +100,7 @@ function PageArt({ children }: { children: ReactNode }): ReactNode {
 }
 
 /**
- * The frame every page sits in: the brand, the nav row, the page, the footer. The homepage's sections
+ * The frame every page sits in: the brand, the nav, the page, the footer. The homepage's sections
  * run the full width and its footer carries the wordmark. Every other page
  * is drawn over the same ground (PageArt), and the shell paints that ground under the footer too.
  */
@@ -123,8 +123,9 @@ export function Shell({
     <AppShell
       brand={<AppShellBrand href="/" label={<Wordmark />} />}
       controls={<Controls />}
-      // On a phone AppShell folds this row behind its Menu button; the controls stay in the header.
-      subnav={<Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />}
+      // One row from md: the nav sits between the brand and the controls. On a phone AppShell folds it
+      // behind its Menu button; the controls stay in the header.
+      nav={<Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />}
       footer={isHome ? <HomeFooter /> : <Footer />}
       bleed
       data-art=""

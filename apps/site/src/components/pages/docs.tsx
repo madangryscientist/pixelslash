@@ -103,7 +103,7 @@ function useActiveHeading(key: string, track: boolean): string | undefined {
     const update = (): void => {
       frame = 0;
       // Where a heading anchor lands (its scroll-margin-top, styles.css), so the two never disagree.
-      // Read on every update: the header is taller from md, so a resize can move it.
+      // Read on every update, so a resize that moves the header is picked up.
       const first = document.getElementById(ids[0] ?? "");
       const line = first ? Number.parseFloat(getComputedStyle(first).scrollMarginTop) + 1 : 0;
       let found: string | undefined = ids[0];
