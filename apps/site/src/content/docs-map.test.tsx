@@ -37,6 +37,14 @@ describe("the nav titles", () => {
     for (const title of titles) seen.set(key(title), [...(seen.get(key(title)) ?? []), title]);
     expect([...seen.values()].filter((group) => group.length > 1)).toEqual([]);
   });
+
+  test("the three flaky-shot pages say what they are and all contain 'flaky'", () => {
+    expect(findPage("flaky-shots")?.title).toContain("Flaky shots");
+    expect(findPage("capture-stabilise")?.title).toContain("Stabilise settings");
+    expect(findPage("capture-stabilise")?.title).toContain("flaky");
+    expect(findPage("upload-flaky")?.title).toContain("Detecting");
+    expect(findPage("upload-flaky")?.title).toContain("flaky");
+  });
 });
 
 describe("getting started", () => {

@@ -75,7 +75,7 @@ An upload that captured its changed shots again writes `report.html` in the snap
 Flaky means the captures of one shot disagreed with each other. It says nothing about whether the change is wanted.
 ```
 
-Each flaky shot then shows `flaky: 1 of 3 runs differed`, its policy, every run side by side, and where the runs differed. Shots below that are listed under **Changed, every run agreed**: those are the changes to take seriously. [Making shots stable](flaky-shots.md) has what to do with them.
+Each flaky shot then shows `flaky: 1 of 3 runs differed`, its policy, every run side by side, and where the runs differed. Shots below that are listed under **Changed, every run agreed**: those are the changes to take seriously. [Flaky shots](flaky-shots.md) has what to do with them.
 
 ## The parity view
 

@@ -140,5 +140,5 @@ Nothing is paused for you. A medium that sits wholly inside an ignored area does
 ## Next
 
 - [Thresholds](thresholds.md): tolerance for the whole shot.
-- [Making shots stable](flaky-shots.md): find what keeps moving.
+- [Flaky shots](flaky-shots.md): find what keeps moving.
 - [Snapshot capture](../cli.md#snapshot-capture-the-pinned-image): the full config.

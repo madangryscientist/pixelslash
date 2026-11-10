@@ -40,7 +40,7 @@ export const CAPTURE_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "capture-stabilise",
-    title: "Stabilise",
+    title: "Stabilise settings for flaky shots",
     group: "capture",
     sections: ["Stabilise: what is frozen before a shot"],
   },
@@ -125,7 +125,7 @@ export const REVIEW_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "upload-flaky",
-    title: "Flaky shot detection and policy",
+    title: "Detecting flaky shots on the server",
     group: "review",
     sections: ["Flaky shots", "Fixing a flake locally"],
     exits: true,
