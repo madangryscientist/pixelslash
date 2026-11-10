@@ -3,11 +3,9 @@ import {
   AppShellBrand,
   Button,
   Caption,
-  Cluster,
   ColourSchemeToggle,
   Container,
   Tabs,
-  Stack,
   TextLink,
 } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
@@ -46,21 +44,8 @@ function Controls(): ReactNode {
   );
 }
 
+/** The footer every page shares: the wordmark, the licence and contact lines, then the trademark line. */
 function Footer(): ReactNode {
-  return (
-    <Stack gap="sm" data-testid="footer">
-      <Cluster gap="md">
-        <span>MIT licence</span>
-        <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
-        <SourceLink />
-      </Cluster>
-      <span data-testid="trademark">{TRADEMARK}</span>
-    </Stack>
-  );
-}
-
-/** The home's footer: the inner pages' lines, with the wordmark in front. */
-function HomeFooter(): ReactNode {
   return (
     <div data-testid="footer" className="home-footer flex flex-col gap-4 py-6">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -101,8 +86,8 @@ function PageArt({ children }: { children: ReactNode }): ReactNode {
 
 /**
  * The frame every page sits in: the brand, the nav, the page, the footer. The homepage's sections
- * run the full width and its footer carries the wordmark. Every other page
- * is drawn over the same ground (PageArt), and the shell paints that ground under the footer too.
+ * run the full width. Every other page is drawn over the same ground (PageArt), and the shell
+ * paints that ground under the footer too. The footer is the same on every page.
  */
 export function Shell({
   pathname,
@@ -126,7 +111,7 @@ export function Shell({
       // One row from md: the nav sits between the brand and the controls. On a phone AppShell folds it
       // behind its Menu button; the controls stay in the header.
       nav={<Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />}
-      footer={isHome ? <HomeFooter /> : <Footer />}
+      footer={<Footer />}
       bleed
       data-art=""
     >

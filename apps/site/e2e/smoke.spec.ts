@@ -40,6 +40,7 @@ async function checkPage(
       await expect(nav.getByRole("link", { name: item.label, exact: true })).toHaveCount(1);
 
     const footer = page.getByTestId("footer");
+    await expect(footer.getByRole("link", { name: "PixelSlash home" })).toBeVisible();
     await expect(footer.getByTestId("trademark")).toContainText("PixelSlash is a name of");
     await expect(footer.getByRole("link", { name: "hello@hack-cove.com" })).toHaveAttribute(
       "href",
