@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DOC_PAGES } from "../src/content/docs-map.ts";
+import { LISTED_PAGES } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
 
 /*
@@ -8,7 +8,10 @@ import { PAGES } from "../src/content/pages.ts";
  */
 
 const ORIGIN = "https://pixelslash.dev";
-const PATHS = [...PAGES.map((page) => page.to), ...DOC_PAGES.map((page) => `/docs/${page.slug}`)];
+const PATHS = [
+  ...PAGES.map((page) => page.to),
+  ...LISTED_PAGES.map((page) => `/docs/${page.slug}`),
+];
 
 const attr = (tag: string, name: string): string =>
   (new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? "")

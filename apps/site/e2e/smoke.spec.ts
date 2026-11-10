@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
-import { DOC_PAGES, GROUPS, neighbours } from "../src/content/docs-map.ts";
+import { DOC_PAGES, GROUPS, LISTED_PAGES, neighbours } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
 import { siteNav } from "./support/site-nav.ts";
 
@@ -102,7 +102,7 @@ test("/docs is the index: a card per group, every page linked, the rail marks Al
 }, info) => {
   await checkPage(page, "/docs", info);
   const index = page.getByTestId("docs-index");
-  for (const item of DOC_PAGES)
+  for (const item of LISTED_PAGES)
     await expect(index.locator(`a[href="/docs/${item.slug}"]`)).toHaveCount(1);
   await expect(page.getByTestId("docs-nav").locator('a[href="/docs"]')).toHaveAttribute(
     "aria-current",
@@ -140,11 +140,11 @@ for (const size of [
   }
 }
 
-for (const doc of DOC_PAGES) {
+for (const doc of LISTED_PAGES) {
   test(`/docs/${doc.slug}: group nav, on this page, previous and next`, async ({ page }, info) => {
     await checkPage(page, `/docs/${doc.slug}`, info);
     const nav = page.getByTestId("docs-nav");
-    for (const other of DOC_PAGES)
+    for (const other of LISTED_PAGES)
       await expect(nav.locator(`a[href="/docs/${other.slug}"]`)).toHaveCount(1);
     await expect(nav.locator(`a[href="/docs/${doc.slug}"]`)).toHaveAttribute(
       "aria-current",

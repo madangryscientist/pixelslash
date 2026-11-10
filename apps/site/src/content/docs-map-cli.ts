@@ -61,7 +61,7 @@ export const CAPTURE_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "playwright",
-    title: "Your own Playwright tests",
+    title: "Capture from Playwright tests",
     group: "capture",
     sections: ["Snapshots from your own Playwright tests"],
     exits: true,
@@ -125,7 +125,7 @@ export const REVIEW_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "upload-flaky",
-    title: "Flaky shots",
+    title: "Flaky shot detection and policy",
     group: "review",
     sections: ["Flaky shots", "Fixing a flake locally"],
     exits: true,

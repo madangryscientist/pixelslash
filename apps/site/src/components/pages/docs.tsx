@@ -17,10 +17,10 @@ import { OLD_ANCHOR_SCRIPT } from "../../content/old-anchors.ts";
 import { CLI_INTRO_DOC } from "../../content/cli-intro.ts";
 import { useDoc } from "../../content/docs.ts";
 import {
-  DOC_PAGES,
   type DocPageDef,
   EXTRA_NAV,
   GROUPS,
+  LISTED_PAGES,
   findPage,
   neighbours,
 } from "../../content/docs-map.ts";
@@ -38,7 +38,7 @@ const pageHref = (page: DocPageDef): string => `/docs/${page.slug}`;
 /** The rail's pages in one group: the map's pages, then the site pages that sit in the same group. */
 function groupItems(groupId: string, current: string | undefined) {
   return [
-    ...DOC_PAGES.filter((page) => page.group === groupId).map((page) => ({
+    ...LISTED_PAGES.filter((page) => page.group === groupId).map((page) => ({
       label: page.title,
       href: pageHref(page),
       active: page.slug === current,
@@ -312,7 +312,7 @@ export function DocsIndexPage(): ReactNode {
               <Card title={group.title} titleStyle="name">
                 <p className="mb-3 text-sm text-slate-600">{group.summary}</p>
                 <ul className="flex flex-col gap-1">
-                  {DOC_PAGES.filter((page) => page.group === group.id).map((page) => (
+                  {LISTED_PAGES.filter((page) => page.group === group.id).map((page) => (
                     <li key={page.slug}>
                       <TextLink href={pageHref(page)}>
                         {page.title}

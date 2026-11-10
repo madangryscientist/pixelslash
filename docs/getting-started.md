@@ -4,7 +4,13 @@ Install PixelSlash, compare two versions of a page, and read the report it write
 
 ## Install
 
-PixelSlash is a Bun CLI that ships on npm. It needs [Bun](https://bun.sh) on your `PATH`, and this page uses npm and `npx` to run it. Start in an empty directory:
+PixelSlash is a Bun CLI that ships on npm. It needs [Bun](https://bun.sh) on your `PATH`, and this page uses npm and `npx` to run it. If you do not have Bun yet, this is the install line from [bun.sh](https://bun.sh):
+
+```
+curl -fsSL https://bun.sh/install | bash
+```
+
+Then start in an empty directory:
 
 ```
 mkdir my-site && cd my-site
