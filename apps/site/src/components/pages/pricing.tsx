@@ -35,7 +35,7 @@ export function PricingPage(): ReactNode {
           </Card>
         ))}
       </CardGrid>
-      <Callout tone="positive" title="Our commitment" data-testid="commitment">
+      <Callout tone="neutral" title="Our commitment" data-testid="commitment">
         {COMMITMENT}
       </Callout>
       <Section title="Questions">

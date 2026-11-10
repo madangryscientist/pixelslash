@@ -222,3 +222,12 @@ test("390 wide: no docs page scrolls sideways, and the fold opens to reach the r
   await openRail(page);
   await expect(page.getByTestId("docs-nav").locator('a[href="/docs/upload"]')).toBeVisible();
 });
+
+// PS-354: the "New here?" box is a statement, not a status, so it takes the neutral tone: no blue, no green.
+for (const scheme of ["light", "dark"] as const) {
+  test(`${scheme}: the "New here?" box is neutral, not blue or green`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.goto("/docs", { waitUntil: "networkidle" });
+    await expect(page.getByTestId("docs-start")).not.toHaveClass(/blue-|emerald-/);
+  });
+}

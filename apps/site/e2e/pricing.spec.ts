@@ -22,3 +22,12 @@ test("pricing leads with one statement and one action, and fills", async ({ page
   if (!header || !facts) throw new Error("the header or the facts did not lay out");
   expect(facts.x + facts.width).toBeGreaterThan(header.x + (header.width * 2) / 3);
 });
+
+// PS-354: "Our commitment" is a statement, not a success message: neutral, so no green or blue.
+for (const scheme of ["light", "dark"] as const) {
+  test(`${scheme}: "Our commitment" is neutral, not blue or green`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.goto("/pricing", { waitUntil: "networkidle" });
+    await expect(page.getByTestId("commitment")).not.toHaveClass(/blue-|emerald-/);
+  });
+}
