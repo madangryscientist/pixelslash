@@ -139,7 +139,8 @@ describe("the docs pages", () => {
   test("the index shows the file's own title and the blurb before its first section", () => {
     expect(CLI_INTRO_DOC.title).toBe(CLI_SPLIT.title);
     expect(CLI_SPLIT.title).toBe("PixelSlash");
-    expect(indexHtml).toContain("Page vs design-system");
+    expect(indexHtml).toContain("compares two versions of a page");
+    expect(indexHtml).not.toContain("Local mlx");
   });
 
   test("the index lists every page, once, under its group", () => {
