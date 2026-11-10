@@ -83,12 +83,7 @@ function Hero(): ReactNode {
         </h1>
         <p className="home-rise mx-auto mt-6 max-w-2xl text-lg text-(--home-sub) md:text-xl">
           For developers and teams who want to see what a change did to their pages before it
-          merges, in place of a hosted visual-review service such as Chromatic, Percy or Argos (
-          <TextLink href="/compare">where it is still behind</TextLink>). PixelSlash takes two
-          versions of a page, Main and Branch, pixel-diffs them and writes a report that shows what
-          changed. It is free, with no paid plan to buy: an MIT-licensed CLI that needs no Storybook
-          and no account. Nothing leaves your machine unless you ask it to, by uploading to a server
-          or naming a hosted judge.
+          merges. PixelSlash pixel-diffs Main and Branch and writes a report of what changed.
         </p>
         <div className="home-rise mt-9 flex flex-wrap justify-center gap-3">
           <Button href="/self-host" size="lg">
@@ -106,7 +101,12 @@ function Hero(): ReactNode {
 
 function Steps(): ReactNode {
   return (
-    <section className="px-5 pt-10 pb-14">
+    <section className="px-5 pt-6 pb-14">
+      <p className="home-reveal mx-auto mb-8 max-w-4xl text-center text-(--home-sub)">
+        PixelSlash runs in place of a hosted visual-review service such as Chromatic, Percy or
+        Argos. It is an MIT-licensed CLI that needs no Storybook and no account, with no paid plan
+        to buy. <TextLink href="/compare">Where it is still behind</TextLink>.
+      </p>
       <ol className="home-steps mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
         {STEPS.map((step, index) => (
           <li key={step.title} className="home-reveal home-step">

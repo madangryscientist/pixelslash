@@ -50,6 +50,28 @@ test("nothing moves under reduced motion, and it moves otherwise", async ({ page
 });
 
 /*
+ * The hero's lead is a short pitch (PS-350): at most 3 lines at 1440x900 on the desktop project and
+ * 6 at 390x844 on the phone project, in both schemes. The lines are the lead's rendered height over
+ * its line-height, so the count is what a visitor sees, wrapped at the real font. The lead is the
+ * paragraph right after the hero's h1.
+ */
+for (const scheme of ["light", "dark"] as const)
+  test(`${scheme}: the hero lead fits its line count`, async ({ page, isMobile }) => {
+    const size = isMobile
+      ? { width: 390, height: 844, max: 6 }
+      : { width: 1440, height: 900, max: 3 };
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
+    const lines = await page.locator("h1 + p").evaluate((lead) => {
+      const { lineHeight } = getComputedStyle(lead);
+      return lead.getBoundingClientRect().height / parseFloat(lineHeight);
+    });
+    expect(lines).toBeLessThanOrEqual(size.max);
+  });
+
+/*
  * On a phone the read-out pill once hung over the demo window's bottom edge and covered its Branch and
  * Main chips (PS-313). At 390 its box meets no other visible element in the hero: not the window, the
  * chips or the caption. The hero's backdrop (aurora, grid) lies under everything and is not counted.
