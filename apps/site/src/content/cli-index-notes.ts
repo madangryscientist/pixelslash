@@ -27,10 +27,11 @@ export const FLAG_NOTES: Readonly<Record<string, string>> = {
   "--branch": "The branch name the build is recorded under.",
   "--pr": "The pull request number the build is recorded under.",
   "--flake-retries":
-    "How many more times a shot that differs from its baseline is captured; 0 turns it off.",
+    "How many more times a shot that differs from its baseline is captured (default 2); 0 turns it off.",
   "--brief": "A file holding your own words on what the build means to change.",
   "--brief-text": "Your own words on what the build means to change, given inline.",
-  "--wait": "Wait for the build to be decided, as `status --wait` does, and exit as it does.",
+  "--wait":
+    "Wait until the server decides the build, then exit with the code that decision maps to: 0 accepted or nothing changed, 4 a reviewer rejected a shot, 5 still waiting when `--timeout` ends, 3 the build errored or the server could not be reached.",
   "--timeout": "How long to wait before giving up, such as 30m.",
   "--interval": "How often to read the build while waiting, such as 15s.",
   "--viewport": "The viewport of these PNGs, as WxH.",
@@ -75,6 +76,7 @@ export const FLAG_NOTES: Readonly<Record<string, string>> = {
   "build --branch": "With `latest`, the newest build of this branch.",
   "status --branch": "Read the newest build of this branch.",
   "--routes": "A file of paths to shoot, one per line.",
+  "init --routes": "The paths to shoot, separated by commas.",
   "--write": "List the config changes that would calm the flake and write the one you pick.",
   "--suggest": "List the same config changes and write nothing.",
   "--resolve": "Mark the flake resolved on the server, once a run came out stable.",

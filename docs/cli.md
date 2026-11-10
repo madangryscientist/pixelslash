@@ -12,6 +12,12 @@ npx pixelslash install-browser
 npx pixelslash --version
 ```
 
+```sh
+pixelslash install-browser [chromium|firefox|webkit|all]
+```
+
+`install-browser [chromium|firefox|webkit|all]` runs the Playwright that `capture` uses to install that browser (`chromium-headless-shell` by default; an unknown name is exit 2).
+
 ### From npm
 
 As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`).
@@ -117,7 +123,7 @@ pixelslash --live-png main.png --local-png branch.png --threshold 0.05 --min-cha
 
 | Flag | Range | Default | What it does |
 | --- | --- | --- | --- |
-| `--threshold` | 0 to 1 | 0.01 (engine default) | Per-pixel tolerance. |
+| `--threshold` | 0 to 1 | 0.01 (engine default) | Per-pixel tolerance; the default is 0.01. |
 | `--min-changed-pixels` | whole number | 0 (no floor) | Floor on the run: the pixels of the surviving `change` regions must reach it. |
 | `--min-changed-ratio` | 0 to 1 | 0 (no floor) | Floor on the run: the share of the overlap that the surviving `change` regions cover must reach it. |
 | `--merge-distance` | px | 24 | Changed pixels and boxes closer than this are one region. |
@@ -770,7 +776,6 @@ pixelslash project list [--server URL] [--token-path PATH] [--config FILE] [--js
 pixelslash flake ID [--runs N] [--out DIR] [--write | --suggest] [--resolve [--note TEXT]] [--json] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
 pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
 pixelslash --version
-pixelslash install-browser [chromium|firefox|webkit|all]
 ```
 
 - `login` asks for a personal token (`psu_…`; it prints where to make one: Settings → API tokens on the server, `<server>/settings`). On a terminal the token is read with echo off; otherwise it is the first line of stdin (`pixelslash login --server URL < token-file`). It checks the token with `GET /api/v1/me`, then stores it. A CI token (`psci_…` or an org token `psorg_…`) is refused: CI passes its token by `PIXELSLASH_TOKEN` or `--token-path` instead. No token is ever printed.
@@ -778,7 +783,7 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 - `whoami` prints the server, where the token came from, and the user and their orgs (the orgs of the projects the token sees), `org token for ORG` with the projects it reaches, or `CI token for project …`. `--json` is `{ server, via, me, orgs }`, with `me` the `/api/v1/me` reply.
 - `builds` lists the project's builds, newest first (`--limit` 1 to 100, the API's own default otherwise), as a table: id, branch, commit, status, the count to review, and when. `build ID` prints one build, its counts, its web link and its snapshots; `build latest` is the project's newest build (on `--branch`, if given). When the build has [twins](#twins-across-platforms) it also prints one `NAME THEME has no PLATFORM twin` line per unlinked shot and a `twins: N linked` line; a build with no second platform prints nothing new. With `--json` both print the API's reply byte for byte, unchanged: pipe it to `jq`.
 - `status` prints one build's link and where its review stands (`changes: 2 waiting · 1 accepted · 0 rejected`), then one `skipped flaky: <name> (WxH theme)` line per flaky shot the `skip` policy kept out of review, then one sentence per [stale twin](#stale-twins) in the build (`Button/md-primary dark on android is stale: web changed in build …`; it changes no exit code), and exits by the outcome (the table below). The build is `--build ID`; else the newest at a commit `--commit SHA` starts; else the newest on `--branch NAME`; else the one `upload` recorded in `DIR/build.json` (`--dir`, default `pixelslash-snapshots`) for this same server and the checked-out commit; else the newest at the checked-out commit. `--commit` and the commit fallback look among the project's newest 100 builds; an older one is named with `--build`. Picking more than one is exit 2, and no build at the commit or on the branch is exit 3. `--json` prints the build read (`GET /api/v1/builds/:id`) as sent. See [Block CI on review](#block-ci-on-review) for `--wait`.
-- `--version` prints `pixelslash <version>`, the version the User-Agent sends. `install-browser [chromium|firefox|webkit|all]` runs the Playwright that `capture` uses to install that browser (`chromium-headless-shell` by default; an unknown name is exit 2).
+- `--version` prints `pixelslash <version>`, the version the User-Agent sends.
 
 **Resolution order**, the same for every remote command, `upload` included:
 

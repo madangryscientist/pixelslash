@@ -66,6 +66,49 @@ describe("the command index", () => {
   });
 });
 
+const MARKDOWN = commandIndexMarkdown(INDEX);
+const flagOf = (command: string, flag: string): string =>
+  INDEX.find((entry) => entry.command === command)?.flags.find((f) => f.flag === flag)?.what ?? "";
+/** One command's section of the markdown, from its heading to the next. */
+const sectionOf = (command: string): string =>
+  MARKDOWN.split("\n### ").find((part) => part.startsWith(`pixelslash ${command}\n`)) ?? "";
+
+describe("the reference text", () => {
+  test("compare says the subcommand can be left out for a pair, and shows that form", () => {
+    const compare = sectionOf("compare");
+    expect(compare).toContain("`pixelslash --live URL --local URL`");
+    expect(compare).toContain("leave the subcommand out");
+    expect(compare).not.toMatch(/^pixelslash compare \(/m);
+    expect(compare).toMatch(/^pixelslash \(--live URL/m);
+  });
+
+  test("init --routes is a comma list and compare --routes is a file", () => {
+    expect(flagOf("init", "--routes")).toBe("The paths to shoot, separated by commas.");
+    expect(flagOf("compare", "--routes")).toMatch(/file of paths/i);
+  });
+
+  test("install-browser is under Install, not under signing in", () => {
+    expect(INDEX.find((entry) => entry.command === "install-browser")?.page).toBe("install");
+    const signingIn = JSON.stringify(CLI_SPLIT.pages.get("signing-in"));
+    expect(signingIn).not.toContain("install-browser [");
+  });
+
+  test("--wait names what it waits for and the exit codes it maps to", () => {
+    const wait = flagOf("status", "--wait");
+    expect(wait).toMatch(/waits? until the server decides the build/i);
+    for (const code of ["0", "3", "4", "5"]) expect(wait).toMatch(new RegExp(`\\b${code}\\b`));
+  });
+
+  test("--threshold and --flake-retries name their defaults", () => {
+    expect(flagOf("compare", "--threshold")).toContain("0.01");
+    expect(flagOf("upload", "--flake-retries")).toContain("default 2");
+  });
+
+  test("the reference links the exit codes page", () => {
+    expect(MARKDOWN).toContain("](/docs/exit-codes)");
+  });
+});
+
 describe("flagsOf", () => {
   test("takes the placeholder after a flag and none for a switch", () => {
     expect(flagsOf("pixelslash upload [--dir DIR] [--wait] [--timeout SECONDS]")).toEqual([
