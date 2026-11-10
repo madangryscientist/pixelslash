@@ -33,6 +33,15 @@ export const COMMAND_SUMMARY: Readonly<Record<string, string>> = {
   project: "Create or list the projects of an org.",
 };
 
+/**
+ * One sentence shown after a command's usage, for what the usage alone does not say. `compare` is
+ * two snapshot dirs; a pair of URLs or PNGs is the bare form, with no subcommand.
+ */
+const AFTER_USAGE: Readonly<Record<string, string>> = {
+  compare:
+    "For a pair of URLs or PNGs, leave the subcommand out: `pixelslash --live URL --local URL` is that run, and `pixelslash compare` itself takes two snapshot dirs.",
+};
+
 /** The page a command belongs on when its synopsis is shown on several. */
 const HOME: Readonly<Record<string, string>> = {
   capture: "capture",
@@ -82,6 +91,9 @@ function synopsisLines(code: string): string[] {
     )
     .filter((line) => BARE.test(line) && /\[|\(|\b[A-Z]{2,}\b/.test(line));
 }
+
+/** The pair form is typed without a subcommand; the index files it under `compare`. */
+const shownUsage = (line: string): string => line.replace(/^pixelslash compare \(/, "pixelslash (");
 
 function takesOf(token: string | undefined): string {
   if (token === undefined) return "";
@@ -210,7 +222,7 @@ export function buildCommandIndex(): CommandEntry[] {
       command,
       summary: COMMAND_SUMMARY[command] ?? "",
       page,
-      usage: unique(entries.map((entry) => entry.line)),
+      usage: unique(entries.map((entry) => shownUsage(entry.line))),
       flags: [...byFlag.entries()].map(([flag, takes]) => ({
         flag,
         takes,
@@ -233,7 +245,7 @@ export function commandIndexMarkdown(
     "",
     "Every `pixelslash` command in one line, the page that explains it and its flags. It is generated from the synopsis blocks of `docs/cli.md`, so it lists what the CLI reference documents.",
     "",
-    "A command given a bad flag prints its own usage line and exits 2; `pixelslash --version` prints the version and exits 0.",
+    "A command given a bad flag prints its own usage line and exits 2; `pixelslash --version` prints the version and exits 0. Every other exit code, and what a runner does with it, is on [Exit codes](/docs/exit-codes).",
     "",
     "```sh\npixelslash --version\n```",
     "",
@@ -259,6 +271,7 @@ export function commandIndexMarkdown(
       ...entry.usage,
       "```",
       "",
+      ...(AFTER_USAGE[entry.command] === undefined ? [] : [AFTER_USAGE[entry.command] ?? "", ""]),
     );
     if (entry.flags.length > 0) {
       lines.push(
