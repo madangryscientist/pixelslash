@@ -1,6 +1,6 @@
 import type { MarkedToken, Tokens } from "marked";
 import { marked } from "./doc-text.ts";
-import { CLI_SPLIT } from "./cli-pages.ts";
+import { CLI_SPLIT } from "./cli-split.ts";
 import { FLAG_NOTES } from "./cli-index-notes.ts";
 import { findPage } from "./docs-map.ts";
 

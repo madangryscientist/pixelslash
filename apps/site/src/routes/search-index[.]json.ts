@@ -6,7 +6,8 @@ import { buildSearchIndex } from "#/content/search-index";
 export const Route = createFileRoute("/search-index.json")({
   server: {
     handlers: {
-      GET: () => Response.json(buildSearchIndex(), { headers: { "cache-control": "no-cache" } }),
+      GET: async () =>
+        Response.json(await buildSearchIndex(), { headers: { "cache-control": "no-cache" } }),
     },
   },
 });

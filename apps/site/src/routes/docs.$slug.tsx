@@ -7,8 +7,9 @@ export const Route = createFileRoute("/docs/$slug")({
   // Imported here, not at the top: the docs' text is the page's chunk, not the site's entry.
   loader: async ({ params }) => {
     if (findPage(params.slug) === undefined) throw notFound();
-    const { describePage } = await import("#/content/docs");
-    return { description: describePage(params.slug) };
+    const { describePage, loadDoc } = await import("#/content/docs");
+    // Loaded here, so the page renders its whole text at once on the server and on a navigation.
+    return { description: describePage(params.slug, await loadDoc(params.slug)) };
   },
   head: ({ params, loaderData }) => {
     const title = `${findPage(params.slug)?.title ?? "Docs"} · Docs · PixelSlash`;

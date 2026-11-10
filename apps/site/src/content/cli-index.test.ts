@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { COMMAND_SUMMARY, buildCommandIndex, commandIndexMarkdown, flagsOf } from "./cli-index.ts";
-import { CLI_SPLIT } from "./cli-pages.ts";
+import { CLI_SPLIT } from "./cli-split.ts";
 import { findPage } from "./docs-map.ts";
 
 const RUN_TS = readFileSync(

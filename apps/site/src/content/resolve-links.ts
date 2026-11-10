@@ -1,10 +1,11 @@
-import { CLI_SPLIT } from "./cli-pages.ts";
+import { ANCHOR_PAGE } from "virtual:cli-meta";
 import { DOC_PAGES } from "./docs-map.ts";
 import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL } from "./links.ts";
 
 /*
- * Where a link in a rendered repo document goes. Apart from links.ts because it reads docs/cli.md:
- * the shell needs the switches on every page, and only a page that renders a document needs this.
+ * Where a link in a rendered repo document goes. Apart from links.ts because it reads which page
+ * holds each heading of docs/cli.md: the shell needs the switches on every page, and only a page
+ * that renders a document needs this.
  */
 
 /** A repo file a page renders, and the site path it is shown on. */
@@ -48,7 +49,7 @@ const PUBLIC_DIR = "apps/site/public/";
 
 /** Where a heading of docs/cli.md is shown: the site cuts the file into pages, so an anchor names one. */
 function cliAnchorHref(anchor: string, currentPage?: string): string {
-  const slug = CLI_SPLIT.anchorPage.get(anchor);
+  const slug = Object.hasOwn(ANCHOR_PAGE, anchor) ? ANCHOR_PAGE[anchor] : undefined;
   if (slug === undefined) throw new Error(`${CLI_DOC_PATH} has no heading #${anchor} to link to`);
   return slug === currentPage ? `#${anchor}` : `/docs/${slug}#${anchor}`;
 }

@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { cliMeta } from "./cli-meta.ts";
 import { DOC_PAGES } from "./src/content/docs-map.ts";
 import { PAGES } from "./src/content/pages.ts";
 
@@ -12,6 +13,7 @@ export default defineConfig({
   // The pages read the repo's own docs (`docs/cli.md`, `SECURITY.md`, ...) at build time.
   server: { fs: { allow: ["../.."] } },
   plugins: [
+    cliMeta(),
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
     tanstackStart({

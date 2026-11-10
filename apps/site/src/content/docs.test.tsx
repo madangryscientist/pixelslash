@@ -6,9 +6,13 @@ import { describe, expect, test } from "vitest";
 import { DocPage, DocsIndexPage } from "#/components/pages/docs";
 import { HomePage } from "#/components/pages/home";
 import { HowItWorksPage } from "#/components/pages/how-it-works";
-import { CLI_SPLIT, splitCli } from "./cli-pages.ts";
+import { splitCli } from "./cli-pages.ts";
+import { CLI_SPLIT } from "./cli-split.ts";
 import { OLD_ANCHOR_SCRIPT } from "./old-anchors.ts";
-import { CLI_INTRO_DOC, DOC_PAGE_DOCS, SECURITY_DOC } from "./docs.ts";
+import { ANCHOR_PAGE } from "virtual:cli-meta";
+import { CLI_INTRO_DOC } from "./cli-intro.ts";
+import { loadAllDocs } from "./docs.ts";
+import { SECURITY_DOC } from "./repo-docs.ts";
 import { TRADEMARK } from "./trademark.ts";
 import { DOC_PAGES, GROUPS, type DocPageDef, neighbours } from "./docs-map.ts";
 import { resolveImageSrc } from "./resolve-links.ts";
@@ -33,6 +37,8 @@ function codeBlocks(list: Token[]): string[] {
   });
 }
 
+const raws = (list: readonly Token[]): string => JSON.stringify(list.map((token) => token.raw));
+
 const unescape = (html: string): string =>
   html
     .replace(/&amp;/g, "&")
@@ -42,6 +48,8 @@ const unescape = (html: string): string =>
     .replace(/&#x27;/g, "'");
 
 const cliPages = DOC_PAGES.filter((page) => page.file === undefined && page.kind === undefined);
+// The pages render at once only once their documents are loaded, as the route loader does first.
+const DOC_PAGE_DOCS = await loadAllDocs();
 const pageHtml = new Map(
   DOC_PAGES.map((page) => [page.slug, renderToStaticMarkup(<DocPage slug={page.slug} />)]),
 );
@@ -252,6 +260,11 @@ describe("links into the docs", () => {
     expect(CLI_SPLIT.anchorPage.get("comparing-two-snapshot-dirs")).toBe("compare-dirs");
     expect(CLI_SPLIT.anchorPage.get("snapshot-capture-the-pinned-image")).toBe("capture");
     expect(CLI_SPLIT.anchorPage.get("exit-codes-and-the-failed-line")).toBe("signing-in");
+  });
+
+  test("the build-time anchor map and index lead are the split of cli.md, unchanged", () => {
+    expect(ANCHOR_PAGE).toEqual(Object.fromEntries(CLI_SPLIT.anchorPage));
+    expect(raws(CLI_INTRO_DOC.tokens)).toBe(raws(CLI_SPLIT.preamble));
   });
 });
 

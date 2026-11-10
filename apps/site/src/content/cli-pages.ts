@@ -1,6 +1,5 @@
 import { type MarkedToken, type Token, type Tokens, lexer } from "marked";
-import cli from "../../../../docs/cli.md?raw";
-import { marked, plainText, slugger, stripTicketIds } from "./doc-text.ts";
+import { marked, plainText, slugger } from "./doc-text.ts";
 import { DOC_PAGES, type DocPageDef } from "./docs-map.ts";
 
 /*
@@ -102,5 +101,3 @@ export function splitCli(markdown: string, pages: readonly DocPageDef[] = DOC_PA
   }
   return { title, preamble, pages: out, ids: walk.ids, anchorPage: walk.anchorPage };
 }
-
-export const CLI_SPLIT = splitCli(stripTicketIds(cli));
