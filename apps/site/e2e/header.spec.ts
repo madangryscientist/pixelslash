@@ -174,8 +174,8 @@ test("the toggle is named, and works from the keyboard", async ({ page }) => {
   const toggle = page.getByRole("button", { name: "Switch to dark theme" });
   await expect(toggle).toBeVisible();
 
-  // Tabbing from the top of the page reaches it: the logo, then the toggle.
-  for (let press = 0; press < 5; press += 1) {
+  // Tabbing from the top of the page reaches it: the logo, the nav's links, then the toggle.
+  for (let press = 0; press < 12; press += 1) {
     await page.keyboard.press("Tab");
     if (await toggle.evaluate((element) => element === document.activeElement)) break;
   }
@@ -224,8 +224,7 @@ for (const scheme of ["light", "dark"] as const) {
 /*
  * The phone pass (PS-313). At 390x844 AppShell folds the nav behind one Menu button: the header is one
  * row, the theme toggle stays in it, and nothing on any page scrolls sideways. `/docs/cli` is the
- * longest doc page (by scrollHeight at 1440). Run on the phone project only, so each case runs once;
- * the 1440 case runs on the desktop project.
+ * longest doc page (by scrollHeight at 1440). Run on the phone project only, so each case runs once.
  */
 const PHONE_PAGES = [...PAGES.map((one) => one.to), "/docs/cli"];
 const LABELS = PAGES.map((one) => one.label);
@@ -293,26 +292,6 @@ test.describe("at 390 without JavaScript", () => {
     }
   });
 });
-
-test.describe("at 1440", () => {
-  test.use({ viewport: { width: 1440, height: 900 } });
-  test.skip(({ isMobile }) => isMobile, "the desktop project only");
-
-  // On / only: the first test in this file holds every other page's header to /'s.
-  test("the header is two rows with every nav link and no Menu", async ({ page }) => {
-    await page.goto("/", { waitUntil: "networkidle" });
-    await expect(menuButton(page)).toBeHidden();
-    const nav = page.getByTestId("site-nav").filter({ visible: true });
-    for (const label of LABELS) {
-      await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
-    }
-    const header = await box(page.locator("header").first());
-    // The nav sits in a second row, below the brand's.
-    expect((await box(nav)).y).toBeGreaterThanOrEqual(header.y + 56);
-    expect(header.h).toBeGreaterThan(100);
-  });
-});
-
 /*
  * A heading anchor lands clear of the header at either width, since scroll-margin-top reads AppShell's
  * --app-header, and the contents list's spy reads the same margin, so at 1440 it marks that heading.

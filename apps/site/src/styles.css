@@ -52,7 +52,15 @@
 }
 
 /* A heading anchor (`/docs#exit-codes-...`) lands clear of the sticky header. AppShell sets
-   `--app-header` on its root: one row on a phone, the row and the nav row from md. */
+   `--app-header` on its root: one row at every width, the nav in that row from md. */
 [id] {
   scroll-margin-top: calc(var(--app-header, 0px) + 1rem);
+}
+
+/* From md (768) to lg (1024) the nav sits beside the brand and the controls, and the row is too
+   narrow for every tab. Home drops out there (the wordmark links home); from lg every tab shows. */
+@media (min-width: 48rem) and (width < 64rem) {
+  header nav[aria-label="Site"] a[href="/"] {
+    display: none;
+  }
 }
