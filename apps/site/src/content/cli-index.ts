@@ -78,10 +78,22 @@ function codeBlocks(tokens: readonly MarkedToken[]): Tokens.Code[] {
 const DOCKER = /^docker run .* pixelslash-capture:dev /;
 const BARE = /^pixelslash ([a-z][a-z-]*)(?= |$)/;
 
+/**
+ * A synopsis can wrap: a line that starts with whitespace and then `[` carries on the line above
+ * it (`import`'s second line), so it is appended to that line instead of being dropped.
+ */
+function joinContinuations(lines: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const line of lines) {
+    if (/^\s+\[/.test(line) && out.length > 0) out[out.length - 1] += ` ${line.trim()}`;
+    else out.push(line);
+  }
+  return out;
+}
+
 /** `docker run … capture […]` and `bun run pixelslash -- (--live …)` read as the command they run. */
 function synopsisLines(code: string): string[] {
-  return code
-    .split("\n")
+  return joinContinuations(code.split("\n"))
     .flatMap((raw) => raw.trim().split(" · "))
     .map((line) =>
       line
@@ -94,10 +106,28 @@ function synopsisLines(code: string): string[] {
 /** The pair form is typed without a subcommand; the index files it under `compare`. */
 const shownUsage = (line: string): string => line.replace(/^pixelslash compare \(/, "pixelslash (");
 
+/*
+ * What a flag takes is shown only when the synopsis word has the shape of a placeholder, so an
+ * example value (`30m`, `/,/about`, `"Pixel`) from a worked example gives nothing instead of
+ * standing in for it. A placeholder is a word of capitals (`URL`, `FILE_KEY`), `WxH`, a `<...>`
+ * form, a `|` choice list, the range `0..1`, the list `x,y,w,h`, or a comma list of those.
+ */
+const WORD = "[A-Z][A-Z0-9_]*";
+const ATOM = `(?:${WORD}|WxH|<[^<>\\s"']+>)`;
+const OPTION = `(?:${ATOM}|[a-z][a-z-]*)`;
+const PLACEHOLDER = new RegExp(
+  `^(?:${OPTION}(?:\\|${OPTION})+|0\\.\\.1|x,y,w,h|${ATOM}(?:,${ATOM})*(?:,\\.\\.\\.)?)$`,
+);
+
 function takesOf(token: string | undefined): string {
   if (token === undefined) return "";
-  const arg = token.replace(/[\])….]+$/, "");
-  return arg === "" || /^[-[(|·]/.test(arg) ? "" : arg;
+  let arg = token;
+  for (;;) {
+    const next = arg.replace(/[\])…]$/, "").replace(/(?<![,.])\.{1,3}$/, "");
+    if (next === arg) break;
+    arg = next;
+  }
+  return PLACEHOLDER.test(arg) ? arg : "";
 }
 
 /** The flags in a synopsis line, each with the placeholder that follows it. */

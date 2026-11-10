@@ -10,7 +10,7 @@ export const REJECTED_EXIT = 4;
 /** The build still waits for processing or review (at `--timeout`, under `--wait`). */
 export const WAITING_EXIT = 5;
 
-export const STATUS_USAGE = `pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+export const STATUS_USAGE = `pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout DURATION] [--interval DURATION]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 Default build: the one \`upload\` recorded in DIR (default pixelslash-snapshots), else the current commit's newest.
 Exit 0 accepted or nothing changed, ${REJECTED_EXIT} rejected, ${WAITING_EXIT} still waiting, ${REMOTE_EXIT} the server did not answer or the build errored, 2 usage.`;
 

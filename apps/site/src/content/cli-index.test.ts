@@ -118,3 +118,61 @@ describe("flagsOf", () => {
     ]);
   });
 });
+
+const takesOfRow = (command: string, flag: string): string | undefined =>
+  INDEX.find((entry) => entry.command === command)?.flags.find((f) => f.flag === flag)?.takes;
+
+describe("the Takes column", () => {
+  const ATOM = String.raw`(?:[A-Z][A-Z0-9_]*|WxH|<[^<>\s"']+>)`;
+  const OPTION = String.raw`(?:${ATOM}|[a-z][a-z-]*)`;
+  const PLACEHOLDER = new RegExp(
+    String.raw`^(?:${OPTION}(?:\|${OPTION})+|0\.\.1|x,y,w,h|${ATOM}(?:,${ATOM})*(?:,\.\.\.)?)$`,
+  );
+
+  test("every flag row takes nothing or a placeholder, never an example value", () => {
+    const rows = INDEX.flatMap((entry) =>
+      entry.flags.map((flag) => ({ command: entry.command, ...flag })),
+    );
+    const bad = rows
+      .filter(({ takes }) => takes !== "" && !PLACEHOLDER.test(takes))
+      .map(({ command, flag, takes }) => `pixelslash ${command} ${flag} shows ${takes}`);
+    expect(bad).toEqual([]);
+    for (const { takes } of rows) {
+      expect(takes).not.toMatch(/["'`]/);
+      expect(takes.replace("0..1", "")).not.toMatch(/\d/);
+    }
+  });
+
+  test.each([
+    ["import", "--device", "LABEL", '"Pixel'],
+    ["import", "--platform", "web|android|ios", "android"],
+    ["import", "--scale", "N", "3"],
+    ["dev", "--against", "main|previous", "main"],
+    ["init", "--routes", "PATH,...", "/,/about"],
+    ["init", "--viewports", "WxH,...", "1280x720,375x812"],
+    ["init", "--themes", "THEME,...", "light,dark"],
+    ["upload", "--timeout", "DURATION", "30m"],
+    ["status", "--timeout", "DURATION", "30m"],
+    ["upload", "--interval", "DURATION", "15s"],
+    ["status", "--interval", "DURATION", "15s"],
+    ["compare", "--width", "PX", "1280"],
+  ])("pixelslash %s %s takes %s, not %s", (command, flag, takes, was) => {
+    expect(takesOfRow(command, flag)).toBe(takes);
+    expect(takesOfRow(command, flag)).not.toBe(was);
+  });
+});
+
+describe("flagsOf placeholders", () => {
+  test("an example value gives an empty takes, a placeholder is kept", () => {
+    expect(
+      flagsOf("pixelslash x --a 3 --b 30m --c light,dark --d /x --e PATH,... --f main|previous"),
+    ).toEqual([
+      { flag: "--a", takes: "" },
+      { flag: "--b", takes: "" },
+      { flag: "--c", takes: "" },
+      { flag: "--d", takes: "" },
+      { flag: "--e", takes: "PATH,..." },
+      { flag: "--f", takes: "main|previous" },
+    ]);
+  });
+});

@@ -34,7 +34,7 @@ import type { Io } from "./run.ts";
 import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout 30m] [--interval 15s]]\n`--brief FILE` or `--brief-text TEXT` sends your own words on what the build means to change (at most " +
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]\n`--brief FILE` or `--brief-text TEXT` sends your own words on what the build means to change (at most " +
   BRIEF_LIMIT +
   " characters); the build's AI summary says whether the changes match it, and it decides nothing.\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.\nA failed upload ends on `UPLOAD FAILED: <reason>` and prints no build link, except that a build the server `errored` names its page in the reason. " +
   ESCALATE;

@@ -16,7 +16,7 @@ import { devLoop, devOnce } from "./dev-loop.ts";
 import { devSpec, differencesLine } from "./dev-spec.ts";
 import type { CliDeps, Io } from "./run.ts";
 
-export const DEV_USAGE = `pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge [--ds DIR]] [--refresh-refs] [--figma-token-path PATH] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
+export const DEV_USAGE = `pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main|previous] [--judge [--ds DIR]] [--refresh-refs] [--figma-token-path PATH] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
 pixelslash dev latest [TARGET] [--json] | pixelslash dev pin [ID] [--json] | pixelslash dev unpin [ID] [--json]
 pixelslash dev spec [TARGET] [--json] [--refresh-refs] [--viewport WxH|NAME] [--theme light|dark] [--figma-token-path PATH] [--config FILE]
 Re-captures one route or story of the config (the app must already be up) on every save and diffs it with the previous iteration, a pin, or main's baselines. A target with features.<target> (a spec, reference PNGs or Figma frames) gets them on the live page beside the shot, and with --judge, a list of how the shot differs; never a score. Keys: r run, p pin, u unpin, m main/previous, f refetch refs, q quit. A second dev in the same worktree attaches to the first. Nothing is uploaded.`;
