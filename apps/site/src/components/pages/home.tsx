@@ -66,7 +66,7 @@ const COMMANDS = [
 function Hero(): ReactNode {
   return (
     <section className="relative px-5 pt-12 pb-6 md:pt-16">
-      <div className="home-aurora" aria-hidden="true">
+      <div className="home-aurora home-aurora-hero" aria-hidden="true">
         <span />
         <span />
         <span />

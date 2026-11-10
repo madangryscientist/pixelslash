@@ -196,6 +196,12 @@ body:has([data-art]) {
   opacity: var(--home-aurora-soft);
 }
 
+/* The hero's aurora fades out over its last 160px, so its blobs do not stop in a flat line at the
+   section's bottom edge (PS-362). Only the hero: the page art beside it fades already. */
+.home-aurora-hero {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 160px), transparent 100%);
+}
+
 .home-grid {
   position: absolute;
   inset: 0;
