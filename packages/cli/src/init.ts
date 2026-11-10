@@ -9,7 +9,7 @@ import { readFlagPairs } from "./args.ts";
 import type { Io } from "./run.ts";
 
 export const INIT_USAGE =
-  "pixelslash init [--url URL | --storybook URL] [--routes /,/about] [--viewports 1280x720,375x812] [--themes light,dark] [--server URL] [--project NAME] [--yes] [--force]\nWrites pixelslash.config.ts and adds the snapshot dirs to .gitignore. Each flag answers its question; the rest are asked on stdin, or take their default with --yes. An existing config is kept unless --force.";
+  "pixelslash init [--url URL | --storybook URL] [--routes PATH,...] [--viewports WxH,...] [--themes THEME,...] [--server URL] [--project NAME] [--yes] [--force]\nWrites pixelslash.config.ts and adds the snapshot dirs to .gitignore. Each flag answers its question; the rest are asked on stdin, or take their default with --yes. An existing config is kept unless --force.";
 
 const FLAGS = ["url", "storybook", "routes", "viewports", "themes", "server", "project"] as const;
 const SWITCHES = ["--yes", "--force"];

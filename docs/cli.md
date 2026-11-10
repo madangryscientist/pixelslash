@@ -45,7 +45,7 @@ pixelslash --live-png main.png --local-png branch.png --out out
 It prints the number of changed pixels and the path of `out/report.html`; open that file in a browser. The full form, with every flag:
 
 ```
-bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width 1280] [--browser chromium|firefox|webkit] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...
+bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH | --live-png-dir DIR --local-png-dir DIR) [--ds DIR | --file FILE_KEY] [--routes FILE] [--token-path PATH] [--out DIR] [--width PX] [--browser chromium|firefox|webkit] [--label TEXT] [--threshold 0..1] [--min-changed-pixels N] [--min-changed-ratio 0..1] [--merge-distance PX] [--min-region-area PX] [--noise-amplitude 0..1] [--max-shift 0..1] [--ignore x,y,w,h]...
 ```
 
 ### Main and Branch
@@ -254,7 +254,7 @@ pixelslash init --url http://localhost:3000 --routes /,/pricing --yes
 The full form, with every flag:
 
 ```
-pixelslash init [--url URL | --storybook URL] [--routes /,/about] [--viewports 1280x720,375x812] [--themes light,dark] [--server URL] [--project NAME] [--yes] [--force]
+pixelslash init [--url URL | --storybook URL] [--routes PATH,...] [--viewports WxH,...] [--themes THEME,...] [--server URL] [--project NAME] [--yes] [--force]
 ```
 
 - It writes `pixelslash.config.ts` from a few questions on stdin (a terminal or a pipe, one answer per line; an empty answer takes the default in brackets). Each flag answers its question instead; `--yes` takes the default for every question no flag answered and asks nothing.
@@ -699,7 +699,7 @@ pixelslash compare MAIN_DIR BRANCH_DIR [--out DIR]
 `pixelslash dev` is a fast local loop for one page or component while you build it: every save re-captures the target and diffs it with the previous iteration. Nothing is uploaded, and nothing is written to a server.
 
 ```
-pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main] [--judge [--ds DIR]] [--refresh-refs] [--figma-token-path PATH] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
+pixelslash dev [TARGET | --url URL] [--viewport WxH|NAME] [--theme light|dark] [--watch PATH]... [--against main|previous] [--judge [--ds DIR]] [--refresh-refs] [--figma-token-path PATH] [--once] [--json] [--config FILE] [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH]
 pixelslash dev latest [TARGET] [--json]
 pixelslash dev pin [ID] [--json] · pixelslash dev unpin [ID] [--json]
 pixelslash dev spec [TARGET] [--json] [--refresh-refs] [--viewport WxH|NAME] [--theme light|dark] [--figma-token-path PATH] [--config FILE]
@@ -767,7 +767,7 @@ pixelslash logout [--server URL] [--config FILE]
 pixelslash whoami [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash builds [--branch NAME] [--limit N] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash build ID|latest [--branch NAME] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
-pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout 30m] [--interval 15s]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
+pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout DURATION] [--interval DURATION]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash parity --build ID [--manifest PATH] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash parity --release android|ios [--project ID|NAME] [--manifest PATH] [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
@@ -925,7 +925,7 @@ The same server drives [`pixelslash dev`](#feature-mode-pixelslash-dev), so an a
 Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots, and they send them only to the server you name. The same CLI talks to the hosted app and to a self-hosted one.
 
 ```
-pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout 30m] [--interval 15s]]
+pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]
 pixelslash capture [--config FILE] [--out DIR] --upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]
 ```
 
