@@ -104,6 +104,13 @@ function luminance(c: Rgb): number {
   return 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
 }
 
+/** The WCAG 2.x contrast ratio between two opaque colours, from 1 to 21. */
+export function contrastRatio(a: Rgb, b: Rgb): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
 /**
  * The colour under an element: its ancestors' backgrounds composited from the nearest opaque one
  * down. A picture or a gradient fill has no single colour, so it returns null.
@@ -132,9 +139,7 @@ function shortfall(
   const bg = groundOf(chain, rgba);
   if (!bg) return null;
   const flat = over([fg[0], fg[1], fg[2], fg[3] * item.opacity], bg);
-  const l1 = luminance(flat);
-  const l2 = luminance(bg);
-  const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  const ratio = contrastRatio(flat, bg);
   const large = item.size >= 24 || (item.weight >= 700 && item.size >= 18.66);
   const needed = large ? 3 : 4.5;
   if (ratio >= needed + margin) return null;
