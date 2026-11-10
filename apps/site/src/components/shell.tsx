@@ -123,12 +123,8 @@ export function Shell({
     <AppShell
       brand={<AppShellBrand href="/" label={<Wordmark />} />}
       controls={<Controls />}
-      subnav={
-        // One scrolling row on a phone rather than wrapping out of the fixed-height bar.
-        <div className="-mx-1 overflow-x-auto px-1 [&>nav]:flex-nowrap [&_a]:whitespace-nowrap">
-          <Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />
-        </div>
-      }
+      // On a phone AppShell folds this row behind its Menu button; the controls stay in the header.
+      subnav={<Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />}
       footer={isHome ? <HomeFooter /> : <Footer />}
       bleed
       data-art=""

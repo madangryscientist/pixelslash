@@ -1,5 +1,7 @@
-import { type Locator, type Page, expect, test } from "@playwright/test";
-import { siteNav } from "./support/site-nav.ts";
+import { type Page, expect, test } from "@playwright/test";
+import { PAGES } from "../src/content/pages.ts";
+import { SCHEME_CLASS, box, hydrated, other, schemeClasses, toggleOf } from "./support/header.ts";
+import { menuButton, menuOpen, siteNav } from "./support/site-nav.ts";
 
 /*
  * One header on every page, and the theme toggle in it (PS-329). Each runs on a desktop and a phone
@@ -16,12 +18,6 @@ const VISITED = [
   "/self-host/",
   "/how-it-works/",
 ];
-
-const SCHEME_CLASS = { light: "latte", dark: "dark" } as const;
-type Scheme = keyof typeof SCHEME_CLASS;
-const other = (scheme: Scheme): Scheme => (scheme === "dark" ? "light" : "dark");
-
-const toggleOf = (page: Page): Locator => page.getByTestId("theme-toggle");
 
 declare global {
   interface Window {
@@ -45,27 +41,6 @@ async function homePaint(page: Page) {
     text: await page.locator(".home").evaluate((element) => getComputedStyle(element).color),
     header: await backgroundOf(page, "header"),
   };
-}
-
-async function box(locator: Locator): Promise<{ x: number; y: number; w: number; h: number }> {
-  const found = await locator.boundingBox();
-  if (!found) throw new Error("no box");
-  return { x: found.x, y: found.y, w: found.width, h: found.height };
-}
-
-/** The scheme classes on <html>: exactly one of them is ever set. */
-async function schemeClasses(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    ["dark", "latte"].filter((name) => document.documentElement.classList.contains(name)),
-  );
-}
-
-/** A click before hydration would do nothing, so wait until React owns the button. */
-async function hydrated(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const button = document.querySelector('[data-testid="theme-toggle"]');
-    return button !== null && Object.keys(button).some((key) => key.startsWith("__reactProps"));
-  });
 }
 
 /**
@@ -243,5 +218,127 @@ for (const scheme of ["light", "dark"] as const) {
       await hide.evaluate((node) => node instanceof Element && node.remove());
       expect(drawn.equals(bare), `${part} painted over the header`).toBe(true);
     }
+  });
+}
+
+/*
+ * The phone pass (PS-313). At 390x844 AppShell folds the nav behind one Menu button: the header is one
+ * row, the theme toggle stays in it, and nothing on any page scrolls sideways. `/docs/cli` is the
+ * longest doc page (by scrollHeight at 1440). Run on the phone project only, so each case runs once;
+ * the 1440 case runs on the desktop project.
+ */
+const PHONE_PAGES = [...PAGES.map((one) => one.to), "/docs/cli"];
+const LABELS = PAGES.map((one) => one.label);
+
+test.describe("at 390", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test.skip(({ isMobile }) => !isMobile, "the phone project only");
+
+  for (const scheme of ["light", "dark"] as const) {
+    for (const to of PHONE_PAGES) {
+      test(`${to} in ${scheme}: one header row, the nav in Menu, no sideways scroll`, async ({
+        page,
+      }) => {
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.goto(to, { waitUntil: "networkidle" });
+        await page.evaluate(() => document.fonts.ready);
+        await hydrated(page);
+
+        const header = await box(page.locator("header").first());
+        expect(header.h).toBeLessThanOrEqual(57);
+        await expect(page.getByTestId("site-nav").filter({ visible: true })).toHaveCount(0);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        ).toBe(true);
+
+        // The toggle is in the row, and works with the menu shut.
+        await expect(toggleOf(page)).toBeVisible();
+        expect(await menuOpen(page)).toBe(false);
+        await toggleOf(page).click();
+        expect(await schemeClasses(page)).toEqual([SCHEME_CLASS[other(scheme)]]);
+        expect(await menuOpen(page)).toBe(false);
+
+        // Menu shows every nav link; Escape shuts it.
+        const nav = await siteNav(page);
+        for (const label of LABELS) {
+          await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+        }
+        await page.keyboard.press("Escape");
+        expect(await menuOpen(page)).toBe(false);
+        await expect(nav).toHaveCount(0);
+
+        // Following a link shuts it.
+        await menuButton(page).click();
+        const target = to === "/pricing" ? "Security" : "Pricing";
+        const href = PAGES.find((one) => one.label === target)?.to ?? "";
+        await nav.getByRole("link", { name: target, exact: true }).click();
+        await page.waitForURL((url) => url.pathname.replace(/\/$/, "") === href);
+        expect(await menuOpen(page)).toBe(false);
+      });
+    }
+  }
+});
+
+test.describe("at 390 without JavaScript", () => {
+  test.use({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false });
+  test.skip(({ isMobile }) => !isMobile, "the phone project only");
+
+  test("Menu opens and shows the nav links", async ({ page }) => {
+    await page.goto("/pricing");
+    const nav = await siteNav(page);
+    for (const label of LABELS) {
+      await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
+  });
+});
+
+test.describe("at 1440", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  test.skip(({ isMobile }) => isMobile, "the desktop project only");
+
+  // On / only: the first test in this file holds every other page's header to /'s.
+  test("the header is two rows with every nav link and no Menu", async ({ page }) => {
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(menuButton(page)).toBeHidden();
+    const nav = page.getByTestId("site-nav").filter({ visible: true });
+    for (const label of LABELS) {
+      await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
+    const header = await box(page.locator("header").first());
+    // The nav sits in a second row, below the brand's.
+    expect((await box(nav)).y).toBeGreaterThanOrEqual(header.y + 56);
+    expect(header.h).toBeGreaterThan(100);
+  });
+});
+
+/*
+ * A heading anchor lands clear of the header at either width, since scroll-margin-top reads AppShell's
+ * --app-header, and the contents list's spy reads the same margin, so at 1440 it marks that heading.
+ */
+for (const [width, height] of [
+  [390, 844],
+  [1440, 900],
+] as const) {
+  test.describe(`a heading anchor at ${width}`, () => {
+    test.use({ viewport: { width, height } });
+    test.skip(({ isMobile }) => isMobile !== width < 768, "one project per width");
+
+    test("lands below the header", async ({ page }) => {
+      await page.goto("/docs/cli#pixelslash-upload", { waitUntil: "networkidle" });
+      await page.evaluate(() => document.fonts.ready);
+      await hydrated(page);
+      const header = await box(page.locator("header").first());
+      const bottom = header.y + header.h;
+      const top = async (): Promise<number> => (await box(page.locator("#pixelslash-upload"))).y;
+      // Landed: at or below the header, and within the 1rem gap of it, not left lower down the page.
+      await expect.poll(top).toBeGreaterThanOrEqual(bottom);
+      expect(await top()).toBeLessThanOrEqual(bottom + 20);
+      if (width < 768) return;
+      await expect(
+        page.locator('a[aria-current="location"]').filter({ visible: true }),
+      ).toHaveAttribute("href", "#pixelslash-upload");
+    });
   });
 }

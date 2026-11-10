@@ -51,7 +51,8 @@
     "Helvetica Neue", Arial, sans-serif;
 }
 
-/* A heading anchor (`/docs#exit-codes-...`) lands clear of the sticky header and the nav row. */
+/* A heading anchor (`/docs#exit-codes-...`) lands clear of the sticky header. AppShell sets
+   `--app-header` on its root: one row on a phone, the row and the nav row from md. */
 [id] {
-  scroll-margin-top: 7.5rem;
+  scroll-margin-top: calc(var(--app-header, 0px) + 1rem);
 }

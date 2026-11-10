@@ -6,10 +6,17 @@ import type { Locator, Page } from "@playwright/test";
  * elements and only one is visible. On a phone the Menu is opened first, as a reader would.
  */
 export async function siteNav(page: Page): Promise<Locator> {
-  const menu = page.locator("header summary", { hasText: /^\s*Menu\s*$/ });
-  if (await menu.isVisible()) {
-    const open = await menu.evaluate((summary) => summary.closest("details")?.open === true);
-    if (!open) await menu.click();
-  }
+  const menu = menuButton(page);
+  if ((await menu.isVisible()) && !(await menuOpen(page))) await menu.click();
   return page.getByTestId("site-nav").filter({ visible: true });
 }
+
+/** The phone header's Menu button: the `<summary>` of AppShell's `<details>`. */
+export const menuButton = (page: Page): Locator =>
+  page.locator("header summary", { hasText: /^\s*Menu\s*$/ });
+
+/** Whether the phone header's Menu is open. */
+export const menuOpen = (page: Page): Promise<boolean> =>
+  page
+    .locator("header details")
+    .evaluate((element) => element instanceof HTMLDetailsElement && element.open);

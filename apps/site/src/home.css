@@ -381,6 +381,14 @@ body:has([data-art]) {
   box-shadow: 0 10px 40px -10px var(--home-shadow);
 }
 
+/* On a phone the window is too narrow for the pill to hang over its edge between the two chips, so
+   it sits under the window instead. */
+@media (max-width: 640px) {
+  .home-readout {
+    margin-top: 0.75rem;
+  }
+}
+
 .home-count {
   --n: var(--to);
   counter-reset: n var(--n);

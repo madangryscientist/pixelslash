@@ -99,11 +99,13 @@ function useActiveHeading(key: string, track: boolean): string | undefined {
     if (!track) return undefined;
     // Heading ids are slugs, so `|` never occurs in one; `key` is how a new page is noticed.
     const ids = key.split("|");
-    // Just under the sticky header and nav row; a heading anchor lands on 7.5rem (styles.css).
-    const line = 140;
     let frame = 0;
     const update = (): void => {
       frame = 0;
+      // Where a heading anchor lands (its scroll-margin-top, styles.css), so the two never disagree.
+      // Read on every update: the header is taller from md, so a resize can move it.
+      const first = document.getElementById(ids[0] ?? "");
+      const line = first ? Number.parseFloat(getComputedStyle(first).scrollMarginTop) + 1 : 0;
       let found: string | undefined = ids[0];
       for (const id of ids) {
         const top = document.getElementById(id)?.getBoundingClientRect().top;

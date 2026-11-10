@@ -48,3 +48,37 @@ test("nothing moves under reduced motion, and it moves otherwise", async ({ page
   await page.reload({ waitUntil: "networkidle" });
   expect(await moving()).toBeGreaterThan(0);
 });
+
+/*
+ * On a phone the read-out pill once hung over the demo window's bottom edge and covered its Branch and
+ * Main chips (PS-313). At 390 its box meets no other visible element in the hero: not the window, the
+ * chips or the caption. The hero's backdrop (aurora, grid) lies under everything and is not counted.
+ */
+test("at 390 the read-out pill overlaps nothing else in the hero", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the phone project only");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.evaluate(() => document.fonts.ready);
+  const hits = await page.evaluate(() => {
+    const readout = document.querySelector(".home-readout");
+    const hero = readout?.closest("section");
+    if (!readout || !hero) return ["no read-out in a hero section"];
+    const pill = readout.getBoundingClientRect();
+    const meets = (other: DOMRect): boolean =>
+      other.width > 0 &&
+      other.height > 0 &&
+      other.left < pill.right &&
+      other.right > pill.left &&
+      other.top < pill.bottom &&
+      other.bottom > pill.top;
+    const found = [...hero.querySelectorAll("*")]
+      .filter((element) => !readout.contains(element) && !element.contains(readout))
+      .filter((element) => !element.closest(".home-aurora, .home-grid"))
+      .filter((element) => element.checkVisibility({ visibilityProperty: true }))
+      .filter((element) => meets(element.getBoundingClientRect()))
+      .map((element) => `${element.tagName.toLowerCase()}.${element.className}`);
+    return found;
+  });
+  expect(hits).toEqual([]);
+});

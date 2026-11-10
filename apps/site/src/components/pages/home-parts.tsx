@@ -52,7 +52,8 @@ export function Demo(): ReactNode {
         <span>{CHANGES.length} regions</span>
       </div>
       <figcaption className="mx-auto mt-4 max-w-2xl text-center text-sm text-(--home-sub)">
-        A real run, not a mock-up: <code>pixelslash --live --local</code> on a billing page at{" "}
+        A real run, not a mock-up:{" "}
+        <code className="whitespace-nowrap">pixelslash --live --local</code> on a billing page at{" "}
         {hero.width}×{hero.height}. It found {hero.changedPixels} changed pixels in {CHANGES.length}{" "}
         regions: the price, the button, the storage bar and its label.
       </figcaption>
