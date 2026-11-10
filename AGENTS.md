@@ -1,4 +1,4 @@
-# PixelSlash — repo conventions
+# PixelSlash: repo conventions
 
 A standalone Bun CLI for visual review: capture Main and Branch (Playwright, or
 existing PNGs), pixel-diff them, write `report.html`, and optionally judge each
@@ -29,7 +29,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@hackcove/pixelslash-engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, every page prerendered from the repo's own docs and `data.json`; no D1, R2 or sign-in. The planner deploys it after a merge (`apps/site/README.md`) |
-| `scripts` | `scripts` | `check-slop.ts` and `write-fixtures.ts` (typecheck + lint only) |
+| `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
 | `PixelSlash.Diff`, `PixelSlash.Diff.Tests` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract, and its xunit tests. Inferred by `@nx/dotnet` (named after the `.csproj`); `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
 
@@ -48,7 +48,8 @@ A change is green when all of these pass **from the worktree**:
 bun install                       # FIRST: a fresh worktree has no node_modules, and nx stops with
                                   # "Could not find Nx modules" until it is installed
 bun run typecheck                 # nx run-many -t typecheck  (tsc, strict)
-bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop)
+bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop;
+                                  # check-dashes fails on an em or en dash in any tracked text file)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
 bun run test                      # nx run-many -t test  (Vitest under the Bun runtime, and xunit for engines/dotnet)
 ```
@@ -96,7 +97,7 @@ change replays it from cache. When a score moves on purpose, commit a new
 **Generated files are not formatted.** `oxfmt` rewrites what it is given, so anything a tool
 writes must be excluded in `.oxfmtrc.json`'s `ignorePatterns` rather than hand-formatted: the
 capability page (`docs/capabilities/*.html`), the bench fixtures, results and Argos cache, the
-route tree, `worker-configuration.d.ts` and the drizzle migrations. They are already listed —
+route tree, `worker-configuration.d.ts` and the drizzle migrations. They are already listed:
 add a pattern when a new generator appears, or `format:check` will fail on a file whose content
 the next run of its generator overwrites. Sources (`data.json`, `build.py`, `bench/src`,
 `scripts`) are formatted normally: a generated file is ignored, its input is not. `**/*.md` is
@@ -163,7 +164,7 @@ queries go through `src/db/*` (they take a `Db`, never D1), and blobs through
 `orgBlobs` in `src/storage/blobs.ts`, so a Docker self-host can swap both.
 
 Anything that changes capture, the diff or the report also gets a real run,
-and the `report.html` it prints is opened and looked at — a green test run
+and the `report.html` it prints is opened and looked at: a green test run
 does not render a report:
 
 ```bash
@@ -212,10 +213,10 @@ Scan several worktrees without opening a diff:
 git log --format='%s%n%b' main..<branch>
 ```
 
-Never commit implementation straight to `main`. Never `git commit -am` — stage
+Never commit implementation straight to `main`. Never `git commit -am`: stage
 new files explicitly or they are silently dropped.
 
-## Capability matrix — `docs/capabilities/`
+## Capability matrix: `docs/capabilities/`
 
 `docs/capabilities/matrix.html` is the standing answer to "what does this do, against the field":
 a capability table with our column and five public tools. `data.json` is the source; `build.py`
@@ -224,7 +225,7 @@ it opens as `file://` without a build step.
 
 **It is kept current as we go, not written once.** Two triggers:
 
-- **A landing changes what we can do** — a new diff kind, a new flow step, an acceptance that no
+- **A landing changes what we can do**: a new diff kind, a new flow step, an acceptance that no
   longer needs a human, a threshold that moves. That is the same commit: edit our row's `v` and
   `note` in `data.json`, clear its `plan` when the ticket lands, re-run `build.py`, commit the
   regenerated `matrix.html` with it. A row that says "open: ob N" after N has landed is a lie
@@ -238,14 +239,14 @@ it opens as `file://` without a build step.
   names that root's sha (`2082085`).
   `audited` is the date our column was last read against `ours_commit`; `updated` is the
   competitors' fetch date.
-- **A positioning or pricing decision is about to be made** — refresh the competitor columns
+- **A positioning or pricing decision is about to be made**: refresh the competitor columns
   (1422, 1425, 1426). Fetch each vendor's docs again, update `updated`, and keep the per-cell
   notes: they are what makes a `partial` arguable rather than a guess.
 
 The honesty rules are the same as the report's:
 
 1. Our column is read from the code at `ours_commit`. A `y` means it exists in the code and the
-   gate exercises it where there is a test — never "we specified it". `build.py` refuses nothing,
+   gate exercises it where there is a test, never "we specified it". `build.py` refuses nothing,
    so this is on the author.
 2. A competitor cell comes from a page actually fetched, with the date in `updated`. Not from
    memory, not generalised from another vendor. `?` means the docs did not say; it is never
@@ -288,7 +289,7 @@ dependencies.
    the non-overlap is not painted as changed. With no judge available the run
    prints `skip: no judge` and invents no violations.
 2. **Capture waits for the page to settle** (fonts, images, network idle, two
-   frames), bounded by the timeout — a page that never settles fails, it does
+   frames), bounded by the timeout: a page that never settles fails, it does
    not hang and it does not shoot early.
 3. **Exit codes are a contract.** Exit 1 only on NEW violations on Branch;
    pixel-only runs exit 0. CI will read this.

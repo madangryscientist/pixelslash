@@ -50,11 +50,11 @@ bun run pixelslash -- (--live URL --local URL | --live-png PATH --local-png PATH
 
 ### Main and Branch
 
-`--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up — the command does not start a dev server.
+`--live` is **Main** (prod or a main preview). `--local` is **Branch** (this worktree's preview). Both URLs must already be up: the command does not start a dev server.
 
 ### How a page is captured
 
-Each capture waits for the page to settle before shooting: web fonts, every image, a short network-idle window, then two animation frames — all bounded by the capture timeout, so a page that never settles fails rather than hangs. Main and Branch are shot at once, each in its own page with its own settle.
+Each capture waits for the page to settle before shooting: web fonts, every image, a short network-idle window, then two animation frames, all bounded by the capture timeout, so a page that never settles fails rather than hangs. Main and Branch are shot at once, each in its own page with its own settle.
 
 ### Choosing the browser
 
@@ -123,7 +123,7 @@ pixelslash --live-png main.png --local-png branch.png --threshold 0.05 --min-cha
 
 | Flag | Range | Default | What it does |
 | --- | --- | --- | --- |
-| `--threshold` | 0 to 1 | 0.01 (engine default) | Per-pixel tolerance; the default is 0.01. |
+| `--threshold` | 0 to 1 | engine default | Per-pixel tolerance; the default is 0.01. |
 | `--min-changed-pixels` | whole number | 0 (no floor) | Floor on the run: the pixels of the surviving `change` regions must reach it. |
 | `--min-changed-ratio` | 0 to 1 | 0 (no floor) | Floor on the run: the share of the overlap that the surviving `change` regions cover must reach it. |
 | `--merge-distance` | px | 24 | Changed pixels and boxes closer than this are one region. |
@@ -147,7 +147,7 @@ When the options differ from the engine defaults the report states them (`Diff o
 
 ### Skipping an area: `--ignore`
 
-`--ignore x,y,w,h` (repeatable) is an area in image px that the diff skips: the pixels stay in both shots and the report draws a hatch over them, but nothing inside is counted, region-clustered or reported as changed. It is listed in the run's `ignored` and counted in `ignoredPixels`; the ratio floor's denominator is what was measured, so ignored pixels do not dilute it. Use it for a video, an ad, a map or live data — for secrets use a redact mask instead, which never reaches the PNG (see `masks` in the capture config). Pair mode only: it is refused with `--routes`.
+`--ignore x,y,w,h` (repeatable) is an area in image px that the diff skips: the pixels stay in both shots and the report draws a hatch over them, but nothing inside is counted, region-clustered or reported as changed. It is listed in the run's `ignored` and counted in `ignoredPixels`; the ratio floor's denominator is what was measured, so ignored pixels do not dilute it. Use it for a video, an ad, a map or live data; for secrets use a redact mask instead, which never reaches the PNG (see `masks` in the capture config). Pair mode only: it is refused with `--routes`.
 
 ## The design-system judge
 
@@ -198,7 +198,7 @@ pixelslash --live-png main.png --local-png branch.png --out out
 
 ### A pair without a design system
 
-A one-pair run without a design system writes `--out/report.html` (open as `file://`): the changed-pixel count, the region and speck counts, both sizes, and Main, Branch and Diff. A changed shot (a `change` region survives) leads with those three **cropped to the changed region** — the union of the `change` regions plus 24px, clipped to the overlap of the two shots, scaled up with CSS so no extra file is written — and the full frame sits behind a `Full frame` click, where the Diff carries the region boxes (yellow for a change, dashed grey for noise).
+A one-pair run without a design system writes `--out/report.html` (open as `file://`): the changed-pixel count, the region and speck counts, both sizes, and Main, Branch and Diff. A changed shot (a `change` region survives) leads with those three **cropped to the changed region**: the union of the `change` regions plus 24px, clipped to the overlap of the two shots, scaled up with CSS so no extra file is written, and the full frame sits behind a `Full frame` click, where the Diff carries the region boxes (yellow for a change, dashed grey for noise).
 
 A shot with no `change` region keeps the full frame as is.
 
@@ -455,8 +455,8 @@ A **mask** hides content that must never leave the machine (a secret, a person's
 ```
 
 - `masks` are **redact**: CSS selectors (every match) or rectangles in full-page CSS px (scaled by the device scale factor); both are painted `#FF00FF` before the PNG is written, so the content never leaves the machine. A selector that matches nothing prints a warning. Use it for secrets and personal data.
-- `ignore` is the opposite: areas the diff skips while the real pixels stay in the PNG, so the report can hatch them over the shots. Same shapes as `masks` — CSS selectors (every match) or rectangles in full-page CSS px — and every element carrying `data-pixelslash-ignore` is one without a config entry. Selectors are resolved to boxes in the live page at screenshot time, in full-page coordinates, scaled by the device scale factor and clipped to the image; nothing is painted. A selector that matches nothing prints a warning. It is allowed at the same three levels as `diff` (top level, on a route, per variant on a route), but the layers **add up** rather than override: project + route + variant. Use it for videos, ads, maps and live data. Capture only records the boxes: the diff that skips them is the pair-mode CLI's, or the server's once uploaded.
-- **Media is warned about, never fixed** (PS-230). Media renders unreliably: a spinner arc, a poster that arrives late. After the settle, capture measures every `<video>` and `<audio>` on the page (`getBoundingClientRect`, whole CSS px from the top of the document, grown outward so the box pastes into an `ignore` rect as it is) and warns once per shot and rect: `warning: <video> at 580,36 112x118 on overview (desktop) — media renders unreliably; add an exclusion zone (route.ignore) for this shot`. A story's route is not in the config, so its warning says to put `data-pixelslash-ignore` on the element in the story. A medium wholly inside an `ignore` area (a rect, a selector, a `data-pixelslash-ignore` element) is already excluded and does not warn; one only partly inside still does, with its whole box. The same boxes are each shot's `media` in `capture --json` and `check --json` (`[]` for none, otherwise `{ tag, x, y, width, height }`) so CI can act on them, and `pixelslash flake` offers the ignore rect for each as its first suggestion. Nothing is paused, seeked, frozen, masked or ignored for you; the PNG and every diff are as they were, and the manifest does not carry it, so it stays byte-reproducible.
+- `ignore` is the opposite: areas the diff skips while the real pixels stay in the PNG, so the report can hatch them over the shots. Same shapes as `masks`: CSS selectors (every match) or rectangles in full-page CSS px, and every element carrying `data-pixelslash-ignore` is one without a config entry. Selectors are resolved to boxes in the live page at screenshot time, in full-page coordinates, scaled by the device scale factor and clipped to the image; nothing is painted. A selector that matches nothing prints a warning. It is allowed at the same three levels as `diff` (top level, on a route, per variant on a route), but the layers **add up** rather than override: project + route + variant. Use it for videos, ads, maps and live data. Capture only records the boxes: the diff that skips them is the pair-mode CLI's, or the server's once uploaded.
+- **Media is warned about, never fixed** (PS-230). Media renders unreliably: a spinner arc, a poster that arrives late. After the settle, capture measures every `<video>` and `<audio>` on the page (`getBoundingClientRect`, whole CSS px from the top of the document, grown outward so the box pastes into an `ignore` rect as it is) and warns once per shot and rect: `warning: <video> at 580,36 112x118 on overview (desktop): media renders unreliably; add an exclusion zone (route.ignore) for this shot`. A story's route is not in the config, so its warning says to put `data-pixelslash-ignore` on the element in the story. A medium wholly inside an `ignore` area (a rect, a selector, a `data-pixelslash-ignore` element) is already excluded and does not warn; one only partly inside still does, with its whole box. The same boxes are each shot's `media` in `capture --json` and `check --json` (`[]` for none, otherwise `{ tag, x, y, width, height }`) so CI can act on them, and `pixelslash flake` offers the ignore rect for each as its first suggestion. Nothing is paused, seeked, frozen, masked or ignored for you; the PNG and every diff are as they were, and the manifest does not carry it, so it stays byte-reproducible.
 
 ### Stabilise: what is frozen before a shot
 
@@ -466,7 +466,7 @@ A **mask** hides content that must never leave the machine (a secret, a person's
 { "stabilise": { "animations": true, "clock": "2026-01-01T00:00:00.000Z", "timers": true } }
 ```
 
-- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), page timers (`setInterval` / `setTimeout`) paused so carousels and tickers capture the same every time (`timers: false` lets them run; with `clock: false` they run too, and `timers: true` there is an error), device scale factor 1. Every capture also waits for the page to settle — fonts, images, network idle, two frames — bounded by `timeoutMs`; the settle cannot be turned off. Up to four shots are taken at once, each in its own browser context with its own settle, so the waits overlap and none is shortened; the PNGs and the manifest's order are the same as one at a time. Each shot keeps its own `timeoutMs`, and the four share the CPU: a page that only just settles in time when shot alone can run out of time here. With timers paused the settle never advances the page clock, so no timer fires during it either (a page that needs a delayed timer to render needs `timers: false`; Playwright's paused clock still runs zero-delay timers at load).
+- `stabilise` defaults: animations and transitions off (finite ones jump to their end, infinite ones reset), caret hidden, `Date.now()` / `new Date()` frozen at `clock` (`false` for the real clock), page timers (`setInterval` / `setTimeout`) paused so carousels and tickers capture the same every time (`timers: false` lets them run; with `clock: false` they run too, and `timers: true` there is an error), device scale factor 1. Every capture also waits for the page to settle (fonts, images, network idle, two frames), bounded by `timeoutMs`; the settle cannot be turned off. Up to four shots are taken at once, each in its own browser context with its own settle, so the waits overlap and none is shortened; the PNGs and the manifest's order are the same as one at a time. Each shot keeps its own `timeoutMs`, and the four share the CPU: a page that only just settles in time when shot alone can run out of time here. With timers paused the settle never advances the page clock, so no timer fires during it either (a page that needs a delayed timer to render needs `timers: false`; Playwright's paused clock still runs zero-delay timers at load).
 
 ### Composition-only projects: what is styled outside the library
 
@@ -864,8 +864,8 @@ It resolves the server, the token and the default project as every remote comman
 
 | Tool | Arguments | Reads |
 | --- | --- | --- |
-| `whoami` | — | `GET /api/v1/me`, with the server and where the token came from |
-| `list_projects` | — | `GET /api/v1/projects` |
+| `whoami` | n/a | `GET /api/v1/me`, with the server and where the token came from |
+| `list_projects` | n/a | `GET /api/v1/projects` |
 | `list_builds` | `project?`, `branch?`, `status?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/builds` |
 | `get_build` | `build_id` | `GET /api/v1/builds/:id`: counts, and each snapshot's group, diff numbers, regions, review state, `carried_from` and `approved_earlier`; and, when a second platform is in play, `twins`: each shot's twins on the other platforms and the shots with none ([Twins](#twins-across-platforms)); each is marked `stale` with its `stale_cause` ([Stale twins](#stale-twins)) |
 | `get_parity` | `build_id`, `manifest?` | the same result as `pixelslash parity --build ID --json`: each twin pair's metrics mismatches, the pairs not measured, and stale declarations ([Parity between twins](#parity-between-twins)). Drift is in the result; the tool does not fail on it |
@@ -909,11 +909,11 @@ The same server drives [`pixelslash dev`](#feature-mode-pixelslash-dev), so an a
 | Tool | Arguments | Twin |
 | --- | --- | --- |
 | `dev_start` | `target?`, `url?`, `viewport?`, `theme?`, `against?` (`previous`, `main`), `judge?`, `ds?` | `pixelslash dev`: starts this worktree's session, or attaches to the one running, and returns `{ started, target, page, by }`. `page` is the live page, which shows every iteration the agent makes |
-| `dev_run` | — | `dev --once --json` with a session live: one run through the session, then its iteration with each shot and diff |
+| `dev_run` | n/a | `dev --once --json` with a session live: one run through the session, then its iteration with each shot and diff |
 | `dev_latest` | `target?` | `dev latest --json`: regions, counts, timings, file paths, the judge's `differences`, and the images, without shooting |
 | `dev_pin`, `dev_unpin` | `id?` | `dev pin\|unpin --json` |
 | `dev_spec` | `target?`, `viewport?`, `theme?`, `refresh_refs?` | `dev spec --json`, except that each ref's `image` names the image block that carries it (`"image 0"`) rather than holding a data URL |
-| `dev_stop` | — | `q`: stops the session this server started. A session started in a terminal is left running, and `dev_stop` says to quit it there |
+| `dev_stop` | n/a | `q`: stops the session this server started. A session started in a terminal is left running, and `dev_stop` says to quit it there |
 
 - **The loop.** The prompt `build-to-spec` (argument `target?`) walks it: read `dev_spec`, `dev_start`, edit, `dev_run` or `dev_latest`, repeat until the shot matches, then `dev_pin` and `dev_stop`. The tool descriptions tell the agent to check after every edit. A save re-runs the session as it does in a terminal, so `dev_latest` after a save shows that run.
 - **The session lives as long as the server.** One the server started stops when the agent's client closes it; one started in a terminal is driven through its live page, as a second `pixelslash dev` would be. One session per worktree still holds: `dev_start` on a different target than the live session's is an error.
@@ -1166,23 +1166,23 @@ Send the token as `Authorization: Bearer <token>`. There are three kinds:
 
 | Request | Auth | Query or body | Reply |
 | --- | --- | --- | --- |
-| `GET /api/v1/me` | CI, org or personal | — | `200 { kind: "user", user: { id, login, name } }`, `200 { kind: "ci", projectId }` or `200 { kind: "org-ci", orgId }` |
+| `GET /api/v1/me` | CI, org or personal | n/a | `200 { kind: "user", user: { id, login, name } }`, `200 { kind: "ci", projectId }` or `200 { kind: "org-ci", orgId }` |
 | `POST /api/v1/builds` | CI, org or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤200, more is a 400), prNumber?, projectId?, clientDiff?, brief? }`; `brief` is trimmed and at most 4000 characters (422 otherwise); `projectId` is required with a personal or org token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
 | `POST /api/v1/builds/:id/baselines` | CI, org or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
 | `POST /api/v1/baselines` | CI, org or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick], removed: [{ name, platform, browser, viewport, theme }] }`: `removed` is what the baseline build holds and no key asked about |
 | `PUT /api/v1/builds/:id/snapshots` | CI, org or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake?, changeNote?, composition?, a11y? }`), `file` (PNG, ≤32 MiB); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (≤32 MiB each, counted in the request's size cap); optional `metrics`, the shot's [layout metrics file](metrics.md) (JSON, ≤1 MiB; a malformed or oversize one is a 400 naming the field) | `200 { id }` |
 | `POST /api/v1/builds/:id/finalize` | CI, org or personal | JSON `{ snapshots: N, timings? }`: `timings` is the CLI's [step timings](#step-timings), optional and stored as sent when well formed | `200 { id, status, error, unmeasured, web_url }`: `web_url` is the build's page in the web app, which the CLI prints when it fails an upload on an `errored` build |
-| `GET /api/v1/projects` | CI, org or personal | — | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; an org token's org's; a CI token's one project |
+| `GET /api/v1/projects` | CI, org or personal | n/a | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; an org token's org's; a CI token's one project |
 | `POST /api/v1/projects` | org or personal | JSON `{ name, org? }`: `name` is 1 to 100 characters; `org` (an id or exact name) is needed only when a personal token belongs to several orgs, and an org token's is its own | `201 { …project, created: true }` for a new project, `200 { …project, created: false }` for the one of that name already in the org (idempotent). A project's `ci` token is a 403; an unknown `org` a 404 |
 | `GET /api/v1/projects/:id/builds` | CI, org or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
-| `GET /api/v1/builds/:id` | CI, org or personal | — | `200 { build: { …build, snapshots: [snapshot], twins? } }`, snapshots in review order. A snapshot also carries `device` (the device label of a native shot, else `null`) and `scale` (its device pixel ratio, else `null`). `twins` pairs the build's shots with the same name and theme on another platform ([Twins](#twins-across-platforms)); it is **absent** unless a second platform is in play, so a web-only build's reply is unchanged |
+| `GET /api/v1/builds/:id` | CI, org or personal | n/a | `200 { build: { …build, snapshots: [snapshot], twins? } }`, snapshots in review order. A snapshot also carries `device` (the device label of a native shot, else `null`) and `scale` (its device pixel ratio, else `null`). `twins` pairs the build's shots with the same name and theme on another platform ([Twins](#twins-across-platforms)); it is **absent** unless a second platform is in play, so a web-only build's reply is unchanged |
 | `GET /api/v1/builds/:id/parity` | CI, org or personal | `name`, `theme` (both required) | `200 { name, theme, columns, metrics, web_url }`: the [parity view](#parity-view) of one snapshot key of the build; 400 without `name` and `theme`, 404 when the build holds no shot under the key |
 | `PUT /api/v1/projects/:id/twin` | personal | JSON `{ twin_project_id }`: another project of the same org, or `null` to clear the link | `200 { project }`, with `twin_project_id` set. A project of another org, an unknown project or the project itself is a 400; a project the user is not a member of is a 404; a CI or org token is a 403 |
-| `GET /api/v1/snapshots/:id` | CI, org or personal | — | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
+| `GET /api/v1/snapshots/:id` | CI, org or personal | n/a | `200 { snapshot: { …snapshot, images: { head, baseline, diff } } }` |
 | `GET /api/v1/projects/:id/detection-flags` | CI, org or personal | `limit?`, `cursor?` | `200 { detection_flags: [flag], next_cursor }`, newest first: the mis-detections reviewers flagged on the snapshot page |
-| `POST /api/v1/detection-flags/:id/exported` | personal | — | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
+| `POST /api/v1/detection-flags/:id/exported` | personal | n/a | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
 | `GET /api/v1/projects/:id/stale` | CI, org or personal | `platform?` (`android` or `ios`; anything else is a 400) | `200 { stale: [item], next_cursor: null }`: the project's [stale twins](#stale-twins), each `{ name, theme, platform, sentence, cause, shots }`; a CI token reads its own project only. With `platform` also `baselines: { platform, linked: [entry] }`, the accepted baseline pairs for `parity --release` |
-| `GET /api/v1/projects/:id/flakes` | CI, org or personal | — | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
+| `GET /api/v1/projects/:id/flakes` | CI, org or personal | n/a | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
 | `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
 
 There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), linking a twin project (`PUT /api/v1/projects/:id/twin`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.

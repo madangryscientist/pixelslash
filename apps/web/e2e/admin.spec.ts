@@ -94,7 +94,7 @@ test("each window reads snapshots per build and time per snapshot, in both theme
       for (const key of ["24h", "7d"]) {
         const figures = view.getByTestId(`admin-${key}-figures`);
         await expect(figures.getByTestId(`admin-${key}-figures-per-build`)).toHaveText(
-          /^\d[\d,]* \/ \d[\d,]*( max)? \/ (—|\d[\d,]*) · n=\d[\d,]* builds$/,
+          /^\d[\d,]* \/ \d[\d,]*( max)? \/ (n\/a|\d[\d,]*) · n=\d[\d,]* builds$/,
         );
         await expect(figures.getByTestId(`admin-${key}-figures-per-snapshot`)).toHaveText(
           / · n=\d[\d,]* compares$/,

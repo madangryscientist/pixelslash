@@ -31,9 +31,9 @@ type Key = (typeof KEYS)[number];
 type Scope = "test" | "variant";
 
 const HINTS: Record<Key, string> = {
-  threshold: "0–1: how different a pixel's colour must be to count",
+  threshold: "0 to 1: how different a pixel's colour must be to count",
   minChangedPixels: "changed pixels below this read as unchanged",
-  minChangedRatio: "0–1: a changed share of the shot below this reads as unchanged",
+  minChangedRatio: "0 to 1: a changed share of the shot below this reads as unchanged",
 };
 
 type ShownOverride = {

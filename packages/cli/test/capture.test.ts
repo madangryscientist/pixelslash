@@ -139,7 +139,7 @@ describe("pixelslash capture, media (PS-230)", () => {
       const argv = ["capture", "--config", config, "--out", join(dir, "out"), "--json"];
       expect(await run(argv, json.io, pinned)).toBe(0);
       expect(json.stderr.split("\n").filter((l) => l.startsWith("warning:"))).toEqual([
-        "warning: <video> at 580,36 112x118 on clip (small) — media renders unreliably; add an exclusion zone (route.ignore) for this shot",
+        "warning: <video> at 580,36 112x118 on clip (small): media renders unreliably; add an exclusion zone (route.ignore) for this shot",
       ]);
       const shots: { name: string; media: unknown }[] = JSON.parse(json.stdout).shots;
       expect(shots.map((s) => [s.name, s.media])).toEqual([

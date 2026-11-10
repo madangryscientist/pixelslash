@@ -90,7 +90,7 @@ function figure(caption, abs) {
   const f = el("figure");
   f.append(el("figcaption", caption));
   const url = fileUrl(abs);
-  if (url) { const img = el("img"); img.src = url + "?v=" + seen.length; img.alt = caption; f.append(img); } else f.append(el("p", "—", "muted"));
+  if (url) { const img = el("img"); img.src = url + "?v=" + seen.length; img.alt = caption; f.append(img); } else f.append(el("p", "n/a", "muted"));
   return f;
 }
 function drawShots(it) {
@@ -114,7 +114,7 @@ function drawJudge(j) {
   if (j.status !== "done") { box.textContent = j.status === "skipped" ? "skip: " + j.reason : "failed: " + j.reason; return; }
   if (j.notes.length === 0) { box.textContent = "no violations"; return; }
   const ul = el("ul");
-  for (const n of j.notes) ul.append(el("li", n.name + " (" + n.shot + "): " + n.component + " — " + n.reason));
+  for (const n of j.notes) ul.append(el("li", n.name + " (" + n.shot + "): " + n.component + ": " + n.reason));
   box.append(ul);
 }
 function px(r) { return Math.round(r.x) + "," + Math.round(r.y) + " " + Math.round(r.width) + "×" + Math.round(r.height); }
@@ -193,7 +193,7 @@ function drawFeature(s) {
   else if (items.length === 0) dl.textContent = "the judge listed no differences";
   else {
     const ul = el("ul", undefined, "diffs");
-    for (const i of items) ul.append(el("li", i.n + ". " + i.name + " (" + i.shot + "): " + i.what + " — at " + px(i.area)));
+    for (const i of items) ul.append(el("li", i.n + ". " + i.name + " (" + i.shot + "): " + i.what + ", at " + px(i.area)));
     dl.append(ul);
   }
   $("spec").textContent = f.spec ? f.spec.text : "no spec";

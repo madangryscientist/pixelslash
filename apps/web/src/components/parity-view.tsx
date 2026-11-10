@@ -188,7 +188,7 @@ function RawNumbers({ metrics }: { metrics: ParityMetricsView }) {
               <td className="pr-4">{r.field}</td>
               {r.values.map((v, i) => (
                 <td key={metrics.rawColumns[i]?.snapshotId ?? i} className="pr-4">
-                  {v ?? "—"}
+                  {v ?? "n/a"}
                 </td>
               ))}
             </tr>

@@ -4,7 +4,7 @@ import { roomyShm, settleCapture, type SettlePage } from "../src/capture.ts";
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("settleCapture", () => {
-  test("waits fonts, images, network idle, then two frames — in order", async () => {
+  test("waits fonts, images, network idle, then two frames, in order", async () => {
     const calls: string[] = [];
     const pending: Array<() => void> = [];
     const gated = (label: string) => {

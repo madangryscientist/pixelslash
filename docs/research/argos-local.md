@@ -38,11 +38,11 @@ from one function:
 | file (at the pinned commit) | role |
 | --- | --- |
 | `apps/backend/src/screenshot-diff/diff/image/index.ts` | **`diffImages(base, head, { threshold })`**: the whole comparison. Returns `{ score, file? }` |
-| `apps/backend/src/screenshot-diff/diff/types.ts` | `DiffResult`, `DiffOptions` (`threshold` 0–1, default 0.5) |
+| `apps/backend/src/screenshot-diff/diff/types.ts` | `DiffResult`, `DiffOptions` (`threshold` 0 to 1, default 0.5) |
 | `apps/backend/src/storage/ImageHandle.ts`, `FileHandle.ts`, `sharp.ts` | image dimensions and the `enlarge` padding. `LocalFileHandle` reads a local path, `S3FileHandle` downloads one |
 | `apps/backend/src/screenshot-diff/computeScreenshotDiff.ts` | the job: loads the pair from S3/DB, calls `diffFiles` → `diffImages`, then applies "ignored change" fingerprints from the DB |
 | `apps/backend/src/build/createBuildDiffs.ts` | pairs base and head screenshots in a build. Byte-identical files (same S3 id) are scored 0 without running a diff |
-| `apps/backend/src/screenshot-diff/diff/image/index.test.ts` + `__fixtures__/` | their calibration table: 20 named cases (fontAliasing, imageCompression1–7, boxShadow, minorChange1–3, …) with the expected changed/unchanged verdict |
+| `apps/backend/src/screenshot-diff/diff/image/index.test.ts` + `__fixtures__/` | their calibration table: 20 named cases (fontAliasing, imageCompression1 to 7, boxShadow, minorChange1 to 3, …) with the expected changed/unchanged verdict |
 | `apps/backend/src/screenshot-diff/diff/image/test/diff.test.ts` | their snapshot scores for simple synthetic pairs, run through `LocalFileHandle`. Our wrapper calls `diffImages` the same way |
 
 Two things in the full app sit outside `diffImages`, so the wrapper does not reproduce them:

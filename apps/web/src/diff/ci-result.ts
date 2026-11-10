@@ -4,8 +4,8 @@ import type { DiffOptions, DiffRegion, DiffResult, IgnoreRect } from "#/db/schem
 /**
  * A CI project's results (ob 1727): the CLI diffs each shot against the baseline the server picked
  * and sends what it measured. The server never decodes a PNG for them; it checks that each result
- * is a result — the right shape, inside the image, its counts agreeing with each other and with the
- * status — and stores it as sent. One that fails is refused by name, and the shot is not measured
+ * is a result (the right shape, inside the image, its counts agreeing with each other and with the
+ * status) and stores it as sent. One that fails is refused by name, and the shot is not measured
  * on the server instead.
  */
 

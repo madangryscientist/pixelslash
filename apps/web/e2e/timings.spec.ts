@@ -52,7 +52,7 @@ test("a diffed build shows its server timings, and the org's Timings tab their p
   await expect(row.getByTestId("timings-diff-tail")).toHaveText("max");
   // Every build with the step is every build: no count beside the figures.
   await expect(row.getByTestId("timings-total-count")).toHaveCount(0);
-  await expect(row.getByTestId("timings-summary")).toHaveText("—");
+  await expect(row.getByTestId("timings-summary")).toHaveText("n/a");
   // The tab says what Total covers and leaves out.
   await expect(page.getByRole("region", { name: "Timings" })).toContainText(
     "Total runs from the diff starting",

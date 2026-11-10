@@ -49,7 +49,7 @@ export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
 
 /**
  * The server diff (ob 1470): when a build is finalised, pick each shot's baseline and measure it
- * with the engine's diff — the same code the CLI runs, so a run here and a run there agree. The
+ * with the engine's diff, the same code the CLI runs, so a run here and a run there agree. The
  * server adds only the things the engine does not know about: which baseline, which stored
  * options and ignore areas, and the build status.
  *

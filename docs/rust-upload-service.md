@@ -1,4 +1,4 @@
-# The Rust upload service — design for approval (PS-217)
+# The Rust upload service: design for approval (PS-217)
 
 Status: **proposed**, waiting on the maintainer. No build ticket is dispatched until he approves this
 and answers the open questions in §9.
@@ -28,7 +28,7 @@ On the LAN CT (2 vCPU, 2 GiB; `pixelslash-web` MemoryHigh 1400M, `pixelslash-dif
 
 - workerd's peak **grows with N**: `snapshotForm` reads every PUT whole (`request.formData()`),
   four at a time from the CLI, and the isolate does not give the memory back between them. After
-  a burst it settles at ~850–950 MB (cause unmeasured).
+  a burst it settles at ~850 to 950 MB (cause unmeasured).
 - From 200 shots the web unit reaches its 1400M MemoryHigh, swaps, and `GET /` slows.
 - The sidecar's ~420 MB is **one** diff's working set at 1280x9500. Two in flight would be
   ~850 MB, which does not fit its 600M MemoryMax; that is why diffs are serial today.
@@ -96,7 +96,7 @@ rest in JS, and a native server needs all of it in Rust (T2):
 | `png-walk.ts` (chunk walk, CRC, IHDR) | 154 | Same error messages (they are pngjs's, and the CLI shows them). |
 | inflate via `node:zlib` (pngjs's capped inflate, `Z_SYNC_FLUSH`) | in `diff-wasm.ts` | `zlib-rs` or `miniz_oxide`; the cap must refuse the same inputs. |
 | deflate of the overlay via `node:zlib` | in `diff-wasm.ts` | **Q1**: a non-zlib deflate gives different bytes. |
-| `ignore-mask.ts` | — | Straight port. |
+| `ignore-mask.ts` | n/a | Straight port. |
 | `regions.ts` (box merge) | 321 | Straight port; the golden pins the boxes. |
 | `measured.ts` (noise, floors) | 102 | Straight port; floats must be computed in the same order. |
 | `shift.ts` (shift labels) | 220 | Straight port. |
@@ -127,8 +127,8 @@ picking baselines stay in TypeScript, where the DB is.
 it is the contract, not the routing table. The test that compares the two still holds. If an
 owner column helps a reader, it is additive (an `owner: "upload"` field); not required.
 
-Server diffs that are not triggered by an upload — a reviewer's re-run (ob 1738) and an override
-or ignore-box edit (`override.ts` → `rediffShots`, ob 1495) — stay synchronous in the web app,
+Server diffs that are not triggered by an upload, a reviewer's re-run (ob 1738) and an override
+or ignore-box edit (`override.ts` → `rediffShots`, ob 1495), stay synchronous in the web app,
 as they are today: `measure()` and `rediffShots` diff and then, in the same call, run
 `settleReviews`, `refreshBuildStatus`, `recordRun` and `queueExplain`. What changes is who does
 the pixels: on the LAN, Rust serves the sidecar's existing synchronous wire (`sidecar-wire.ts`)
@@ -174,7 +174,7 @@ two routes and passes every other request to the web app through a **service bin
 (`env.WEB.fetch(request)`), which costs no extra billed request and no public hop. The web app
 binds back to the Rust Worker (`env.UPLOAD`) for the synchronous diff calls (re-run, override).
 
-The alternative — the web app owns the domain and forwards the two routes over a service binding —
+The alternative, the web app owns the domain and forwards the two routes over a service binding,
 reads the body into the web app's isolate before forwarding unless it streams `request.body`
 straight through, which it can. It is a smaller change on Cloudflare, but it makes the LAN and
 Cloudflare topologies differ. That is **Q2**.
@@ -190,8 +190,8 @@ not depend on part order.
 
 1. **Authorize from the headers alone**, before reading the body:
    `POST /internal/v1/uploads/authorize` with the CLI version header, the bearer token and the
-   build id. The web app runs what `handleApi` runs today — `belowMinimum` (426 `cli_outdated`),
-   `authorize` (401), `actorBuild` (404, closed build) — and either returns that error, which Rust
+   build id. The web app runs what `handleApi` runs today: `belowMinimum` (426 `cli_outdated`),
+   `authorize` (401), `actorBuild` (404, closed build), and either returns that error, which Rust
    relays byte for byte, or returns `{ orgId, projectId, diffLocation, status, limits }`. The
    content-length cap is checked here, as `snapshotForm` does (`pngs × MAX_PNG_BYTES + 64 KiB`,
    413).
@@ -206,7 +206,7 @@ not depend on part order.
    every 400's text is unchanged; writes the row with `putSnapshot` minus its blob write (split
    out: T5); and replies with:
    - `reply`: the exact status and JSON body the CLI gets today, which Rust relays;
-   - `jobs`: 0–2 diff jobs it can already name (the baseline diff, and against-main for a branch
+   - `jobs`: 0 to 2 diff jobs it can already name (the baseline diff, and against-main for a branch
      build), when the project diffs on the server and a baseline is picked;
    - `orphans`: blob keys a resend replaced, which Rust deletes.
    On a 4xx, Rust deletes the parts it staged.
@@ -232,7 +232,7 @@ re-sent or its baseline moved, it answers 409 and Rust drops the result. The car
 and, only when that shows a change and `acceptedKey` is set, diffs again against it and reports
 that result. No round trip for the second diff.
 
-Both kinds of diff — these jobs and the synchronous `/v1/diff` calls — share the same K slots.
+Both kinds of diff, these jobs and the synchronous `/v1/diff` calls, share the same K slots.
 A synchronous call goes to the **front** of the queue: a reviewer's re-run sent during a 500-shot
 upload must not wait behind hundreds of jobs and hit the client's 15 s timeout.
 
@@ -247,13 +247,13 @@ so a job lost to a restart is simply re-issued by finalize. No queue table, no n
 1. Authorize as in step 1.
 2. **Wait for the build's in-flight and queued jobs**, up to a wall cap W (default 20 s, under
    today's `DIFF_BUDGET_MS = 25 s`).
-3. `POST /internal/v1/finalize/plan`: the web app runs today's `processBuild` front half —
-   `finaliseBuild`, the atomic claim, `selectBaselines`, `withOverrides`, `stands` — and returns
+3. `POST /internal/v1/finalize/plan`: the web app runs today's `processBuild` front half:
+   `finaliseBuild`, the atomic claim, `selectBaselines`, `withOverrides`, `stands`, and returns
    the jobs still due (the shots with no standing result, typically none, or the ones whose
    baseline could not be picked at PUT time).
 4. Run those jobs (same runner, same K), within what is left of W.
-5. `POST /internal/v1/finalize/commit`: the back half — `markRemoved`, accept on the default
-   branch, `refreshBuildStatus`, `recordRun`, `queueExplain` — and the reply body, which Rust
+5. `POST /internal/v1/finalize/commit`: the back half: `markRemoved`, accept on the default
+   branch, `refreshBuildStatus`, `recordRun`, `queueExplain`, and the reply body, which Rust
    relays.
 6. If W runs out first, commit replies exactly as today's `DiffCeilingError` does: `errored` with
    `unmeasured: <n>`. The shipped CLI already loops on that while `unmeasured` falls
@@ -278,8 +278,8 @@ one diff of that size costs **~395 MB**, about 32 B/px over 12.16 Mpx. Where it 
 | Shot | Pixels | Today, measured | Native, estimated |
 | --- | --- | --- | --- |
 | 1280x9500 (the largest in the PS-214 corpus) | 12.16 M | ~395 MB | **~270 MB** |
-| 1440x6000 | 8.64 M | — | ~190 MB |
-| 1440x900 | 1.30 M | — | ~29 MB |
+| 1440x6000 | 8.64 M | n/a | ~190 MB |
+| 1440x900 | 1.30 M | n/a | ~29 MB |
 
 The native figure is an estimate until T2's port exists; T7 measures it. The binary itself idles
 at a few MB.
@@ -295,7 +295,7 @@ C_put × 1 MB  +  K × 270 MB  +  jobs × 1 KB  +  ~10 MB base
 ```
 
 At the CLI's C_put = 4 and K = 2: **~555 MB for any N** (500 shots queue 500 KB of jobs). Today
-the same burst is workerd 330–640 MB growing with N, plus the sidecar's 420 MB.
+the same burst is workerd 330 to 640 MB growing with N, plus the sidecar's 420 MB.
 
 ### Choosing K
 
@@ -307,8 +307,8 @@ the same burst is workerd 330–640 MB growing with N, plus the sidecar's 420 MB
   which is the sidecar's 600M budget plus 100M. The worst case is two 1280x9500 shots at once.
 - If the native diff stays at today's ~395 MB (the estimate is wrong), two in flight is ~800 MB
   and does not fit 700M. Then the choice is K = 1, or a larger cap paid for by the web unit:
-  workerd no longer holds any PNG body, so its burst peak (330–640 MB today) should fall, and its
-  1400M MemoryHigh can give some back. Its post-burst 850–950 MB plateau is unexplained by PS-214,
+  workerd no longer holds any PNG body, so its burst peak (330 to 640 MB today) should fall, and its
+  1400M MemoryHigh can give some back. Its post-burst 850 to 950 MB plateau is unexplained by PS-214,
   so that is not counted on until T7 measures it.
 
 Time: 500 shots × 0.28 s / 2 ≈ **70 s of diff, overlapped** with the upload (the 500-shot branch
@@ -375,7 +375,7 @@ the OOM killer acts later, at first touch. Admission is what keeps the unit unde
 the LAN cut-over the web unit and the Rust unit (700M) add up to 2400M. That is safe only if
 the two do not peak together. They do not today, because the sidecar peaks during finalize and
 workerd peaks during the PUTs. With diffs overlapping the upload, they will. The web unit should
-be the one to give: it no longer reads any PNG body, so its PS-214 PUT peak (330–640 MB) should
+be the one to give: it no longer reads any PNG body, so its PS-214 PUT peak (330 to 640 MB) should
 fall. T7 measures it, then lowers `pixelslash-web`'s caps so the two `MemoryMax` add up to
 ≤ 1900M, about 150 MB under the CT. That is **Q10**.
 
@@ -385,9 +385,9 @@ is 1). That is ~4.5 Mpx whole-image, and the band diff (T8) lifts it (Q5).
 
 ### Later: a band diff
 
-The whole-image diff is the whole of that 270 MB. Most of the diff is local — the anti-alias
+The whole-image diff is the whole of that 270 MB. Most of the diff is local: the anti-alias
 test reads a radius-2 neighbourhood, and the blob boxes are connected components, which a
-row-by-row union-find builds without the whole image — so a first pass that decodes, compares and
+row-by-row union-find builds without the whole image, so a first pass that decodes, compares and
 encodes a few rows at a time would need roughly the compressed PNGs plus a few hundred rows,
 ~16 MB at 1280x9500 (an estimate).
 
@@ -475,7 +475,7 @@ new route file; every query still through `src/db/*`):
 | `POST diff-results` | `{ jobId, snapshotId, kind, againstKey, branchKey, result, overlayKey, ms }` | 200, 409 stale, 404 gone |
 | `POST finalize/plan` | `{ buildId, actor }` | `{ claim, jobs: Job[] }` or `{ reply }` (already finalised, refused) |
 | `POST finalize/commit` | `{ buildId, claim, unmeasured }` | `{ reply: { status, body } }` |
-| `POST /v1/diff` on `127.0.0.1:4181` (web app → Rust; LAN) | the sidecar wire (`sidecar-wire.ts`), unchanged | the sidecar's reply — synchronous, for finalize before T7, re-run and override. Loopback-only and unauthenticated, as the sidecar is today; not under `/internal` and not behind the secret |
+| `POST /v1/diff` on `127.0.0.1:4181` (web app → Rust; LAN) | the sidecar wire (`sidecar-wire.ts`), unchanged | the sidecar's reply: synchronous, for finalize before T7, re-run and override. Loopback-only and unauthenticated, as the sidecar is today; not under `/internal` and not behind the secret |
 
 The Rust service owns no row and keeps no state across restarts; the web app owns every write.
 
@@ -599,11 +599,11 @@ repo's own code and its own measurements.
 
 | # | Size | Ticket | Depends on |
 | --- | --- | --- | --- |
-| T1 | M | Split `lib.rs` into `pixelslash-diff` (target-neutral, scalar + SIMD paths with identical bytes) and `pixelslash-diff-wasm`; cargo workspace; Rust in the gate (`.tool-versions`, Nx run-commands, clippy, fmt, cargo-deny). `diff.wasm` unchanged. | — |
+| T1 | M | Split `lib.rs` into `pixelslash-diff` (target-neutral, scalar + SIMD paths with identical bytes) and `pixelslash-diff-wasm`; cargo workspace; Rust in the gate (`.tool-versions`, Nx run-commands, clippy, fmt, cargo-deny). `diff.wasm` unchanged. | n/a |
 | T2 | L | Port `png-walk`, inflate, deflate (per Q1), `ignore-mask`, `regions`, `measured`, `shift`, `identical`, `yiq` to the core; `pngjs-golden.json` in `cargo test`; a bench leg for the Rust core. | T1 |
 | T3 | M | fs blob store and its loopback API in a minimal native bin; `HttpBlobStore` in the web app; the miniflare → fs migration script and runbook; the LAN switched over. | T1 |
 | T4 | L | `pixelslash-upload-native` as the front door: hyper pass-through to vite preview on loopback, `/internal` stripping, config, the systemd unit, the binary in `release.sh`'s release (built on the desktop, PS-225), the internal secret. | T3 |
-| T5 | M | The internal endpoints in the web app (`/internal/v1/*`), the secret check, `putSnapshot` split from its blob write, `processBuild` split into plan and commit; TS tests for each. | — |
+| T5 | M | The internal endpoints in the web app (`/internal/v1/*`), the secret check, `putSnapshot` split from its blob write, `processBuild` split into plan and commit; TS tests for each. | n/a |
 | T6 | M | Rust serves the sidecar wire at `127.0.0.1:4181/v1/diff` with the native core behind K slots (synchronous calls first); `compare.ts`'s in-process fallback removed when a sidecar URL is set; the Bun sidecar and its unit removed. Every server diff (finalize, re-run, override, against-main) now runs in Rust, still called synchronously. | T2, T4 |
 | T7 | L | The async job runner (dedupe, retries, the in-job carry fallback); streaming PUT and finalize in `pixelslash-upload`, behind `PIXELSLASH_UPLOAD_RUST`; admission by byte budget and the per-shot pixel cap (§3, "The memory limit"); the orphan sweep; the `/api/v1` contract suite run against both paths; the PS-214 re-run at K = 1, 2 written into `apps/web/perf/README.md`. | T5, T6 |
 | T8 | M | The band diff in the core: row-streamed decode, radius-2 window, row-by-row union-find for blob boxes, streamed overlay encode, and the second pass over merged regions for shift labels; golden parity; a `bench:perf` entry in `bench/PERF.md`. | T2 |
@@ -615,7 +615,7 @@ Miniflare host instead of `vite preview`. vite preview holds ~560 MB idle (PS-21
 Miniflare; it depends on nothing here and can land before T4, which forwards to whatever listens
 on `127.0.0.1:3001`. Its measured saving is what Q10 lowers the web unit's caps by.
 
-Rough total: three L and five M on the LAN path (T1–T8), then T9 (L) and T10 (S) for Cloudflare.
+Rough total: three L and five M on the LAN path (T1 to T8), then T9 (L) and T10 (S) for Cloudflare.
 T3 and T5 can run beside T1/T2.
 
 Each ticket's brief carries its own `## Do not`; common to all: no change to `/api/v1`'s shape,
@@ -628,7 +628,7 @@ Each has a recommendation; the build tickets assume it unless he says otherwise.
 
 | # | Question | Recommendation |
 | --- | --- | --- |
-| **Q1** | The golden pins the overlay PNG's **sha256**, which pins zlib's exact deflate bytes. A pure-Rust deflate (`miniz_oxide`) gives different, equally valid bytes. Keep byte-identical overlays (use `zlib-rs`, which aims at zlib's output — to be proven in T2), or relax the golden to the **decoded** overlay pixels plus the result fields? | Try `zlib-rs` for byte parity in T2; if it does not match, relax the golden to decoded pixels. Overlay bytes are not part of any contract a user sees. |
+| **Q1** | The golden pins the overlay PNG's **sha256**, which pins zlib's exact deflate bytes. A pure-Rust deflate (`miniz_oxide`) gives different, equally valid bytes. Keep byte-identical overlays (use `zlib-rs`, which aims at zlib's output; to be proven in T2), or relax the golden to the **decoded** overlay pixels plus the result fields? | Try `zlib-rs` for byte parity in T2; if it does not match, relax the golden to decoded pixels. Overlay bytes are not part of any contract a user sees. |
 | **Q2** | The front door: Rust owns `:3000` / the custom domain and forwards the rest (recommended, same shape on both hosts), or the web app owns them and forwards the two routes (smaller change on Cloudflare, different shape per host)? | Rust is the front door on both. |
 | **Q3** | K = 2 and the Rust unit at MemoryHigh 600M / MemoryMax 700M, from PS-214's ~395 MB per diff today and the ~270 MB the native core is estimated at, before T7 measures it? If the estimate does not hold, K = 1 or a larger cap taken from the web unit's 1400M? | Yes to K = 2 / 700M. If T7 measures more than ~300 MB a diff, the byte budget ("The memory limit") already admits one 1280x9500 at a time, so nothing breaks; set `B_px` from the measurement. K stays a setting. |
 | **Q4** | Rust in the gate: every machine that runs `bun run test` then needs cargo (as it needs .NET today). Accept, or keep cargo behind an opt-out like `NX_DOTNET_DISABLE`? | Accept, with the same kind of opt-out env var for a machine without it. |

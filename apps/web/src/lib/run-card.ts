@@ -112,7 +112,7 @@ const ms = (v: number) => formatDuration(v, { exact: true });
 /** "1,208 snapshots · 612 compared · p50 41 ms · p95 180 ms · p99 610 ms (n = 612)", each named as what it is. */
 function compareText(shots: number, comparedShots: number, stats: StepStats): string {
   const tail = stats.tail === "p95" ? `p95 ${ms(stats.p95)}` : `slowest ${ms(stats.max)}`;
-  const p99 = stats.p99 === null ? "—" : ms(stats.p99);
+  const p99 = stats.p99 === null ? "n/a" : ms(stats.p99);
   return `${plural(shots, "snapshot")} · ${formatNumber(comparedShots)} compared · p50 ${ms(stats.p50)} · ${tail} · p99 ${p99} (n = ${formatNumber(stats.n)})`;
 }
 

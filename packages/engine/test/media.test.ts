@@ -80,7 +80,7 @@ describe("capture warns about media", () => {
     const { result, warnings, out } = await capture(config([{ path: "/video", name: "page" }]));
     expect(result.manifest.snapshots).toHaveLength(1);
     expect(warnings).toEqual([
-      "warning: <video> at 580,36 112x118 on page (desktop) — media renders unreliably; add an exclusion zone (route.ignore) for this shot",
+      "warning: <video> at 580,36 112x118 on page (desktop): media renders unreliably; add an exclusion zone (route.ignore) for this shot",
     ]);
     expect(Object.values(result.media)).toEqual([
       [{ tag: "video", x: 580, y: 36, width: 112, height: 118 }],
@@ -159,7 +159,7 @@ describe("mediaWarning", () => {
     if (!route || !variant) throw new Error("no route or variant");
     const story = { ...route, storybook: { origin: "http://x", id: "a--b" } };
     expect(mediaWarning(story, variant, m)).toBe(
-      "warning: <video> at 1,2 3x4 on page (desktop) — media renders unreliably; mark it with data-pixelslash-ignore in the story",
+      "warning: <video> at 1,2 3x4 on page (desktop): media renders unreliably; mark it with data-pixelslash-ignore in the story",
     );
   });
 });
