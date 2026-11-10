@@ -56,7 +56,14 @@ function groupItems(groupId: string, current: string | undefined) {
  * `current` is a slug or, for a page outside the map, its path. Folded, the rail is one screen
  * tall, so it is not the page's longest column.
  */
-export function DocsNav({ current }: { current?: string }): ReactNode {
+export function DocsNav({
+  current,
+  groups = true,
+}: {
+  current?: string;
+  /** False on the /docs landing, whose own cards are the group tree: the rail then keeps search and "All docs". */
+  groups?: boolean;
+}): ReactNode {
   return (
     <nav aria-label="Docs" data-testid="docs-nav" className="flex flex-col gap-4">
       <DocsSearch />
@@ -67,29 +74,31 @@ export function DocsNav({ current }: { current?: string }): ReactNode {
         label="Docs overview"
         items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
       />
-      <div className="flex flex-col">
-        {GROUPS.map((group) => {
-          const items = groupItems(group.id, current);
-          const open = items.some((item) => item.active);
-          return (
-            // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
-            <Disclosure
-              key={`${group.id}-${open}`}
-              summary={group.title}
-              defaultOpen={open}
-              data-testid={`docs-group-${group.id}`}
-            >
-              <Tabs
-                variant="pill"
-                orientation="vertical"
-                size="sm"
-                label={group.title}
-                items={items}
-              />
-            </Disclosure>
-          );
-        })}
-      </div>
+      {groups && (
+        <div className="flex flex-col">
+          {GROUPS.map((group) => {
+            const items = groupItems(group.id, current);
+            const open = items.some((item) => item.active);
+            return (
+              // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
+              <Disclosure
+                key={`${group.id}-${open}`}
+                summary={group.title}
+                defaultOpen={open}
+                data-testid={`docs-group-${group.id}`}
+              >
+                <Tabs
+                  variant="pill"
+                  orientation="vertical"
+                  size="sm"
+                  label={group.title}
+                  items={items}
+                />
+              </Disclosure>
+            );
+          })}
+        </div>
+      )}
     </nav>
   );
 }
@@ -252,12 +261,30 @@ const FIRST_STEP = {
   text: "Install PixelSlash, compare two versions of a page and read the report. About fifteen minutes, all on your machine.",
 } as const;
 
+/** The trailing mark on an index link. Decorative: the link's name is its title. */
+function LinkChevron(): ReactNode {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className="ml-1 inline-block h-3.5 w-3.5 align-[-0.1em]"
+    >
+      <path
+        fillRule="evenodd"
+        d="M7.2 4.8a.75.75 0 0 1 1.06 0l4.7 4.67a.75.75 0 0 1 0 1.06l-4.7 4.67a.75.75 0 1 1-1.06-1.06L11.37 10 7.2 5.86a.75.75 0 0 1 0-1.06Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 /** `/docs`: one first step, then every group. */
 export function DocsIndexPage(): ReactNode {
   const first = findPage(FIRST_STEP.slug);
   if (first === undefined) throw new Error(`docs: no page ${FIRST_STEP.slug}`);
   return (
-    <SidebarLayout rail={<DocsNav />} railLabel="Docs">
+    <SidebarLayout rail={<DocsNav groups={false} />} railLabel="Docs">
       {/* `/docs#anchor` links from before the split land on the page that holds the anchor. */}
       <script dangerouslySetInnerHTML={{ __html: OLD_ANCHOR_SCRIPT }} />
       <ProseLayout
@@ -282,12 +309,15 @@ export function DocsIndexPage(): ReactNode {
         <ul data-testid="docs-index" className="m-0 list-none columns-1 gap-x-6 p-0 md:columns-2">
           {GROUPS.map((group) => (
             <li key={group.id} className="mb-6 break-inside-avoid">
-              <Card title={group.title}>
-                <p className="mb-2 text-sm text-slate-600">{group.summary}</p>
+              <Card title={group.title} titleStyle="name">
+                <p className="mb-3 text-sm text-slate-600">{group.summary}</p>
                 <ul className="flex flex-col gap-1">
                   {DOC_PAGES.filter((page) => page.group === group.id).map((page) => (
                     <li key={page.slug}>
-                      <TextLink href={pageHref(page)}>{page.title}</TextLink>
+                      <TextLink href={pageHref(page)}>
+                        {page.title}
+                        <LinkChevron />
+                      </TextLink>
                     </li>
                   ))}
                 </ul>

@@ -80,3 +80,19 @@
 :root.latte main :is(h1, h2, h3) .text-slate-900 {
   color: var(--ps-heading);
 }
+
+/* The /docs index links are quiet (PS-365): body ink with a trailing chevron at rest, the link
+   colour on hover and keyboard focus, so the page is not a field of purple. TextLink ignores
+   className and the themes remap its violet with unlayered rules at 0,2,0 (0,3,0 on hover), so
+   this is unlayered too and scoped to the index at 0,2,2 (0,3,2 for the states) to win. */
+[data-testid="docs-index"] ul a[href] {
+  color: inherit;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+[data-testid="docs-index"] ul a[href]:is(:hover, :focus-visible) {
+  color: var(--hc-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

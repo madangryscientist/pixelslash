@@ -22,6 +22,9 @@ const PAGES = ["/", "/pricing", "/docs", "/docs/getting-started"] as const;
 // card headings (text-slate-400 and 500) keep their slate, as styles.css does.
 const PLAIN_H2 = "h2:not([class*='text-slate-']), h2.text-slate-900";
 const MUTED_CARD_H2 = "h2:is(.text-slate-400, .text-slate-500)";
+// The /docs group cards were muted overlines until PS-365 made their titles real headings; the
+// pricing page still has a muted card heading.
+const MUTED_CARD_PATH = "/pricing";
 
 type Ink = { text: string; color: string };
 
@@ -79,9 +82,14 @@ test.describe("at 1440 in light", () => {
     expect(h2?.color, `/ first plain h2 "${h2?.text}"`).toBe(INK);
 
     await open(page, "/docs");
+    const card = await firstInk(page, PLAIN_H2);
+    expect(card, "/docs: a group card h2 in main").not.toBeNull();
+    expect(card?.color, "/docs group card heading").toBe(INK);
+
+    await open(page, MUTED_CARD_PATH);
     const muted = await firstInk(page, MUTED_CARD_H2);
-    expect(muted, "/docs: a muted h2 in main").not.toBeNull();
-    expect(muted?.color, "/docs muted card heading").toBe(LIGHT_MUTED);
+    expect(muted, `${MUTED_CARD_PATH}: a muted h2 in main`).not.toBeNull();
+    expect(muted?.color, `${MUTED_CARD_PATH} muted card heading`).toBe(LIGHT_MUTED);
   });
 });
 
@@ -99,8 +107,13 @@ test.describe("at 1440 in dark", () => {
     expect(h2?.color, "/ first plain h2").toBe(DARK_HEADING);
 
     await open(page, "/docs");
+    const card = await firstInk(page, PLAIN_H2);
+    expect(card, "/docs: a group card h2 in main").not.toBeNull();
+    expect(card?.color, "/docs group card heading").toBe(DARK_HEADING);
+
+    await open(page, MUTED_CARD_PATH);
     const muted = await firstInk(page, MUTED_CARD_H2);
-    expect(muted, "/docs: a muted h2 in main").not.toBeNull();
-    expect(muted?.color, "/docs muted card heading").toBe(DARK_MUTED);
+    expect(muted, `${MUTED_CARD_PATH}: a muted h2 in main`).not.toBeNull();
+    expect(muted?.color, `${MUTED_CARD_PATH} muted card heading`).toBe(DARK_MUTED);
   });
 });
