@@ -54,16 +54,10 @@ function groupItems(groupId: string, current: string | undefined) {
 /**
  * The rail: the search box, then each group as a fold, only the one holding the current page open.
  * `current` is a slug or, for a page outside the map, its path. Folded, the rail is one screen
- * tall, so it is not the page's longest column.
+ * tall, so it is not the page's longest column. The /docs landing has no rail: its search box and
+ * group cards sit in the content column instead.
  */
-export function DocsNav({
-  current,
-  groups = true,
-}: {
-  current?: string;
-  /** False on the /docs landing, whose own cards are the group tree: the rail then keeps search and "All docs". */
-  groups?: boolean;
-}): ReactNode {
+export function DocsNav({ current }: { current?: string }): ReactNode {
   return (
     <nav aria-label="Docs" data-testid="docs-nav" className="flex flex-col gap-4">
       <DocsSearch />
@@ -74,31 +68,29 @@ export function DocsNav({
         label="Docs overview"
         items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
       />
-      {groups && (
-        <div className="flex flex-col">
-          {GROUPS.map((group) => {
-            const items = groupItems(group.id, current);
-            const open = items.some((item) => item.active);
-            return (
-              // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
-              <Disclosure
-                key={`${group.id}-${open}`}
-                summary={group.title}
-                defaultOpen={open}
-                data-testid={`docs-group-${group.id}`}
-              >
-                <Tabs
-                  variant="pill"
-                  orientation="vertical"
-                  size="sm"
-                  label={group.title}
-                  items={items}
-                />
-              </Disclosure>
-            );
-          })}
-        </div>
-      )}
+      <div className="flex flex-col">
+        {GROUPS.map((group) => {
+          const items = groupItems(group.id, current);
+          const open = items.some((item) => item.active);
+          return (
+            // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
+            <Disclosure
+              key={`${group.id}-${open}`}
+              summary={group.title}
+              defaultOpen={open}
+              data-testid={`docs-group-${group.id}`}
+            >
+              <Tabs
+                variant="pill"
+                orientation="vertical"
+                size="sm"
+                label={group.title}
+                items={items}
+              />
+            </Disclosure>
+          );
+        })}
+      </div>
     </nav>
   );
 }
@@ -279,12 +271,12 @@ function LinkChevron(): ReactNode {
   );
 }
 
-/** `/docs`: one first step, then every group. */
+/** `/docs`: the search box, one first step, then every group. No rail: the cards run the full column. */
 export function DocsIndexPage(): ReactNode {
   const first = findPage(FIRST_STEP.slug);
   if (first === undefined) throw new Error(`docs: no page ${FIRST_STEP.slug}`);
   return (
-    <SidebarLayout rail={<DocsNav groups={false} />} railLabel="Docs">
+    <>
       {/* `/docs#anchor` links from before the split land on the page that holds the anchor. */}
       <script dangerouslySetInnerHTML={{ __html: OLD_ANCHOR_SCRIPT }} />
       <ProseLayout
@@ -292,6 +284,7 @@ export function DocsIndexPage(): ReactNode {
         title="Docs"
         subtitle="Install PixelSlash, run a first compare, then look up whatever you are doing next."
       >
+        <DocsSearch />
         <Callout
           tone="neutral"
           title="New here? Start with the first compare"
@@ -326,6 +319,6 @@ export function DocsIndexPage(): ReactNode {
           ))}
         </ul>
       </ProseLayout>
-    </SidebarLayout>
+    </>
   );
 }

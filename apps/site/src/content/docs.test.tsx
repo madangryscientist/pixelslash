@@ -150,7 +150,7 @@ describe("the docs pages", () => {
   });
 
   test("the index lists every page, once, under its group", () => {
-    // The rail links every page too, so count only the group cards.
+    // Count from the group cards on, not the lead above them.
     const cards = indexHtml.slice(indexHtml.indexOf('data-testid="docs-index"'));
     const counts = LISTED_PAGES.map((item) => [
       item.slug,

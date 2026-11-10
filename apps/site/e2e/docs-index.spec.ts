@@ -4,8 +4,8 @@ import { GROUPS } from "../src/content/docs-map.ts";
 /*
  * PS-365: the /docs landing has a hierarchy. Each group card's title is a real heading, apart in
  * colour from its summary; the links inside are body ink with a chevron at rest and the link
- * colour on hover and keyboard focus; and the rail drops its group tree on this page only, since
- * the landing is the tree. Run on the desktop project at 1440x900, in both themes.
+ * colour on hover and keyboard focus; and the landing has no rail at all (PS-370), its search box
+ * and group cards run the full column. Run on the desktop project at 1440x900, in both themes.
  */
 
 const GROUP_TESTID = '[data-testid^="docs-group-"]';
@@ -32,18 +32,40 @@ for (const scheme of ["light", "dark"] as const) {
       }
     });
 
-    test("the rail has no group tree on /docs, and keeps all twelve on a docs page", async ({
-      page,
-    }) => {
-      await page.goto("/docs", { waitUntil: "networkidle" });
-      const nav = page.getByTestId("docs-nav");
-      await expect(nav.locator(GROUP_TESTID)).toHaveCount(0);
-      await expect(nav.locator('a[href="/docs"]')).toHaveAttribute("aria-current", "page");
-      await expect(nav.getByRole("searchbox").or(nav.locator("input")).first()).toBeVisible();
+    // Light only: the layout does not depend on the scheme, and the rail check runs once.
+    if (scheme === "light")
+      test("/docs has no rail, and its search box sits above the first card; /getting-started keeps all twelve groups", async ({
+        page,
+      }) => {
+        await page.goto("/docs", { waitUntil: "networkidle" });
+        // The rail is SidebarLayout's aside, labelled "Docs"; the landing renders none.
+        await expect(page.getByRole("complementary", { name: "Docs" })).toHaveCount(0);
 
-      await page.goto("/docs/getting-started", { waitUntil: "networkidle" });
-      await expect(page.getByTestId("docs-nav").locator(GROUP_TESTID)).toHaveCount(GROUPS.length);
-    });
+        const search = page.getByRole("searchbox", { name: "Search the docs" });
+        await expect(search).toBeVisible();
+        // Reached by the keyboard alone: Tab from the top of the page until the search box has focus.
+        await page.evaluate(() => {
+          const focused = document.activeElement;
+          if (focused instanceof HTMLElement) focused.blur();
+        });
+        await expect(async () => {
+          await page.keyboard.press("Tab");
+          await expect(search).toBeFocused({ timeout: 100 });
+        }).toPass({ timeout: 15_000 });
+        const firstCard = await page
+          .getByTestId("docs-index")
+          .locator(":scope > li")
+          .first()
+          .boundingBox();
+        const box = await search.boundingBox();
+        if (!firstCard || !box) throw new Error("the search box or the first card has no box");
+        expect(box.y + box.height, "search ends above the first card").toBeLessThanOrEqual(
+          firstCard.y,
+        );
+
+        await page.goto("/docs/getting-started", { waitUntil: "networkidle" });
+        await expect(page.getByTestId("docs-nav").locator(GROUP_TESTID)).toHaveCount(GROUPS.length);
+      });
 
     test("a card link is body ink at rest, with an aria-hidden chevron, and takes the link colour on hover and on focus", async ({
       page,
