@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
-import { DOC_PAGES, neighbours } from "../src/content/docs-map.ts";
+import { DOC_PAGES, GROUPS, neighbours } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
 import { siteNav } from "./support/site-nav.ts";
 
@@ -108,6 +108,36 @@ test("/docs is the index: a card per group, every page linked, the rail marks Al
     "page",
   );
 });
+
+// PS-351: the groups are packed into columns, so no card is a box with a void under its links.
+for (const size of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  for (const colorScheme of ["light", "dark"] as const) {
+    test(`/docs: no group card is a void under its links at ${size.width} in ${colorScheme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(size);
+      await page.emulateMedia({ colorScheme });
+      await checkPage(page, "/docs", info);
+      const gaps = await page
+        .getByTestId("docs-index")
+        .locator(":scope > li")
+        .evaluateAll((items) =>
+          items.map((item) => {
+            const card = item.querySelector("section") ?? item;
+            const links = card.querySelectorAll("a");
+            const last = links[links.length - 1];
+            if (last === undefined) return Number.POSITIVE_INFINITY;
+            return card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
+          }),
+        );
+      expect(gaps).toHaveLength(GROUPS.length);
+      for (const gap of gaps) expect(gap).toBeLessThanOrEqual(24);
+    });
+  }
+}
 
 for (const doc of DOC_PAGES) {
   test(`/docs/${doc.slug}: group nav, on this page, previous and next`, async ({ page }, info) => {

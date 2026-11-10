@@ -304,20 +304,23 @@ export function DocsIndexPage(): ReactNode {
           {FIRST_STEP.text}
         </Callout>
         <DocBody doc={CLI_INTRO_DOC} />
-        <CardGrid columns={2} as="ul" data-testid="docs-index">
+        {/* Packed into columns, not a grid: a grid stretches a short group to its long neighbour's height. */}
+        <ul data-testid="docs-index" className="m-0 list-none columns-1 gap-x-6 p-0 md:columns-2">
           {GROUPS.map((group) => (
-            <Card key={group.id} title={group.title}>
-              <p className="mb-2 text-sm text-slate-600">{group.summary}</p>
-              <ul className="flex flex-col gap-1">
-                {DOC_PAGES.filter((page) => page.group === group.id).map((page) => (
-                  <li key={page.slug}>
-                    <TextLink href={pageHref(page)}>{page.title}</TextLink>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            <li key={group.id} className="mb-6 break-inside-avoid">
+              <Card title={group.title}>
+                <p className="mb-2 text-sm text-slate-600">{group.summary}</p>
+                <ul className="flex flex-col gap-1">
+                  {DOC_PAGES.filter((page) => page.group === group.id).map((page) => (
+                    <li key={page.slug}>
+                      <TextLink href={pageHref(page)}>{page.title}</TextLink>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </li>
           ))}
-        </CardGrid>
+        </ul>
       </ProseLayout>
     </SidebarLayout>
   );
