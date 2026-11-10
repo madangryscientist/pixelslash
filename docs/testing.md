@@ -129,8 +129,8 @@ Measured on the desktop, `--skip-nx-cache`, the same machine in the same session
 
 | Layer | Project | Files | Tests | Time |
 | --- | --- | --- | --- | --- |
-| Smoke | `cli` | 0 → 1 | 0 → 4 | – → 2 s (the CLI build is cached) |
-| Smoke | `web` | 0 → 1 | 0 → 4 | – → 17 s (build, migrate, serve, drive) |
+| Smoke | `cli` | 0 → 1 | 0 → 4 | n/a → 2 s (the CLI build is cached) |
+| Smoke | `web` | 0 → 1 | 0 → 4 | n/a → 17 s (build, migrate, serve, drive) |
 | E2E | `web` (Playwright, 1 worker) | 24 → 23 | 39 → 36 (38 + 1 skipped → 35 + 1 skipped) | 164 s → 154 s |
 | Integration + unit | `engine` | 47 → 47 | 584 → 582 (580 pass + 2 skipped) | 20.1 s → 18.8 s |
 | Integration + unit | `cli` | 29 → 29 | 214 → 214 | 31.0 s → 30.7 s |

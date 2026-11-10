@@ -9,8 +9,8 @@ import { unfinished } from "#/db/server-timings";
  * 30 s CPU limit on a build of several whole-page changes, or the Worker is evicted) never gets
  * to write `errored`, so its build would read `processing` for ever. Nothing heartbeats, so age
  * is the only evidence of death: a build claimed longer ago than this has no live run, and the
- * next finalise may take it over. It must outlast any run that is still going — the request is
- * capped at 30 s of CPU, and R2 waits add wall time, not CPU — and stay short enough that a
+ * next finalise may take it over. It must outlast any run that is still going (the request is
+ * capped at 30 s of CPU, and R2 waits add wall time, not CPU) and stay short enough that a
  * client retrying finalise is not left waiting on a corpse. Five minutes is ten times the cap.
  *
  * The claim is a lease without a fence: a run still alive past the bound would be overwritten by

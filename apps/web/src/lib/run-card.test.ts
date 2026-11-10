@@ -27,7 +27,7 @@ describe("the per-compare line and cache hits", () => {
   test("p95 and p99 appear at their gates, and the note names the p99 gate below it", () => {
     const under = card({ shots: times(499) }).compare;
     expect(under?.value).toContain(`p95 ${d(475)}`);
-    expect(under?.value).toContain("p99 — (n = 499)");
+    expect(under?.value).toContain("p99 n/a (n = 499)");
     expect(under?.note).toContain("p99 from 500 compares");
     const at = card({ shots: times(500) }).compare;
     expect(at?.value).toContain(`p99 ${d(495)} (n = 500)`);
@@ -57,7 +57,7 @@ describe("runCard with timings", () => {
 
   test("states the per-compare median, tail and n, and names the slowest", () => {
     expect(c.compare?.value).toBe(
-      `3 snapshots · 3 compared · p50 ${d(80)} · slowest ${d(120)} · p99 — (n = 3)`,
+      `3 snapshots · 3 compared · p50 ${d(80)} · slowest ${d(120)} · p99 n/a (n = 3)`,
     );
     expect(c.compare?.source).toBe("stored by the server");
     expect(c.compare?.note).toContain(`s0 (1280x720, light) ${d(120)}`);

@@ -103,7 +103,7 @@ desk$ ssh $VM 'docker run --rm --network none --entrypoint /bench/self-test argo
 
 Expect `Tests 27 passed (27)`. That is their `diff/image/index.test.ts` calibration table and
 `test/diff.test.ts` snapshot scores. `--testTimeout 30000` is set because on 2 vCPU their
-`different-dimensions` case takes 4–10 s, and vitest's default timeout is 5 s.
+`different-dimensions` case takes 4 to 10 s, and vitest's default timeout is 5 s.
 
 ### Step 4: run pairs
 

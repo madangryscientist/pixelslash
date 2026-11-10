@@ -58,9 +58,9 @@ Where the shipped cs long-page time goes (skia parallel, 207.2 ms):
 | regions | 76.4 | 37% | not ticketed (lever 15) |
 | pixel_compare | 48.1 | 23% | not ticketed (SIMD compare, lever 15) |
 | decode (wall, two files in parallel) | 32.7 | 16% | libspng on zlib-ng: 16.9 ms, needs a native build |
-| rest (spawn, JSON, exit) | 27.6 | 13% | — |
+| rest (spawn, JSON, exit) | 27.6 | 13% | n/a |
 | startup | 16.0 | 8% | AOT / ReadyToRun (lever 16) |
-| anti_alias | 4.2 | 2% | — |
+| anti_alias | 4.2 | 2% | n/a |
 
 Where the production-shaped ts long-page time goes (pngjs, sequential, pngjs overlay, 1114.8 ms):
 
@@ -70,9 +70,9 @@ Where the production-shaped ts long-page time goes (pngjs, sequential, pngjs ove
 | decode | 274.7 | 25% | napi-image: 29.8 ms (CLI only); not changed in production |
 | pixel_compare | 171.8 | 15% | not ticketed (lever 15) |
 | regions | 158.6 | 14% | not ticketed (lever 15) |
-| anti_alias | 31.9 | 3% | — |
-| rest | 29.6 | 3% | — |
-| startup | 21.1 | 2% | — (was ~103 ms; see "What we know") |
+| anti_alias | 31.9 | 3% | n/a |
+| rest | 29.6 | 3% | n/a |
+| startup | 21.1 | 2% | n/a (was ~103 ms; see "What we know") |
 
 ## Bottlenecks
 
@@ -95,7 +95,7 @@ wall, because each is its own median.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Load | 25.7 (20%) | 52.4 (21%) | 274.7 (25%) | 19.3 (20%) | 20.9 (20%) | 32.7 (16%) |
 | Diff | **51.4 (40%)** | **81.4 (33%)** | 362.3 (32%) | **31.4 (33%)** | **40.0 (38%)** | **128.7 (62%)** |
-| Encode | 23.4 (18%) | 80.8 (33%) | **415.8 (37%)** | – | – | – |
+| Encode | 23.4 (18%) | 80.8 (33%) | **415.8 (37%)** | n/a | n/a | n/a |
 | Startup | 21.1 (16%) | 21.1 (9%) | 21.1 (2%) | 16.4 (17%) | 16.3 (15%) | 16.0 (8%) |
 | Rest | 6.2 (5%) | 9.1 (4%) | 29.6 (3%) | 26.7 (28%) | 26.9 (25%) | 27.6 (13%) |
 | **Wall** | 128.1 | 247.4 | 1114.8 | 95.3 | 105.7 | 207.2 |
@@ -108,7 +108,7 @@ Bold is the biggest stage in each column. Where each one lies, and what is aimed
 | **Encode** | deflating the overlay PNG; the deflate level does not move it | ts long: 37% | napi-image encodes it in 27 ms (CLI only) | measured in PS-168; production unchanged |
 | **Load** | unfilter, for pngjs and stb (56% and 65% of decode) | ts long: 25% | measured in PS-168: SkiaSharp is the cs default; napi-image is the ts bench default | done for the bench; the CLI ships napi-image (PS-185), workerd stays on pngjs |
 | Startup | Bun loading the engine's imports | ts phone: 16% | `bun build --compile` measured: no gain | done (PS-168) |
-| Rest | spawn, JSON, exit; cs's grew to ~27 ms with SkiaSharp (stb ~20 ms in the same run) | cs phone: 28% | not targeted | — |
+| Rest | spawn, JSON, exit; cs's grew to ~27 ms with SkiaSharp (stb ~20 ms in the same run) | cs phone: 28% | not targeted | n/a |
 
 **A pair that is byte-equal skips all five.** The identical-bytes shortcut (ob 1948) compares the
 two files' bytes first: equal, and there is no decode, no diff and no overlay. The `diff-identical`
@@ -122,7 +122,7 @@ every page (62% of the long page) and the largest ts stage on phone and desktop.
 
 ## Levers: tried and queued
 
-Rows 5–14 are the PS-168 run (2026-10-25, `env` dedicated), long page, `self` median (decode +
+Rows 5 to 14 are the PS-168 run (2026-10-25, `env` dedicated), long page, `self` median (decode +
 diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`.
 
 | # | Lever | Engine | Status | Measured effect (same run) | Ticket |
@@ -141,15 +141,15 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 12 | WASM decoders (@jsquash/png; libspng or Wuffs in WASM) | ts (workerd-safe) | ✅ measured, a switch | jsquash parallel 528.9 ms, tied with pngjs parallel (523.8); @cf-wasm/png +442%; libspng and Wuffs in WASM could not build | PS-168 |
 | 13 | Overlay encode: lower deflate level, sharp, WASM, skip | ts | ✅ measured; `none` is the bench default | long `overlay_encode`: pngjs 415.8, level 6 414.6, level 1 404.1, cf-wasm 231.2, sharp 35.3, napi-image 27.3 ms; wall 1114.8 → 706.4 ms with none | PS-168 |
 | 14 | `bun build --compile` for startup | ts | ✅ measured, not adopted | startup 21.2 → 26.4 ms (slower); self −2% | PS-168 |
-| 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | — | — |
-| 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | — | — |
+| 15 | Faster regions / SIMD pixel compare | both | 💡 not ticketed | n/a | n/a |
+| 16 | .NET Native AOT / ReadyToRun for startup | cs | 💡 not ticketed | n/a | n/a |
 | 17 | Identical-bytes shortcut: skip decode, diff and overlay when both PNGs are byte-equal (server: sha256 at upload, so no blob read either) | ts + web | ✅ measured | long page, same file twice: 665.7 ms → 0.003 ms (in-process diff); changed pages 0% (desktop −2.3%, long +0.1%, noise) | ob 1948 |
 | 19 | Self-host server diff in a Bun sidecar with napi-image (workerd keeps pngjs on Cloudflare) | web (self-host) | ✅ measured, shipped | PS-200 burst, 50 shots 1280×5000: diff time 29.7/37.9 → 11.9/14.3 s; workerd settled RSS 660/691 → 357/363 MB | PS-203 |
 | 18 | Shoot pages at once: a pair's two, up to four in `capture` and `check` (each its own context and settle; the waits overlap, none is shortened) | CLI capture | ✅ measured, shipped | capture-only 10 shots total 6630 → 2527 ms (−62%); long pair 2162 → 1559 ms (−28%); 5-route pair 7.4 → 4.5 s (−39%); PNGs byte-equal | PS-195 |
 | 20 | Server diff's hot loops (unfilter, pixel loop, region blobs) in Rust→WASM; inflate and the overlay encode unchanged | web (workerd) | ✅ measured, shipped; the only diff, CLI and server, since PS-210 | workerd, 15 rounds: phone 42.4 → 22.6 ms (−47%), desktop 126.3 → 75.7 (−40%), long 891.8 → 531.7 (−40%); peak RSS after the rounds 2140 → 347 MB; byte-equal | PS-204 |
 | 21 | Free the explain queue's full-page decodes: `regionCrops` decodes one PNG at a time and releases its raster, `explainShot` releases the three blobs it read | web + engine | ✅ measured, shipped | burst 50 × 1280×9500 with the model on: workerd peak 1497 → 783 / 728 MB, settled 1499 → 611 / 617 MB; crops unchanged | PS-206 |
 | 22 | The WASM differ's overlay encode: pngjs's adaptive filter pass in the module (wasm SIMD), deflate in workerd's zlib at pngjs's level and strategy, chunks in JS | web (workerd) | ✅ measured, shipped; the only overlay encode since PS-210 | workerd, 15 rounds, wasm with pngjs's encode → its own: phone 23.1 → 12.2 ms (−47%), desktop 76.0 → 32.2 (−58%), long 528.8 → 238.0 (−55%); against pngjs −71 to −74%; overlay byte-equal | PS-205 |
-| 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1–4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
+| 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1 to 4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
 | 24 | Tile hashes: hash both shots in 64 px tiles (a hand-written 4-lane multiply-rotate hash over the decoded pixels) and run the pixel loop and the region pass only over the tiles that differ, the region pass over each dirty tile row plus the rows the merge gap reaches | ts + web | ✅ measured, shipped as the default (`--no-tiles` / `tiles: false` turn it off) | dedicated, self, off → on: phone 34.3 → 28.9 ms (−16%), desktop 52.8 → 50.0 (−5%), long 367.5 → 253.3 (−31%), long + one badge 306.6 → 175.0 (−43%), long + 10 px shift 422.4 → 388.0 (−8%); hashing 0.7 / 2.9 / 10.6 / 9.6 / 9.6 ms; same result on all 157 corpus pairs, overlay included | PS-191 |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
@@ -160,11 +160,11 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 
 - **Diff is now the biggest stage for both engines.** Regions plus pixel_compare are 124 ms of
   cs's 207 ms long page, and 330 ms of ts's 1115 ms. No decoder change moves them.
-- **A SIMD native decoder takes cs decode from 189.5 ms (stb, sequential) to 16.9–32.7 ms** on the
+- **A SIMD native decoder takes cs decode from 189.5 ms (stb, sequential) to 16.9 to 32.7 ms** on the
   long page (libspng on zlib-ng, Wuffs, SkiaSharp, all parallel). Unfilter was the part stb was slow at.
 - **ts's fastest decoder is native** (napi-image, CLI only). Among what workerd can load (WASM or
   JS), nothing beats pngjs: pngjs parallel 523.8 ms and jsquash parallel 528.9 ms are a tie.
-- **The overlay's deflate level does not matter** (404–416 ms at every pngjs level); the encoder does
+- **The overlay's deflate level does not matter** (404 to 416 ms at every pngjs level); the encoder does
   (napi-image 27 ms, sharp 35 ms).
 - **ts startup is now ~21 ms**, against ~103 ms in the ob 1932 run. The bench imports
   `@hackcove/pixelslash-engine/diff` instead of the package root, which loaded Playwright. That is two runs
@@ -172,11 +172,11 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 - **Parallel decode only pays on big images, and only for a slow decoder.** On phone the Worker's
   start-up costs more than it saves; with napi-image, parallel is slower even on the long page
   (449.2 against 402.6 ms).
-- **cs anti-alias is nearly free** (0.4–4.2 ms, against ts's 8–32 ms).
+- **cs anti-alias is nearly free** (0.4 to 4.2 ms, against ts's 8 to 32 ms).
 - **Accuracy is unchanged.** cs matches ts row for row on both corpora (157 pairs: same verdicts,
   same regions), with SkiaSharp parallel as with stb sequential. Every TS decoder candidate gives
   pngjs's RGBA byte for byte on every corpus PNG (`bench/test/codecs.test.ts`).
-- **In workerd, the hot loops in WASM take 40–47% off the diff** (PS-204), and the long page drops
+- **In workerd, the hot loops in WASM take 40 to 47% off the diff** (PS-204), and the long page drops
   from 892 to 532 ms. The overlay encode (pngjs, about 330 ms on the long page) was then 62% of what
   was left. **Its filter pass was the cost, not deflate** (PS-205): deflate alone is 13.5 of pngjs's
   330 ms. With the filter in the module (wasm SIMD) the WASM diff takes the long page to 238 ms,
@@ -194,7 +194,7 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
   workerd diff and the self-host's Bun sidecar (PS-203) all run PS-204's `diff.wasm`, and the pngjs
   and napi-image diffs, the `DIFF_WASM` switch and the workerd A/B harness are gone. The sidecar
   stays for memory, not speed: PS-210 measured the in-process diff over `pixelslash-web`'s
-  `MemoryHigh=1400M` on the RSS burst (1519–1588 MB peak, 1124 MB with the sidecar).
+  `MemoryHigh=1400M` on the RSS burst (1519 to 1588 MB peak, 1124 MB with the sidecar).
 
 ## Run log
 
@@ -222,15 +222,15 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 ### 2026-10-25 · PS-205 · desktop, shared · the overlay encode's filter pass in WASM, in workerd
 
-**With its own encode, the WASM diff is 47–58% faster than the WASM diff with pngjs's encode, and
-71–74% faster than pngjs.** The overlay is the same byte for byte.
+**With its own encode, the WASM diff is 47 to 58% faster than the WASM diff with pngjs's encode, and
+71 to 74% faster than pngjs.** The overlay is the same byte for byte.
 
 **Question.** After PS-204, pngjs's overlay encode was 62% of the WASM diff on the long page. Is it
 the filter pass or deflate? If it is the filter, can the module do it and keep pngjs's bytes?
 
 **Split first.** The same harness timed pngjs's whole encode against its deflate alone, run on the
 inflated IDAT of pngjs's own overlay at pngjs's options (`level: 9`, `strategy: 3`, Z_RLE, 32 KiB
-chunks). Deflate is 4–12% of the encode, so the filter pass is the cost:
+chunks). Deflate is 4 to 12% of the encode, so the filter pass is the cost:
 
 | Page | pngjs encode | its deflate | Deflate's share |
 | --- | ---: | ---: | ---: |
@@ -239,7 +239,7 @@ chunks). Deflate is 4–12% of the encode, so the filter pass is the cost:
 | long | 330.1 ms | 13.5 ms | 4% |
 
 **What moved.** pngjs's adaptive filter, written from the PNG spec in `engines/wasm` (no crates):
-for each row it tries filters 0–4, sums |byte − predictor| unwrapped, and keeps the first smallest
+for each row it tries filters 0 to 4, sums |byte − predictor| unwrapped, and keeps the first smallest
 sum, so ties go to the lower filter as in pngjs. The sums and the chosen row's bytes go 16 bytes at
 a time in i16 lanes (wasm SIMD); the first pixel and the tail go one byte at a time. A scalar
 version took 157 ms on the long page in Bun, and SIMD takes 28 ms. JS deflates the filtered rows
@@ -249,7 +249,7 @@ view of the module's memory, because the rows buffer can grow it. The module is 
 from 26475.
 
 **Env.** As PS-204: Linux desktop, 12 cores, other worktrees running (`shared`); two workerd
-processes from `vite preview`; the PS-168 pages (seeds 100–102); every pair checked equal across
+processes from `vite preview`; the PS-168 pages (seeds 100 to 102); every pair checked equal across
 pngjs, wasm and wasm with pngjs's encode (every field and the overlay's sha256) before any timing;
 15 rounds after 3 warm-up, interleaved and reversed on odd rounds, medians from the client. "Before"
 is `wasm-pngjs`, the WASM differ with pngjs's encode passed through its `encode` hook, in the same
@@ -274,14 +274,14 @@ needs one row of zeros and the filtered rows (the overlay's size plus one byte p
 
 **Tests.** `packages/engine/test/diff-wasm.test.ts` holds the overlay byte-equal to pngjs's on the
 bench corpus (whose overlays use all five filters, which a test asserts), on the three perf pages,
-and on noise at widths 1–33 pixels, which covers the first pixel, the 16-byte steps and the tail.
+and on noise at widths 1 to 33 pixels, which covers the first pixel, the 16-byte steps and the tail.
 `apps/web/src/diff/wasm.test.ts` covers the app's server-diff fixtures.
 
 **Not measured.** Cloudflare's own runtime: nothing was deployed.
 
 ### 2026-10-25 · PS-206 · desktop, shared · workerd's memory on a burst that is explained
 
-**The 1.5 GB was the explain queue, not the diff, and it is now about 0.6–0.8 GB.** With the
+**The 1.5 GB was the explain queue, not the diff, and it is now about 0.6 to 0.8 GB.** With the
 project's model set, every changed shot is explained after the finalise. `explainShot` read the
 baseline, the branch and the overlay whole, and `regionCrops` decoded all three with pngjs at once
 (about 49 MB of raster each at 1280×9500). None of it was freed, and a Worker has no `gc()`. On an
@@ -307,7 +307,7 @@ PIXELSLASH_RSS_MODEL=1 PIXELSLASH_RSS_BURST=50 PIXELSLASH_RSS_HEIGHT=9500 bunx p
 
 | Run | after main | peak | settled 10 s | sidecar peak | vite peak | diff | explain | GET / probes (failed, slowest) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| before, diff only | 446 MB | 454 MB | 349 MB | 482 MB | 503 MB | 21.9 s | — | 33 (0, 118 ms) |
+| before, diff only | 446 MB | 454 MB | 349 MB | 482 MB | 503 MB | 21.9 s | n/a | 33 (0, 118 ms) |
 | before, explained | 382 MB | **1497 MB** | **1499 MB** | 466 MB | 554 MB | 21.8 s | 31.4 s | 64 (0, 1323 ms) |
 | after, explained #1 | 385 MB | **783 MB** | **611 MB** | 466 MB | 555 MB | 24.5 s | 37.2 s | 73 (0, 1078 ms) |
 | after, explained #2 | 307 MB | **728 MB** | **617 MB** | 457 MB | 571 MB | 24.8 s | 42.9 s | 92 (0, 1458 ms) |
@@ -317,7 +317,7 @@ explain stub answers at once, so the explain column is the queue and the crops, 
 
 **Against the CT's cap.** `pixelslash-web` runs vite preview and workerd in one cgroup, with
 MemoryHigh at 1400M. Before the change, workerd alone reached 1.5 GB, which matches the live stall.
-After it, workerd peaks at 0.73–0.78 GB. The sum of the two processes' separate peaks is about
+After it, workerd peaks at 0.73 to 0.78 GB. The sum of the two processes' separate peaks is about
 1.3 GB, but they do not peak at the same moment. The rest of workerd's settled ~610 MB is the
 isolate's heap and allocator after 100 uploads (about 180 MB of it at idle). This change does not
 touch it.
@@ -363,7 +363,7 @@ else on the reserved CPUs. `bench/perf-results/2026-10-25T23-00-49-470Z.json`. M
 
 Where it moved (off → on, ms): long `pixel_compare` 50.5 → 22.6 and `regions` 168.2 → 68.7; the
 badge 47.7 → 14.7 and 112.3 → 4.3; the shift 91.3 → 73.1 and 183.3 → 152.1. Decode is the same on
-both sides (143–148 ms on every long page).
+both sides (143 to 148 ms on every long page).
 
 - **The hashing costs about 10 ms on the long page** (3% of its self time), 3 ms on desktop and
   under 1 on phone. That is the most tiles can cost: a pair where every tile differs pays it and
@@ -385,7 +385,7 @@ the host (`engines/wasm/native`, bench-only, no crate) and each step timed in wa
 cs. Only what native Rust still loses is ours.
 
 **Step by step, wasm against native** (`bun run bench:native -- --runs 10`, shared desktop, load
-5–7; the warm median and the first run on a fresh instance; the same rows on both sides, inflate
+5 to 7; the warm median and the first run on a fresh instance; the same rows on both sides, inflate
 outside both; every image, field, overlay and box list FNV-equal between the two). Long page, ms,
 two runs: HEAD's `lib.rs` and this branch's, four minutes apart:
 
@@ -408,9 +408,9 @@ its decimals.
 - **The pixel loop is not ours, and neither are the blob boxes.** The pixel loop is the same in wasm
   and natively. The blob boxes are about 9 ms slower in wasm than natively with the same code, so
   that is the runtime. Natively both beat cs (cs pixel_compare + anti_alias 53.7, regions 80.9 in
-  the dedicated run below). SIMD128 on both loops was tried: 1–4 ms, inside the noise, so dropped.
-- **The first run pays for memory.** Copying the rows into a fresh instance took 33–44 ms in wasm in
-  every run, against 6–10 natively in three runs of four (30 in the first): `memory.grow` and the
+  the dedicated run below). SIMD128 on both loops was tried: 1 to 4 ms, inside the noise, so dropped.
+- **The first run pays for memory.** Copying the rows into a fresh instance took 33 to 44 ms in wasm in
+  every run, against 6 to 10 natively in three runs of four (30 in the first): `memory.grow` and the
   first touch of the new pages. In a cold process that is most of `decode_other`.
 
 **Dedicated A/B** (`bun run bench:perf -- --env dedicated --runs 10`, HEAD's `ts-diff` from a
@@ -427,8 +427,8 @@ The long page's phases (ts after; cs's decode is one phase, both files at once):
 
 | Phase | ts after | cs | Whose |
 | --- | ---: | ---: | --- |
-| decode_inflate | 66.6 | — | the runtime's zlib, one file after the other |
-| decode_unfilter | 30.7 | — | ours, fixed (cold; 13 warm) |
+| decode_inflate | 66.6 | n/a | the runtime's zlib, one file after the other |
+| decode_unfilter | 30.7 | n/a | ours, fixed (cold; 13 warm) |
 | decode_other | 38.2 | 64.7 work, 39.3 wall | wasm's memory growth and first touch, plus the chunk walk |
 | pixel_compare (+ anti_alias) | 51.3 | 53.7 | even |
 | regions | 100.1 | 80.9 | blob boxes 52 cold (natively about 33), JS merge and rules 25 |
@@ -455,16 +455,16 @@ ticket does not take:
 
 **In workerd** (`apps/web/perf/diff-wasm/run.ts`, restored minimal: one workerd, the server's
 `wasmDiff`, each page checked equal to Bun's first; 15 rounds after 3 warm-up; run in a HEAD
-worktree, then this branch, back to back, shared desktop, load 4–8; the module runs there, SIMD128
+worktree, then this branch, back to back, shared desktop, load 4 to 8; the module runs there, SIMD128
 included, as PS-205's filter pass already did):
 
 | Page | before | after | Change | Request alone |
 | --- | ---: | ---: | ---: | ---: |
-| phone | 26.6 ms | 22.5 ms | −15% | 13.4–14.1 ms |
-| desktop | 51.5 ms | 39.0 ms | −24% | 11.4–11.8 ms |
-| long | 297.1 ms | 211.0 ms | −29% | 15.2–16.7 ms |
+| phone | 26.6 ms | 22.5 ms | −15% | 13.4 to 14.1 ms |
+| desktop | 51.5 ms | 39.0 ms | −24% | 11.4 to 11.8 ms |
+| long | 297.1 ms | 211.0 ms | −29% | 15.2 to 16.7 ms |
 
-Peak RSS after the rounds 405 → 403 MB. The empty request cost 11–17 ms here against 1.5–2.6 in
+Peak RSS after the rounds 405 → 403 MB. The empty request cost 11 to 17 ms here against 1.5 to 2.6 in
 PS-205's run, so the desktop was busy; compare the two columns, not this table with older ones.
 
 ### 2026-10-25 · PS-209 · desktop, dedicated · the WASM diff as a bench engine, against ts and cs
@@ -532,7 +532,7 @@ The overlay encode's own phase (median ms):
 
 ### 2026-10-25 · PS-204 · desktop, shared · the server diff's hot loops in WASM, in workerd
 
-**In workerd, the WASM diff is 40–47% faster than pngjs, and it holds a sixth of the memory.** The
+**In workerd, the WASM diff is 40 to 47% faster than pngjs, and it holds a sixth of the memory.** The
 result is the same byte for byte: every field, and the overlay's bytes.
 
 Three loops moved to a 26475-byte Rust module (`engines/wasm`): the unfilter, the per-pixel loop
@@ -546,7 +546,7 @@ not apply there. Can WASM win in workerd, where jsquash's WASM decoder tied pngj
 `apps/web/perf/diff-wasm/`, a Worker built with the Cloudflare Vite plugin and served by
 `vite preview`. Two workerd processes run side by side: one serves pngjs and the encode-only probe,
 the other serves wasm and an empty request. That way each process's VmHWM belongs to one
-implementation. The pages are the PS-168 run's (seeds 100–102). Every pair is checked equal across
+implementation. The pages are the PS-168 run's (seeds 100 to 102). Every pair is checked equal across
 the two processes before any timing, using every field plus the overlay's sha256. Each request is
 one diff, and the implementations interleave, in reverse order on odd rounds. The figures are
 medians of 15 rounds after 3 warm-up rounds, taken from the client.
@@ -565,7 +565,7 @@ A second 15-round run, right after, landed within 1.5%: long 889.2 against 539.2
 implementations pay the same encode. Taking it out, the long page is about 562 ms for pngjs
 against 202 ms for wasm (−64%).
 
-**Memory.** Both processes idled at 113–122 MB after the pages loaded. After 18 rounds, pngjs's
+**Memory.** Both processes idled at 113 to 122 MB after the pages loaded. After 18 rounds, pngjs's
 workerd was at 2140 MB RSS (VmHWM 2140), and it was still growing: it was 1108 MB after 4 rounds.
 wasm's was at 347 MB RSS (VmHWM 434) after 18 rounds and also after 4. The pngjs process also served
 the encode probe, so its figure covers pngjs's diffs and encodes together. The wasm module's memory
@@ -587,7 +587,7 @@ not use this path.
 
 ### 2026-10-25 · PS-203 · desktop, shared · the self-host's server diff in a Bun sidecar
 
-**The self-host's server diff is 2.5–2.7× faster, and workerd settles at about half the memory.**
+**The self-host's server diff is 2.5 to 2.7× faster, and workerd settles at about half the memory.**
 On PS-200's burst the 50 diffs took 29.7 and 37.9 s in-process and 11.9 and 14.3 s through the
 sidecar; workerd settled at 660 and 691 MB before and 357 and 363 MB after, under PS-200's 665 MB.
 The diff now decodes and encodes with napi-image in a Bun process on loopback instead of pngjs in
@@ -608,16 +608,16 @@ PIXELSLASH_RSS_BURST=50 bunx playwright test rss-burst                          
 
 | Run | diff | branch upload | workerd idle / peak / settled | sidecar idle / peak / settled | finalises |
 | --- | ---: | ---: | --- | --- | ---: |
-| before #1 | 29.7 s | — | 177 / 681 / 660 MB | — | 1 |
-| after #1 | **11.9 s** | — | 178 / 371 / 357 MB | 39 / 317 / 51 MB | 1 |
-| before #2 | 37.9 s | 42.0 s | 181 / 725 / 691 MB | — | 1 |
+| before #1 | 29.7 s | n/a | 177 / 681 / 660 MB | n/a | 1 |
+| after #1 | **11.9 s** | n/a | 178 / 371 / 357 MB | 39 / 317 / 51 MB | 1 |
+| before #2 | 37.9 s | 42.0 s | 181 / 725 / 691 MB | n/a | 1 |
 | after #2 | **14.3 s** | 18.5 s | 178 / 392 / 363 MB | 35 / 343 / 58 MB | 1 |
 
 The first pair's branch upload was not printed (the line gained it after). The load moved between
 runs, so compare each after with the before beside it, not across pairs.
 
 **Memory.** workerd's peak halves because it no longer holds pngjs's decoded rasters and overlays;
-the sidecar holds them instead, and gives them back (settled 51–58 MB). Worst case, both peaks at
+the sidecar holds them instead, and gives them back (settled 51 to 58 MB). Worst case, both peaks at
 once, is about 735 MB against 725 MB before; settled the two together are about 420 MB against
 691 MB. The sidecar's unit is capped at 450M/600M, and `pixelslash-web`'s PS-155 cap is unchanged.
 
@@ -634,7 +634,7 @@ early. **The cut overlaps the waits instead of shortening any:** a pair's Main a
 once, and `capture` (and `check`) shoot up to four pages at once, each in its own browser context with
 its own full settle. Capture-only total −62%, long pair −28%, 5-route pair −39%; the PNGs are byte-equal.
 
-**Question.** PS-190 found capture is 68–93% of a real CLI run but could not say which part. Which part
+**Question.** PS-190 found capture is 68 to 93% of a real CLI run but could not say which part. Which part
 of capture dominates, and can it be cut inside invariant 2?
 
 **Env.** Same machine and fixtures as PS-190: Linux desktop, 12 cores, load average 1.4 to 2.0, browser
@@ -651,12 +651,12 @@ within 37 ms of its median and every after total within 24 ms, so p95 (= max of 
 
 | Run | | total | capture (sum) | settle (sum) | network idle | screenshot | navigate | launch | diff |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| capture only, 10 shots | before | 6630 | 6169 | 5122 | 4867 | 734 | 64 | 40 | — |
-| | after | **2527 (−62%)** | 7088 | 5096 | 4814 | 1329 | 102 | 39 | — |
+| capture only, 10 shots | before | 6630 | 6169 | 5122 | 4867 | 734 | 64 | 40 | n/a |
+| | after | **2527 (−62%)** | 7088 | 5096 | 4814 | 1329 | 102 | 39 | n/a |
 | long pair, 1440 × 6080 | before | 2162 | 1453 | 1021 | 965 | 327 | 13 | 39 | 694 |
 | | after | **1559 (−28%)** | 846 | 1007 | 959 | 507 | 19 | 39 | 705 |
-| 5-route pair, 5 shots | before | 7.4 s | 6.3 s | 5140 | 4855 | 940 | 64 | — | 1.0 s |
-| | after | **4.5 s (−39%)** | 3.4 s | 5135 | 4857 | 1335 | 72 | — | 1.0 s |
+| 5-route pair, 5 shots | before | 7.4 s | 6.3 s | 5140 | 4855 | 940 | 64 | n/a | 1.0 s |
+| | after | **4.5 s (−39%)** | 3.4 s | 5135 | 4857 | 1335 | 72 | n/a | 1.0 s |
 
 The 5-route row is from the stderr line (0.1 s) and the per-route manifests; its index carries the rest.
 
@@ -678,7 +678,7 @@ branch), `fixtures/capture` (6 PNGs) and the PS-190 config (10 PNGs) hashed iden
 manifest, on both, two runs each; the 10-shot capture there went from 6.3 s to 2.2 s.
 
 **Never-settling page.** A page whose top-level `fetch` never answers still fails both a pair and
-`capture` with exit 1 after 8.2–8.6 s ("capture settle exceeded 8000ms"), as before.
+`capture` with exit 1 after 8.2 to 8.6 s ("capture settle exceeded 8000ms"), as before.
 
 ### 2026-10-25 · PS-190 · desktop, shared · where a real run's time goes
 
@@ -726,7 +726,7 @@ under 30 ms of overhead):
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | 5-route pair, 1440 wide, 5 shots, 2 changed | 7348 | 6345 · 86% | 975 · **13%** | not run | 7350 | 1003 |
 | long page pair, 1440 × 6080, 1 shot | 2156 | 1456 · 68% | 691 · **32%** | not run | 2164 | 705 |
-| capture only, 10 shots (5 routes × 2 variants) | 6613 | 6166 · 93% | — (no diff in capture) | not run | 6639 | — |
+| capture only, 10 shots (5 routes × 2 variants) | 6613 | 6166 · 93% | n/a (no diff in capture) | not run | 6639 | n/a |
 
 The capture-only total is 447 ms above its captures: browser launch and app start, which `captureMs` leaves out.
 
@@ -736,9 +736,9 @@ Timings tab and the build page were not opened, because they need a signed-in se
 
 | Build | uploaded shots | queue (before diff) | diff | explain | summary | total (claim to finish) | diff share of queue + total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| A, passed | 1 | 1116 | 28 | — | 4252 | 4357 | 0.5% |
+| A, passed | 1 | 1116 | 28 | n/a | 4252 | 4357 | 0.5% |
 | B, changes | 1 | 2851 | 238 | 3296 | 15092 | 18699 | 1.1% |
-| C, passed | 448 | 17493 | 12512 | — | — | 12733 | 41% |
+| C, passed | 448 | 17493 | 12512 | n/a | n/a | 12733 | 41% |
 | **median (n = 3)** | | 2851 | 238 | 3296 (n = 1) | 9672 (n = 2) | 12733 | |
 | **p95 (n = 3, = max)** | | 17493 | 12512 | 3296 | 15092 | 18699 | |
 | **pooled** | | 21460 | 12778 · **22%** | | | 35789 | 22% of 57249 |
@@ -868,22 +868,22 @@ files and the process start. On the server the same pair is not even read: equal
 | Page | Engine | decode | read | inflate | unfilter | other | pixcmp | aa | regions | overlay | startup | rest | wall |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | phone | ts | 18.7 | 0.0 | 2.3 | 9.3 | 6.8 | 7.8 | 5.9 | 18.6 | 17.2 | 103.1 | 9.0 | 180.5 |
-| phone | cs | 29.0 | 2.3 | 5.4 | 9.1 | 11.2 | 7.6 | 0.3 | 11.9 | – | 24.0 | 8.4 | 81.8 |
+| phone | cs | 29.0 | 2.3 | 5.4 | 9.1 | 11.2 | 7.6 | 0.3 | 11.9 | n/a | 24.0 | 8.4 | 81.8 |
 | desktop | ts | 43.6 | 0.0 | 9.5 | 21.0 | 13.0 | 20.4 | 5.1 | 27.1 | 53.0 | 104.0 | 10.3 | 264.3 |
-| desktop | cs | 45.2 | 2.3 | 8.3 | 20.5 | 13.3 | 11.0 | 0.3 | 16.0 | – | 23.8 | 9.2 | 107.1 |
+| desktop | cs | 45.2 | 2.3 | 8.3 | 20.5 | 13.3 | 11.0 | 0.3 | 16.0 | n/a | 23.8 | 9.2 | 107.1 |
 | long | ts | 242.1 | 0.1 | 62.9 | 125.8 | 50.1 | 125.8 | 21.7 | 127.4 | 321.2 | 102.4 | 39.9 | 986.2 |
-| long | cs | 153.2 | 2.3 | 26.6 | 92.7 | 30.1 | 38.5 | 3.1 | 56.9 | – | 23.6 | 9.4 | 285.2 |
+| long | cs | 153.2 | 2.3 | 26.6 | 92.7 | 30.1 | 38.5 | 3.1 | 56.9 | n/a | 23.6 | 9.4 | 285.2 |
 
 `--decode parallel` (decode is the wall time; the split is the summed work over both files):
 
 | Page | Engine | decode | read | inflate | unfilter | other | pixcmp | aa | regions | overlay | startup | rest | wall |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | phone | ts | 22.3 | 0.0 | 2.4 | 10.6 | 8.0 | 9.4 | 8.4 | 20.1 | 17.7 | 103.9 | 9.0 | 188.5 |
-| phone | cs | 27.1 | 3.1 | 10.1 | 11.3 | 21.7 | 8.6 | 0.3 | 12.1 | – | 24.1 | 8.3 | 81.9 |
+| phone | cs | 27.1 | 3.1 | 10.1 | 11.3 | 21.7 | 8.6 | 0.3 | 12.1 | n/a | 24.1 | 8.3 | 81.9 |
 | desktop | ts | 37.6 | 0.0 | 9.9 | 27.3 | 13.8 | 21.1 | 8.6 | 28.6 | 53.3 | 104.0 | 10.8 | 263.5 |
-| desktop | cs | 36.2 | 3.2 | 13.5 | 21.5 | 24.1 | 11.3 | 0.3 | 16.0 | – | 24.2 | 8.8 | 97.5 |
+| desktop | cs | 36.2 | 3.2 | 13.5 | 21.5 | 24.1 | 11.3 | 0.3 | 16.0 | n/a | 24.2 | 8.8 | 97.5 |
 | long | ts | 137.6 | 0.1 | 69.0 | 133.6 | 43.9 | 129.1 | 21.8 | 125.7 | 321.2 | 101.9 | 27.3 | 874.7 |
-| long | cs | 92.3 | 3.2 | 32.6 | 93.6 | 41.5 | 37.8 | 3.1 | 56.1 | – | 23.7 | 9.2 | 223.5 |
+| long | cs | 92.3 | 3.2 | 32.6 | 93.6 | 41.5 | 37.8 | 3.1 | 56.1 | n/a | 23.7 | 9.2 | 223.5 |
 
 ### 2026-10-24 · ob 1910 · the C# engine against ts
 

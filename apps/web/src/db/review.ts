@@ -318,7 +318,7 @@ export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> 
 }
 
 /**
- * Accept every shot of the build, recording who and when. A rejection is never undone — a
+ * Accept every shot of the build, recording who and when. A rejection is never undone: a
  * rejected build is not reviewable at all, so accepting cannot mask it; the build stays failed
  * until a new build arrives. The acceptance reaches the other builds' shots that carry the same
  * change (`decideGroup`).

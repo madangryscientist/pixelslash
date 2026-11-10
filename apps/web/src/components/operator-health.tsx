@@ -36,7 +36,7 @@ function WindowSection({
   return (
     <HealthSection
       title={w.label}
-      note={`Builds that ended since ${formatDateTime(w.since)}${capped ? ", the newest only (the read is capped)" : ""}. Times are median / 95th percentile / 99th percentile. The middle figure is the slowest when under ${P95_MIN_BUILDS} builds; the last reads — when under ${P99_MIN_BUILDS}. Each cell names its own n.`}
+      note={`Builds that ended since ${formatDateTime(w.since)}${capped ? ", the newest only (the read is capped)" : ""}. Times are median / 95th percentile / 99th percentile. The middle figure is the slowest when under ${P95_MIN_BUILDS} builds; the last reads n/a when under ${P99_MIN_BUILDS}. Each cell names its own n.`}
       testId={`admin-window-${w.key}`}
     >
       <Text as="p" data-testid={`admin-${w.key}-finished`}>

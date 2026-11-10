@@ -33,7 +33,7 @@ function Cell({
   if (!stats)
     return (
       <TableCell tone="muted" data-testid={`timings-${step}`}>
-        —
+        n/a
       </TableCell>
     );
   return (

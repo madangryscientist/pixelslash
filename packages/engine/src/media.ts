@@ -9,7 +9,7 @@ export function mediaWarning(route: Route, variant: Variant, m: MediaBox): strin
   const fix = route.storybook
     ? "mark it with data-pixelslash-ignore in the story"
     : "add an exclusion zone (route.ignore) for this shot";
-  return `warning: <${m.tag}> at ${m.x},${m.y} ${m.width}x${m.height} on ${route.name} (${variant.name}) — media renders unreliably; ${fix}`;
+  return `warning: <${m.tag}> at ${m.x},${m.y} ${m.width}x${m.height} on ${route.name} (${variant.name}): media renders unreliably; ${fix}`;
 }
 
 /**

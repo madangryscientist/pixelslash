@@ -4,9 +4,22 @@
   "sourceRoot": "scripts",
   "projectType": "library",
   "targets": {
-    "typecheck": { "command": "tsc -p scripts/tsconfig.json" },
+    "typecheck": {
+      "command": "tsc -p scripts/tsconfig.json"
+    },
     "lint": {
-      "command": "oxlint --type-aware --deny-warnings scripts && bun scripts/check-slop.ts scripts"
+      "command": "oxlint --type-aware --deny-warnings scripts && bun scripts/check-slop.ts scripts",
+      "dependsOn": ["check-dashes"]
+    },
+    "check-dashes": {
+      "command": "bun scripts/check-dashes.ts",
+      "cache": false
+    },
+    "test": {
+      "command": "bun --bun vitest run",
+      "options": {
+        "cwd": "scripts"
+      }
     }
   }
 }

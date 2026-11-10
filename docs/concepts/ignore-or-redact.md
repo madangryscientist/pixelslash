@@ -132,7 +132,7 @@ A mask paints the area on both sides, so a mask of the same size in the same pla
 A `<video>` or similar element renders unreliably, so PixelSlash warns about it:
 
 ```
-warning: <video> at 580,36 112x118 on overview (desktop) — media renders unreliably; add an exclusion zone (route.ignore) for this shot
+warning: <video> at 580,36 112x118 on overview (desktop): media renders unreliably; add an exclusion zone (route.ignore) for this shot
 ```
 
 Nothing is paused for you. A medium that sits wholly inside an ignored area does not warn.

@@ -128,7 +128,7 @@ function a11yItem(r: CompareRow, id: string): string {
   const head = `<li id="${esc(`${id}-a11y`)}">${esc(r.name)} <span class="shot">${esc(r.shot)}</span>`;
   if (d.state === "unbaselined") {
     const found = d.found.length > 0 ? a11yItems(d.found) : "";
-    return `${head} — <span class="warn">no Main scan to compare against: ${d.found.length} found, none called new</span>${found}</li>`;
+    return `${head}: <span class="warn">no Main scan to compare against: ${d.found.length} found, none called new</span>${found}</li>`;
   }
   const fresh =
     d.fresh.length > 0 ? `<h3>New on Branch (${d.fresh.length})</h3>${a11yItems(d.fresh)}` : "";
@@ -140,7 +140,7 @@ function a11yItem(r: CompareRow, id: string): string {
     d.omitted > 0
       ? ` <span class="warn">(${d.omitted} past the cap were not kept, so a new one may be hidden)</span>`
       : "";
-  const none = d.fresh.length === 0 && d.already.length === 0 ? " — no violations" : "";
+  const none = d.fresh.length === 0 && d.already.length === 0 ? ": no violations" : "";
   return `${head}${none}${cut}${fresh}${already}</li>`;
 }
 
@@ -225,9 +225,9 @@ export function renderCompareIndex(input: {
     : "";
   const flaky = (r: CompareRow) =>
     r.flaky
-      ? ` — <span class="warn">flaky: ${r.flaky.differed} of ${r.flaky.runs} captures differed</span>`
+      ? `, <span class="warn">flaky: ${r.flaky.differed} of ${r.flaky.runs} captures differed</span>`
       : "";
-  const px = (r: CompareRow) => ` — ${r.changedPixels} changed pixels${flaky(r)}`;
+  const px = (r: CompareRow) => `: ${r.changedPixels} changed pixels${flaky(r)}`;
   const anchors = anchorsOf(input);
   const lists = [
     compareList("Changed", changed, anchors, px),
@@ -237,7 +237,7 @@ export function renderCompareIndex(input: {
       "Not compared",
       failed,
       anchors,
-      (r) => ` — <span class="warn">${esc(r.error ?? "")}</span>`,
+      (r) => `: <span class="warn">${esc(r.error ?? "")}</span>`,
     ),
     compareList("Unchanged", unchanged, anchors, () => ""),
     a11ySection(input),

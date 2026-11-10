@@ -112,7 +112,7 @@ function BoxTrail({ trail }: { trail: Box[] }) {
               @{b.by}, {formatDateTime(b.at)}
             </TableCell>
             <TableCell>
-              {b.cleared ? `@${b.cleared.by}, ${formatDateTime(b.cleared.at)}` : "—"}
+              {b.cleared ? `@${b.cleared.by}, ${formatDateTime(b.cleared.at)}` : "n/a"}
             </TableCell>
           </TableRow>
         ))}

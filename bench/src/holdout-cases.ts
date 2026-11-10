@@ -213,7 +213,7 @@ const INBOX: PageSpec = {
   word: recipeJs(setText("#m3 .subject", "Re: roadmap review, updated notes attached"), [
     "text:#m3 .subject",
   ]),
-  number: recipeJs(setText("#range-count", "1–6"), ["text:#range-count"]),
+  number: recipeJs(setText("#range-count", "1\u20136"), ["text:#range-count"]),
   missingIcon: recipe("#icon-m2{visibility:hidden}", ["#icon-m2"]),
   missingRow: recipe("#mails #m3{display:none}", ["#mails", "#foot"]),
   iconSwap: recipeJs(setSvg("#icon-m4", CROSS), ["#icon-m4"]),

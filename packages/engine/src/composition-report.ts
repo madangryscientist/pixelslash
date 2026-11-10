@@ -138,7 +138,7 @@ export function renderGaps(list: GapsList, sizes: Sizes): string {
         .filter(Boolean)
         .join(" ");
       const places = g.places.map((p) => placeItem(p, sizes, "gap")).join("\n        ");
-      return `<li class="group"><p class="what">${GAP_LABEL[g.kind]}: ${what} — ${g.places.length} ${g.places.length === 1 ? "place" : "places"}</p>
+      return `<li class="group"><p class="what">${GAP_LABEL[g.kind]}: ${what} (${g.places.length} ${g.places.length === 1 ? "place" : "places"})</p>
       <p class="reason">${esc(g.reason)}</p>
       <ul>
         ${places}
@@ -146,7 +146,7 @@ export function renderGaps(list: GapsList, sizes: Sizes): string {
     })
     .join("\n    ");
   const special = list.special
-    .map((s) => placeItem(s, sizes, "special", ` — ${esc(s.reason)}`))
+    .map((s) => placeItem(s, sizes, "special", `: ${esc(s.reason)}`))
     .join("\n      ");
   return `<!doctype html>
 <html lang="en">

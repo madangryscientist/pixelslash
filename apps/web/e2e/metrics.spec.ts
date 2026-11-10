@@ -46,7 +46,7 @@ test("a diffed build states its wall time, counts and compare time, and the bran
   await expect(card.getByTestId("run-cache-hits-value")).toHaveText("1");
   await expect(card.getByTestId("run-unmeasured-value")).toHaveText("0");
   await expect(card.getByTestId("run-compare-value")).toContainText("2 snapshots · 1 compared");
-  await expect(card.getByTestId("run-compare-value")).toContainText("p99 — (n = 1)");
+  await expect(card.getByTestId("run-compare-value")).toContainText("p99 n/a (n = 1)");
   await expect(card.getByTestId("run-compare-source")).toContainText("stored by the server");
   // A feature branch is never auto-accepted, the CLI sent no re-captures, no model ran.
   await expect(card.getByTestId("run-auto-accepted")).toHaveCount(0);

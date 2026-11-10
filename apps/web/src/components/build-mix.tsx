@@ -71,7 +71,7 @@ export function ToReview({
   build: MixBuild | null;
   defaultBranch: string;
 }) {
-  if (!build) return <Text tone="muted">—</Text>;
+  if (!build) return <Text tone="muted">n/a</Text>;
   if (UNMEASURED.has(build.status)) {
     return (
       <Text tone="muted" data-testid="to-review">

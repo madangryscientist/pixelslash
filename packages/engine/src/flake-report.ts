@@ -14,7 +14,7 @@ function flakySection({ entry, record, files }: FlakyShot): string {
   const figures = runs
     .map(({ run, file }) => {
       const differed = record.differed.includes(run);
-      const caption = run === 1 ? "run 1 (uploaded)" : `run ${run}${differed ? " — differed" : ""}`;
+      const caption = run === 1 ? "run 1 (uploaded)" : `run ${run}${differed ? ", differed" : ""}`;
       return `<figure><img src="${esc(file)}" alt="${esc(caption)}"><figcaption>${esc(caption)}</figcaption></figure>`;
     })
     .join("");
@@ -28,7 +28,7 @@ function flakySection({ entry, record, files }: FlakyShot): string {
   return `<section>
     <h2>${esc(entry.name)} <span class="shot">${esc(shotLabel(entry))}</span></h2>
     <p class="flaky">flaky: ${n} of ${record.runs} runs differed</p>
-    <p>policy: <b>${esc(record.policy)}</b> — sent with the shot; what it does to the build is the server's call.</p>
+    <p>policy: <b>${esc(record.policy)}</b>: sent with the shot; what it does to the build is the server's call.</p>
     <div class="runs">${figures}</div>
     ${regions ? `<p>Where the runs differed from run 1, in image px:</p><ul>${regions}</ul>` : ""}
   </section>`;
@@ -38,7 +38,7 @@ function shotList(entries: { entry: SnapshotEntry; note?: string }[]): string {
   return entries
     .map(
       ({ entry, note }) =>
-        `<li>${esc(entry.name)} <span class="shot">${esc(shotLabel(entry))}</span>${note ? ` — ${esc(note)}` : ""}</li>`,
+        `<li>${esc(entry.name)} <span class="shot">${esc(shotLabel(entry))}</span>${note ? `: ${esc(note)}` : ""}</li>`,
     )
     .join("");
 }

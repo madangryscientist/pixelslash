@@ -53,7 +53,7 @@ export function HealthSection({
 }
 
 export function StepCell({ stats }: { stats: StepStats | null }) {
-  if (!stats) return <TableCell tone="muted">—</TableCell>;
+  if (!stats) return <TableCell tone="muted">n/a</TableCell>;
   return (
     <TableCell numeric secondary={plural(stats.n, "build")}>
       {formatDuration(stats.p50, { exact: true })} <Text tone="muted">/</Text>{" "}
@@ -65,7 +65,7 @@ export function StepCell({ stats }: { stats: StepStats | null }) {
         </>
       )}{" "}
       <Text tone="muted">/</Text>{" "}
-      {stats.p99 === null ? "—" : formatDuration(stats.p99, { exact: true })}
+      {stats.p99 === null ? "n/a" : formatDuration(stats.p99, { exact: true })}
     </TableCell>
   );
 }

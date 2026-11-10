@@ -45,13 +45,13 @@ function Times({ build }: { build: BuildCompares }) {
         {times.tail === "max" ? `${ms(times.max)} max` : ms(times.p95)}
       </TableCell>
       <TableCell numeric align="end" secondary={n}>
-        {times.p99 === null ? "—" : ms(times.p99)}
+        {times.p99 === null ? "n/a" : ms(times.p99)}
       </TableCell>
     </>
   );
 }
 
-/** `p50 / p95 / p99 · n`: the p95 reads max under its gate and the p99 a dash under its own. */
+/** `p50 / p95 / p99 · n`: the p95 reads max under its gate and the p99 n/a under its own. */
 function Figures({
   stats,
   unit,
@@ -66,13 +66,13 @@ function Figures({
   if (!stats)
     return (
       <Text tone="muted" data-testid={testId}>
-        — · n=0 {noun}
+        n/a · n=0 {noun}
       </Text>
     );
   return (
     <Text data-testid={testId}>
       {unit(stats.p50)} / {unit(stats.tail === "max" ? stats.max : stats.p95)}
-      {stats.tail === "max" && " max"} / {stats.p99 === null ? "—" : unit(stats.p99)} · n=
+      {stats.tail === "max" && " max"} / {stats.p99 === null ? "n/a" : unit(stats.p99)} · n=
       {formatNumber(stats.n)} {noun}
     </Text>
   );
@@ -161,7 +161,7 @@ export function BuildComparesTable({
       <Caption as="p">
         A cache hit has the same bytes as its baseline: it is a snapshot, no compare ran, and it is
         in no time. n counts the compares with a time: the server's, or else what the CLI sent. p95
-        reads max under {P95_MIN_BUILDS} and p99 reads — under {formatNumber(P99_MIN_COMPARES)}.
+        reads max under {P95_MIN_BUILDS} and p99 reads n/a under {formatNumber(P99_MIN_COMPARES)}.
         {cut}
       </Caption>
     </>

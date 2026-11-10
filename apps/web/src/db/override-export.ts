@@ -49,7 +49,7 @@ function configVariant(v: VariantKey): ConfigVariant {
  * The overrides and boxes as config: merge each route's `diff`, `ignore` and `variants` into the
  * route (or story) of that name. A variant is named by the config's default
  * (`chromium-1280x720-light`); one the config already names differently is renamed to match.
- * Uploaded with no overrides, it measures as they do — except where the config already sets the
+ * Uploaded with no overrides, it measures as they do, except where the config already sets the
  * same key on that variant, which beats a route's value: move it to the variant, or drop the
  * config's. A box is in image px, and a config rect in CSS px: the same at a deviceScaleFactor of 1.
  */

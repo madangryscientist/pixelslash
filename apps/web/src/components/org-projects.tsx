@@ -94,7 +94,7 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
         <BuildCell project={project} />
       </TableCell>
       <TableCell>
-        {latest ? <MixBar counts={latest.counts} /> : <Text tone="muted">—</Text>}
+        {latest ? <MixBar counts={latest.counts} /> : <Text tone="muted">n/a</Text>}
       </TableCell>
       <TableCell>
         <ToReview build={latest} defaultBranch={project.defaultBranch} />

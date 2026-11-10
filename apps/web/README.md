@@ -1,4 +1,4 @@
-# apps/web — the PixelSlash review app
+# apps/web: the PixelSlash review app
 
 TanStack Start on Cloudflare Workers, D1 via Drizzle, R2 for the shots, GitHub sign-in. CI uploads
 builds with `pixelslash upload`; people review them here.
@@ -476,7 +476,7 @@ options and ignore areas, and answers with the result and the overlay, so the ve
 the regions and the overlay's bytes are the same as in-process (`src/diff/sidecar.test.ts` holds
 this on a `bench/corpus` pair and the e2e fixtures). It stays because it keeps a burst's diffs
 out of `pixelslash-web`'s memory: on the RSS burst (`e2e/rss-burst.spec.ts`, workerd and vite together)
-PS-210 measured the in-process diff at a 1519–1588 MB peak and 1124 MB with the sidecar.
+PS-210 measured the in-process diff at a 1519 to 1588 MB peak and 1124 MB with the sidecar.
 
 `DIFF_SIDECAR_URL` names it, in `wrangler.jsonc`'s `env.e2e` vars only, so the CT build and the
 production e2e run use it (that run starts a sidecar of its own on a free port;

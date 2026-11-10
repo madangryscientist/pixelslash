@@ -229,7 +229,7 @@ export function renderIndex(rows: RouteRow[], pixel: boolean): string {
   const items = rows
     .map((r) => {
       const status = routeStatus(r, pixel);
-      return `<li><a href="${esc(r.slug)}/report.html">${esc(r.path)}</a> — ${esc(status)}</li>`;
+      return `<li><a href="${esc(r.slug)}/report.html">${esc(r.path)}</a>: ${esc(status)}</li>`;
     })
     .join("\n");
   const already = rows.reduce((n, r) => n + r.already, 0);
