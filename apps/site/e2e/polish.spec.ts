@@ -124,3 +124,35 @@ for (const scheme of ["light", "dark"] as const) {
     }
   });
 }
+
+/*
+ * The home install block shows every command whole (PS-371). It was a scroll box, so the second
+ * command was cut at 1440 with nothing to show it scrolled. Now no element in the block scrolls
+ * sideways, at each width, in both themes. The light and dark runs are kept because the ticket asks
+ * for both, though colour cannot change where a line wraps.
+ */
+
+for (const width of [1440, 1024, 390] as const) {
+  for (const scheme of ["light", "dark"] as const) {
+    test.describe(`install block at ${width}px, ${scheme}`, () => {
+      test.use({ viewport: { width, height: 900 }, colorScheme: scheme });
+      test.skip(({ isMobile }) => isMobile, "the desktop project runs every width");
+
+      test("no command is cut or scrolls sideways", async ({ page }) => {
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await page.goto("/", { waitUntil: "networkidle" });
+        const pre = page.locator("pre", { hasText: "npm i -D @hackcove/pixelslash" });
+        await pre.scrollIntoViewIfNeeded();
+        const measure = await pre.evaluate((el) => {
+          const block = el.closest("figure");
+          if (!block) throw new Error("the install command has no figure");
+          const scrolled = [block, ...Array.from(block.querySelectorAll("*"))].filter(
+            (node) => node.scrollWidth > node.clientWidth + 1,
+          ).length;
+          return { scrolled };
+        });
+        expect(measure.scrolled, `${width} ${scheme}: elements that scroll sideways`).toBe(0);
+      });
+    });
+  }
+}

@@ -175,7 +175,7 @@ function Checkout(): ReactNode {
             </p>
           </div>
           <div className="home-reveal min-w-0">
-            <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} overflow="scroll" copy />
+            <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} overflow="wrap" copy />
           </div>
         </div>
       </Container>

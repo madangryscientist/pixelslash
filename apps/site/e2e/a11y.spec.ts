@@ -25,12 +25,19 @@ for (const scheme of ["light", "dark"] as const) {
 test("a code block too wide for its box takes keyboard focus, and one that fits does not", async ({
   page,
 }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
-  const scrollers = page.locator('main [class*="overflow-x-auto"]:not(:has(a[href], button))');
-  expect(await scrollers.count()).toBeGreaterThan(0);
-  for (const scroller of await scrollers.all()) {
-    const overflows = await scroller.evaluate((node) => node.scrollWidth > node.clientWidth);
-    if (overflows) await expect(scroller).toHaveAttribute("tabindex", "0");
-    else await expect(scroller).not.toHaveAttribute("tabindex");
+  test.setTimeout(300_000);
+  // The home's install block wraps now (PS-371), so the home may carry no scroller; the check runs
+  // over every page and asserts that at least one scroller exists across the site.
+  let scrollers = 0;
+  for (const path of PATHS) {
+    await page.goto(path, { waitUntil: "networkidle" });
+    const found = page.locator('main [class*="overflow-x-auto"]:not(:has(a[href], button))');
+    for (const scroller of await found.all()) {
+      scrollers += 1;
+      const overflows = await scroller.evaluate((node) => node.scrollWidth > node.clientWidth);
+      if (overflows) await expect(scroller, path).toHaveAttribute("tabindex", "0");
+      else await expect(scroller, path).not.toHaveAttribute("tabindex");
+    }
   }
+  expect(scrollers).toBeGreaterThan(0);
 });
