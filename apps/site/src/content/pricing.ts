@@ -30,7 +30,7 @@ export const FACTS = [
   },
   {
     title: "Paid hosting is planned, not available",
-    icon: "ci",
+    icon: "speed",
     body: "A paid service run by us is planned. It is not on sale: there is nothing to pay.",
   },
 ] as const;

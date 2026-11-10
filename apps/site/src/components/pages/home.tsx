@@ -12,7 +12,7 @@ import { REPO_PUBLIC, REPO_URL } from "#/content/links";
  */
 
 /** What the CLI does, each one a section of docs/cli.md; the anchors are checked by the smoke test. */
-const FEATURES = [
+export const FEATURES = [
   {
     title: "Two pages, one diff",
     body: "Shoot Main and Branch with Playwright, or hand it PNGs you already have. It writes a report.html that shows what changed.",
@@ -41,13 +41,13 @@ const FEATURES = [
     title: "A review server",
     body: "pixelslash upload sends shots to a PixelSlash server you run, which holds the build for a person to review and reports a GitHub check.",
     href: "/docs/upload#uploading-to-a-server",
-    icon: "review",
+    icon: "self-host",
   },
   {
     title: "A design-system judge",
     body: "--ds checks each shot against your component rasters with a vision model. With no judge installed it says so and invents nothing.",
     href: "/docs/judge",
-    icon: "theme",
+    icon: "review",
   },
 ] as const;
 
