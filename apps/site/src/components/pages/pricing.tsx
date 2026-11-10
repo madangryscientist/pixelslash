@@ -18,7 +18,7 @@ import { ACTION, COMMITMENT, FACTS, LEAD, STATEMENT } from "../../content/pricin
 export function PricingPage(): ReactNode {
   return (
     <ProseLayout
-      width="wide"
+      width="full"
       title={<Display as="span">{STATEMENT}</Display>}
       subtitle={LEAD}
       gap="lg"
