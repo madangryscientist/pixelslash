@@ -1,14 +1,16 @@
+import { type Token, lexer } from "marked";
 import { use } from "react";
-import { plainText } from "./doc-text.ts";
+import { CLI_PAGES } from "virtual:cli-pages";
+import { marked, plainText } from "./doc-text.ts";
 import { DOC_PAGES, type DocPageDef, findPage } from "./docs-map.ts";
-import { type Doc, parseDoc } from "./markdown.tsx";
+import { type Doc, type Heading, parseDoc } from "./markdown.tsx";
 
 /*
  * The docs pages' documents, read from the repo at build time. A page renders what the file says
  * today; it never keeps a copy of its own, so the site cannot drift from the docs.
  *
- * Each page's text is its own chunk, loaded when that page is: the docs index and a page that is
- * a file of its own do not carry every other page's text, nor lex it as they hydrate (PS-357).
+ * Each page's text is its own chunk, loaded when that page is: no page carries another page's
+ * text, nor lexes it as it hydrates (PS-357). A page cut from docs/cli.md is cut at build time.
  * The server renders the whole page, since the route's loader has the document before the render.
  */
 
@@ -51,15 +53,30 @@ const FILE_SOURCES: Record<DocFile, () => Promise<{ default: string }>> = {
     import("../../../../docs/help/coming-from-chromatic.md?raw"),
 };
 
+/** A page cut from cli.md: its headings keep the anchors GitHub gives them in the whole file. */
+async function parseCliPage(page: DocPageDef): Promise<Doc> {
+  const load = CLI_PAGES[page.slug];
+  if (load === undefined) throw new Error(`docs: page ${page.slug} has no sections`);
+  const { MARKDOWN, IDS } = await load();
+  if (page.kind === "cli-index") return parseDoc(MARKDOWN, "docs/cli.md", page.slug);
+  const tokens = marked(lexer(MARKDOWN));
+  const ids = new WeakMap<Token, string>();
+  const headings: Heading[] = [];
+  for (const token of tokens) {
+    if (token.type !== "heading") continue;
+    const id = IDS[headings.length] ?? "";
+    ids.set(token, id);
+    headings.push({ depth: token.depth, text: plainText(token.tokens), id });
+  }
+  return { source: "docs/cli.md", title: page.title, tokens, headings, ids, page: page.slug };
+}
+
 async function parsePage(slug: string): Promise<Doc> {
   const page = findPage(slug);
   if (page === undefined) throw new Error(`docs: no page ${slug}`);
-  if (page.file !== undefined) {
-    const { default: markdown } = await FILE_SOURCES[page.file]();
-    return parseDoc(markdown, page.file, slug);
-  }
-  const { cliDocOf } = await import("./cli-docs.ts");
-  return cliDocOf(page);
+  if (page.file === undefined) return parseCliPage(page);
+  const { default: markdown } = await FILE_SOURCES[page.file]();
+  return parseDoc(markdown, page.file, slug);
 }
 
 /** A load React's `use` reads at once when it has settled: it never suspends a page it has. */
@@ -77,7 +94,8 @@ export function loadDoc(slug: string): Promise<Doc> {
       loading.status = "fulfilled";
       loading.value = doc;
     },
-    () => undefined,
+    // A chunk that failed to load (a dropped connection, a deploy since) is tried again next time.
+    () => LOADS.delete(slug),
   );
   LOADS.set(slug, loading);
   return loading;
