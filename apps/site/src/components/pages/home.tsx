@@ -1,4 +1,4 @@
-import { Button, Card, CardGrid, CodeBlock, Pill, TextLink } from "@hackcove/ui-react";
+import { Button, Card, CardGrid, CodeBlock, Container, Pill, TextLink } from "@hackcove/ui-react";
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
 import { Demo } from "#/components/pages/home-parts";
@@ -122,83 +122,91 @@ function Steps(): ReactNode {
 
 function Features(): ReactNode {
   return (
-    <section className="px-5 py-14">
-      <div className="mx-auto max-w-6xl">
-        <h2 className="home-reveal text-center text-3xl font-bold tracking-tight md:text-5xl">
-          What it does
-        </h2>
-        <div className="home-cards mt-12">
-          <CardGrid columns={3}>
-            {FEATURES.map((feature) => (
-              // A one-cell grid, so the card fills the row's height.
-              <div key={feature.title} className="home-reveal grid">
-                <Card href={feature.href} icon={feature.icon} size="lg">
-                  <h3 className="text-lg font-semibold">{feature.title}</h3>
-                  <p className="mt-2 text-(--home-sub)">{feature.body}</p>
-                  <span
-                    className="home-more mt-4 inline-block text-sm font-semibold"
-                    aria-hidden="true"
-                  >
-                    Read more →
-                  </span>
-                </Card>
-              </div>
-            ))}
-          </CardGrid>
+    <section className="py-14">
+      <Container>
+        <div data-testid="home-column">
+          <h2 className="home-reveal text-center text-3xl font-bold tracking-tight md:text-5xl">
+            What it does
+          </h2>
+          <div className="home-cards mt-12">
+            <CardGrid columns={3}>
+              {FEATURES.map((feature) => (
+                // A one-cell grid, so the card fills the row's height.
+                <div key={feature.title} className="home-reveal grid">
+                  <Card href={feature.href} icon={feature.icon} size="lg">
+                    <h3 className="text-lg font-semibold">{feature.title}</h3>
+                    <p className="mt-2 text-(--home-sub)">{feature.body}</p>
+                    <span
+                      className="home-more mt-4 inline-block text-sm font-semibold"
+                      aria-hidden="true"
+                    >
+                      Read more →
+                    </span>
+                  </Card>
+                </div>
+              ))}
+            </CardGrid>
+          </div>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 function Checkout(): ReactNode {
   return (
-    <section className="px-5 py-14">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[2fr_3fr]">
-        <div className="home-reveal">
-          <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Install it from npm</h2>
-          <p className="mt-5 text-lg text-(--home-sub)">
-            It is on npm as <code>@hackcove/pixelslash</code>, and the command is{" "}
-            <code>pixelslash</code>. The CLI runs on <TextLink href="https://bun.sh">Bun</TextLink>,
-            so Bun must be on your PATH; <code>npx</code> starts it. PNG mode needs no browser; for
-            URL capture run <code>install-browser</code> once per machine.
-          </p>
-          <p className="mt-4 text-(--home-sub)">
-            To run it from a clone instead, <code>bun install</code> and then{" "}
-            <code>bun run pixelslash -- …</code> in a checkout of{" "}
-            {REPO_PUBLIC ? <TextLink href={REPO_URL}>the repository</TextLink> : "the repository"}.
-          </p>
+    <section className="py-14">
+      <Container>
+        <div data-testid="home-column" className="grid items-center gap-10 lg:grid-cols-[2fr_3fr]">
+          <div className="home-reveal">
+            <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Install it from npm</h2>
+            <p className="mt-5 text-lg text-(--home-sub)">
+              It is on npm as <code>@hackcove/pixelslash</code>, and the command is{" "}
+              <code>pixelslash</code>. The CLI runs on{" "}
+              <TextLink href="https://bun.sh">Bun</TextLink>, so Bun must be on your PATH;{" "}
+              <code>npx</code> starts it. PNG mode needs no browser; for URL capture run{" "}
+              <code>install-browser</code> once per machine.
+            </p>
+            <p className="mt-4 text-(--home-sub)">
+              To run it from a clone instead, <code>bun install</code> and then{" "}
+              <code>bun run pixelslash -- …</code> in a checkout of{" "}
+              {REPO_PUBLIC ? <TextLink href={REPO_URL}>the repository</TextLink> : "the repository"}
+              .
+            </p>
+          </div>
+          <div className="home-reveal min-w-0">
+            <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} overflow="scroll" copy />
+          </div>
         </div>
-        <div className="home-reveal min-w-0">
-          <CodeBlock label="bash" language="bash" lines={[...COMMANDS]} overflow="scroll" copy />
-        </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 function Local(): ReactNode {
   return (
-    <section className="px-5 pt-14 pb-20">
-      <div className="home-reveal home-band mx-auto max-w-6xl">
-        <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
-          Your pixels stay <span className="home-gradient-text">on your machine.</span>
-        </h2>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-(--home-sub)">
-          A page shot leaves the machine only when you ask. An upload goes only to the server the
-          project names, which today is one you run; a service run by us is planned. A hosted judge
-          you name gets the shots it judges. On that server, a project's own AI model, if you set
-          one, gets the three crops of a changed region, never a whole shot.
-        </p>
-        <div className="mt-9 flex flex-wrap justify-center gap-3">
-          <Button href="/security" variant="outline">
-            Security
-          </Button>
-          <Button href="/how-it-works">
-            How it works <span aria-hidden="true">→</span>
-          </Button>
+    <section className="pt-14 pb-20">
+      <Container>
+        <div data-testid="home-column" className="home-reveal home-band">
+          <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
+            Your pixels stay <span className="home-gradient-text">on your machine.</span>
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-(--home-sub)">
+            A page shot leaves the machine only when you ask. An upload goes only to the server the
+            project names, which today is one you run; a service run by us is planned. A hosted
+            judge you name gets the shots it judges. On that server, a project's own AI model, if
+            you set one, gets the three crops of a changed region, never a whole shot.
+          </p>
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <Button href="/security" variant="outline">
+              Security
+            </Button>
+            <Button href="/how-it-works">
+              How it works <span aria-hidden="true">→</span>
+            </Button>
+          </div>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

@@ -261,6 +261,7 @@ export function DocsIndexPage(): ReactNode {
       {/* `/docs#anchor` links from before the split land on the page that holds the anchor. */}
       <script dangerouslySetInnerHTML={{ __html: OLD_ANCHOR_SCRIPT }} />
       <ProseLayout
+        width="full"
         title="Docs"
         subtitle="Install PixelSlash, run a first compare, then look up whatever you are doing next."
       >
