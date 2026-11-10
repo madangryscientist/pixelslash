@@ -35,15 +35,21 @@ for (const viewport of WIDTHS) {
     test.use({ viewport, colorScheme: "light" });
     test.skip(({ isMobile }) => isMobile, "the desktop project only");
 
-    test("/pricing: the facts and the commitment run from the header's left to its right", async ({
+    test("/pricing: the facts run from the header's left to its right, the commitment ends at its right", async ({
       page,
     }) => {
       const { left, right } = await open(page, "/pricing");
-      for (const id of ["pricing-facts", "commitment"]) {
-        const found = await box(page.getByTestId(id));
-        expect(Math.abs(found.x - left), `${id} left`).toBeLessThanOrEqual(TOLERANCE);
-        expect(Math.abs(found.x + found.w - right), `${id} right`).toBeLessThanOrEqual(TOLERANCE);
-      }
+      const facts = await box(page.getByTestId("pricing-facts"));
+      expect(Math.abs(facts.x - left), "pricing-facts left").toBeLessThanOrEqual(TOLERANCE);
+      expect(Math.abs(facts.x + facts.w - right), "pricing-facts right").toBeLessThanOrEqual(
+        TOLERANCE,
+      );
+      // The commitment sits beside the headline now, so only its right edge is on the column.
+      const commitment = await box(page.getByTestId("commitment"));
+      expect(commitment.x, "commitment left is inside the column").toBeGreaterThan(left);
+      expect(Math.abs(commitment.x + commitment.w - right), "commitment right").toBeLessThanOrEqual(
+        TOLERANCE,
+      );
     });
 
     test("/docs: the index cards end at the header's right", async ({ page }) => {
