@@ -37,11 +37,10 @@ test('home: "Read more" clears 7:1 in both themes', async ({ page }) => {
   }
 });
 
-test("every copy button on the site copies its block", async ({ page, context }) => {
-  test.slow();
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  let buttons = 0;
-  for (const path of PATHS) {
+// One test per path, each on its own budget, so the check does not grow with the page count (PS-382).
+for (const path of PATHS) {
+  test(`${path}: every copy button copies its block`, async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto(path, { waitUntil: "networkidle" });
     // By position, not by name: a copied button is named "copied" and would drop out of a name match.
     const all = page.locator("figure:has(pre) button");
@@ -55,11 +54,25 @@ test("every copy button on the site copies its block", async ({ page, context })
       const copied = await page.evaluate(() => navigator.clipboard.readText());
       const shown = (await block.locator("pre").first().innerText()).replace(/\s+/g, " ").trim();
       expect(copied.replace(/\s+/g, " ").trim(), `${path} #${index}`).toBe(shown);
-      buttons += 1;
     }
-  }
-  expect(buttons).toBeGreaterThan(20);
-  // The pages that carry their own blocks have one.
+  });
+}
+
+test("the site carries more than 20 copy buttons in total", async ({ context }) => {
+  // Counted without clicking, a page at a time in parallel, so it stays well inside the default budget.
+  const counts = await Promise.all(
+    PATHS.map(async (path) => {
+      const tab = await context.newPage();
+      await tab.goto(path, { waitUntil: "networkidle" });
+      const count = await tab.locator("figure:has(pre) button").count();
+      await tab.close();
+      return count;
+    }),
+  );
+  expect(counts.reduce((sum, count) => sum + count, 0)).toBeGreaterThan(20);
+});
+
+test("the pages that carry their own blocks have a copy button", async ({ page }) => {
   for (const path of ["/", "/how-it-works"]) {
     await page.goto(path, { waitUntil: "networkidle" });
     await expect(page.getByRole("button", { name: "copy", exact: true })).not.toHaveCount(0);
