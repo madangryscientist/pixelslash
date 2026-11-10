@@ -283,6 +283,13 @@ body:has([data-art]) {
   overflow: hidden;
 }
 
+/* Everything drawn in shot coordinates lives in the stage, which is always the shot's 16:9, so each
+   percentage inside it keeps its meaning. It fills the frame; a phone frames a crop (below). */
+.home-stage {
+  position: absolute;
+  inset: 0;
+}
+
 .home-demo img {
   position: absolute;
   inset: 0;
@@ -343,9 +350,22 @@ body:has([data-art]) {
   box-shadow: 0 4px 14px -4px var(--home-shadow);
 }
 
+/* A phone frames the part of the shot that holds the changes (--crop-* are shot pixels, written from
+   hero.json in Demo). The stage is the whole shot, scaled so the crop fills the frame and shifted so
+   the crop's corner meets the frame's. The chips ride the top corners: at the bottom left the Branch
+   chip would cover the storage bar's region. */
 @media (max-width: 640px) {
+  .home-stage {
+    inset: auto;
+    width: calc(100% * var(--shot-w) / var(--crop-w));
+    height: calc(100% * var(--shot-h) / var(--crop-h));
+    left: calc(-100% * var(--crop-x) / var(--crop-w));
+    top: calc(-100% * var(--crop-y) / var(--crop-h));
+  }
+
   .home-chip {
-    bottom: 0.4rem;
+    top: 0.4rem;
+    bottom: auto;
     padding: 0.1rem 0.4rem;
     font-size: 0.55rem;
   }

@@ -91,7 +91,14 @@ test("at 390 the read-out pill overlaps nothing else in the hero", async ({ page
     const hero = readout?.closest("section");
     if (!readout || !hero) return ["no read-out in a hero section"];
     const pill = readout.getBoundingClientRect();
-    const meets = (other: DOMRect): boolean =>
+    const meets = (other: {
+      width: number;
+      height: number;
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
+    }): boolean =>
       other.width > 0 &&
       other.height > 0 &&
       other.left < pill.right &&
@@ -102,12 +109,103 @@ test("at 390 the read-out pill overlaps nothing else in the hero", async ({ page
       .filter((element) => !readout.contains(element) && !element.contains(readout))
       .filter((element) => !element.closest(".home-aurora, .home-grid"))
       .filter((element) => element.checkVisibility({ visibilityProperty: true }))
-      .filter((element) => meets(element.getBoundingClientRect()))
+      // The demo frame clips the shot's stage on a phone (PS-372): what counts is the part that shows.
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        const frame = element.closest(".home-demo")?.getBoundingClientRect();
+        if (!frame || element.classList.contains("home-demo")) return meets(box);
+        return meets({
+          width: box.width,
+          height: box.height,
+          left: Math.max(box.left, frame.left),
+          right: Math.min(box.right, frame.right),
+          top: Math.max(box.top, frame.top),
+          bottom: Math.min(box.bottom, frame.bottom),
+        });
+      })
       .map((element) => `${element.tagName.toLowerCase()}.${element.className}`);
     return found;
   });
   expect(hits).toEqual([]);
 });
+
+/*
+ * PS-372: on a phone the hero demo frames the part of the shot that holds the changes, not the whole
+ * shot squeezed into 350px. At 390x844, in both schemes: the shot is drawn at a scale of at least 0.45
+ * (rendered width over its natural 1280; the whole shot was 0.27), every change region's border box
+ * lies inside the frame, no chip meets a region, and the page does not scroll sideways. At 1440 and
+ * 1024 nothing changed: the frame is the shot's 16:9 and the shot fills it.
+ */
+for (const scheme of ["light", "dark"] as const)
+  test(`${scheme}: the phone hero demo frames the changes`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "the phone project only");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
+    const measured = await page.evaluate(() => {
+      const frame = document.querySelector(".home-demo");
+      const image = document.querySelector<HTMLImageElement>(".home-demo img");
+      if (!frame || !image) throw new Error("home has no demo");
+      const frameBox = frame.getBoundingClientRect();
+      const regions = [...frame.querySelectorAll(".home-region")].map((one) =>
+        one.getBoundingClientRect(),
+      );
+      const chips = [...frame.querySelectorAll(".home-chip")].map((one) =>
+        one.getBoundingClientRect(),
+      );
+      const outside = regions.filter(
+        (one) =>
+          one.left < frameBox.left - 0.5 ||
+          one.top < frameBox.top - 0.5 ||
+          one.right > frameBox.right + 0.5 ||
+          one.bottom > frameBox.bottom + 0.5,
+      ).length;
+      return {
+        scale: image.getBoundingClientRect().width / image.naturalWidth,
+        regions: regions.length,
+        outside,
+        collisions: chips.flatMap((chip) =>
+          regions.filter(
+            (region) =>
+              chip.left < region.right &&
+              chip.right > region.left &&
+              chip.top < region.bottom &&
+              chip.bottom > region.top,
+          ),
+        ).length,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+      };
+    });
+    expect(measured.regions).toBeGreaterThan(0);
+    expect(measured.scale).toBeGreaterThanOrEqual(0.45);
+    expect(measured.outside).toBe(0);
+    expect(measured.collisions).toBe(0);
+    expect(measured.scrollWidth).toBeLessThanOrEqual(measured.innerWidth);
+  });
+
+for (const width of [1440, 1024])
+  test(`at ${width} the hero demo shows the whole shot`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "the desktop project only");
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/", { waitUntil: "networkidle" });
+    const measured = await page.evaluate(() => {
+      const frame = document.querySelector(".home-demo")?.getBoundingClientRect();
+      const image = document.querySelector<HTMLImageElement>(".home-demo img");
+      if (!frame || !image) throw new Error("home has no demo");
+      const drawn = image.getBoundingClientRect();
+      return {
+        ratio: frame.width / frame.height,
+        sameWidth: Math.abs(drawn.width - frame.width),
+        sameHeight: Math.abs(drawn.height - frame.height),
+      };
+    });
+    expect(measured.ratio).toBeCloseTo(1280 / 720, 2);
+    expect(measured.sameWidth).toBeLessThan(0.5);
+    expect(measured.sameHeight).toBeLessThan(0.5);
+  });
 
 /*
  * PS-366: the local band's paragraph is two sentences (at most 45 words), centred and at most 60ch wide,
