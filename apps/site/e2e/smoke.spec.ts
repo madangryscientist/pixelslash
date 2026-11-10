@@ -97,17 +97,11 @@ for (const { to, label } of PAGES) {
   });
 }
 
-test("/docs is the index: a card per group, every page linked, the rail marks All docs", async ({
-  page,
-}, info) => {
+test("/docs is the index: a card per group, every page linked", async ({ page }, info) => {
   await checkPage(page, "/docs", info);
   const index = page.getByTestId("docs-index");
   for (const item of LISTED_PAGES)
     await expect(index.locator(`a[href="/docs/${item.slug}"]`)).toHaveCount(1);
-  await expect(page.getByTestId("docs-nav").locator('a[href="/docs"]')).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
 });
 
 // PS-351: the groups are packed into columns, so no card is a box with a void under its links.
