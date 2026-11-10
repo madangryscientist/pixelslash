@@ -78,3 +78,20 @@ for (const scheme of ["light", "dark"] as const) {
     });
   });
 }
+
+/*
+ * PS-366: on a phone the "New here?" callout stacks. Its text takes the full width and sits above the
+ * button, which is full width too, so the text is not squeezed into a narrow column beside it.
+ */
+test("at 390 the docs callout stacks: its text is wide and sits above the button", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/docs", { waitUntil: "networkidle" });
+  const text = page.locator('[data-testid="docs-start"] > div > div:first-child');
+  const button = page.getByTestId("docs-first-step");
+  const [t, b] = await Promise.all([text.boundingBox(), button.boundingBox()]);
+  if (!t || !b) throw new Error("callout text or button has no box");
+  expect(b.y).toBeGreaterThan(t.y + t.height);
+  expect(t.width).toBeGreaterThanOrEqual(300);
+});

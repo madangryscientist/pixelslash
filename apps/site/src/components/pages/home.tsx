@@ -82,8 +82,8 @@ function Hero(): ReactNode {
           See what your change <span className="home-gradient-text">did to the page.</span>
         </h1>
         <p className="home-rise mx-auto mt-6 max-w-2xl text-lg text-(--home-sub) md:text-xl">
-          For developers and teams who want to see what a change did to their pages before it
-          merges. PixelSlash pixel-diffs Main and Branch and writes a report of what changed.
+          PixelSlash pixel-diffs Main against Branch and writes a report of what changed. It runs on
+          your machine, for free.
         </p>
         <div className="home-rise mt-9 flex flex-wrap justify-center gap-3">
           <Button href="/self-host" size="lg">
@@ -191,11 +191,13 @@ function Local(): ReactNode {
           <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
             Your pixels stay <span className="home-gradient-text">on your machine.</span>
           </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-(--home-sub)">
-            A page shot leaves the machine only when you ask. An upload goes only to the server the
-            project names, which today is one you run; a service run by us is planned. A hosted
-            judge you name gets the shots it judges. On that server, a project's own AI model, if
-            you set one, gets the three crops of a changed region, never a whole shot.
+          <p
+            data-testid="local-band-copy"
+            className="mx-auto mt-5 max-w-[60ch] text-lg text-(--home-sub)"
+          >
+            A page shot leaves the machine only when you ask, and an upload goes only to the server
+            your project names. If a project sets its own AI model, the model gets the three crops
+            of a changed region, never a whole shot.
           </p>
           <div className="mt-9 flex flex-wrap justify-center gap-3">
             <Button href="/security" variant="outline">

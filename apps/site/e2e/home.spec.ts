@@ -50,16 +50,17 @@ test("nothing moves under reduced motion, and it moves otherwise", async ({ page
 });
 
 /*
- * The hero's lead is a short pitch (PS-350): at most 3 lines at 1440x900 on the desktop project and
- * 6 at 390x844 on the phone project, in both schemes. The lines are the lead's rendered height over
+ * The hero's lead is a short pitch (PS-350, PS-366): at most 2 lines at 1440x900 on the desktop project
+ * and 6 at 390x844 on the phone project, in both schemes. The lines are the lead's rendered height over
  * its line-height, so the count is what a visitor sees, wrapped at the real font. The lead is the
- * paragraph right after the hero's h1.
+ * paragraph right after the hero's h1. It says how the diff works, so it does not repeat the headline
+ * ("see what" and "change did" are the headline's words, PS-366).
  */
 for (const scheme of ["light", "dark"] as const)
   test(`${scheme}: the hero lead fits its line count`, async ({ page, isMobile }) => {
     const size = isMobile
       ? { width: 390, height: 844, max: 6 }
-      : { width: 1440, height: 900, max: 3 };
+      : { width: 1440, height: 900, max: 2 };
     await page.setViewportSize({ width: size.width, height: size.height });
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
     await page.goto("/", { waitUntil: "networkidle" });
@@ -69,6 +70,9 @@ for (const scheme of ["light", "dark"] as const)
       return lead.getBoundingClientRect().height / parseFloat(lineHeight);
     });
     expect(lines).toBeLessThanOrEqual(size.max);
+    const text = await page.locator("h1 + p").innerText();
+    expect(text.toLowerCase()).not.toContain("see what");
+    expect(text.toLowerCase()).not.toContain("change did");
   });
 
 /*
@@ -104,3 +108,34 @@ test("at 390 the read-out pill overlaps nothing else in the hero", async ({ page
   });
   expect(hits).toEqual([]);
 });
+
+/*
+ * PS-366: the local band's paragraph is two sentences (at most 45 words), centred and at most 60ch wide,
+ * so it reads as a paragraph, not five centred lines. It keeps the three facts of the security page:
+ * a page shot leaves only when asked, an upload goes only to the named server, and a project's own AI
+ * model gets the three crops of a changed region, never a whole shot.
+ */
+for (const scheme of ["light", "dark"] as const)
+  test(`${scheme}: the local band's paragraph is short and at most 60ch wide`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
+    const band = page.getByTestId("home-column").nth(2).locator("p").first();
+    const text = (await band.innerText()).trim();
+    expect(text.split(/\s+/).length).toBeLessThanOrEqual(45);
+    expect(text).toMatch(/leaves the machine only when you ask/);
+    expect(text).toMatch(/three crops of a changed region, never a whole shot/);
+    const widths = await band.evaluate((p) => {
+      const probe = document.createElement("span");
+      probe.textContent = "0".repeat(60);
+      probe.style.font = getComputedStyle(p).font;
+      probe.style.visibility = "hidden";
+      probe.style.position = "absolute";
+      p.append(probe);
+      const sixtyCh = probe.getBoundingClientRect().width;
+      probe.remove();
+      return { box: p.getBoundingClientRect().width, sixtyCh };
+    });
+    expect(widths.box).toBeLessThanOrEqual(widths.sixtyCh * 1.02);
+  });
