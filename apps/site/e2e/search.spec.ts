@@ -50,3 +50,53 @@ test("a search for nothing says so", async ({ page }) => {
   }).toPass();
   await expect(status).toContainText("Nothing matches");
 });
+
+/*
+ * The search glass and the / shortcut. The box is the one on screen: the landing's content column,
+ * or the rail on a docs page (folded on a phone, where the key does nothing).
+ */
+
+test("the search field has a decorative glass, and the hint names the key", async ({ page }) => {
+  await page.goto("/docs", { waitUntil: "networkidle" });
+  const field = page.getByTestId("docs-search");
+  const glass = page.getByRole("search").locator("svg").first();
+  await expect(glass).toBeVisible();
+  await expect(glass).toHaveAttribute("aria-hidden", "true");
+  await expect(field).toHaveAccessibleName("Search the docs");
+  await expect(field).toHaveAttribute("placeholder", "Search the docs (press /)");
+});
+
+/** Press `/` until the field takes focus: the listener is attached after hydration, so a first press can land early. */
+async function slashFocuses(page: Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: "networkidle" });
+  const field = page.getByTestId("docs-search");
+  await expect(async () => {
+    await page.locator("body").click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press("/");
+    await expect(field, path).toBeFocused({ timeout: 1000 });
+  }).toPass();
+  await expect(field, path).toHaveValue("");
+}
+
+test("/ focuses the search field from anywhere on /docs, and on a docs page's rail", async ({
+  page,
+  isMobile,
+}) => {
+  await slashFocuses(page, "/docs");
+  // On a phone the rail is folded, so the key focuses nothing there (the desktop run checks the rail).
+  if (!isMobile) await slashFocuses(page, "/docs/install");
+});
+
+test("/ types into a text field, and Ctrl, Alt or Meta with it does nothing", async ({ page }) => {
+  await slashFocuses(page, "/docs");
+  const field = page.getByTestId("docs-search");
+  await field.click();
+  await page.keyboard.press("/");
+  await expect(field).toHaveValue("/");
+
+  await page.locator("body").click({ position: { x: 1, y: 1 } });
+  await page.keyboard.press("Control+/");
+  await page.keyboard.press("Alt+/");
+  await page.keyboard.press("Meta+/");
+  await expect(field).not.toBeFocused();
+});
