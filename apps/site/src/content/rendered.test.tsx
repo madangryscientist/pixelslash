@@ -9,7 +9,7 @@ import { SecurityPage } from "#/components/pages/security";
 import { SelfHostPage } from "#/components/pages/self-host";
 import { TICKET_ID } from "./doc-text.ts";
 import { loadAllDocs } from "./docs.ts";
-import { DOC_PAGES, EXTRA_NAV, GROUPS, neighbours } from "./docs-map.ts";
+import { DOC_PAGES, EXTRA_NAV, GROUPS, LISTED_PAGES, neighbours } from "./docs-map.ts";
 import { CLI_SPLIT } from "./cli-split.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
@@ -93,10 +93,12 @@ describe("the page template", () => {
 
 describe("prev and next", () => {
   test("every page links the page before and after it in the map, across every group", () => {
-    const wrong = DOC_PAGES.flatMap((page, index) => {
+    const wrong = LISTED_PAGES.flatMap((page, index) => {
       const { prev, next } = neighbours(page.slug);
       const markup = html.get(page.slug) ?? "";
-      const want = [DOC_PAGES[index - 1], DOC_PAGES[index + 1]].flatMap((p) => (p ? [p.slug] : []));
+      const want = [LISTED_PAGES[index - 1], LISTED_PAGES[index + 1]].flatMap((p) =>
+        p ? [p.slug] : [],
+      );
       const got = [prev, next].flatMap((p) => (p ? [p.slug] : []));
       const unlinked = got.filter((slug) => !markup.includes(`href="/docs/${slug}"`));
       return got.join() === want.join() && unlinked.length === 0 ? [] : [page.slug];
@@ -106,7 +108,7 @@ describe("prev and next", () => {
 
   test("the pages of one group are next to one another", () => {
     const broken = GROUPS.filter((group) => {
-      const at = DOC_PAGES.flatMap((page, index) => (page.group === group.id ? [index] : []));
+      const at = LISTED_PAGES.flatMap((page, index) => (page.group === group.id ? [index] : []));
       return at.some((position, i) => i > 0 && position !== (at[i - 1] ?? -2) + 1);
     }).map((group) => group.id);
     expect(broken).toEqual([]);

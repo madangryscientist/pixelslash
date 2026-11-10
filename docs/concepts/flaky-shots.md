@@ -1,4 +1,4 @@
-# Flaky shots and stabilisation
+# Making shots stable
 
 A flaky shot differs from itself: the same code, shot twice, gives two images. PixelSlash prevents most of that before the shot, detects the rest after it, and helps you fix the cause.
 

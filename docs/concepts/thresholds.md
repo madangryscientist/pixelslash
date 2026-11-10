@@ -114,4 +114,4 @@ A value that is not a number from 0 to 1 stops the run with exit 2:
 
 - [Tuning the diff](../cli.md#tuning-the-diff): every flag, including the noise and shift settings.
 - [Ignore or redact](ignore-or-redact.md): for a part of the page, leave it out instead of loosening the whole shot.
-- [Flaky shots and stabilisation](flaky-shots.md): a shot that changes by itself needs a fix, not a higher threshold.
+- [Making shots stable](flaky-shots.md): a shot that changes by itself needs a fix, not a higher threshold.

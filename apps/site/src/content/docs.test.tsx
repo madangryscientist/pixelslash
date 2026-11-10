@@ -13,7 +13,7 @@ import { CLI_INTRO_DOC } from "./cli-intro.ts";
 import { loadAllDocs } from "./docs.ts";
 import { SECURITY_DOC } from "./repo-docs.ts";
 import { TRADEMARK } from "./trademark.ts";
-import { DOC_PAGES, GROUPS, type DocPageDef, neighbours } from "./docs-map.ts";
+import { DOC_PAGES, GROUPS, LISTED_PAGES, type DocPageDef, neighbours } from "./docs-map.ts";
 import { resolveImageSrc } from "./resolve-links.ts";
 import { plainText, slugger } from "./markdown.tsx";
 
@@ -152,7 +152,7 @@ describe("the docs pages", () => {
   test("the index lists every page, once, under its group", () => {
     // The rail links every page too, so count only the group cards.
     const cards = indexHtml.slice(indexHtml.indexOf('data-testid="docs-index"'));
-    const counts = DOC_PAGES.map((item) => [
+    const counts = LISTED_PAGES.map((item) => [
       item.slug,
       cards.match(new RegExp(`href="/docs/${item.slug}"`, "g"))?.length ?? 0,
     ]);
@@ -160,12 +160,12 @@ describe("the docs pages", () => {
     for (const group of GROUPS) expect(indexHtml).toContain(group.title);
   });
 
-  test.each(DOC_PAGES.map((p) => p.slug))(
+  test.each(LISTED_PAGES.map((p) => p.slug))(
     "%s has the group nav, a rail and previous/next",
     (slug) => {
       const html = pageHtml.get(slug) ?? "";
       expect(html).toContain('data-testid="docs-nav"');
-      for (const other of DOC_PAGES) expect(html).toContain(`href="/docs/${other.slug}"`);
+      for (const other of LISTED_PAGES) expect(html).toContain(`href="/docs/${other.slug}"`);
       expect(
         html.match(/aria-current="page"/g)?.length,
         "current page marked",
@@ -179,8 +179,8 @@ describe("the docs pages", () => {
   );
 
   test("the first page has no previous and the last no next", () => {
-    expect(neighbours(DOC_PAGES[0]?.slug ?? "").prev).toBeUndefined();
-    expect(neighbours(DOC_PAGES.at(-1)?.slug ?? "").next).toBeUndefined();
+    expect(neighbours(LISTED_PAGES[0]?.slug ?? "").prev).toBeUndefined();
+    expect(neighbours(LISTED_PAGES.at(-1)?.slug ?? "").next).toBeUndefined();
   });
 
   test("getting started is docs/getting-started.md, and its links resolve", () => {

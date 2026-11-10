@@ -64,6 +64,12 @@ export type DocPageDef = {
   group: GroupId;
   /** Headings of docs/cli.md this page shows (plain text, as the heading reads). */
   sections: readonly string[];
+  /**
+   * Served at /docs/<slug> but not listed: absent from the nav, the /docs landing, the previous
+   * and next links, the sitemap and the search index. For a section of cli.md that is a note for
+   * maintainers, not something a reader looks up, but that cli.md still has to put on a page.
+   */
+  unlisted?: true;
   /** The page can end a run with a non-zero exit, so it links to the exit codes. */
   exits?: boolean;
   /** A page the site generates from cli.md instead of cutting it: the command index. */
@@ -131,7 +137,7 @@ export const DOC_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "tutorial-playwright",
-    title: "Your Playwright tests",
+    title: "Tutorial: your Playwright tests",
     group: "tutorials",
     sections: [],
     file: "docs/tutorials/playwright.md",
@@ -209,7 +215,7 @@ export const DOC_PAGES: readonly DocPageDef[] = [
   ...CAPTURE_PAGES,
   {
     slug: "compare",
-    title: "Compare two versions",
+    title: "Compare URLs and PNGs",
     group: "diff",
     sections: ["Compare two versions"],
     exits: true,
@@ -269,9 +275,15 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     title: "GTK window dogfood",
     group: "reference",
     sections: ["Local-screenshot dogfood (GTK windows)"],
+    unlisted: true,
   },
   ...HELP_PAGES,
 ];
+
+/** The pages a reader is shown: every page but the unlisted ones. The nav, the landing, the sitemap and the search index use this. */
+export const LISTED_PAGES: readonly DocPageDef[] = DOC_PAGES.filter(
+  (page) => page.unlisted !== true,
+);
 
 /** Pages of the site that are not docs pages but sit in the docs nav, under the group they belong to. */
 export const EXTRA_NAV: readonly { group: GroupId; title: string; href: string }[] = [
@@ -282,10 +294,11 @@ export function findPage(slug: string): DocPageDef | undefined {
   return DOC_PAGES.find((page) => page.slug === slug);
 }
 
-/** The page before and after `slug` in nav order, across groups. */
+/** The listed page before and after `slug` in nav order, across groups. An unlisted page has neither. */
 export function neighbours(slug: string): { prev?: DocPageDef; next?: DocPageDef } {
-  const index = DOC_PAGES.findIndex((page) => page.slug === slug);
-  const prev = DOC_PAGES[index - 1];
-  const next = DOC_PAGES[index + 1];
+  const index = LISTED_PAGES.findIndex((page) => page.slug === slug);
+  if (index === -1) return {};
+  const prev = LISTED_PAGES[index - 1];
+  const next = LISTED_PAGES[index + 1];
   return { ...(prev ? { prev } : {}), ...(next ? { next } : {}) };
 }

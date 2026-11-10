@@ -35,7 +35,7 @@ export const CONCEPT_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "flaky-shots",
-    title: "Flaky shots and stabilisation",
+    title: "Making shots stable",
     group: "concepts",
     sections: [],
     file: "docs/concepts/flaky-shots.md",

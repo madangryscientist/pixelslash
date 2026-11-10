@@ -97,7 +97,7 @@ A rejection can't be undone by accepting another shot in that build. A rejected 
 
 Two more kinds of shot don't become baselines:
 
-- A flaky shot under the `skip` policy, unless a reviewer accepted it by hand. See [Flaky shots and stabilisation](flaky-shots.md).
+- A flaky shot under the `skip` policy, unless a reviewer accepted it by hand. See [Making shots stable](flaky-shots.md).
 - A branch shot with no result, such as one from [another environment](fingerprints.md).
 
 ## Next

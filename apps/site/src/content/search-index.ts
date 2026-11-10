@@ -1,7 +1,7 @@
 import type { MarkedToken } from "marked";
 import { loadDoc } from "./docs.ts";
 import { SELF_HOST_DOC } from "./repo-docs.ts";
-import { DOC_PAGES, EXTRA_NAV } from "./docs-map.ts";
+import { EXTRA_NAV, LISTED_PAGES } from "./docs-map.ts";
 import type { Doc } from "./markdown.tsx";
 import type { SearchEntry } from "./search.ts";
 
@@ -63,7 +63,7 @@ export function entriesOf(doc: Doc, base: string, pageTitle: string): SearchEntr
 /** Every entry: the docs pages in nav order, then the pages outside the map that the rail links. */
 export async function buildSearchIndex(): Promise<SearchEntry[]> {
   const docs = await Promise.all(
-    DOC_PAGES.map(async (page) =>
+    LISTED_PAGES.map(async (page) =>
       entriesOf(await loadDoc(page.slug), `/docs/${page.slug}`, page.title),
     ),
   );
