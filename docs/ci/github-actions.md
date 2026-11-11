@@ -2,7 +2,7 @@
 
 Capture the base branch and the pull request in the pinned image, compare them, keep the report as an artifact, and fail the job when anything differs.
 
-**Tested on** GitHub Actions, on an `ubuntu-24.04` runner, on 2026-11-04, on a private repository. Both the passing run and the failing run are below.
+**Tested on** GitHub Actions, on an `ubuntu-24.04` runner, on 2026-11-04, on a private repository. Both the passing run and the failing run are below. The capture log is from that run; the two compare logs are from a local run of the same `ci/visual-gate.sh` on 2026-11-11 (see "What it prints").
 
 ## The gate, first
 
@@ -119,19 +119,26 @@ fingerprint: {"image":"ghcr.io/madangryscientist/pixelslash-capture@sha256:d8b33
 manifest: /work/snapshots/main/manifest.json
 ```
 
-With nothing different, the compare step passes on `pixelslash: 0 changed, 1 unchanged, 0 new, 0 removed`. On a pull request that turned a button green, it fails:
+The compare step, with nothing different, passes: the script prints `compare`'s lines and exits 0.
 
 ```
-timing: 1 shot, diff 0.1s, total 0.1s
-visual gate: differences found, read the report
+timing: 1 shot, diff 0.0s, total 0.0s
+pixelslash: 0 changed, 1 unchanged, 0 new, 0 removed
+report: file://<run dir>/pixelslash-report/index.html
+```
+
+On a pull request that turned a button green, the same step fails, and the script adds its own line, `visual gate: differences found, read the report`, to the end:
+
+```
+timing: 1 shot, diff 0.0s, total 0.0s
 pixelslash: 1 changed, 0 unchanged, 0 new, 0 removed
 changed:
-  index (chromium 1280x720)
-report: file:///work/pixelslash-report/index.html
-##[error]Process completed with exit code 1.
+  button (chromium 1280x720)
+report: file://<run dir>/pixelslash-report/index.html
+visual gate: differences found, read the report
 ```
 
-The `file:///work` path is inside the container. The report is in the artifact.
+The job exits 1. These two logs are what a passing run and a failing run print, from a local run of this page's `ci/visual-gate.sh` on 2026-11-11, not from a GitHub Actions run. It needed no browser: the run used `pixelslash import` on a PNG from the repo (`fixtures/ds/button.png`, once as it is and once with its blue recoloured green) and `pixelslash compare` on the two snapshot dirs; the workflow above captures the two servers' URLs in the pinned image instead. The report path is shortened. In the workflow it is `file:///work/pixelslash-report/index.html`, a path inside the container; the report is in the artifact.
 
 ## Read the report
 
