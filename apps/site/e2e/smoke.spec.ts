@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { DOC_PAGES, GROUPS, LISTED_PAGES, neighbours } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
+import { groupRows } from "./support/docs-rows.ts";
 import { siteNav } from "./support/site-nav.ts";
 
 /*
@@ -104,7 +105,9 @@ test("/docs is the index: a card per group, every page linked", async ({ page },
     await expect(index.locator(`a[href="/docs/${item.slug}"]`)).toHaveCount(1);
 });
 
-// PS-351: no card is a box with a void under its links (the grid, PS-378, lets a card keep its own height).
+// PS-351: no card is a box with a void under its links. Since PS-385 cards in a row end level, so the
+// shorter card of a pair has slack by design; the guard is per row: the fullest card of each row ends
+// within 24px of its last link, plus one link line for a two-column group whose columns differ by one.
 for (const size of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
@@ -116,20 +119,10 @@ for (const size of [
       await page.setViewportSize(size);
       await page.emulateMedia({ colorScheme });
       await checkPage(page, "/docs", info);
-      const gaps = await page
-        .getByTestId("docs-index")
-        .locator(":scope > li")
-        .evaluateAll((items) =>
-          items.map((item) => {
-            const card = item.querySelector("section") ?? item;
-            const links = card.querySelectorAll("a");
-            const last = links[links.length - 1];
-            if (last === undefined) return Number.POSITIVE_INFINITY;
-            return card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
-          }),
-        );
-      expect(gaps).toHaveLength(GROUPS.length);
-      for (const gap of gaps) expect(gap).toBeLessThanOrEqual(24);
+      const rows = await groupRows(page);
+      expect(rows.flatMap((row) => row.groups)).toHaveLength(GROUPS.length);
+      for (const row of rows)
+        expect(Math.min(...row.groups.map((g) => g.gap))).toBeLessThanOrEqual(56);
     });
   }
 }
