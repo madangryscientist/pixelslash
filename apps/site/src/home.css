@@ -107,7 +107,10 @@
   overflow-x: clip;
 }
 
+/* Positioned, so the content stacks above the aurora behind it; axe reads an unpositioned child as
+   under the blob and blends the two, which flagged a table head the aurora does not reach (PS-403). */
 .page-art > :not(.page-art-bg) {
+  position: relative;
   flex: 1;
 }
 
