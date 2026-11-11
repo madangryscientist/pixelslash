@@ -17,11 +17,15 @@ export const ACTION = { label: "Self-host it", href: "/self-host" } as const;
 export const COMMITMENT =
   "No feature will ever sit behind a paid plan. Paid hosting, when it comes, pays for us running PixelSlash for you; everything it runs is in the source code you can host yourself.";
 
+/** What the licence allows and forbids, in the callout after the facts (PS-386). */
+export const LICENCE_BRIEF =
+  "The CLI, the diff engine and the review app are all in the repository, with nothing held back. You may use, copy and modify it. You may not offer it to others as a hosted or managed service that gives them a substantial set of its features.";
+
 export const FACTS = [
   {
     title: "Free, and source available",
     icon: "branch",
-    body: "PixelSlash is licensed under the Elastic License 2.0, which is source available, not open source. The CLI, the diff engine and the review app are all in the repository, with nothing held back. You may use, copy and modify it. You may not offer it to others as a hosted or managed service that gives them a substantial set of its features.",
+    body: "PixelSlash is licensed under the Elastic License 2.0, which is source available, not open source.",
   },
   {
     title: "Self-host all of it",
