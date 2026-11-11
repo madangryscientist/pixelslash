@@ -1,24 +1,6 @@
-import { Card, SubsectionHeading, TextLink } from "@hackcove/ui-react";
+import { Card, Icon, SubsectionHeading, TextLink } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { EXTRA_NAV, GROUPS, LISTED_PAGES } from "../../content/docs-map.ts";
-
-/** The trailing mark on an index link. Decorative: the link's name is its title. */
-function LinkChevron(): ReactNode {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className="ml-1 inline-block h-3.5 w-3.5 align-[-0.1em]"
-    >
-      <path
-        fillRule="evenodd"
-        d="M7.2 4.8a.75.75 0 0 1 1.06 0l4.7 4.67a.75.75 0 0 1 0 1.06l-4.7 4.67a.75.75 0 1 1-1.06-1.06L11.37 10 7.2 5.86a.75.75 0 0 1 0-1.06Z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
 
 /** A group with more than this many listed links spans the row and lists them in two columns. */
 const LONG_GROUP = 8;
@@ -86,7 +68,9 @@ export function DocsGroupGrid(): ReactNode {
                 >
                   <TextLink href={link.href}>
                     {link.title}
-                    <LinkChevron />
+                    <span className="ml-1 inline-block align-[-0.1em]">
+                      <Icon name="chevron-right" size="sm" />
+                    </span>
                   </TextLink>
                 </li>
               ))}
