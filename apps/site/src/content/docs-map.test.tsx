@@ -47,6 +47,32 @@ describe("the nav titles", () => {
   });
 });
 
+describe("the /docs landing", () => {
+  test("links every page the nav lists, the site pages in the nav included", () => {
+    const hrefs = [
+      ...LISTED_PAGES.map((page) => `/docs/${page.slug}`),
+      ...EXTRA_NAV.map((extra) => extra.href),
+    ];
+    expect(hrefs.filter((href) => !indexHtml.includes(`href="${href}"`))).toEqual([]);
+  });
+
+  test("puts a site page in the nav inside its own group's card, after that group's pages", () => {
+    for (const extra of EXTRA_NAV) {
+      // A group's card is a top-level `<li class="grid ...">`; its links are plain `<li>`s inside it.
+      const card = indexHtml
+        .split('<li class="grid')
+        .find((part) => part.includes(`href="${extra.href}"`));
+      expect(card).toBeDefined();
+      const group = LISTED_PAGES.filter((page) => page.group === extra.group);
+      const last = group.at(-1);
+      expect(last).toBeDefined();
+      const at = (href: string): number => (card ?? "").indexOf(`href="${href}"`);
+      expect(at(`/docs/${last?.slug}`)).toBeGreaterThan(-1);
+      expect(at(extra.href)).toBeGreaterThan(at(`/docs/${last?.slug}`));
+    }
+  });
+});
+
 describe("getting started", () => {
   test("shows how to install Bun before its first command", () => {
     const md = readFileSync(join(ROOT, "docs/getting-started.md"), "utf8");

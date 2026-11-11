@@ -103,6 +103,8 @@ The changed pixels are then clustered into **regions** (`regions[]` in the manif
 - a box with an area under 4px (`minRegionArea`) is a speck, dropped and counted in `specks`
 - a region that is faint (90th percentile of colour distance at most 0.25, no pixel above 0.5), uneven (the spread of those distances is at least 0.3 of their mean, so a flat element that moved is never noise), and moves both lighter and darker (minority share at least 0.2), is labelled `noise`, kept in `regions`, and does not make the run `changed`.
 
+A **`change` region** is a region that survives the speck and noise filters and is not a `shift` (below): it counts as a change, and it is what can make a run `changed`.
+
 ### Sub-pixel shifts
 
 A region whose content moved by a fraction of a pixel, all alike (`maxShift`, 0 to 1; default 0.9), is labelled `shift`: the region's own box fits one sub-pixel shift on both axes, that fit explains at least a quarter of its colour difference, and the edge tiles in a 24px halo around the box agree with the same shift; a whole pixel moved, or a neighbour that stayed put, keeps it a `change`. `shift` regions are kept in `regions`, are drawn in their own style, and do not make the run `changed`.
@@ -124,10 +126,10 @@ pixelslash --live-png main.png --local-png branch.png --threshold 0.05 --min-cha
 | Flag | Range | Default | What it does |
 | --- | --- | --- | --- |
 | `--threshold` | 0 to 1 | engine default | Per-pixel tolerance; the default is 0.01. |
-| `--min-changed-pixels` | whole number | 0 (no floor) | Floor on the run: the pixels of the surviving `change` regions must reach it. |
+| `--min-changed-pixels` | whole number | 0 (no floor) | Floor on the run: the pixels of the surviving [`change` regions](#regions-specks-and-noise) must reach it. |
 | `--min-changed-ratio` | 0 to 1 | 0 (no floor) | Floor on the run: the share of the overlap that the surviving `change` regions cover must reach it. |
 | `--merge-distance` | px | 24 | Changed pixels and boxes closer than this are one region. |
-| `--min-region-area` | px | 4 | A box with a smaller area is a speck, dropped and counted. |
+| `--min-region-area` | px | 4 | A box with a smaller area is a [speck](#regions-specks-and-noise), dropped and counted. |
 | `--noise-amplitude` | 0 to 1 | 0.25 | How faint a region may be and still be labelled `noise`. |
 | `--max-shift` | 0 to 1 (pixels) | 0.9 | How far a sub-pixel shift may move a region and still be labelled `shift`; 0 turns the call off. |
 
@@ -715,7 +717,7 @@ pixelslash dev spec [TARGET] [--json] [--refresh-refs] [--viewport WxH|NAME] [--
 
 - **Keys.** `r` run now · `p` pin the latest iteration · `u` unpin · `m` toggle main / previous · `f` refetch the Figma refs · `q` quit.
 - **What a run is compared with.** By default the previous iteration; while an iteration is pinned, the newest pin. `--against main` (or `m`) compares with the baselines the server would pick for this checkout, through the same read-only `POST /api/v1/baselines` that `check` uses, as whoever `pixelslash login` or `PIXELSLASH_TOKEN` is. Without credentials it says `no credentials for main's baselines (…)` and stays on the previous iteration.
-- **Judge.** `--judge --ds DIR` runs the design-system judge on each iteration after its diff is shown. On a target with a spec or refs (below), `--judge` also shows the local vision model the shot, the reference and the spec, and it lists how the shot differs, each with a box on the shot, numbered on the live page; `--ds` is then optional. The list is descriptions, never a pass, a fail or a score. With no judge available it prints `skip: no judge` and invents nothing.
+- **Judge.** `--judge --ds DIR` runs the design-system judge on each iteration after its diff is shown. On a target with a spec or refs (below), `--judge` also shows the judge model (the local one, or the hosted one when `PIXELSLASH_OPENCODE_MODEL` is set: see [The opencode judge](#the-opencode-judge)) the shot, the reference and the spec, and it lists how the shot differs, each with a box on the shot, numbered on the live page; `--ds` is then optional. The list is descriptions, never a pass, a fail or a score. With no judge available it prints `skip: no judge` and invents nothing.
 - **Live page.** `http://127.0.0.1:PORT` (bound to loopback only) shows the shots, the diff, the comparison image, the timeline of iterations, the pins, the judge's notes and the feature section (below), and updates itself after each run. Its buttons send a header a page from another origin cannot, so another site cannot pin or run.
 - **Storage.** Iterations and pins live in `.pixelslash/dev/` at the worktree root, which ignores itself (`dev` writes a `*` into `.pixelslash/dev/.gitignore`; your own `.gitignore` is not touched), and they survive a restart. The store is capped at 200 MB: past it the oldest iterations go first, never a pin, the newest, or what the newest was compared with.
 - **One session per worktree.** A second `pixelslash dev` in the same worktree attaches to the first: it prints the live page and follows its runs, and `q` leaves it without stopping the session. `dev --once` on a different target than the session's is exit 2, rather than returning the other page's result. A lock whose process is gone is taken over.
@@ -742,11 +744,11 @@ A target can name what it is being built against: a markdown spec, and reference
 ```
 
 - **`spec`** is a `.md` path, and **`refs`** is a list of `.png` paths or Figma frame URLs (with a `node-id`), either bare or as `{ src, viewport?, theme? }`. Paths are relative to the config file. A ref with `viewport` (a `WxH` or a variant name) or `theme` applies only to the shots of that variant; one without applies to every variant. A bad key, path or URL fails at load and names the key (`features.cart.refs[1].src …`), and a file that is not there also names the config it was read from. PixelSlash reads the spec and the PNGs and never writes them; the spec is read again on each run, so editing it shows at once.
-- **Figma refs** are rendered through the Figma API at the variant's width times `deviceScaleFactor`, and cached in `.pixelslash/dev/refs/`. They are fetched once, then again only on `f` or `--refresh-refs`, never on a save. The token comes from `FIGMA_TOKEN` or `--figma-token-path PATH`, never from git. Without one, that ref prints `skip: no figma token (URL)` and everything else carries on; an earlier render in the cache still stands. A Figma ref is the only thing in feature mode that touches the network.
+- **Figma refs** are rendered through the Figma API at the variant's width times `deviceScaleFactor`, and cached in `.pixelslash/dev/refs/`. They are fetched once, then again only on `f` or `--refresh-refs`, never on a save. The token comes from `FIGMA_TOKEN` or `--figma-token-path PATH`, never from git. Without one, that ref prints `skip: no figma token (URL)` and everything else carries on; an earlier render in the cache still stands. A Figma ref is the only thing in feature mode that touches the network, apart from a hosted judge model (`PIXELSLASH_OPENCODE_MODEL`), which `--judge` then sends the shot, the reference and the spec.
 - **The live page** gets a Feature section: per shot, the reference and the current shot side by side; the two overlaid, with a slider that fades the reference over the shot (onion skin); and the spec text. Both sizes are stated, and when they differ the overlay is only the overlapping rectangle from the top left, and the page says so. With `--judge`, the differences are numbered boxes on the shot with a list beside it.
 - **What it does not claim.** Nothing is measured against a reference: there is no match percentage, no score and no pass or fail, on the page, in the terminal or in the JSON. A mock-up is not a baseline, so the overlay is for looking and the judge's list is for reading. The pixel diff stays between iterations (or main), as above.
 - **`dev spec [TARGET] [--json]`** prints the spec and the refs without a run. `--json` is `{ target, spec: { path, text }, refs: [{ index, kind, source, variant, viewport, theme, file, size, skip, image }] }`, where `image` is the ref inline as a `data:image/png;base64,…` URL, scaled down to at most 1024 px wide, so an agent can look at it without opening a file. `TARGET` may be left out when the config has one feature.
-- The spec and the refs never leave the machine: nothing is uploaded, and the server never sees them.
+- Nothing is uploaded, and the server never sees the spec or the refs. They leave the machine only to a hosted judge model, when you set `PIXELSLASH_OPENCODE_MODEL` and pass `--judge`.
 
 ## Signing in and reading builds
 
@@ -922,7 +924,7 @@ The same server drives [`pixelslash dev`](#feature-mode-pixelslash-dev), so an a
 
 ## Uploading to a server
 
-Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots, and they send them only to the server you name. The same CLI talks to the hosted app and to a self-hosted one.
+Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots to a PixelSlash server, and they send them only to the server you name. The one other way a shot leaves is a hosted judge model, which only a set `PIXELSLASH_OPENCODE_MODEL` turns on (see [The opencode judge](#the-opencode-judge)). The same CLI talks to the hosted app and to a self-hosted one.
 
 ```
 pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]
@@ -979,7 +981,7 @@ With `--judge`, the local vision model (the same `mlx_vlm.generate` or `ollama` 
 
 - To know which shots changed, the CLI diffs each shot against the baseline the server picked, in a `server` project too, as for flaky shots. A `server` project is still never sent that diff.
 - The sentence goes up as `meta.changeNote` (one line, at most 300 characters; the server collapses whitespace, drops a trailing full stop, cuts it to 300 and drops anything that is not a string, never a 400). It is stored in `snapshots.change_note` and shown on the build page's card, labelled as the judge's, and in the branch page's change summary. An unchanged or new shot gets none.
-- The images go only to the local model, which runs on this machine. Nothing is sent to any other model.
+- The images go to the local model, which runs on this machine. The exception is a set `PIXELSLASH_OPENCODE_MODEL`: the judge is then that hosted model, and the baseline and branch shots go to its provider (see [The opencode judge](#the-opencode-judge)). No other model sees them.
 - The sentence decides nothing: not a review state, a threshold, a build's verdict or an exit code.
 - With no local judge, the run prints `skip: no judge` and uploads without sentences. A model that fails on a shot is a warning on stderr (`judge: <shot>: <why>`), and that shot uploads without one.
 - `--judge` on `capture` needs `--upload`.
@@ -1146,6 +1148,33 @@ PIXELSLASH_SERVER=https://<server> PIXELSLASH_TOKEN_FILE=<path to a project's CI
 - Both variables are required (use an absolute token path; a `~` in the value is not expanded) and nothing is hard-coded: the shots go only to the server named, and the token file is given to the CLI as `--token-path` (nothing here reads it, and it is never in git). The script is one `package.json` line over `pixelslash capture --upload`; the snapshot dir `.wrangler/dogfood-snapshots` is cleared on every run.
 - The capture is `apps/web/e2e/dogfood-review.config.ts`: the same `start` and `setup` as the organizations-page dogfood (`dogfood-orgs.config.ts`), over the fixed seed in `dogfood-seed.ts`, whose shots now have real PNGs (`dogfood-images.ts`, written to the local bucket by the setup) so the build and snapshot pages render. Six shots: three pages × two themes. It shares `.wrangler/e2e` and `dist/` with the e2e suite, so do not run it while `nx test:e2e web` runs.
 - Upload once from the commit you compare against with `--branch main`, then from the branch: the server's baseline rules above apply, and only the pages a change touched land in Changed. Capture outside the pinned image records a `bare` fingerprint, so compare like with like: shots from the same machine, or the pinned image on both sides.
+
+## Environment variables
+
+Every environment variable the CLI and its packages read. None is always required: an unset variable falls back to the default below, or, where there is no default, the command that needs it says so and exits 2. A flag always beats the variable of the same job. In CI, the two that matter most are the server and the token:
+
+```sh
+export PIXELSLASH_SERVER=https://review.example.com
+export PIXELSLASH_TOKEN="$REVIEW_TOKEN"   # from the CI's secret store, never git
+pixelslash upload pixelslash-snapshots --wait
+```
+
+| Variable | What it does | Default |
+| --- | --- | --- |
+| `PIXELSLASH_SERVER` | The review server's URL, for `upload`, `status`, `login`, `init`, `check` and the other commands that talk to one. `--server` wins; the config's `upload.server` is the fallback. | unset |
+| `PIXELSLASH_TOKEN` | The token for that server (a CI token `psci_…`, an org token `psorg_…` or a personal token `psu_…`). Read after `--token-path` and before the token `pixelslash login` stored. Never put it in git. | unset |
+| `FIGMA_TOKEN` | A Figma personal access token, for `--file FILE_KEY` runs and for Figma refs in `pixelslash dev`. `--token-path` and `--figma-token-path` win. Only the token and the file or node ids go to Figma. | unset (`dev` skips a Figma ref; a `--file` run stops and asks for a token) |
+| `PIXELSLASH_OPENCODE_MODEL` | `<provider/model>` of a hosted vision model. Set, every judge (the DS judge, `dev --judge`, `upload --judge`) runs through `opencode run -m` and the images it judges go to that provider. See [The opencode judge](#the-opencode-judge). The model's key is opencode's own (`OPENCODE_API_KEY`), which PixelSlash never reads. | unset (mlx, else ollama, else `skip: no judge`) |
+| `PIXELSLASH_SENTRY_DSN` | The Sentry DSN crashes and `UPLOAD FAILED` runs are reported to. See [Error reporting](#error-reporting-opt-in). | unset (no reporting, no SDK loaded) |
+| `PIXELSLASH_SENTRY_ENVIRONMENT` | The environment tag on an error report. | `cli` |
+| `PIXELSLASH_IMAGE_DIGEST` | The pinned capture image's digest, which a shot's [fingerprint](#the-manifest-and-the-fingerprint) records as `image`. Pass it with `-e` when you run the image. | unset |
+| `PIXELSLASH_IMAGE_VERSION` | The image's version, recorded as `version:<it>` when no digest is set. The capture image sets it. | unset (the fingerprint is `bare`) |
+| `PIXELSLASH_SNAPSHOT_DIR` | The directory `snapshot()` writes to in your own [Playwright tests](#snapshots-from-your-own-playwright-tests), when the call passes no `dir`. | `pixelslash-snapshots` |
+| `XDG_CONFIG_HOME` | Where `pixelslash login` keeps its token file: `$XDG_CONFIG_HOME/pixelslash/credentials.json`. | `~/.config` |
+| `HOME` | The home directory the credentials file falls back to when `XDG_CONFIG_HOME` is unset. | the OS's home directory |
+| `GITHUB_HEAD_REF` | The branch an upload names, in a GitHub Actions pull request run. `--branch` wins. | unset (then `GITHUB_REF_NAME`, then the checked-out branch) |
+| `GITHUB_REF_NAME` | The branch an upload names when `GITHUB_HEAD_REF` is unset. | unset |
+| `GITHUB_REF` | The pull request number an upload names, read from `refs/pull/N/…`. `--pr` wins. | unset (no pull request) |
 
 ## API
 

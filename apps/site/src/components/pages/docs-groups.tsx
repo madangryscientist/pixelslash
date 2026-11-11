@@ -1,6 +1,6 @@
 import { Card, SubsectionHeading, TextLink } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
-import { GROUPS, LISTED_PAGES } from "../../content/docs-map.ts";
+import { EXTRA_NAV, GROUPS, LISTED_PAGES } from "../../content/docs-map.ts";
 
 /** The trailing mark on an index link. Decorative: the link's name is its title. */
 function LinkChevron(): ReactNode {
@@ -28,11 +28,24 @@ const LONG_GROUP = 8;
  * than 8 listed links spans the row and lists its links in two columns; Get started spans the
  * first row. The rest pair up: walking in order, a group that would sit alone in a row (the next
  * group spans, or it is the last) spans too, so no half row is left empty. Each group is a grid of
- * its heading over a card that fills the rest, so the cards in one row end level.
+ * its heading over a card that fills the rest, so the cards in one row end level. A site page that
+ * sits in the docs nav (`EXTRA_NAV`) is a link in its group's card after the group's pages, drawn
+ * as a page link is, and counts towards the group's length.
  */
 export function DocsGroupGrid(): ReactNode {
-  const pages = GROUPS.map((group) => LISTED_PAGES.filter((page) => page.group === group.id));
-  const long = pages.map((list) => list.length > LONG_GROUP);
+  const links = GROUPS.map((group) => [
+    ...LISTED_PAGES.filter((page) => page.group === group.id).map((page) => ({
+      key: page.slug,
+      href: `/docs/${page.slug}`,
+      title: page.title,
+    })),
+    ...EXTRA_NAV.filter((extra) => extra.group === group.id).map((extra) => ({
+      key: extra.href,
+      href: extra.href,
+      title: extra.title,
+    })),
+  ]);
+  const long = links.map((list) => list.length > LONG_GROUP);
   const spans: boolean[] = [];
   let column = 0;
   GROUPS.forEach((_, index) => {
@@ -66,13 +79,13 @@ export function DocsGroupGrid(): ReactNode {
                   : "flex flex-col gap-1"
               }
             >
-              {pages[index]?.map((page) => (
+              {links[index]?.map((link) => (
                 <li
-                  key={page.slug}
+                  key={link.key}
                   className={long[index] ? "md:mb-1 break-inside-avoid" : undefined}
                 >
-                  <TextLink href={`/docs/${page.slug}`}>
-                    {page.title}
+                  <TextLink href={link.href}>
+                    {link.title}
                     <LinkChevron />
                   </TextLink>
                 </li>
