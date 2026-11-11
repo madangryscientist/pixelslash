@@ -18,23 +18,26 @@ import { ACTION, COMMITMENT, FACTS, LEAD, STATEMENT } from "../../content/pricin
 /**
  * The statement, its lead and the one action on the left of a hero, the commitment beside them on the
  * right; the facts follow, and the contact line ends the page. Below lg the hero is one column, in
- * that order.
+ * that order. From lg the hero is the facts' own three columns with the same gap, the headline over
+ * two of them and the commitment over the third, so its left edge meets the third card's.
  */
 export function PricingPage(): ReactNode {
   return (
     <Stack width="full" gap="lg">
-      <div className="grid gap-8 lg:grid-cols-[3fr_2fr] lg:items-start" data-testid="pricing-hero">
-        <Stack gap="sm">
-          <PageHeading>
-            <Display as="span">{STATEMENT}</Display>
-          </PageHeading>
-          <Lead>{LEAD}</Lead>
-          <Cluster>
-            <Button href={ACTION.href} size="lg" data-testid="pricing-action">
-              {ACTION.label} <span aria-hidden="true">→</span>
-            </Button>
-          </Cluster>
-        </Stack>
+      <div className="grid gap-8 lg:grid-cols-3 lg:gap-4 lg:items-start" data-testid="pricing-hero">
+        <div className="lg:col-span-2">
+          <Stack gap="sm">
+            <PageHeading>
+              <Display as="span">{STATEMENT}</Display>
+            </PageHeading>
+            <Lead>{LEAD}</Lead>
+            <Cluster>
+              <Button href={ACTION.href} size="lg" data-testid="pricing-action">
+                {ACTION.label} <span aria-hidden="true">→</span>
+              </Button>
+            </Cluster>
+          </Stack>
+        </div>
         <Callout tone="neutral" title="Our commitment" data-testid="commitment">
           {COMMITMENT}
         </Callout>
