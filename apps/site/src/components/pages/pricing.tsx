@@ -12,8 +12,15 @@ import {
   TextLink,
 } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
-import { CONTACT } from "../../content/links.ts";
-import { ACTION, COMMITMENT, FACTS, LEAD, STATEMENT } from "../../content/pricing.ts";
+import { CONTACT, REPO_PUBLIC, REPO_URL } from "../../content/links.ts";
+import {
+  ACTION,
+  COMMITMENT,
+  FACTS,
+  LEAD,
+  LICENCE_BRIEF,
+  STATEMENT,
+} from "../../content/pricing.ts";
 
 /**
  * The statement, its lead and the one action on the left of a hero, the commitment beside them on the
@@ -49,6 +56,16 @@ export function PricingPage(): ReactNode {
           </Card>
         ))}
       </CardGrid>
+      <Callout tone="neutral" title="The licence in brief" data-testid="licence-brief">
+        <Stack gap="sm">
+          <span data-testid="licence-brief-text">{LICENCE_BRIEF}</span>
+          {REPO_PUBLIC ? (
+            <span>
+              <TextLink href={`${REPO_URL}/blob/main/LICENSE`}>Read the licence</TextLink>
+            </span>
+          ) : null}
+        </Stack>
+      </Callout>
       <Caption as="p">
         Questions? Write to <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>.
       </Caption>

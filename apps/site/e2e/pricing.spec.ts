@@ -14,8 +14,9 @@ test("pricing leads with one statement and one action, and fills", async ({ page
   await expect(main.getByRole("heading", { level: 1 })).toBeInViewport();
   await expect(main.getByTestId("pricing-action")).toBeInViewport();
   await expect(main.getByTestId("pricing-action")).toHaveAttribute("href", ACTION.href);
-  // The contact address at the foot of the page is the only other link.
-  await expect(main.locator('a:not([href^="mailto:"])')).toHaveCount(1);
+  // The action and the LICENSE link in the licence callout (PS-386); the contact address at the foot
+  // is a mailto link and not counted.
+  await expect(main.locator('a:not([href^="mailto:"])')).toHaveCount(2);
 
   const header = await page.getByRole("banner").boundingBox();
   const facts = await main.getByTestId("pricing-facts").boundingBox();
