@@ -5,7 +5,7 @@ import { DOC_PAGES } from "../src/content/docs-map.ts";
  * Where a reader is in the docs: the rail with the current page marked and only its group open,
  * breadcrumbs, a contents list that follows the headings, an index with one first step, and a phone
  * that folds the rail and the contents. Each runs on a desktop and a phone (playwright.config.ts).
- * PS-333 adds the sticky rail and contents: the kit's `SidebarLayout` and `DetailLayout stickyAside`.
+ * PS-333 adds the sticky rail and contents: the kit's `SidebarLayout` and, from PS-401, a site grid with the same sticky classes at xl.
  */
 
 // A page long enough to have several headings and a group other than the first.
