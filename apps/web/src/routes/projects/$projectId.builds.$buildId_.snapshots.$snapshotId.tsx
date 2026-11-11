@@ -9,9 +9,10 @@ import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
 import { EdgeWarning, IgnoreBoxes, useIgnoreDraft } from "#/components/ignore-boxes";
 import { RerunShot } from "#/components/rerun";
+import type { PanelToggle } from "#/components/snapshot-controls";
 import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
 import { SidePanel } from "#/components/snapshot-side-panel";
-import { SnapshotViewer } from "#/components/snapshot-viewer";
+import { SnapshotViewer, useViewState, type ViewState } from "#/components/snapshot-viewer";
 import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
 import { ignoreAreas } from "#/lib/ignore-areas";
@@ -19,6 +20,7 @@ import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
 import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { useReviewKeys } from "#/lib/use-review-keys";
+import { useWide } from "#/lib/use-wide";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snapshots/$snapshotId")(
@@ -184,15 +186,88 @@ function ShotCrumbs({ data }: { data: ReturnType<typeof Route.useLoaderData> }) 
   );
 }
 
+/**
+ * At Fit, side by side, on a wide screen, the side panel folds away so the two panes get the whole
+ * width; the toggle brings it back. It stays open while a task in it needs it (flagging, drawing
+ * an ignore area), and below `lg` it is a stack under the image as ever. Null when it never folds.
+ */
+function usePanelFold(
+  view: ReturnType<typeof useViewState>,
+  busy: boolean,
+): { folded: boolean; toggle: PanelToggle | null } {
+  const wide = useWide();
+  const [reopened, setReopened] = useState(false);
+  const folds = wide && view.mode === "side" && view.scale === "fit";
+  if (!folds) return { folded: false, toggle: null };
+  const folded = !reopened && !busy;
+  return {
+    folded,
+    toggle: { shown: !folded, locked: busy, onToggle: () => setReopened(folded) },
+  };
+}
+
+/** The centre column: the viewer, and the composition and accessibility findings under it. */
+function ViewerStage({
+  data,
+  error,
+  flag,
+  ignore,
+  ignored,
+  view,
+  panel,
+}: {
+  data: ReturnType<typeof Route.useLoaderData>;
+  error: string | null;
+  flag: ReturnType<typeof useFlagDraft>;
+  ignore: ReturnType<typeof useIgnoreDraft>;
+  ignored: ReturnType<typeof ignoreAreas>;
+  view: ViewState;
+  panel: PanelToggle | null;
+}) {
+  const { snapshot, images } = data;
+  return (
+    <Stack gap="sm">
+      <DecisionError error={error} />
+      <EdgeWarning result={snapshot.diffResult} />
+      <CompositionFocus>
+        <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
+          <SnapshotViewer
+            name={snapshot.name}
+            mainUrl={images.main}
+            branchUrl={images.branch}
+            diffUrl={images.diff}
+            result={snapshot.diffResult}
+            removed={snapshot.diffStatus === "removed"}
+            composition={snapshot.composition}
+            marks={flag.marks}
+            onDraw={flag.onDraw ?? ignore.onDraw}
+            ignored={ignored}
+            view={view}
+            panel={panel}
+          />
+        </RegionNotesProvider>
+        <CompositionPanel composition={snapshot.composition} />
+        <A11yPanel diff={snapshot.a11yDiff} />
+      </CompositionFocus>
+    </Stack>
+  );
+}
+
 function SnapshotPage() {
   const data = Route.useLoaderData();
-  const { project, build, snapshot, images, previousId, nextId, names } = data;
+  const { project, build, snapshot, previousId, nextId, names } = data;
   const reviewable = build.status === "changes" || build.status === "passed";
   const { busy, error, decide } = useDecision(data, reviewable);
   const [help, setHelp] = useState(false);
   const flag = useFlagDraft(snapshot.id, data.flags, snapshot.diffResult !== null);
   const ignore = useIgnoreDraft(snapshot.id);
   const ignored = ignoreAreas(snapshot, data.uploadedIgnore, ignore.rect);
+  const view = useViewState();
+  // The flag form and the ignore tools live in the panel, so it stays while they are in use.
+  const { folded, toggle } = usePanelFold(
+    view,
+    flag.open || ignore.drawing || ignore.rect !== null,
+  );
   const label = useMemo(() => shotLabeller(names)(snapshot.name), [names, snapshot.name]);
   useRefreshWhile(snapshot.aiPending);
 
@@ -230,30 +305,22 @@ function SnapshotPage() {
             }}
           />
         }
-        panel={<SideColumn data={data} flag={flag} ignore={ignore} reviewable={reviewable} />}
+        panelLabel="Review panel"
+        panel={
+          folded ? null : (
+            <SideColumn data={data} flag={flag} ignore={ignore} reviewable={reviewable} />
+          )
+        }
       >
-        <Stack gap="sm">
-          <DecisionError error={error} />
-          <EdgeWarning result={snapshot.diffResult} />
-          <CompositionFocus>
-            <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
-              <SnapshotViewer
-                name={snapshot.name}
-                mainUrl={images.main}
-                branchUrl={images.branch}
-                diffUrl={images.diff}
-                result={snapshot.diffResult}
-                removed={snapshot.diffStatus === "removed"}
-                composition={snapshot.composition}
-                marks={flag.marks}
-                onDraw={flag.onDraw ?? ignore.onDraw}
-                ignored={ignored}
-              />
-            </RegionNotesProvider>
-            <CompositionPanel composition={snapshot.composition} />
-            <A11yPanel diff={snapshot.a11yDiff} />
-          </CompositionFocus>
-        </Stack>
+        <ViewerStage
+          data={data}
+          error={error}
+          flag={flag}
+          ignore={ignore}
+          ignored={ignored}
+          view={view}
+          panel={toggle}
+        />
       </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}
     </Page>

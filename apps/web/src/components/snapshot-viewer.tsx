@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type Crop, changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { Composition } from "#/components/composition";
-import { type Mode, ViewerControls } from "#/components/snapshot-controls";
+import { type Mode, type PanelToggle, ViewerControls } from "#/components/snapshot-controls";
 import type { Scale } from "#/components/snapshot-frame";
 import { type Marking, Pane } from "#/components/snapshot-pane";
-import { SnapshotOverlay } from "#/components/snapshot-overlay";
+import { OverlayControls, SnapshotOverlay, useOverlay } from "#/components/snapshot-overlay";
 import { SliderControls, SnapshotSlider, useSlider } from "#/components/snapshot-slider";
 import type { DiffResult, IgnoreRect } from "#/db/schema";
 
@@ -100,6 +100,20 @@ function cropOf(result: DiffResult | null): Crop | null {
   return result ? changeCrop(result.regions, result.width, result.height) : null;
 }
 
+/** How the shot is being looked at; the page holds it, because the side panel folds away at Fit. */
+export type ViewState = {
+  mode: Mode;
+  onMode: (mode: Mode) => void;
+  scale: Scale;
+  onScale: (scale: Scale) => void;
+};
+
+export function useViewState(): ViewState {
+  const [mode, onMode] = useState<Mode>("side");
+  const [scale, onScale] = useState<Scale>("fit");
+  return { mode, onMode, scale, onScale };
+}
+
 /**
  * The three ways to look at one shot, each at the chosen scale and with or without the measured
  * boxes. Boxes are drawn from the regions the diff stored, nothing is recomputed here; when the two
@@ -109,47 +123,56 @@ export function SnapshotViewer({
   marks = [],
   onDraw = null,
   ignored = [],
+  view,
+  panel,
   ...shots
-}: Shots & Partial<Marking>) {
-  const [chosen, setMode] = useState<Mode>("side");
+}: Shots & Partial<Marking> & { view: ViewState; panel: PanelToggle | null }) {
   // An area is drawn on Main or Branch as they stand; overlay and slider move the images around.
-  const mode = onDraw ? "side" : chosen;
-  const [scale, setScale] = useState<Scale>("fit");
-  const [highlight, setHighlight] = useState(true);
+  const mode = onDraw ? "side" : view.mode;
+  const { scale } = view;
+  // Off on load: the shot is read as it is first, and the boxes are asked for.
+  const [highlight, setHighlight] = useState(false);
   const [showFindings, setShowFindings] = useState(true);
   const slider = useSlider();
+  const overlay = useOverlay();
   const { result } = shots;
   const crop = cropOf(result);
-  const view = { highlight, scale, crop };
   const draw = overlapDraw(onDraw, result);
+  const shown = { highlight, scale, crop };
+  let modeControls: ReactNode = null;
+  if (mode === "slider")
+    modeControls = <SliderControls slider={slider} branchUrl={shots.branchUrl} />;
+  if (mode === "overlay")
+    modeControls = <OverlayControls overlay={overlay} diffUrl={shots.diffUrl} />;
   return (
     <section aria-label="Snapshot viewer">
       <ViewerControls
         mode={mode}
-        onMode={setMode}
+        onMode={view.onMode}
         highlight={highlight}
         onHighlight={setHighlight}
         scale={scale}
-        onScale={setScale}
+        onScale={view.onScale}
         measured={result !== null}
         crop={crop}
         composition={shots.composition}
         showFindings={showFindings}
         onShowFindings={setShowFindings}
-        slider={<SliderControls slider={slider} branchUrl={shots.branchUrl} />}
+        modeControls={modeControls}
+        panel={panel}
       />
       {mode === "side" && (
         <SideBySide
           {...shots}
           showFindings={showFindings}
-          {...view}
+          {...shown}
           marks={marks}
           onDraw={draw}
           ignored={ignored}
         />
       )}
-      {mode === "overlay" && <SnapshotOverlay {...shots} {...view} />}
-      {mode === "slider" && <SnapshotSlider {...shots} {...view} slider={slider} />}
+      {mode === "overlay" && <SnapshotOverlay {...shots} {...shown} overlay={overlay} />}
+      {mode === "slider" && <SnapshotSlider {...shots} {...shown} slider={slider} />}
     </section>
   );
 }

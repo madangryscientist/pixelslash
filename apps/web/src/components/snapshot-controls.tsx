@@ -7,6 +7,9 @@ import { useHydrated } from "#/components/ui";
 
 export type Mode = "side" | "overlay" | "slider";
 
+/** The side panel's toggle: whether it is showing, and `locked` when a task in it keeps it open. */
+export type PanelToggle = { shown: boolean; locked: boolean; onToggle: () => void };
+
 const MODES: { id: Mode; label: string }[] = [
   { id: "side", label: "Side by side" },
   { id: "overlay", label: "Overlay" },
@@ -93,6 +96,27 @@ function CompositionToggle({
 const hasFindings = (composition: Composition | null | undefined): composition is Composition =>
   !!composition && composition.gaps.length + composition.special.length > 0;
 
+/** The side panel's show and hide switch; it is held open (and disabled) while a task needs the panel. */
+function PanelButton({ panel }: { panel: PanelToggle }) {
+  const hydrated = useHydrated();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      pressed={panel.shown}
+      disabled={!hydrated || panel.locked}
+      title={
+        panel.locked
+          ? "The panel stays open while you flag or ignore an area"
+          : "Show or hide the side panel (the summary, the explanation and the tools)"
+      }
+      onClick={panel.onToggle}
+    >
+      Side panel
+    </Button>
+  );
+}
+
 /**
  * The mode (and the slider's own controls beside it), then, a wider gap apart, the toggles that draw
  * on the shot, then the scale: one row above the stage.
@@ -109,7 +133,8 @@ export function ViewerControls({
   composition,
   showFindings,
   onShowFindings,
-  slider,
+  modeControls,
+  panel,
 }: {
   mode: Mode;
   onMode: (mode: Mode) => void;
@@ -122,15 +147,20 @@ export function ViewerControls({
   composition: Composition | null | undefined;
   showFindings: boolean;
   onShowFindings: (on: boolean) => void;
-  /** The slider's range and onion toggle, shown in slider mode. */
-  slider?: ReactNode;
+  /** The chosen mode's own controls beside the mode picker: the slider's range, the overlay's opacity. */
+  modeControls?: ReactNode;
+  /**
+   * The side panel's toggle, only while the panel can be folded away (Fit, side by side, a wide
+   * screen); null otherwise, when the panel is always there.
+   */
+  panel: PanelToggle | null;
 }) {
   const hydrated = useHydrated();
   return (
     <Cluster gap="md" wrap>
       <Cluster gap="xs" wrap>
         <Segmented label="View mode" options={MODES} value={mode} onChange={onMode} />
-        {mode === "slider" && slider}
+        {modeControls}
       </Cluster>
       <Cluster gap="xs" wrap>
         <Button
@@ -143,7 +173,7 @@ export function ViewerControls({
           }
           onClick={() => onHighlight(!highlight)}
         >
-          Highlight
+          {highlight ? "Highlight on" : "Highlight off"}
         </Button>
         {hasFindings(composition) && (
           <CompositionToggle
@@ -155,6 +185,7 @@ export function ViewerControls({
         )}
       </Cluster>
       <ClusterGrow />
+      {panel && <PanelButton panel={panel} />}
       <Segmented
         label="Scale"
         options={SCALES}

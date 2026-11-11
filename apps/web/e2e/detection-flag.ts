@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { SERVER } from "./ports";
+import { showPanel } from "./snapshot-viewer";
 
 const HYDRATION = /hydrat|react\.dev\/errors\/(418|423|425)/i;
 
@@ -35,6 +36,7 @@ export async function flagFalsePositive(page: Page) {
 
   await page.reload();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await showPanel(page);
   const badge = page.getByTestId("detection-flag");
   await expect(badge).toHaveCount(1);
   await expect(badge).toHaveAttribute("data-kind", "false_positive");

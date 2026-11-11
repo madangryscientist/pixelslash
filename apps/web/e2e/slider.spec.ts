@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { showPanel } from "./snapshot-viewer";
 
 /**
  * The side panel's disclosures and the slider (PS-265): Branch is drawn at Main's scale, the divider follows a drag on the image,
@@ -22,6 +23,7 @@ test("Details and Tools start shut; the slider draws both shots at one scale, dr
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await showPanel(page);
 
   // The side panel leads with the summary; Details and Tools start collapsed and open with a click.
   await expect(page.getByTestId("sizes")).toBeHidden();

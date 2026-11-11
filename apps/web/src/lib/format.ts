@@ -77,3 +77,14 @@ export function formatBytes(bytes: number): string {
   const text = unit === 0 || value >= 10 ? String(Math.round(value)) : value.toFixed(1);
   return `${text} ${units[unit]}`;
 }
+
+/**
+ * The share of the compared area that changed, to one decimal place: "35.7%". Anything above zero
+ * that would round to 0.0% reads "<0.1%", so a real change never shows as none. `area` is the
+ * compared (overlapping) rectangle, never the larger shot (invariant 1).
+ */
+export function formatPercent(part: number, area: number): string {
+  if (area <= 0 || part <= 0) return "0.0%";
+  const percent = (part / area) * 100;
+  return percent < 0.1 ? "<0.1%" : `${Math.min(percent, 100).toFixed(1)}%`;
+}

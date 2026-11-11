@@ -56,9 +56,9 @@ test("a build held open by differences from main shows them as changed and new",
   await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   const title = page.locator("h1");
-  await expect(page.getByTestId("position")).toHaveText("1 of 3");
+  await expect(page.getByTestId("position")).toHaveText("shot 1 of 3");
   await expect(title).toHaveAttribute("title", "about");
   await page.keyboard.press("j");
-  await expect(page.getByTestId("position")).toHaveText("2 of 3");
+  await expect(page.getByTestId("position")).toHaveText("shot 2 of 3");
   await expect(title).toHaveAttribute("title", "pricing");
 });

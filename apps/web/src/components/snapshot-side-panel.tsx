@@ -20,7 +20,7 @@ import { Provenance } from "#/components/provenance";
 import { TwinsRow } from "#/components/twins";
 import type { SnapshotView } from "#/db/review";
 import type { DiffOptions } from "#/db/schema";
-import { formatDateTime, formatNumber } from "#/lib/format";
+import { formatDateTime, formatNumber, formatPercent } from "#/lib/format";
 import { awaitsDecision } from "#/lib/snapshot-groups";
 import type { TwinEntry } from "#/lib/twins";
 
@@ -84,7 +84,11 @@ function Summary({ snapshot }: { snapshot: SnapshotView }) {
     const boxes = result.regions.filter((region) => region.kind === "change").length;
     body = (
       <KeyValueList>
-        <KeyValue label="Changed px">{formatNumber(result.changedPixels)}</KeyValue>
+        <KeyValue label="Changed px">
+          <span data-testid="changed-px">
+            {`${formatNumber(result.changedPixels)} (${formatPercent(result.changedPixels, result.width * result.height)})`}
+          </span>
+        </KeyValue>
         <KeyValue label="Changed regions">{boxes}</KeyValue>
       </KeyValueList>
     );

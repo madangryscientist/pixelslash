@@ -43,8 +43,10 @@ function keyStep(event: KeyboardEvent, position: number): number | null {
 }
 
 /**
- * The divider's grip: a focusable `role=slider`, so the wipe works without a pointer. A Pill marks
- * where the wipe sits; hackcove has no Slider, so there is no coloured divider line of our own.
+ * The divider: a 2px white line with a 1px dark edge, so it reads on a light shot and on a dark
+ * one whatever the app's theme, and a round grab handle in the middle. The whole thing is a
+ * focusable `role=slider`, so the wipe works without a pointer. hackcove has no Slider, so the
+ * line is drawn here (listed as a kit gap in the PR).
  */
 function Handle({ slider }: { slider: SliderState }) {
   const { position, setPosition } = slider;
@@ -63,12 +65,21 @@ function Handle({ slider }: { slider: SliderState }) {
         event.preventDefault();
         setPosition(next);
       }}
-      className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none"
+      className="group absolute inset-y-0 w-8 -translate-x-1/2 cursor-ew-resize touch-none outline-none"
       style={{ left: `${position}%` }}
     >
-      <Pill tone="violet" round>
+      <span
+        data-testid="slider-divider"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-[color:var(--hc-surface,white)] shadow-[0_0_0_1px_var(--hc-ink,#0f172a)]"
+      />
+      <span
+        data-testid="slider-grip"
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-1/2 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-[color:var(--hc-ink,#0f172a)] bg-[color:var(--hc-surface,white)] text-sm text-[color:var(--hc-ink,#0f172a)] shadow-md group-focus-visible:ring-2 group-focus-visible:ring-[color:var(--hc-accent,#7c3aed)] group-focus-visible:ring-offset-2"
+      >
         ↔
-      </Pill>
+      </span>
     </div>
   );
 }
