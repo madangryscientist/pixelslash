@@ -124,10 +124,10 @@ export function Pane({
   const measured = width && height ? { width, height } : null;
   return (
     <figure className="min-w-0">
-      {/* Sticks under the bar while this pane scrolls past, so a tall shot never loses its side; `bg-gray-50` is the page canvas AppShell paints. */}
+      {/* Sticks under the bar while this pane scrolls past, so a tall shot never loses its side. It is opaque so the shot scrolls under it, in the theme's surface colour (the kit has no canvas variable). */}
       <figcaption
         data-testid="pane-label"
-        className="sticky top-[calc(var(--app-header,0px)+var(--shot-bar,6rem))] z-4 mb-2 bg-gray-50 py-1 text-sm font-medium"
+        className="sticky top-[calc(var(--app-header,0px)+var(--shot-bar,6rem))] z-4 mb-2 bg-[color:var(--hc-surface,white)] py-1 text-sm font-medium"
       >
         {label}
         {caption && (
