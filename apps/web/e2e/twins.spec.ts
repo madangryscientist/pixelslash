@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { SHA_MAIN, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { showPanel } from "./snapshot-viewer";
 import { createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 
@@ -48,6 +49,7 @@ async function shoot(
   await page.reload();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /dark/ : /^((?!dark).)*$/);
+  if (page.url().includes("/snapshots/")) await showPanel(page);
   await target.screenshot({ path: join(SHOTS, `${name}-${scheme}.png`) });
 }
 
@@ -77,6 +79,7 @@ test("a web and an android shot of one name and theme are twins; an android-only
   );
   expect(web && android).toBeTruthy();
   await open(page, `/projects/${projectId}/builds/${buildId}/snapshots/${web?.id}`);
+  await showPanel(page);
   const twins = page.getByTestId("twins");
   await expect(twins.getByTestId("twin")).toHaveCount(1);
   await expect(twins).toContainText("android · Pixel 8 API 35");
@@ -87,6 +90,7 @@ test("a web and an android shot of one name and theme are twins; an android-only
   // The link goes to the twin, whose own panel links back to the web shot.
   await twins.getByRole("link", { name: "android · Pixel 8 API 35" }).click();
   await expect(page).toHaveURL(new RegExp(`/snapshots/${android?.id}$`));
+  await showPanel(page);
   await expect(page.getByTestId("twins")).toContainText("web");
 });
 

@@ -31,7 +31,7 @@ const SHORTCUTS: [string, string][] = [
 type Review = { index: number | null; total: number };
 
 function reviewText(review: Review): string {
-  if (review.index !== null) return `${review.index} / ${review.total} with a change`;
+  if (review.index !== null) return `change ${review.index} of ${review.total}`;
   if (review.total === 0) return "nothing to review";
   return `not to review · ${review.total} with a change`;
 }
@@ -211,7 +211,7 @@ export function ViewerBar({
               {reviewText(review)}
             </Text>
             <Text data-testid="position" tone="muted" numeric>
-              {position} of {total}
+              {`shot ${position} of ${total}`}
             </Text>
           </Cluster>
         </div>

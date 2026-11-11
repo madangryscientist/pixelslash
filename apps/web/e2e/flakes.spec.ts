@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { showPanel } from "./snapshot-viewer";
 
 /**
  * Flakes on the server (ob 1724): a flaky shot under each policy, uploaded as the CLI sends it,
@@ -51,6 +52,7 @@ test("a flaky shot under each policy: badge, summary line, config line, resolve 
     .click();
   await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await showPanel(page);
   const panel = page.getByTestId("flake-panel");
   await expect(panel.getByTestId("flaky-badge")).toHaveText("skipped: flaky");
   await expect(panel.getByTestId("flake-differed")).toHaveText("1 of 3 runs differed (run 2)");

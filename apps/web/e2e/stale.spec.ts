@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { showPanel } from "./snapshot-viewer";
 import { SERVER } from "./ports";
 
 /**
@@ -79,6 +80,7 @@ async function shoot(
   await page.reload();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /dark/ : /^((?!dark).)*$/);
+  if (page.url().includes("/snapshots/")) await showPanel(page);
   await target.screenshot({ path: join(SHOTS, `${name}-${scheme}.png`) });
 }
 
@@ -126,6 +128,7 @@ test("accepting a web change makes the android twin stale until an android shot 
   const web = (await shots(token, webBuild)).find((s) => s.name === NAME);
   expect(web).toBeTruthy();
   await open(page, `/projects/${projectId}/builds/${webBuild}/snapshots/${web?.id}`);
+  await showPanel(page);
   const twins = page.getByTestId("twins");
   await expect(twins.getByTestId("stale-badge")).toHaveCount(1);
   await expect(twins.getByTestId("twin-stale-cause")).toContainText("accepted by E2E Octocat");
@@ -153,6 +156,7 @@ test("accepting a web change makes the android twin stale until an android shot 
     page.getByText("no change here; the web twin changed, so this native shot needs a review"),
   ).toBeVisible();
   await open(page, `/projects/${projectId}/builds/${nativeBuild}/snapshots/${android?.id}`);
+  await showPanel(page);
   await expect(page.getByTestId("position")).toHaveText(/of \d/);
 
   // 5. The reviewer accepts it, and the stale line is gone.

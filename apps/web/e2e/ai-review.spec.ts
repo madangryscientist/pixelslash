@@ -10,6 +10,7 @@ import {
   uploadBuild,
 } from "./api-upload";
 import { STUB } from "./ports";
+import { highlightToggle, showPanel } from "./snapshot-viewer";
 
 /**
  * A project's own model (ob 1473), set on the settings page and answered by the e2e stub, which
@@ -65,11 +66,13 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
   await expect(summary.getByRole("alert")).toHaveCount(0);
 
   await filtered.getByTestId("snapshot-row").getByRole("link").click();
+  await showPanel(page);
   const notes = page.getByTestId("ai-explanation");
   await expect(notes.getByTestId("ai-auto-passed")).toBeVisible();
   await expect(notes.getByTestId("ai-label")).toHaveText("noise");
   await expect(notes).toContainText("Text edges moved by a sub-pixel.");
-  // Every pane that draws the region's box carries its label.
+  // Every pane that draws the region's box carries its label (the highlight is off when a shot opens).
+  await highlightToggle(page).click();
   await expect(page.locator('rect[data-ai-label="noise"]').first()).toBeAttached();
 });
 
@@ -124,6 +127,7 @@ test("with no model a changed shot is reviewed as plain pixels", async ({ page }
   await expect(page.getByTestId("summary-sentence")).toHaveCount(0);
   await expect(page.getByTestId("summary-regenerate")).toHaveCount(0);
   await page.getByTestId("snapshot-row").getByRole("link").click();
+  await showPanel(page);
   await expect(page.getByTestId("ai-skip")).toHaveText("skip: no judge. Review the pixels.");
 });
 

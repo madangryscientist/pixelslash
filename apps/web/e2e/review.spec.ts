@@ -14,7 +14,7 @@ import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
 import { rivalContext, rivalSession } from "./rival";
-import { checkSnapshotViewer } from "./snapshot-viewer";
+import { checkSnapshotViewer, showPanel, walkViewModes } from "./snapshot-viewer";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const WEB = fileURLToPath(new URL("..", import.meta.url));
@@ -227,23 +227,15 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   // The changed shot: both modes, boxes from the stored regions, signed image URLs.
   await group(page, "changed").getByRole("link", { name: /about/i }).click();
   await expect(page).toHaveURL(/\/snapshots\//);
-  await expect(page.getByTestId("position")).toHaveText("1 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 1 of 5");
+  await showPanel(page);
   await expect(page.getByTestId("sizes")).toContainText("compared at 40×40");
   await expect(page.getByTestId("diff-options")).toContainText("threshold");
   await expect(page.getByTestId("diff-options")).toContainText("0.2");
   await expectSignedImage(page);
   await capture(page, "03-snapshot-side-by-side");
 
-  await page.getByRole("radio", { name: "Overlay" }).click();
-  await expect(
-    page.locator('svg[aria-label="Measured regions"] rect[data-kind="change"]').first(),
-  ).toBeVisible();
-  await capture(page, "04-snapshot-overlay");
-
-  await page.getByRole("radio", { name: "Slider" }).click();
-  await page.getByLabel("Compare position").fill("70");
-  await expect(page.getByLabel("Compare position")).toHaveValue("70");
-  await capture(page, "05-snapshot-slider");
+  await walkViewModes(page, capture);
   await checkSnapshotViewer(page);
   await flagFalsePositive(page);
   await capture(page, "05b-snapshot-flagged");
@@ -251,15 +243,15 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   // j walks to the next shot in the build's order; k comes back.
   await page.locator("h1").click();
   await page.keyboard.press("j");
-  await expect(page.getByTestId("position")).toHaveText("2 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 2 of 5");
   await expect(page.getByTestId("sizes")).toContainText("Main 40×40 · Branch 48×40");
   await expect(page.getByTestId("sizes")).toContainText("not painted as changed");
   await page.keyboard.press("k");
-  await expect(page.getByTestId("position")).toHaveText("1 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 1 of 5");
 
   // a accepts the shot on screen, and the reviewer moves to the next shot awaiting a decision.
   await page.keyboard.press("a");
-  await expect(page.getByTestId("position")).toHaveText("2 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 2 of 5");
   // Back on shot 1: its decision is there, and accepting did not clear its flag (they are independent).
   await page.keyboard.press("k");
   await expect(page.getByTestId("review-state")).toHaveText("accepted by e2e-octocat");
@@ -269,7 +261,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
 
   // r rejects the size-changed shot and the build fails.
   await group(page, "changed").getByRole("link", { name: /hero/i }).click();
-  await expect(page.getByTestId("position")).toHaveText("2 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 2 of 5");
   await rejectThenWalkFailedBuild(page, buildUrl);
   await open(page, buildUrl);
   await expect(page.getByTestId("build-status")).toHaveText("failed");
@@ -333,12 +325,12 @@ test("a decision moves the reviewer on: accept advances, a failed decision stays
   await threeChangedBuild(page, "Advance Co");
   const position = page.getByTestId("position");
   await group(page, "changed").getByRole("link", { name: /s2/i }).click();
-  await expect(position).toHaveText("2 of 3");
+  await expect(position).toHaveText("shot 2 of 3");
   // Wrap: shot 3 is the last, so deciding it goes back to shot 1, still undecided.
   await page.keyboard.press("j");
-  await expect(position).toHaveText("3 of 3");
+  await expect(position).toHaveText("shot 3 of 3");
   await page.keyboard.press("a");
-  await expect(position).toHaveText("1 of 3");
+  await expect(position).toHaveText("shot 1 of 3");
   // A failed decision stays on the shot and shows the error.
   await page.route("**/*", (route) => {
     const body = route.request().postData() ?? "";
@@ -348,12 +340,12 @@ test("a decision moves the reviewer on: accept advances, a failed decision stays
   });
   await page.keyboard.press("a");
   await expect(page.getByRole("alert")).toBeVisible();
-  await expect(position).toHaveText("1 of 3");
+  await expect(position).toHaveText("shot 1 of 3");
   await page.unroute("**/*");
 
   // Accept 1, then 2: none is left undecided, so the build page shows the settled state.
   await page.keyboard.press("a");
-  await expect(position).toHaveText("2 of 3");
+  await expect(position).toHaveText("shot 2 of 3");
   await page.keyboard.press("a");
   await page.waitForURL(/\/builds\/[^/?]+(\?.*)?$/);
 });
@@ -362,12 +354,12 @@ test("re-deciding a shot: a rejection goes to the build page", async ({ page }) 
   await threeChangedBuild(page, "Redecide Co");
   const position = page.getByTestId("position");
   await group(page, "changed").getByRole("link", { name: /s1/i }).click();
-  await expect(position).toHaveText("1 of 3");
+  await expect(position).toHaveText("shot 1 of 3");
   await page.keyboard.press("a");
-  await expect(position).toHaveText("2 of 3");
+  await expect(position).toHaveText("shot 2 of 3");
   // Back to shot 1 and reject it: the build fails, so the reviewer goes to the build page.
   await page.keyboard.press("k");
-  await expect(position).toHaveText("1 of 3");
+  await expect(position).toHaveText("shot 1 of 3");
   await page.keyboard.press("r");
   await page.waitForURL(/\/builds\/[^/?]+(\?.*)?$/);
 });

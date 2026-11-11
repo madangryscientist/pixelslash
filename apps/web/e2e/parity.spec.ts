@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { SHA_MAIN, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { showPanel } from "./snapshot-viewer";
 import { png } from "./png";
 import { SERVER } from "./ports";
 
@@ -73,6 +74,7 @@ test("the side panel opens the parity view: web and android side by side, no ios
   expect(web).toBeTruthy();
 
   await open(page, `/projects/${projectId}/builds/${buildId}/snapshots/${web?.id}`);
+  await showPanel(page);
   await page.getByTestId("twins").getByTestId("compare-platforms").click();
   await expect(page).toHaveURL(/\/builds\/[^/]+\/parity\?/);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
