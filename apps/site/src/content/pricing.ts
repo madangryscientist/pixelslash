@@ -21,7 +21,7 @@ export const FACTS = [
   {
     title: "Free, and source available",
     icon: "branch",
-    body: "PixelSlash is licensed under the Elastic License 2.0, which is source available, not open source. The CLI, the diff engine and the review app are all in the repository, with nothing held back. You may use, copy and modify it. You may not offer it to others as a hosted or managed service.",
+    body: "PixelSlash is licensed under the Elastic License 2.0, which is source available, not open source. The CLI, the diff engine and the review app are all in the repository, with nothing held back. You may use, copy and modify it. You may not offer it to others as a hosted or managed service that gives them a substantial set of its features.",
   },
   {
     title: "Self-host all of it",

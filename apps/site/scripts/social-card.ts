@@ -26,7 +26,7 @@ p { margin-top: 28px; font-size: 26px; color: #bac2de; }
 <div class="copy">
   <div class="brand"><img src="${await dataUrl("public/favicon.svg", "image/svg+xml")}" alt="">PixelSlash</div>
   <h1>See what your change <span>did to the page.</span></h1>
-  <p>Source available · Elastic License 2.0 · Local first</p>
+  <p>Source available · Local first</p>
 </div>
 <img class="shot" src="${await dataUrl("public/hero/branch.png", "image/png")}" alt="">`;
 

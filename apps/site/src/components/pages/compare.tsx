@@ -160,7 +160,7 @@ function WhoFor(): ReactNode {
       <Text as="p">
         No row below is ours alone, so the difference is the mix: a run is local by default, and the
         whole review app is source available and can be self-hosted for your own use. Argos is open
-        source too, but its docs say self-hosting is not officially supported, and it is run as a
+        source, but its docs say self-hosting is not officially supported, and it is run as a
         managed service. Lost Pixel is local and open source, and is being wound down.
       </Text>
       <Text as="p">
