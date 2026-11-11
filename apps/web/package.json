@@ -23,8 +23,8 @@
   },
   "dependencies": {
     "@hackcove/pixelslash-engine": "workspace:*",
-    "@hackcove/themes": "^0.2.0",
-    "@hackcove/ui-react": "^0.10.0",
+    "@hackcove/themes": "^0.2.1",
+    "@hackcove/ui-react": "^0.10.1",
     "@sentry/cloudflare": "11.9.0",
     "@sentry/react": "11.9.0",
     "@tailwindcss/vite": "^4.1.18",

@@ -5,26 +5,6 @@ import { type SearchEntry, type SearchHit, search } from "../../content/search.t
 const INDEX_URL = "/search-index.json";
 const HINT = "Search the docs (press /)";
 
-/** The glass, drawn in the kit's icon grammar (24 units, ink in 2 to 22, 1.5 stroke, round caps and joins, no fill). */
-function SearchGlass(): ReactNode {
-  return (
-    <Icon>
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="10.5" cy="10.5" r="7" />
-        <path d="M15.5 15.5 21 21" />
-      </svg>
-    </Icon>
-  );
-}
-
 /** A key that types a character: a text field, a select or a contenteditable area (the rule `apps/web` uses too). */
 function isTextEntry(target: EventTarget | null): boolean {
   return (
@@ -96,7 +76,7 @@ export function DocsSearch(): ReactNode {
     <div role="search" ref={rootRef} className="flex flex-col gap-2">
       <Input
         type="search"
-        icon={<SearchGlass />}
+        icon={<Icon name="search" />}
         aria-label="Search the docs"
         placeholder={query === "" ? HINT : undefined}
         data-testid="docs-search"

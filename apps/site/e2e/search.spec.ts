@@ -59,9 +59,10 @@ test("a search for nothing says so", async ({ page }) => {
 test("the search field has a decorative glass, and the hint names the key", async ({ page }) => {
   await page.goto("/docs", { waitUntil: "networkidle" });
   const field = page.getByTestId("docs-search");
-  const glass = page.getByRole("search").locator("svg").first();
-  await expect(glass).toBeVisible();
-  await expect(glass).toHaveAttribute("aria-hidden", "true");
+  // The kit's Icon is decorative on its wrapper (aria-hidden), and draws the glass inside it.
+  const glassBox = page.getByRole("search").locator("[aria-hidden='true']:has(> svg)").first();
+  await expect(glassBox).toBeVisible();
+  await expect(glassBox.locator("svg")).toBeVisible();
   await expect(field).toHaveAccessibleName("Search the docs");
   await expect(field).toHaveAttribute("placeholder", "Search the docs (press /)");
 });
