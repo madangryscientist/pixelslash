@@ -91,6 +91,12 @@
   text-decoration: none;
 }
 
+/* The chevron after each link takes the accent ink at rest (PS-385), so the page is not grey on
+   grey in light. The link text stays quiet; on hover and focus both are accent. */
+[data-testid="docs-index"] ul a[href] svg {
+  color: var(--hc-accent);
+}
+
 [data-testid="docs-index"] ul a[href]:is(:hover, :focus-visible) {
   color: var(--hc-accent);
   text-decoration: underline;

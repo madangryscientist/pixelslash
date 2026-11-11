@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { GROUPS } from "../src/content/docs-map.ts";
+import { GROUPS, LISTED_PAGES } from "../src/content/docs-map.ts";
+import { groupRows } from "./support/docs-rows.ts";
 
 /*
  * PS-378: the /docs landing has a hierarchy. A group heading is larger and heavier than the links
- * under it, Get started is the first group, spans the row and starts above the fold, an odd tail
- * spans its row so the grid ends evenly, and the intro is held to 75ch. That every listed page is
+ * under it, Get started is the first group, spans the row and starts above the fold, a long group
+ * (more than 8 links) spans the row in two columns, no group sits alone in a half row, the cards in
+ * a row end level (PS-385), the chevrons take the accent ink, and the intro is held to 75ch. That every listed page is
  * still linked stays with smoke.spec.ts and docs.test.tsx. Desktop, 1440x900, both themes.
  */
 
@@ -54,22 +56,7 @@ for (const scheme of ["light", "dark"] as const) {
       expect(second.width).toBeLessThan(list.width * 0.6);
     });
 
-    test("an odd tail spans the row, so the grid ends evenly", async ({ page }) => {
-      await page.goto("/docs", { waitUntil: "networkidle" });
-      const cards = page.getByTestId("docs-index").locator(":scope > li");
-      const [list, last] = await Promise.all([
-        page.getByTestId("docs-index").boundingBox(),
-        cards.last().boundingBox(),
-      ]);
-      if (!list || !last) throw new Error("the list or its last group has no box");
-      // Get started spans the first row, so an odd count after it leaves the last group alone in its row.
-      const alone = (GROUPS.length - 1) % 2 === 1;
-      if (alone)
-        expect(last.width, "a lone last group spans the row").toBeGreaterThanOrEqual(
-          list.width - 1,
-        );
-      else expect(last.width, "a paired last group shares its row").toBeLessThan(list.width * 0.6);
-    });
+    layoutTests();
 
     test("the intro is held to 75ch", async ({ page }) => {
       await page.goto("/docs", { waitUntil: "networkidle" });
@@ -84,5 +71,95 @@ for (const scheme of ["light", "dark"] as const) {
       });
       expect(width, "intro width against 75ch").toBeLessThanOrEqual(ch75 + 1);
     });
+  });
+}
+
+/** PS-385: the grid's row rules, run inside the 1440 describes above (viewport and scheme are theirs). */
+function layoutTests(): void {
+  test("every group with more than 8 listed links is full width, in two columns", async ({
+    page,
+  }) => {
+    await page.goto("/docs", { waitUntil: "networkidle" });
+    const cards = page.getByTestId("docs-index").locator(":scope > li");
+    const list = await page.getByTestId("docs-index").boundingBox();
+    if (!list) throw new Error("the list has no box");
+    let longGroups = 0;
+    for (const [index, group] of GROUPS.entries()) {
+      const count = LISTED_PAGES.filter((p) => p.group === group.id).length;
+      const box = await cards.nth(index).boundingBox();
+      if (!box) throw new Error(`${group.id} has no box`);
+      if (count <= 8) continue;
+      longGroups += 1;
+      expect(box.width, `${group.id}: ${count} links span the row`).toBeGreaterThanOrEqual(
+        list.width - 1,
+      );
+      const links = await cards
+        .nth(index)
+        .locator("a[href^='/docs/']")
+        .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
+      expect(new Set(links).size, `${group.id}: links in two columns`).toBe(2);
+    }
+    expect(longGroups, "the data has a long group").toBeGreaterThan(0);
+  });
+
+  test("every group is full width or shares its row with exactly one half width group", async ({
+    page,
+  }) => {
+    await page.goto("/docs", { waitUntil: "networkidle" });
+    const list = await page.getByTestId("docs-index").boundingBox();
+    if (!list) throw new Error("the list has no box");
+    const full = (width: number): boolean => width >= list.width - 1;
+    for (const row of await groupRows(page)) {
+      if (row.groups.length === 1)
+        expect(
+          full(row.groups[0]?.width ?? 0),
+          `row at ${Math.round(row.top)}: alone, so full`,
+        ).toBe(true);
+      else {
+        expect(row.groups, `row at ${Math.round(row.top)}: shares with exactly one`).toHaveLength(
+          2,
+        );
+        expect(
+          row.groups.every((g) => !full(g.width)),
+          "both are half width",
+        ).toBe(true);
+      }
+    }
+  });
+
+  test("cards in one row end level", async ({ page }) => {
+    await page.goto("/docs", { waitUntil: "networkidle" });
+    const rows = await groupRows(page);
+    expect(rows.length).toBeGreaterThan(1);
+    for (const row of rows) {
+      const bottoms = row.groups.map((g) => g.bottom);
+      const spread = Math.max(...bottoms) - Math.min(...bottoms);
+      expect(spread, `row at ${Math.round(row.top)}: card bottoms`).toBeLessThanOrEqual(2);
+    }
+  });
+  chevronTest();
+}
+
+/** PS-385: the chevron after each link is accent ink, the link text stays quiet. */
+function chevronTest(): void {
+  test("the chevrons take the accent ink, the link text stays quiet", async ({ page }) => {
+    await page.goto("/docs", { waitUntil: "networkidle" });
+    const colours = await page.getByTestId("docs-index").evaluate((list) => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--hc-accent)";
+      list.append(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      const link = list.querySelector("ul a[href^='/docs/']");
+      const chevron = link?.querySelector("svg");
+      if (!link || !chevron) throw new Error("no index link with a chevron");
+      return {
+        accent,
+        text: getComputedStyle(link).color,
+        chevron: getComputedStyle(chevron).color,
+      };
+    });
+    expect(colours.chevron, "chevron against the accent token").toBe(colours.accent);
+    expect(colours.chevron, "chevron against the link text").not.toBe(colours.text);
   });
 }
