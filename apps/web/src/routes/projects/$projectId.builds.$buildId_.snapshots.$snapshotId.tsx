@@ -10,7 +10,7 @@ import { FlakePanel } from "#/components/flake";
 import { EdgeWarning, IgnoreBoxes, useIgnoreDraft } from "#/components/ignore-boxes";
 import { RerunShot } from "#/components/rerun";
 import type { PanelToggle } from "#/components/snapshot-controls";
-import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
+import { ShortcutHelp, StickyRail, ViewerBar } from "#/components/snapshot-panels";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer, useViewState, type ViewState } from "#/components/snapshot-viewer";
 import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
@@ -20,7 +20,7 @@ import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
 import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { useReviewKeys } from "#/lib/use-review-keys";
-import { useWide } from "#/lib/use-wide";
+import { usePanelFold } from "#/lib/use-panel-fold";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snapshots/$snapshotId")(
@@ -160,20 +160,28 @@ function SideColumn({
 }) {
   const { project, build, snapshot } = data;
   return (
-    <SidePanel
-      projectId={project.id}
-      buildId={build.id}
-      snapshot={snapshot}
-      options={data.diffOptions}
-      reviewable={reviewable}
-      status={build.status}
-      metrics={data.metrics}
-      twins={data.twins}
-      tools={hasTools(data) ? <ShotTools data={data} ignore={ignore} /> : null}
-    >
-      <FlagPanel projectId={project.id} snapshotId={snapshot.id} flags={data.flags} draft={flag} />
-      {data.flake && <Flake data={data} />}
-    </SidePanel>
+    <StickyRail>
+      {" "}
+      <SidePanel
+        projectId={project.id}
+        buildId={build.id}
+        snapshot={snapshot}
+        options={data.diffOptions}
+        reviewable={reviewable}
+        status={build.status}
+        metrics={data.metrics}
+        twins={data.twins}
+        tools={hasTools(data) ? <ShotTools data={data} ignore={ignore} /> : null}
+      >
+        <FlagPanel
+          projectId={project.id}
+          snapshotId={snapshot.id}
+          flags={data.flags}
+          draft={flag}
+        />
+        {data.flake && <Flake data={data} />}
+      </SidePanel>
+    </StickyRail>
   );
 }
 
@@ -184,26 +192,6 @@ function ShotCrumbs({ data }: { data: ReturnType<typeof Route.useLoaderData> }) 
       crumbs={[orgCrumb(org), projectCrumb(project), buildCrumb(project.id, build), snapshot.name]}
     />
   );
-}
-
-/**
- * At Fit, side by side, on a wide screen, the side panel folds away so the two panes get the whole
- * width; the toggle brings it back. It stays open while a task in it needs it (flagging, drawing
- * an ignore area), and below `lg` it is a stack under the image as ever. Null when it never folds.
- */
-function usePanelFold(
-  view: ReturnType<typeof useViewState>,
-  busy: boolean,
-): { folded: boolean; toggle: PanelToggle | null } {
-  const wide = useWide();
-  const [reopened, setReopened] = useState(false);
-  const folds = wide && view.mode === "side" && view.scale === "fit";
-  if (!folds) return { folded: false, toggle: null };
-  const folded = !reopened && !busy;
-  return {
-    folded,
-    toggle: { shown: !folded, locked: busy, onToggle: () => setReopened(folded) },
-  };
 }
 
 /** The centre column: the viewer, and the composition and accessibility findings under it. */
@@ -283,14 +271,17 @@ function SnapshotPage() {
     helpOpen: help,
   });
 
+  const crumbs = <ShotCrumbs data={data} />;
   return (
     <Page bleed>
+      {/* On a phone the breadcrumbs scroll away above the bar; from sm they sit in it. */}
+      <div className="px-4 pt-2 sm:hidden">{crumbs}</div>
       <FullBleedLayout
         padded
         bar={
           <ViewerBar
             {...data}
-            breadcrumbs={<ShotCrumbs data={data} />}
+            breadcrumbs={crumbs}
             label={label}
             reviewable={reviewable}
             busy={busy}
