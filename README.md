@@ -102,5 +102,5 @@ compares what PixelSlash does with other tools, including where it is behind.
 
 ## Licence
 
-MIT; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). PixelSlash is a name of Jacobus
-Langner; the MIT licence does not grant it.
+Elastic License 2.0; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). PixelSlash is a name of
+Jacobus Langner; the licence does not grant it.

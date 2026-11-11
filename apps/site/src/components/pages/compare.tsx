@@ -154,14 +154,14 @@ function WhoFor(): ReactNode {
         sunsetting it. Today that means running the review server yourself.
       </Text>
       <Text as="p">
-        It is free: MIT-licensed, with all of it in the repository and no paid plan to buy. A paid
-        service run by us is planned; it is not on sale.
+        It is free: source available under the Elastic License 2.0, with all of it in the repository
+        and no paid plan to buy. A paid service run by us is planned; it is not on sale.
       </Text>
       <Text as="p">
         No row below is ours alone, so the difference is the mix: a run is local by default, and the
-        whole review app is open source and can be self-hosted. Argos is open source too, but its
-        docs say self-hosting is not officially supported, and it is run as a managed service. Lost
-        Pixel is local and open source, and is being wound down.
+        whole review app is source available and can be self-hosted for your own use. Argos is open
+        source, but its docs say self-hosting is not officially supported, and it is run as a
+        managed service. Lost Pixel is local and open source, and is being wound down.
       </Text>
       <Text as="p">
         The diff is measured. On the held-out half of{" "}

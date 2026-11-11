@@ -75,7 +75,7 @@ function Hero(): ReactNode {
       <div className="relative mx-auto max-w-4xl text-center">
         <p className="home-rise">
           <Pill tone="emerald" dot round>
-            Free · Open source · MIT · Local first
+            Free · Source available · Elastic License 2.0 · Local first
           </Pill>
         </p>
         <h1 className="home-rise mt-6 text-5xl leading-[1.05] font-bold tracking-tight md:text-[4.25rem]">
@@ -104,8 +104,8 @@ function Steps(): ReactNode {
     <section className="px-5 pt-6 pb-14">
       <p className="home-reveal mx-auto mb-8 max-w-4xl text-center text-(--home-sub)">
         PixelSlash runs in place of a hosted visual-review service such as Chromatic, Percy or
-        Argos. It is an MIT-licensed CLI that needs no Storybook and no account, with no paid plan
-        to buy. <TextLink href="/compare">Where it is still behind</TextLink>.
+        Argos. It is a source-available CLI that needs no Storybook and no account, with no paid
+        plan to buy. <TextLink href="/compare">Where it is still behind</TextLink>.
       </p>
       <ol className="home-steps mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
         {STEPS.map((step, index) => (
