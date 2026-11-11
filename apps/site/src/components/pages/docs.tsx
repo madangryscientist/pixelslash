@@ -26,6 +26,7 @@ import {
 } from "../../content/docs-map.ts";
 import { REPO_PUBLIC, REPO_URL } from "../../content/links.ts";
 import { DocBody, type Heading } from "../../content/markdown.tsx";
+import { DocsGroupGrid } from "./docs-groups";
 import { DocsSearch } from "./docs-search";
 import { useActiveHeading } from "./use-active-heading";
 
@@ -253,24 +254,6 @@ const FIRST_STEP = {
   text: "Install PixelSlash, compare two versions of a page and read the report. About fifteen minutes, all on your machine.",
 } as const;
 
-/** The trailing mark on an index link. Decorative: the link's name is its title. */
-function LinkChevron(): ReactNode {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className="ml-1 inline-block h-3.5 w-3.5 align-[-0.1em]"
-    >
-      <path
-        fillRule="evenodd"
-        d="M7.2 4.8a.75.75 0 0 1 1.06 0l4.7 4.67a.75.75 0 0 1 0 1.06l-4.7 4.67a.75.75 0 1 1-1.06-1.06L11.37 10 7.2 5.86a.75.75 0 0 1 0-1.06Z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
-
 /** `/docs`: the search box, one first step, then every group. No rail: the cards run the full column. */
 export function DocsIndexPage(): ReactNode {
   const first = findPage(FIRST_STEP.slug);
@@ -297,27 +280,10 @@ export function DocsIndexPage(): ReactNode {
         >
           {FIRST_STEP.text}
         </Callout>
-        <DocBody doc={CLI_INTRO_DOC} />
-        {/* Packed into columns, not a grid: a grid stretches a short group to its long neighbour's height. */}
-        <ul data-testid="docs-index" className="m-0 list-none columns-1 gap-x-6 p-0 md:columns-2">
-          {GROUPS.map((group) => (
-            <li key={group.id} className="mb-6 break-inside-avoid">
-              <Card title={group.title} titleStyle="name">
-                <p className="mb-3 text-sm text-slate-600">{group.summary}</p>
-                <ul className="flex flex-col gap-1">
-                  {LISTED_PAGES.filter((page) => page.group === group.id).map((page) => (
-                    <li key={page.slug}>
-                      <TextLink href={pageHref(page)}>
-                        {page.title}
-                        <LinkChevron />
-                      </TextLink>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </li>
-          ))}
-        </ul>
+        <div className="max-w-[75ch]" data-testid="docs-intro">
+          <DocBody doc={CLI_INTRO_DOC} />
+        </div>
+        <DocsGroupGrid />
       </ProseLayout>
     </>
   );

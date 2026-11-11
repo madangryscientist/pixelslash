@@ -104,7 +104,7 @@ test("/docs is the index: a card per group, every page linked", async ({ page },
     await expect(index.locator(`a[href="/docs/${item.slug}"]`)).toHaveCount(1);
 });
 
-// PS-351: the groups are packed into columns, so no card is a box with a void under its links.
+// PS-351: no card is a box with a void under its links (the grid, PS-378, lets a card keep its own height).
 for (const size of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
