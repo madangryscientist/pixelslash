@@ -4,7 +4,6 @@ import {
   Callout,
   Card,
   CardGrid,
-  DetailLayout,
   Disclosure,
   PageHeader,
   ProseLayout,
@@ -206,7 +205,7 @@ function DocArticle({ slug }: { slug: string }): ReactNode {
   const article = (
     <div className="flex flex-col gap-8">
       {hasRail && (
-        <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
+        <details className="rounded-md border border-slate-200 px-4 py-2 xl:hidden">
           <summary className="cursor-pointer text-sm font-medium">On this page</summary>
           <div className="py-2">
             <OnThisPage headings={doc.headings} />
@@ -219,29 +218,27 @@ function DocArticle({ slug }: { slug: string }): ReactNode {
       <PrevNext slug={slug} />
     </div>
   );
-  return hasRail ? (
-    // The kit sticks the contents under the header from `lg` and scrolls it itself when it is taller than the room left.
-    <DetailLayout
-      title={page.title}
-      breadcrumbs={breadcrumbs}
-      stickyAside
-      aside={
-        <nav aria-label="On this page" data-testid="docs-contents" className="hidden lg:block">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            On this page
-          </p>
-          <OnThisPage headings={doc.headings} track />
-        </nav>
-      }
-    >
-      {article}
-    </DetailLayout>
-  ) : (
+  return (
     <div>
       <PageHeader title={page.title} breadcrumbs={breadcrumbs} />
-      {/* Nothing to stick: the kit's DetailLayout without its aside, so no second unnamed aside beside the rail's. */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="min-w-0 lg:col-span-2">{article}</div>
+      {/* The columns are sized to their content: the text takes the room, the contents list is 12rem from xl. The kit's DetailLayout gives its aside a third, which suits a details panel and not a contents list. */}
+      <div className={hasRail ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_12rem]" : "grid gap-6"}>
+        <div className="min-w-0" data-testid="docs-article">
+          {article}
+        </div>
+        {hasRail && (
+          // The kit's own sticky classes (STICKY_ASIDE_LG, STICKY_SCROLL_LG) at xl, which it does not export: stuck under the header, scrolling itself when taller than the room left.
+          <aside className="hidden min-w-0 xl:sticky xl:top-[var(--app-header,0px)] xl:block xl:self-start">
+            <div className="xl:-m-1 xl:max-h-[calc(100dvh-var(--app-header,0px)-2rem)] xl:overflow-y-auto xl:p-1">
+              <nav aria-label="On this page" data-testid="docs-contents">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  On this page
+                </p>
+                <OnThisPage headings={doc.headings} track />
+              </nav>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
