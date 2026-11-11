@@ -2,7 +2,7 @@
   "name": "@hackcove/pixelslash-engine",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "type": "module",
   "imports": {
     "#diff-module": {

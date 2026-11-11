@@ -52,7 +52,7 @@ function Footer(): ReactNode {
         <a href="/" className="flex items-center" aria-label="PixelSlash home">
           <Wordmark />
         </a>
-        <span>MIT licence</span>
+        <span>Elastic License 2.0</span>
         <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
         <SourceLink />
       </div>

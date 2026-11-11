@@ -711,7 +711,7 @@
       "label": "Free tier / OSS plan",
       "ps": {
         "v": "p",
-        "note": "MIT and free to self-host with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app is not live",
+        "note": "Free to self-host for your own use with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app is not live",
         "commit": "cad8b76"
       },
       "t": {
@@ -729,8 +729,8 @@
       "k": "open_source",
       "label": "Open source",
       "ps": {
-        "v": "y",
-        "note": "public repo under MIT, with NOTICE: the CLI, engine, Playwright helper, review app, site and self-host image are all in the tree; the name is not licensed",
+        "v": "n",
+        "note": "source available under the Elastic License 2.0, not an OSI open-source licence: all the code is in the public repo; offering it to others as a hosted service is not allowed; the name is not licensed",
         "commit": "cad8b76"
       },
       "t": {
@@ -740,7 +740,8 @@
         "applitools": "?",
         "lost": "y"
       },
-      "plan": ""
+      "plan": "",
+      "gap": "an open-source licence: the Elastic License 2.0 is source available, so all the code is public but offering it to others as a hosted or managed service is not allowed"
     }
   ],
   "notes": {

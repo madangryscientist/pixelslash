@@ -1,7 +1,7 @@
 {
   "name": "@pixelslash/bench",
   "private": true,
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "type": "module",
   "dependencies": {
     "@hackcove/pixelslash-engine": "workspace:*",

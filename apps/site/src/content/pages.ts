@@ -8,7 +8,7 @@ export const PAGES = [
     label: "Home",
     title: "PixelSlash: visual review for the web",
     description:
-      "PixelSlash diffs two versions of a page and shows what changed. Open source, MIT, self-hostable.",
+      "PixelSlash diffs two versions of a page and shows what changed. Source available under the Elastic License 2.0, self-hostable.",
   },
   {
     to: "/how-it-works",
@@ -43,7 +43,7 @@ export const PAGES = [
     label: "Pricing",
     title: "Pricing · PixelSlash",
     description:
-      "PixelSlash is free and you can run all of it yourself. There is no paid plan to buy; the whole product is in the open-source repository.",
+      "PixelSlash is free and you can run all of it yourself. There is no paid plan to buy; the whole product is in the source-available repository.",
   },
   {
     to: "/security",

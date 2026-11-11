@@ -24,8 +24,8 @@ function WhoFor(): ReactNode {
         <TextLink href="/compare">The comparison</TextLink> lists where it is still behind.
       </Text>
       <Text as="p">
-        It is free: MIT-licensed, with all of it in the repository and no paid plan to buy. A paid
-        service run by us is planned; it is not on sale.
+        It is free: source available under the Elastic License 2.0, with all of it in the repository
+        and no paid plan to buy. A paid service run by us is planned; it is not on sale.
       </Text>
       <Text as="p">
         It differs in where the work happens: a local run needs no server, and uploads nothing
