@@ -136,6 +136,25 @@ test("a shot whose judge failed says so and why, not that there is no judge", as
   await expect(page.getByTestId("ai-skip")).toHaveCount(0);
 });
 
+test("the view mode picker keeps the chosen mode checked, also across a theme toggle", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openChangedShot(page);
+  const radio = (name: string) => page.getByRole("radio", { name, exact: true });
+  for (const mode of ["Slider", "Overlay", "Side by side"]) {
+    await radio(mode).click();
+    await expect(radio(mode)).toHaveAttribute("aria-checked", "true");
+    for (const other of ["Side by side", "Overlay", "Slider"].filter((m) => m !== mode))
+      await expect(radio(other)).toHaveAttribute("aria-checked", "false");
+    // A theme toggle re-renders the page: the mode stays chosen.
+    await page.getByTestId("theme-toggle").click();
+    await expect(radio(mode)).toHaveAttribute("aria-checked", "true");
+    await page.getByTestId("theme-toggle").click();
+    await expect(radio(mode)).toHaveAttribute("aria-checked", "true");
+  }
+});
+
 test("the overlay's opacity range sets the top layer's opacity", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openChangedShot(page);
