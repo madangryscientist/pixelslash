@@ -110,7 +110,7 @@ export function Shell({
       controls={<Controls />}
       // One row from md: the nav sits between the brand and the controls. On a phone AppShell folds it
       // behind its Menu button; the controls stay in the header.
-      nav={<Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />}
+      nav={<Tabs variant="pill" items={items} label="Site" size="md" data-testid="site-nav" />}
       footer={<Footer />}
       bleed
       data-art=""

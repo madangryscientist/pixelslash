@@ -65,6 +65,18 @@
   }
 }
 
+/* The nav is the kit's md pill (14px). From md to lg the tabs do not fit the row at that size, so
+   this band keeps the sm metrics (px-2.5 py-1 text-xs: 12px on a 1.3333 line). Unlayered, like the
+   Home rule, so it beats the kit's utilities; the line height is set too, as text-xs sets both. The
+   selector also matches the phone Menu's nav, which is hidden in this band. From lg the nav is 14px. */
+@media (min-width: 48rem) and (width < 64rem) {
+  header nav[aria-label="Site"] a {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: calc(1 / 0.75);
+  }
+}
+
 /* Light-theme headings have their own, darker ink (PS-364). Latte's theme file maps the kit's
    text-slate-900 (headings, Display, SectionHeading) to body grey with an unlayered rule at 0,2,0,
    so the rules below are written at :root.latte (0,2,x) to win; a selector without the root is

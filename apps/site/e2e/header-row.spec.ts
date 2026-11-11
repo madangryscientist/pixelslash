@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { PAGES } from "../src/content/pages.ts";
 import { box, hydrated, toggleOf } from "./support/header.ts";
-import { menuButton } from "./support/site-nav.ts";
+import { menuButton, siteNav } from "./support/site-nav.ts";
 
 const LABELS = PAGES.map((one) => one.label);
 
@@ -13,6 +13,8 @@ const LABELS = PAGES.map((one) => one.label);
  */
 const ROW_MAX = 64;
 const WIDTHS = [768, 1024, 1280, 1440] as const;
+// The nav is the kit's md pill (14px) from lg; from md to lg the tabs would not fit, so they keep sm (12px).
+const NAV_FONT_PX = (width: number): string => (width < 1024 ? "12px" : "14px");
 
 for (const width of WIDTHS) {
   for (const scheme of ["light", "dark"] as const) {
@@ -45,6 +47,10 @@ for (const width of WIDTHS) {
           tops.push(Math.round((await box(link)).y));
         }
         expect(new Set(tops).size).toBe(1);
+        for (const label of shown) {
+          const link = nav.getByRole("link", { name: label, exact: true });
+          await expect(link).toHaveCSS("font-size", NAV_FONT_PX(width));
+        }
         const home = nav.getByRole("link", { name: "Home", exact: true });
         if (width < 1024) await expect(home).toHaveCount(0);
         else await expect(home).toBeVisible();
@@ -106,5 +112,20 @@ test.describe("at 768 in light, the page it is on", () => {
       "aria-current",
       "page",
     );
+  });
+});
+
+test.describe("on a phone, the open Menu", () => {
+  test.skip(({ isMobile }) => !isMobile, "the mobile project only");
+
+  test("shows its nav links at 14px", async ({ page }) => {
+    await page.goto("/", { waitUntil: "networkidle" });
+    await hydrated(page);
+    const nav = await siteNav(page);
+    for (const label of LABELS) {
+      const link = nav.getByRole("link", { name: label, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveCSS("font-size", "14px");
+    }
   });
 });
