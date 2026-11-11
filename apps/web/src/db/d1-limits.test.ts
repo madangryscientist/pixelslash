@@ -12,6 +12,8 @@ import { overrideChanges } from "./overrides";
 import { createOrg, createProject, listOrgs } from "./orgs";
 import { acceptAllSnapshots, buildView } from "./review";
 import { d1Db } from "./test-d1";
+import { twinsOfBuild } from "./twins";
+import { baselinesOf } from "./twins-read";
 import { signInGithubUser } from "./users";
 
 /**
@@ -79,6 +81,18 @@ describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
     expect(view.snapshots.every((s) => s.approvedEarlier?.buildId === first.id)).toBe(true);
     const shotNames = [...new Set(view.snapshots.map((s) => s.name))];
     expect(await overrideChanges(ctx.db, ctx.userId, ctx.projectId, shotNames)).toEqual([]);
+
+    // The build page's twin read: a web build, so the android and ios baselines are read under every
+    // name (PS-406: the baselines read bound more than it counted, and 89 names broke it).
+    await twinsOfBuild(ctx.db, second.id);
+    // The widest form of that read: all three platforms and the excluded build.
+    const wide = await baselinesOf(ctx.db, {
+      projectIds: [ctx.projectId],
+      platforms: ["web", "android", "ios"],
+      names,
+      exceptBuild: second.id,
+    });
+    expect(wide.length).toBeGreaterThan(0);
 
     // The snapshot pages: the first, a middle and the last shot.
     for (const snapshot of [view.snapshots[0], view.snapshots[SHOTS >> 1], view.snapshots.at(-1)]) {
