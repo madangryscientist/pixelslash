@@ -200,6 +200,14 @@ for (const scheme of ["light", "dark"] as const) {
       });
 
       await page.goto(to, { waitUntil: "networkidle" });
+      // `fonts.ready` resolves when nothing is pending, which is also true before layout has asked
+      // for the face (status `unloaded`; the preload fetches the file, not the FontFace). So wait
+      // for the page itself to have loaded Inter, then read it below. Nothing here loads the face.
+      await page.waitForFunction(() =>
+        [...document.fonts].some(
+          (face) => face.status === "loaded" && face.family.replaceAll('"', "") === "Inter",
+        ),
+      );
       await page.evaluate(() => document.fonts.ready);
 
       expect(foreign, "a request left the site's own origin").toEqual([]);

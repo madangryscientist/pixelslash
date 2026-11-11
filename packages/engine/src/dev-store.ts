@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, stat } from "node:fs/promises";
+import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Region } from "./regions.ts";
 
@@ -114,8 +114,19 @@ export async function newIteration(store: DevStore): Promise<{ id: string; dir: 
   return { id, dir };
 }
 
+/**
+ * Written to a temp file and renamed over, so a reader (the live page, a second `dev`, a test
+ * polling for the first result) sees the whole file or none of it. `Bun.write` truncates and then
+ * writes in place, and a reader that lands between the two parses an empty file.
+ */
+async function writeJson(file: string, value: unknown): Promise<void> {
+  const temp = `${file}.${process.pid}.tmp`;
+  await Bun.write(temp, `${JSON.stringify(value, null, 2)}\n`);
+  await rename(temp, file);
+}
+
 export async function saveIteration(it: DevIteration): Promise<void> {
-  await Bun.write(join(it.dir, "result.json"), `${JSON.stringify(it, null, 2)}\n`);
+  await writeJson(join(it.dir, "result.json"), it);
 }
 
 /** An iteration's result, or undefined when it has none (still running, or pruned). */
@@ -161,7 +172,7 @@ export async function readPins(store: DevStore): Promise<string[]> {
 
 async function writePins(store: DevStore, pins: string[]): Promise<void> {
   await mkdir(store.root, { recursive: true });
-  await Bun.write(pinsFile(store), `${JSON.stringify({ pins }, null, 2)}\n`);
+  await writeJson(pinsFile(store), { pins });
 }
 
 /** Pin `id` (default: the latest iteration) as the comparison point; returns the pinned id. */

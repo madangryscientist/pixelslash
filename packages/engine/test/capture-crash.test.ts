@@ -41,6 +41,8 @@ const html = (color: string) =>
 
 /** Hits per path, and how long the first `/slow` hit holds its body (the real crash lands in that wait). */
 const hits = new Map<string, number>();
+/** Resolved once the first `/slow` hit has sent its head: the navigation is then in flight and stalled, so a crash lands in the goto. */
+let slowHeld = Promise.withResolvers<void>();
 const server = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
@@ -61,6 +63,7 @@ const server = Bun.serve({
         new ReadableStream({
           async start(c) {
             c.enqueue(enc.encode('<!doctype html><body style="margin:0;background:#ff0000">'));
+            slowHeld.resolve();
             await Bun.sleep(4_000);
             c.close();
           },
@@ -75,6 +78,7 @@ beforeEach(() => {
   contexts = 0;
   plan = () => {};
   hits.clear();
+  slowHeld = Promise.withResolvers<void>();
 });
 afterAll(async () => {
   await server.stop(true);
@@ -235,13 +239,14 @@ describe(
     test("real Chromium: a renderer killed mid-load is retried and the retry's PNG is kept", async () => {
       plan = (n, context) => {
         if (n !== 1) return;
+        // Killed when the server holds the first hit, not after a delay: on a loaded runner the
+        // request can reach the server later than any fixed wait. A crash that lands first leaves
+        // the retry as the server's first hit, and that one stalls, so the retry's goto times out.
         context.on("page", (page) => {
-          setTimeout(() => {
-            void context
-              .newCDPSession(page)
-              .then((cdp) => cdp.send("Page.crash"))
-              .catch(() => {});
-          }, 500);
+          void slowHeld.promise
+            .then(() => context.newCDPSession(page))
+            .then((cdp) => cdp.send("Page.crash"))
+            .catch(() => {});
         });
       };
       const { warnings, rgb, error } = await run("/slow", 4_000);
