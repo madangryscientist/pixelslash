@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { BlobStore } from "#/storage/blobs";
-import type { SnapshotKey } from "./baselines";
+import { type SnapshotKey, snapshotKeyOf } from "./baselines";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
 import { refreshBuildStatus } from "./verdict";
@@ -137,6 +137,35 @@ export async function labelFlake(
   // A write only when the label changes: a shot with no flake, the common case, writes nothing.
   if (flakeId !== shot.flakeId)
     await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
+}
+
+/**
+ * `labelFlake` with no flake record, for many shots of one project at once: each takes its key's
+ * open flake, if any, in one read of the project's open flakes. A shot is written only when its
+ * label changes, as `labelFlake` writes, so the outcome is the same one shot at a time.
+ */
+export async function labelOpenFlakes(
+  db: Db,
+  projectId: string,
+  shots: { id: string; key: SnapshotKey; flakeId: string | null }[],
+): Promise<void> {
+  const open = await db
+    .select({
+      id: flakes.id,
+      name: flakes.name,
+      platform: flakes.platform,
+      browser: flakes.browser,
+      viewport: flakes.viewport,
+      theme: flakes.theme,
+    })
+    .from(flakes)
+    .where(and(eq(flakes.projectId, projectId), eq(flakes.status, "open")));
+  const byKey = new Map(open.map((f) => [snapshotKeyOf(f), f.id]));
+  for (const shot of shots) {
+    const flakeId = byKey.get(snapshotKeyOf(shot.key)) ?? null;
+    if (flakeId !== shot.flakeId)
+      await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
+  }
 }
 
 /**

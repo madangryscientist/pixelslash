@@ -73,6 +73,15 @@ export function snapshotForm(
   return form;
 }
 
+/**
+ * One shot of a batch: the meta a PUT sends for a shot registered by hash, with the hash.
+ * Only a shot with nothing but its meta to send is batched (no metrics file, CI result or flake
+ * record), so this is the whole of what its PUT would carry.
+ */
+export function batchItem(e: SnapshotEntry, sha256: string, note: string | null) {
+  return { ...snapshotMeta(e), ...(note ? { changeNote: note } : {}), sha256 };
+}
+
 function snapshotMeta(e: SnapshotEntry) {
   return {
     name: e.name,

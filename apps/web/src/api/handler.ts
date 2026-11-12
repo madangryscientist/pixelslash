@@ -1,5 +1,6 @@
 import { type Actor, actorBuild, actorProject, actorUser } from "#/db/actor";
 import { type Build, createBuild, finaliseBuild, putSnapshot } from "#/db/builds";
+import { putHeldSnapshots } from "#/db/held-snapshots";
 import type { Db } from "#/db/db";
 import { type ProcessDeps, processBuild } from "#/diff/process";
 import type { DiffLocation } from "#/db/schema";
@@ -10,6 +11,7 @@ import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { endAbandoned } from "./abandoned";
 import { authorize, bearer } from "./authorize";
 import { snapshotForm } from "./snapshot-form";
+import { parseBatch } from "./validate-batch";
 import { createProjectByName } from "./project-create";
 import { listFlakes, resolveProjectFlake } from "./flakes";
 import { getParity } from "./parity";
@@ -103,6 +105,12 @@ async function addSnapshot(ctx: Ctx, build: Build, owner: BuildOwner): Promise<R
   const sent = await ctx.timer.time("form", () => snapshotForm(ctx.request, owner));
   const blobs = orgBlobs(ctx.store, owner.orgId);
   return json(await putSnapshot({ db: ctx.db, blobs, timer: ctx.timer }, build, sent));
+}
+
+/** Shots whose PNGs the project holds, registered together (many in one request); see `putHeldSnapshots`. */
+async function addHeldSnapshots(ctx: Ctx, build: Build): Promise<Response> {
+  const sent = parseBatch(await jsonBody(ctx.request));
+  return json(await putHeldSnapshots({ db: ctx.db, timer: ctx.timer }, build, sent));
 }
 
 async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promise<Response> {
@@ -215,6 +223,12 @@ export const ENDPOINTS: readonly Endpoint[] = [
     path: "/api/v1/builds/:id/snapshots",
     upload: true,
     run: (ctx, p) => withBuild(ctx, at(p, 0), (build, owner) => addSnapshot(ctx, build, owner)),
+  },
+  {
+    method: "POST",
+    path: "/api/v1/builds/:id/snapshots/batch",
+    upload: true,
+    run: (ctx, p) => withBuild(ctx, at(p, 0), (build) => addHeldSnapshots(ctx, build)),
   },
   {
     method: "POST",

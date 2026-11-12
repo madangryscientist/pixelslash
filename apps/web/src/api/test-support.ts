@@ -42,8 +42,8 @@ export function memoryStore(failPuts = false) {
   return { store, data };
 }
 
-export async function setup() {
-  const db = testDb();
+export async function setup(beforeQuery?: Parameters<typeof testDb>[0]) {
+  const db = testDb(beforeQuery);
   const user = await signInGithubUser(db, {
     githubId: 1,
     login: "ada",
