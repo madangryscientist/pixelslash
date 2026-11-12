@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";
 import type { Db } from "#/db/db";
-import { refreshBuildStatus, reviewSnapshot } from "#/db/review";
+import { reviewSnapshot } from "#/db/review";
+import { refreshBuildStatus } from "#/db/verdict";
 import { context, FINGERPRINT, onlyShot, rows, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 

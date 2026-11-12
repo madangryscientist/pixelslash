@@ -3,7 +3,7 @@ import { type Build, getBuild } from "#/db/builds";
 import { chunk } from "#/db/chunks";
 import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
-import { refreshBuildStatus } from "#/db/review";
+import { refreshBuildStatus } from "#/db/verdict";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { builds, projects, snapshots } from "#/db/schema";
 import { finishedAfter, msBetween, recordExplained } from "#/db/server-timings";
@@ -250,8 +250,10 @@ async function explainJob(
     .returning({ id: snapshots.id });
   if (settled.length > 0) await recordSettled(deps, job);
   if (outcome.passed) {
-    await refreshBuildStatus(deps.db, job.buildId);
-    if (deps.checkRuns) await syncCheckRuns({ db: deps.db, ...deps.checkRuns }, [job.buildId]);
+    // A build a run holds again (or that errored) is not given a verdict by a late explain (PS-392).
+    const verdict = await refreshBuildStatus(deps.db, job.buildId);
+    if (verdict !== null && deps.checkRuns)
+      await syncCheckRuns({ db: deps.db, ...deps.checkRuns }, [job.buildId]);
   }
   return "done";
 }

@@ -198,7 +198,9 @@ export type BuildStatus = (typeof BUILD_STATUSES)[number];
 
 /**
  * One upload for one project at one commit. `ancestorShas` feed the baseline pick.
- * `uploading` is the only mutable status: finalising moves it on, and nothing moves it back.
+ * Finalising moves `uploading` on and nothing moves it back. After that a diff, a re-diff and a
+ * recovery claim take `errored` and the verdicts back to `processing`; the status writes that end a
+ * run are fenced on the claim (`processingStartedAt`), so a run that lost its build writes nothing.
  */
 export const builds = sqliteTable(
   "builds",

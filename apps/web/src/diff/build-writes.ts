@@ -75,20 +75,30 @@ export function reasonOf(e: unknown): string {
 
 /**
  * `timings`: the server timings (ob 1792) the end of the run writes with its error, if it has any.
- * Returns the reason it stored, for a reply that must say the same.
+ * `startedAt` is the claim the run holds (`processingStartedAt`): the write lands only on a build
+ * still `processing` under that claim, so a run that lost its build to a successor, or whose
+ * build already has a verdict, writes nothing (PS-392). Returns the reason it stored, for a reply
+ * that must say the same, or null when nothing was written.
  */
 export async function markErrored(
   db: Db,
   build: Build,
   e: unknown,
-  timings: Partial<ReturnType<typeof runFields>> = {},
-): Promise<string> {
+  { startedAt, timings = {} }: { startedAt: Date; timings?: Partial<ReturnType<typeof runFields>> },
+): Promise<string | null> {
   const error = reasonOf(e);
-  await db
+  const written = await db
     .update(builds)
     .set({ ...timings, status: "errored", error })
-    .where(eq(builds.id, build.id));
-  return error;
+    .where(
+      and(
+        eq(builds.id, build.id),
+        eq(builds.status, "processing"),
+        eq(builds.processingStartedAt, startedAt),
+      ),
+    )
+    .returning({ id: builds.id });
+  return written.length > 0 ? error : null;
 }
 
 /**
