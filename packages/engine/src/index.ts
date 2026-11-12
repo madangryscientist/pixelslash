@@ -21,7 +21,7 @@ export {
   settleCapture,
   type CapturePage,
 } from "./capture.ts";
-export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
+export { CaptureError, DevLockError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { BRIEF_LIMIT, briefTooLong, trimBrief } from "./brief.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
 export {

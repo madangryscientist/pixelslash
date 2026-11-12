@@ -1,6 +1,7 @@
 import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { DEV_DIR, type DevStore } from "./dev-store.ts";
+import { DevLockError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 
 /**
@@ -52,7 +53,11 @@ export async function readLock(store: DevStore): Promise<DevLock | undefined> {
   }
 }
 
-/** The lock's process is running and, when it has a page, the page answers. */
+/**
+ * The lock's process is running and, when it has a page, the page answers. A page that is only
+ * slow (the 2 s probe timed out) is a live owner on a busy page: its lock is kept (PS-393). A
+ * refused connection or an error answer means the pid was recycled or the page is broken.
+ */
 async function lockLive(lock: DevLock, deps: LockDeps): Promise<boolean> {
   if (!(deps.pidAlive ?? pidAlive)(lock.pid)) return false;
   if (lock.url === null) return true;
@@ -61,8 +66,8 @@ async function lockLive(lock: DevLock, deps: LockDeps): Promise<boolean> {
       signal: AbortSignal.timeout(2000),
     });
     return res.ok;
-  } catch {
-    return false;
+  } catch (e) {
+    return e instanceof Error && e.name === "TimeoutError";
   }
 }
 
@@ -88,6 +93,15 @@ async function create(store: DevStore, lock: DevLock): Promise<boolean> {
   }
 }
 
+/** Both attempts lost a race: name the other claimant, never the caller as its own owner. */
+async function lostRace(store: DevStore, lock: DevLock): Promise<Claim> {
+  const owner = await readLock(store);
+  if (owner && owner.pid !== lock.pid) return { held: false, owner };
+  throw new DevLockError(
+    `pixelslash dev: could not take the session lock ${lockFile(store)} (another run was claiming it); retry`,
+  );
+}
+
 /** Take the worktree's session, or name who holds it. A stale lock is removed and taken. */
 export async function claimSession(
   store: DevStore,
@@ -106,8 +120,7 @@ export async function claimSession(
     // Another claimant may have taken the stale lock meanwhile: remove only the dead owner's.
     if ((await readLock(store))?.pid === owner?.pid) await rm(lockFile(store), { force: true });
   }
-  const owner = await readLock(store);
-  return owner ? { held: false, owner } : { held: false, owner: lock };
+  return lostRace(store, lock);
 }
 
 /** The worktree's top directory, or `cwd` outside git. */

@@ -253,7 +253,12 @@ export async function startSession(
   });
   const page = serveDevPage(store, t.target, ctl);
   url = page.url;
-  const claim = await claimSession(store, { pid: process.pid, url, target: t.target });
+  const claim = await claimSession(store, { pid: process.pid, url, target: t.target }).catch(
+    async (e: unknown) => {
+      await Promise.all([page.stop(), session.close()]);
+      throw e;
+    },
+  );
   if (!claim.held) {
     await Promise.all([page.stop(), session.close()]);
     return claim;

@@ -6,6 +6,7 @@ import {
   INSTALL_NAMES,
   IMAGE_BROWSERS,
   CaptureError,
+  DevLockError,
   FigmaError,
   UploadError,
   UsageError,
@@ -280,7 +281,12 @@ async function guarded(
       await reportUploadFailure(e, command, state);
       return REMOTE_EXIT;
     }
-    if (e instanceof CaptureError || e instanceof FigmaError || e instanceof UploadError) {
+    if (
+      e instanceof CaptureError ||
+      e instanceof DevLockError ||
+      e instanceof FigmaError ||
+      e instanceof UploadError
+    ) {
       io.stderr.write(`${e.message}\n`);
       await reportUploadFailure(e, command, state);
       return 1;
