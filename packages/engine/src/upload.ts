@@ -1,12 +1,6 @@
-import { baselinePng, fetchBaselines } from "./baselines-client.ts";
-import {
-  type BaselinePick,
-  type CiResult,
-  type DiffLocation,
-  type PickedShot,
-  measureShot,
-  withoutSame,
-} from "./ci-diff.ts";
+import { join } from "node:path";
+import { fetchBaselines } from "./baselines-client.ts";
+import type { BaselinePick, DiffLocation } from "./ci-diff.ts";
 import type { ChangeNoter } from "./change-note.ts";
 import { DEFAULT_FLAKE_RETRIES } from "./config-flake.ts";
 import { isHttpUrl } from "./routes.ts";
@@ -15,9 +9,8 @@ import type { FetchLike } from "./figma.ts";
 import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.ts";
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, readManifest } from "./manifest.ts";
-import type { Shoot, SnapshotEntry } from "./snapshot.ts";
+import type { Shoot, SnapshotEntry, SnapshotManifest } from "./snapshot.ts";
 import {
-  elapsed,
   loadNow,
   requestLog,
   timingsToSend,
@@ -26,8 +19,9 @@ import {
   type Timings,
 } from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
-import { readShot, sha256Of } from "./upload-form.ts";
+import { readShot } from "./upload-form.ts";
 import { shotSender } from "./upload-send.ts";
+import { changeNote, measurePng, sameAsBaselines } from "./upload-measure.ts";
 import { knownImages } from "./upload-known.ts";
 
 const CONCURRENCY = 4;
@@ -90,6 +84,13 @@ export type UploadDeps = {
    */
   recaptureConcurrency?: number | undefined;
   /**
+   * The shots (`identity`) captured on a pooled preview page (PS-445). Each is measured whatever
+   * the retries, and kept only where it equals its baseline: one that differs, or has none, is shot
+   * again through `recapture` on a fresh page, and that PNG replaces it on disk and in the upload.
+   * Ignored without `recapture`.
+   */
+  reused?: ReadonlySet<string> | undefined;
+  /**
    * `upload --judge` (ob 1745): a sentence for each shot that changed, sent as its `changeNote`.
    * Each shot with a baseline is then measured here, whatever the project's diff location, to know
    * which changed; the sentence is read on the review pages and decides nothing.
@@ -100,6 +101,8 @@ export type UploadDeps = {
 export type UploadResult = {
   buildId: string;
   snapshots: number;
+  /** How many shots from a pooled preview page were shot again on a fresh page (PS-445). */
+  reshot: number;
   git: GitContext;
   /**
    * The run's timings (ob 1791): the CLI's own plus this upload's, finalize included. The server
@@ -241,7 +244,8 @@ export async function uploadSnapshots(
   await clearFlakeOutput(opts.dir);
   const known = await knownImages(client, id, opts.dir, manifest.snapshots);
   const timed: ShotTiming[] = [];
-  const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
+  const pooled = pooledOf(deps);
+  const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i], pooled: pooled(e) }));
   const stop = { on: false };
   const measuring = needsMeasure(ci, flakes.retries, deps.describe);
   const sender = shotSender(client, id, { dir: opts.dir, known, sent: () => progress.sent++ });
@@ -255,6 +259,7 @@ export async function uploadSnapshots(
   };
   await runWorkers(worker, stop);
   await sender.flush();
+  await saveReshot(opts.dir, manifest, flakes.reshot());
   const runTimings = uploadRun(timed, manifest.snapshots.length, loadStart);
   const sent = timingsToSend(opts.timings, started, log.finish(), runTimings);
   const done = await finalise(client, id, manifest.snapshots.length, sent);
@@ -265,6 +270,7 @@ export async function uploadSnapshots(
   return {
     buildId: id,
     snapshots: manifest.snapshots.length,
+    reshot: flakes.reshot(),
     git: ctx,
     timings,
     ...outcome,
@@ -274,7 +280,10 @@ export async function uploadSnapshots(
 /**
  * Read one shot, measure it as far as this upload needs, and gather what its PUT or batch item
  * carries. A server project measures at finalise; here its diff only decides whether to re-capture
- * and what the judge describes, and is never sent as the shot's result.
+ * and what the judge describes, and is never sent as the shot's result. A shot from a pooled preview
+ * page (PS-445) is kept only when it is byte for byte its baseline; otherwise, or with no baseline,
+ * it is shot again on a fresh page, and that PNG is the shot from then on: on disk, in the upload,
+ * in the measure and as the first run the flake check compares with.
  */
 async function measureOne(
   client: Client,
@@ -284,6 +293,7 @@ async function measureOne(
     dir: string;
     ci: boolean;
     measuring: boolean;
+    pooled: boolean;
   },
   run: {
     flakes: ReturnType<typeof flakePass>;
@@ -291,23 +301,37 @@ async function measureOne(
     warn: (m: string) => void;
   },
 ) {
-  const { e, pick, ci, measuring } = shot;
+  const { e, pick, ci, pooled } = shot;
   const { flakes } = run;
-  const { file, png, metrics } = await readShot(shot.dir, e);
-  const hash = sha256Of(png);
+  const read = await readShot(shot.dir, e);
+  const { file, metrics } = read;
   const mains = new Map<string, Buffer>();
   const timing: ShotTiming = { name: identity(e) };
-  // A baseline with this shot's own bytes is unchanged: it is not fetched or diffed. A CI
-  // project sends a result and its mask for every baseline, so it measures them all.
-  const todo = pick && !ci ? withoutSame(pick, hash) : pick;
-  const results =
-    todo && measuring ? await measureTimed(client, { e, png, pick: todo, mains }, timing) : [];
-  if (results.length > 0 || (measuring && todo !== pick)) flakes.measured();
-  const changed = results.find((r) => r.status === "changed");
+  const { measuring } = shot;
+  let png: Buffer = read.png;
+  if (pooled && !(await sameAsBaselines(client, pick, png, mains))) {
+    const fresh = await flakes.fresh(e);
+    png = fresh.png;
+    e.ignore = fresh.ignore;
+    await Bun.write(file, png);
+  }
+  const m = await measurePng(client, { e, png, pick, ci, measuring, mains }, timing);
+  if (m.counted) flakes.measured();
+  const { changed, results, hash } = m;
   const flake = changed ? await flakes.check(e, png) : undefined;
   const note = await changeNote(run.describe, { e, file, changed, mains }, run.warn, timing);
   return { e, png, hash, timing, extras: { results: ci ? results : [], flake, note, metrics } };
 }
+
+/** A shot shot again on a fresh page has that page's ignore boxes: the manifest says so too (PS-445). */
+async function saveReshot(dir: string, manifest: SnapshotManifest, reshot: number): Promise<void> {
+  if (reshot > 0)
+    await Bun.write(join(dir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+/** Whether a shot was taken on a pooled preview page; none is without `recapture` to shoot it fresh (PS-445). */
+const pooledOf = (deps: UploadDeps) => (e: SnapshotEntry) =>
+  deps.recapture !== undefined && deps.reused?.has(identity(e)) === true;
 
 /** Whether a shot is measured here: a CI diff sends it, a re-capture or the judge reads it. */
 const needsMeasure = (ci: boolean, retries: number, describe: ChangeNoter | undefined) =>
@@ -327,59 +351,4 @@ async function runWorkers(worker: () => Promise<void>, stop: { on: boolean }): P
     ),
   );
   for (const r of settled) if (r.status === "rejected") throw r.reason;
-}
-
-/** The judge's sentence for a changed shot; a model that fails is said and the shot goes without. */
-async function changeNote(
-  describe: ChangeNoter | undefined,
-  shot: {
-    e: SnapshotEntry;
-    file: string;
-    changed: CiResult | undefined;
-    mains: Map<string, Buffer>;
-  },
-  warn: (m: string) => void,
-  timing: ShotTiming,
-): Promise<string | null> {
-  const { e, file, changed, mains } = shot;
-  const main = changed && mains.get(changed.baselineId);
-  if (!describe || !changed || !main) return null;
-  const started = performance.now();
-  try {
-    return await describe({ file, main, diff: changed.diffResult });
-  } catch (err) {
-    warn(`judge: ${identity(e)}: ${err instanceof Error ? err.message : String(err)}`);
-    return null;
-  } finally {
-    timing.judgeMs = elapsed(started);
-  }
-}
-
-/**
- * `measureShot` with its diff time on `timing`, less the baseline downloads inside it (those are
- * the `fetch baseline` requests). `mains` keeps the baselines for the judge.
- */
-async function measureTimed(
-  client: Client,
-  shot: {
-    e: SnapshotEntry;
-    png: Buffer;
-    pick: BaselinePick;
-    mains: Map<string, Buffer>;
-  },
-  timing: ShotTiming,
-): Promise<CiResult[]> {
-  const { e, png, pick, mains } = shot;
-  let fetching = 0;
-  const fetchMain = async (p: PickedShot) => {
-    const started = performance.now();
-    const bytes = await baselinePng(client, p);
-    fetching += elapsed(started);
-    mains.set(p.id, bytes);
-    return bytes;
-  };
-  const started = performance.now();
-  const results = await measureShot(e, png, pick, fetchMain);
-  timing.diffMs = Math.max(0, elapsed(started) - fetching);
-  return results;
 }

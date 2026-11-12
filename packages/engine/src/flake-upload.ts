@@ -92,6 +92,7 @@ export function flakePass(opts: {
   const rechecked: Rechecked[] = [];
   const skipped: SkippedShot[] = [];
   let measured = 0;
+  let reshot = 0;
   // A session shoots up to `concurrency` shots at once, each in its own context, so the upload's
   // workers and one shot's retries share that many re-captures; without a limit, one at a time.
   const slot = limiter(opts.concurrency ?? 1);
@@ -114,6 +115,19 @@ export function flakePass(opts: {
   };
   return {
     retries,
+    /** How many shots `fresh` shot again. */
+    reshot: () => reshot,
+    /**
+     * The shot again on a fresh page (PS-445), for a shot first taken on a pooled preview page that
+     * differs from its baseline or has none. It shares the re-captures' slots. A shot that cannot be
+     * shot fresh fails the upload: its pooled PNG is never sent in its place.
+     */
+    async fresh(e: SnapshotEntry): Promise<Shoot> {
+      const shot = await slot(() => (recapture ? recapture(e) : Promise.resolve(undefined)));
+      if (!shot) throw new UsageError(`${identity(e)}: the config has no such route or variant`);
+      reshot++;
+      return shot;
+    },
     /** A shot was measured against its baseline, changed or not. */
     measured: () => {
       measured++;
@@ -136,32 +150,41 @@ export function flakePass(opts: {
       }
     },
     /** Save the runs and write the report, in manifest order. A report that fails is said. */
-    async finish(manifest: SnapshotEntry[]): Promise<FlakeOutcome> {
-      if (retries === 0) return { flaky: [], changed: [], skipped, report: undefined };
-      const order = new Map(manifest.map((e, i) => [e, i]));
-      const byOrder = (a: SnapshotEntry, b: SnapshotEntry) =>
-        (order.get(a) ?? 0) - (order.get(b) ?? 0);
-      rechecked.sort((a, b) => byOrder(a.e, b.e));
-      skipped.sort((a, b) => byOrder(a.entry, b.entry));
-      const changed = rechecked.filter((r) => !r.flake.flaky).map((r) => r.e);
-      try {
-        const flaky = await saveRuns(dir, rechecked);
-        const report = join(dir, "report.html");
-        const shots = manifest.length;
-        await Bun.write(
-          report,
-          renderFlakeReport({ flaky, changed, skipped, retries, measured, shots }),
-        );
-        return { flaky, changed, skipped, report };
-      } catch (err) {
-        warn(
-          `warning: the flake report was not written: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        const flaky = rechecked
-          .filter((r) => r.flake.flaky)
-          .map((r) => ({ entry: r.e, record: r.flake.record, files: [] }));
-        return { flaky, changed, skipped, report: undefined };
-      }
-    },
+    finish: (manifest: SnapshotEntry[]): Promise<FlakeOutcome> =>
+      finishPass(dir, { rechecked, skipped, retries, measured }, manifest, warn),
   };
+}
+
+/** The pass's end: save the flaky shots' runs and write the report, in manifest order. A report that fails is said. */
+async function finishPass(
+  dir: string,
+  pass: { rechecked: Rechecked[]; skipped: SkippedShot[]; retries: number; measured: number },
+  manifest: SnapshotEntry[],
+  warn: (m: string) => void,
+): Promise<FlakeOutcome> {
+  const { rechecked, skipped, retries, measured } = pass;
+  if (retries === 0) return { flaky: [], changed: [], skipped, report: undefined };
+  const order = new Map(manifest.map((e, i) => [e, i]));
+  const byOrder = (a: SnapshotEntry, b: SnapshotEntry) => (order.get(a) ?? 0) - (order.get(b) ?? 0);
+  rechecked.sort((a, b) => byOrder(a.e, b.e));
+  skipped.sort((a, b) => byOrder(a.entry, b.entry));
+  const changed = rechecked.filter((r) => !r.flake.flaky).map((r) => r.e);
+  try {
+    const flaky = await saveRuns(dir, rechecked);
+    const report = join(dir, "report.html");
+    const shots = manifest.length;
+    await Bun.write(
+      report,
+      renderFlakeReport({ flaky, changed, skipped, retries, measured, shots }),
+    );
+    return { flaky, changed, skipped, report };
+  } catch (err) {
+    warn(
+      `warning: the flake report was not written: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    const flaky = rechecked
+      .filter((r) => r.flake.flaky)
+      .map((r) => ({ entry: r.e, record: r.flake.record, files: [] }));
+    return { flaky, changed, skipped, report: undefined };
+  }
 }

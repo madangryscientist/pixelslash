@@ -133,7 +133,8 @@ function gapsLine({ manifest, gapsPath = "" }: SnapshotResult): string {
 /**
  * `pixelslash capture`: every route × variant in the config into a snapshot dir + manifest. Exit 0.
  * With `--upload` the browser stays open through the upload, so a shot that differs from its
- * baseline is captured again the same way (ob 1737), and closes after it.
+ * baseline is captured again the same way (ob 1737), and closes after it. Only there may a story be
+ * shot on a reused preview page (PS-445).
  */
 export async function runCapture(
   argv: string[],
@@ -166,7 +167,9 @@ export async function runCapture(
     warn,
   });
   try {
-    const result = await captureInto(session, flags.out);
+    // Stories may be shot on a reused preview page here, and only here: each shot meets its
+    // baseline in the upload, and one that is not byte for byte its baseline is shot again fresh.
+    const result = await captureInto(session, flags.out, undefined, { reuse: true });
     const timings = buildTimings(
       started,
       result.shots,
@@ -180,6 +183,7 @@ export async function runCapture(
       ...deps,
       recapture: (e) => recapture(session, e),
       recaptureConcurrency: config.concurrency ?? defaultConcurrency(),
+      reused: result.reused,
       timings,
     });
   } finally {

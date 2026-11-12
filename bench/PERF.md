@@ -152,6 +152,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1 to 4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
 | 24 | Tile hashes: hash both shots in 64 px tiles (a hand-written 4-lane multiply-rotate hash over the decoded pixels) and run the pixel loop and the region pass only over the tiles that differ, the region pass over each dirty tile row plus the rows the merge gap reaches | ts + web | ✅ measured, shipped as the default (`--no-tiles` / `tiles: false` turn it off) | dedicated, self, off → on: phone 34.3 → 28.9 ms (−16%), desktop 52.8 → 50.0 (−5%), long 367.5 → 253.3 (−31%), long + one badge 306.6 → 175.0 (−43%), long + 10 px shift 422.4 → 388.0 (−8%); hashing 0.7 / 2.9 / 10.6 / 9.6 / 9.6 ms; same result on all 157 corpus pairs, overlay included | PS-191 |
 | 25 | Flake re-captures through a limit of the capture concurrency instead of one serial queue; a shot's retries run together | CLI upload (`flakePass`, `checkFlake`) | ✅ measured, shipped | 240 re-captures on HackCove's Storybook, dedicated: 73.2 s → 18.0 s median of three, same flaky and changed lists | n/a |
+| 26 | Reuse one Storybook preview page per capture worker in `capture --upload`: switch it to the next story through the preview's channel instead of loading the iframe again; a shot that is not byte for byte its baseline is shot again on a fresh page | CLI capture (`capture --upload`) | ✅ measured, shipped | 786 shots on HackCove's Storybook, dedicated: 57.1 s fresh → 28.5 s with reuse, re-shots included (median of three); 16 to 19 re-shot per run | n/a |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -206,6 +207,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-11-12 | n/a | desktop, dedicated | capture reuse: one preview page per worker, switched story to story, against a fresh page per story, 786 shots, 57.1 s to 28.5 s |
 | 2026-11-12 | n/a | desktop, dedicated | the flake pass: re-captures bounded by the capture concurrency instead of one at a time, 240 re-captures, 73.2 s to 18.0 s |
 | 2026-11-12 | n/a | desktop, dedicated | capture workers 2 to 10 on a Storybook of 786 shots; the default is ten, capped by the cores |
 | 2026-10-26 | PS-191 | desktop, dedicated | tile hashes: diff.wasm compares only the 64 px tiles that differ, off against on |
@@ -222,6 +224,52 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-11-12 · capture reuse · desktop, dedicated · one preview page per worker, against a fresh page per story
+
+**A Storybook capture of 786 shots takes 28.5 s with reused preview pages where it took 57.1 s on a
+fresh page per story (medians of three, interleaved), 2.0x faster, counting the fresh re-shots the reuse
+needs.**
+
+**Question.** Each story shot opens a new context and page, loads Storybook's `iframe.html` and boots
+the preview before the story renders. What does keeping one preview page per worker, and telling it to
+render the next story through the preview's own channel, do to a capture's wall? A switched page's PNG
+is not always byte for byte a fresh page's, so `capture --upload` shoots again on a fresh page any
+shot that is not byte for byte its baseline: how many is that, and what do they cost?
+
+**Setup.** `env` dedicated: `pixelslash-bench-reserve on --cpus 1-5,7-11 --mem 10G --pid $$` at the
+top of one script with an exit trap running `off`; afterwards `"active":false`. The Storybook is
+HackCove's whole static build at one theme (`catppuccin-mocha`), 786 shots, `concurrency: 10`. A
+baseline was captured once by the CLI, on fresh pages, into its own dir. Each run opens a capture
+session (the browser launch is not in the time) and times `captureInto` into a fresh dir, fresh
+(`reuse` off) or reuse (`reuse` on). A reuse run then shoots again on a fresh page, through
+`recapture` and 4 at a time (the upload's worker count), every shot whose PNG is not byte for byte
+the baseline's, and that is timed too. The order was fresh, reuse, fresh, reuse, fresh, reuse, all
+from one script. Seconds:
+
+| Mode | Stage | Run 1 | Run 2 | Run 3 | Median |
+| --- | --- | ---: | ---: | ---: | ---: |
+| fresh | capture | 60.4 | 56.9 | 57.1 | 57.1 |
+| reuse | capture | 26.3 | 26.8 | 26.4 | 26.4 |
+| reuse | fresh re-shots | 2.1 | 2.4 | 2.1 | 2.1 |
+| reuse | total | 28.4 | 29.2 | 28.5 | 28.5 |
+
+| Mode | Differ from the baseline | Re-shot on a fresh page | Still differ after the fresh shot |
+| --- | --- | --- | --- |
+| fresh, runs 1 to 3 | 12, 13, 11 | n/a | n/a |
+| reuse, runs 1 to 3 | 17, 19, 16 | 17, 19, 16 | 9, 11, 9 |
+
+**What differs.** A fresh capture already differs from a fresh baseline on 11 to 13 shots (the video
+spinner, the gallery and all-themes overviews, a few drawers and dialogs): those shots flake on any
+page. A reuse capture differs on 16 to 19; after the fresh re-shot 9 to 11 still differ, the same kind
+of shots as the fresh runs' list, so reuse leaves no difference of its own behind. The 5 to 8 it adds
+before the re-shot are reuse artifacts (the `kbd` stories, the card grid, sidebar and prose layouts, the
+full dialog and a field dialog), each put right by its fresh shot. The upload's flake retries then run on the fresh PNG as
+before; they are not in this time.
+
+The runs were on the change's first version, which counted a worker's first story on a page as reused
+too; the shipped version counts only a story switched to in place, so it re-shoots at most as many.
+The script and raw log were scratch files and are not committed.
 
 ### 2026-11-12 · flake pass · desktop, dedicated · re-captures in parallel, not one at a time
 
