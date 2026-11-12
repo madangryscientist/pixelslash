@@ -48,7 +48,6 @@ Gaps:
 
 - `markErrored` and `refreshBuildStatus` are unconditional updates. The 5 minute claim has no fence (admitted at `diff/claim.ts:16`), so the original run and the re-claimer can both write the final state.
 - The explain consumer (`ai/explain-queue.ts:253`) calls `refreshBuildStatus` without checking the build is in a verdict state, so it can turn `processing` or `errored` into a verdict.
-- The snapshot PUT guard (`db/builds.ts:160`) reads then inserts, so a PUT racing finalise can land after the count check.
 - An abandoned build that was never processed can only be escaped by uploading again (`diff/rerun.ts:146`).
 
 ## CLI exit codes (the run's terminal states)
@@ -80,8 +79,6 @@ flowchart LR
 Gaps:
 
 - With `--routes`, `result.skipped` is the last route's value (`engine/src/compare.ts:97`). Earlier violations are masked as `skip:` and exit 0; an earlier skip is hidden when the last route was judged.
-- The Sentry upload report is chosen by matching the text `UPLOAD FAILED:` in the message (`run.ts:236`), not by error type.
-- The CI template comment (`init.ts:264`) lists 0, 4, 5, 3 and 2 and leaves out 1 and 7, which the same commands can return.
 
 ## `status` and `--wait`: server status to outcome to exit
 
@@ -271,7 +268,7 @@ Gaps: the measure and a11y phase after the screenshot is still reported as `scre
 | `RunState.stage` | `capture`, `compare`, `upload`, or none, set from the command table; one transition, capture to upload on `capture --upload` (`cli/src/failure.ts:10`, `upload.ts:253`) | check, dev and flake crash with no stage |
 | Judge availability | `opencode:<model>` if its env var is set, else mlx, else ollama, else none; JudgeError reasons: binary missing, timeout, exit, empty answer (`engine/src/judge.ts:48` to `71`) | |
 | Dev mode choice | subcommand on the store, else attach to a live session, else `--once` or the loop; keys r, p, u, m, f, q, SIGTERM as q (`cli/src/dev.ts:497`, `dev-loop.ts`) | |
-| Flake | `open` to `resolved` and back; a new detection reopens (`web/src/db/flakes.ts:55` to `220`) | resolve has no status guard; `openFlake` races on the evidence array |
+| Flake | `open` to `resolved` and back; a new detection reopens (`web/src/db/flakes.ts:55` to `220`) | `openFlake` races on the evidence array |
 | Flake upload pass | per changed shot: `flaky`, `changed` or `skipped`; policy `review` or `skip` (`cli/src/flake-upload.ts`) | |
 | GitHub check | uploading or processing gives `in_progress`; else `completed`, success only for `passed` (`web/src/github/check-run.ts:88`) | `changes` and `errored` both look like failure |
 | D1 busy retry | SQLITE_BUSY waits 25, 50, 100, 200 ms, 5 tries (`web/src/db/busy.ts:10`) | `batch` and `exec` are not retried |

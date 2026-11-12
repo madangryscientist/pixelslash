@@ -58,7 +58,7 @@ import { IMPORT_USAGE, runImport } from "./import.ts";
 import { INIT_USAGE, runInit } from "./init.ts";
 import { MCP_USAGE } from "./mcp-usage.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
-import { UPLOAD_USAGE, runUpload } from "./upload.ts";
+import { UPLOAD_USAGE, isUploadFailure, runUpload } from "./upload.ts";
 
 export type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
 
@@ -241,13 +241,13 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
   );
 }
 
-/** Only the `UPLOAD FAILED` runs of the known errors are Sentry's: a refused argument or a page that would not settle is the user's. */
+/** Only the errors `failedUpload` made (an `UPLOAD FAILED` run, by identity) are Sentry's: a refused argument or a page that would not settle is the user's. */
 async function reportUploadFailure(
   e: Error,
   command: { name: string; env: Record<string, string | undefined> },
   state: RunState,
 ): Promise<void> {
-  if (!e.message.includes("UPLOAD FAILED:")) return;
+  if (!isUploadFailure(e)) return;
   await reportToSentry(command.env, e, {
     kind: "upload",
     command: command.name,
