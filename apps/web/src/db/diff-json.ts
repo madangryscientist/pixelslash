@@ -164,6 +164,8 @@ export type BuildTimings = {
       p90Ms?: number;
       maxMs?: number;
       wallMs?: number;
+      /** The server's own split of these requests (its `Server-Timing` parts, summed, in ms); absent from a CLI or a server from before it. */
+      server?: Record<string, number>;
     }[];
   };
   shots: TimedShot[];

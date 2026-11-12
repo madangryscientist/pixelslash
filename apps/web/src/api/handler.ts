@@ -1,30 +1,21 @@
 import { type Actor, actorBuild, actorProject, actorUser } from "#/db/actor";
-import {
-  type Build,
-  BuildFinalisedError,
-  ImageUnknownError,
-  SnapshotCountError,
-  createBuild,
-  finaliseBuild,
-  putSnapshot,
-} from "#/db/builds";
-import { type Db, NotFoundError } from "#/db/db";
-import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process";
+import { type Build, createBuild, finaliseBuild, putSnapshot } from "#/db/builds";
+import type { Db } from "#/db/db";
+import { type ProcessDeps, processBuild } from "#/diff/process";
 import type { DiffLocation } from "#/db/schema";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { type RateLimiter, overApiLimit, retryAfter } from "#/server/rate-limit";
-import { reportError } from "#/server/sentry";
+import { ServerTimer, withServerTiming } from "#/server/server-timing";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { endAbandoned } from "./abandoned";
 import { authorize, bearer } from "./authorize";
-import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
+import { snapshotForm } from "./snapshot-form";
 import { createProjectByName } from "./project-create";
 import { listFlakes, resolveProjectFlake } from "./flakes";
 import { getParity } from "./parity";
 import { listStale } from "./stale";
 import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines";
 import {
-  API_VERSION,
   type ReadCtx,
   buildUrl,
   getBuild,
@@ -35,10 +26,10 @@ import {
   markDetectionFlagExported,
 } from "./read";
 import { putProjectTwin } from "./twins-link";
-import { BadRequest, Forbidden, object, parseFinalise, parseNewBuild } from "./validate";
+import { BadRequest, object, parseFinalise, parseNewBuild } from "./validate";
 import { knownImages } from "./known";
 import { belowMinimum } from "./cli-version";
-import { Unprocessable } from "./errors";
+import { errorOf, failWith } from "./api-error";
 
 export type ApiDeps = {
   db: Db;
@@ -74,7 +65,7 @@ async function jsonBody(request: Request): Promise<unknown> {
   }
 }
 
-type Ctx = ApiDeps & { actor: Actor; request: Request };
+type Ctx = ApiDeps & { actor: Actor; request: Request; timer: ServerTimer };
 
 /**
  * A CI token's build goes to its project; a personal or org token names one it can see in
@@ -109,14 +100,16 @@ async function startBuild(ctx: Ctx): Promise<Response> {
 }
 
 async function addSnapshot(ctx: Ctx, build: Build, owner: BuildOwner): Promise<Response> {
-  const sent = await snapshotForm(ctx.request, owner);
+  const sent = await ctx.timer.time("form", () => snapshotForm(ctx.request, owner));
   const blobs = orgBlobs(ctx.store, owner.orgId);
-  return json(await putSnapshot({ db: ctx.db, blobs }, build, sent));
+  return json(await putSnapshot({ db: ctx.db, blobs, timer: ctx.timer }, build, sent));
 }
 
 async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promise<Response> {
   const { snapshots, timings } = parseFinalise(await jsonBody(ctx.request));
-  const done = await finaliseBuild(ctx.db, build, snapshots, timings);
+  const done = await ctx.timer.time("finalise", () =>
+    finaliseBuild(ctx.db, build, snapshots, timings),
+  );
   // The diff runs here, in the request: inline for beta, no Queue (the map's server diff). One
   // whole-page change at 1280x4000 fits the 30 s CPU limit; several do not, and processBuild stops
   // before the limit and ends the build `errored` with a reason that names it, so the reply carries
@@ -130,10 +123,13 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   const { db, diff, diffSidecar, explainQueue, modelKeySecret } = ctx;
   // The check run says `in_progress` while the diff runs, then the verdict (PS-23); neither call
   // can fail the finalise.
-  const sync = () => (ctx.checkRuns ? syncCheckRuns({ db, ...ctx.checkRuns }, [done.id]) : null);
+  const sync = () =>
+    ctx.timer.time("sync", async () => {
+      if (ctx.checkRuns) await syncCheckRuns({ db, ...ctx.checkRuns }, [done.id]);
+    });
   await sync();
   const result = await processBuild(
-    { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret },
+    { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret, timer: ctx.timer },
     done,
   );
   await sync();
@@ -204,7 +200,9 @@ async function withBuild(
   buildId: string,
   run: (build: Build, owner: BuildOwner) => Promise<Response>,
 ): Promise<Response> {
-  const { build, ...owner } = await actorBuild(ctx.db, ctx.actor, buildId);
+  const { build, ...owner } = await ctx.timer.time("build", () =>
+    actorBuild(ctx.db, ctx.actor, buildId),
+  );
   return run(build, owner);
 }
 
@@ -292,37 +290,6 @@ function match(pattern: string, path: string[]): string[] | null {
   return params;
 }
 
-type ApiError = { status: number; code: string; message: string };
-
-function errorOf(e: unknown): ApiError {
-  if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };
-  if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
-  if (e instanceof Forbidden) return { status: 403, code: "forbidden", message: e.message };
-  if (e instanceof Unprocessable) return { status: 422, code: "unprocessable", message: e.message };
-  if (e instanceof ImageUnknownError) return { status: 409, code: e.code, message: e.message };
-  if (
-    e instanceof BuildFinalisedError ||
-    e instanceof SnapshotCountError ||
-    e instanceof NoRecoveryError
-  )
-    return { status: 409, code: "conflict", message: e.message };
-  if (e instanceof TooLarge)
-    return { status: 413, code: "too_large", message: `PNG over ${MAX_PNG_BYTES} bytes` };
-  // Not one of the refusals above: a failed upload or finalise, which is the server's fault (PS-227).
-  reportError(e, { area: "api" });
-  throw e;
-}
-
-/**
- * An upload endpoint's error is the string it always was; every other carries a code. An upload
- * error the CLI acts on adds `code` beside the string (`ImageUnknownError.CODE`), which is additive.
- */
-function failWith(upload: boolean, { status, code, message }: ApiError): Response {
-  if (upload)
-    return json({ error: message, ...(code === ImageUnknownError.CODE ? { code } : {}) }, status);
-  return json({ api_version: API_VERSION, error: { code, message } }, status);
-}
-
 /**
  * The API, `/api/v1/…`, as a plain Request → Response so tests and the Worker route share it.
  * `authorize` turns the token into an actor: a CI token reaches its one project, an org (`psorg_`)
@@ -331,6 +298,11 @@ function failWith(upload: boolean, { status, code, message }: ApiError): Respons
  * their replies are in `ENDPOINTS` and the "API" section of docs/cli.md.
  */
 export async function handleApi(request: Request, deps: ApiDeps): Promise<Response> {
+  const timer = new ServerTimer();
+  return withServerTiming(await route(request, deps, timer), timer);
+}
+
+async function route(request: Request, deps: ApiDeps, timer: ServerTimer): Promise<Response> {
   const path = new URL(request.url).pathname.split("/").filter(Boolean);
   const fits = ENDPOINTS.flatMap((e) => {
     const params = match(e.path, path);
@@ -344,8 +316,14 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
       code: "cli_outdated",
       message: `upgrade the CLI: this server needs pixelslash ${deps.minCliVersion} or newer`,
     });
-  const actor = await authorize({ db: deps.db, request });
-  if (await overApiLimit(deps.rateLimit, request, actor && bearer(request)))
+  const { actor, limited } = await timer.time("auth", async () => {
+    const who = await authorize({ db: deps.db, request });
+    return {
+      actor: who,
+      limited: await overApiLimit(deps.rateLimit, request, who && bearer(request)),
+    };
+  });
+  if (limited)
     return retryAfter(
       failWith(upload, {
         status: 429,
@@ -369,7 +347,7 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
     return failWith(false, { status: 404, code: "not_found", message: "not found" });
   }
   try {
-    return await hit.endpoint.run({ ...deps, actor, request }, hit.params);
+    return await hit.endpoint.run({ ...deps, actor, request, timer }, hit.params);
   } catch (e) {
     return failWith(upload, errorOf(e));
   }

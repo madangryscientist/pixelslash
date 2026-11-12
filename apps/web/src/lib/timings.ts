@@ -263,6 +263,31 @@ function requestRows(t: BuildTimings): ProfileRow[] {
   });
 }
 
+/**
+ * The server's split of each request kind that carried one: its own time against the CLI's (the
+ * gap is the wait before the handler, the network and the retries), then its parts, biggest first.
+ * The parts are summed over the kind's requests, like the batch's `ms`.
+ */
+function serverRows(t: BuildTimings): ProfileRow[] {
+  return (t.upload?.batches ?? []).flatMap((b) => {
+    if (!b.server) return [];
+    const { total, ...parts } = b.server;
+    const split = Object.entries(parts)
+      .toSorted(([, x], [, y]) => y - x)
+      .map(([name, ms]) => `${name} ${dur(ms)}`);
+    const lead = total === undefined ? "" : `${dur(total)} of ${dur(b.ms)} request time`;
+    const text = [lead, split.join(", ")].filter((x) => x !== "").join(": ");
+    if (!text) return [];
+    return [
+      {
+        key: `server-${b.step.replaceAll(/\W+/g, "-")}`,
+        label: `${b.step.charAt(0).toUpperCase()}${b.step.slice(1)} on the server`,
+        text,
+      },
+    ];
+  });
+}
+
 function hostRow(t: BuildTimings): ProfileRow[] {
   if (!t.host) return [];
   const { cores, loadStart, loadEnd } = t.host;
@@ -287,6 +312,7 @@ export function cliProfileRows(timings: BuildTimings | null): ProfileRow[] {
     ...captureWallRow(timings),
     ...capturePartsRow(timings),
     ...requestRows(timings),
+    ...serverRows(timings),
     ...hostRow(timings),
   ];
 }

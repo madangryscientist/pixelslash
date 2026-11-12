@@ -12,6 +12,7 @@ import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
 import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
+import { type PartTimer, timeIf } from "#/server/server-timing";
 import type { BlobStore } from "#/storage/blobs";
 import { CiResultError } from "./ci-result";
 import { NoRecoveryError, claim, dead } from "./claim";
@@ -75,6 +76,8 @@ export type ProcessDeps = {
   explainQueue?: ExplainQueue | undefined;
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
   modelKeySecret?: string | undefined;
+  /** Counts the run's baseline pick, measuring and removed markers into the request's `Server-Timing`. */
+  timer?: PartTimer | undefined;
 };
 
 async function storeSnapshot(
@@ -396,13 +399,13 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
   try {
     await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
-    const baselines: Baselines = await selectBaselines(
-      deps.db,
-      build,
-      new Set(rows.map(snapshotKeyOf)),
+    const baselines: Baselines = await timeIf(deps.timer, "baselines", () =>
+      selectBaselines(deps.db, build, new Set(rows.map(snapshotKeyOf))),
     );
-    await timer.diff(() => measureAll(deps, { build, project }, rows, baselines));
-    await markRemoved(deps, build, baselines.removed);
+    await timeIf(deps.timer, "measure", () =>
+      timer.diff(() => measureAll(deps, { build, project }, rows, baselines)),
+    );
+    await timeIf(deps.timer, "removed", () => markRemoved(deps, build, baselines.removed));
     await assertMeasured(deps.db, build, project);
     // Before the default branch accepts: a native shot of a stale key is left for a person (PS-297).
     await markStale(deps.db, build.id);

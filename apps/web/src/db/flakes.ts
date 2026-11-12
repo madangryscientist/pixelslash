@@ -107,6 +107,8 @@ export async function labelFlake(
     key: SnapshotKey;
     imageKey: string;
     stem: string;
+    /** The flake the stored row already carries (a re-upload keeps it); null for a new row. */
+    flakeId: string | null;
   },
   flake: SentFlake | null,
 ): Promise<void> {
@@ -132,7 +134,9 @@ export async function labelFlake(
   } else {
     flakeId = await openFlakeOf(db, shot.projectId, shot.key);
   }
-  await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
+  // A write only when the label changes: a shot with no flake, the common case, writes nothing.
+  if (flakeId !== shot.flakeId)
+    await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
 }
 
 /**

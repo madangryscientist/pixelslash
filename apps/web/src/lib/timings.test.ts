@@ -229,6 +229,30 @@ describe("the CLI's speed profile", () => {
     expect(rows.host).toBe("16 cores, load 3.2 at the start and 4.1 at the end");
   });
 
+  test("a request kind with a server split shows the server's time against the CLI's, then its parts biggest first", () => {
+    const timings: BuildTimings = {
+      ...full,
+      upload: {
+        totalMs: 9_000,
+        batches: [
+          {
+            step: "upload",
+            count: 120,
+            ms: 20_000,
+            server: { blob: 1_500, db: 8_000, total: 12_000, auth: 400 },
+          },
+          { step: "finalize", count: 1, ms: 9_500 },
+        ],
+      },
+    };
+    const rows = Object.fromEntries(cliProfileRows(timings).map((r) => [r.key, r.text]));
+    expect(rows["server-upload"]).toMatch(
+      /^12.s of 20.s request time: db 8\.0.s, blob 1\.5.s, auth 400.ms$/,
+    );
+    // A kind with no split, as from an older server, has no row.
+    expect(rows["server-finalize"]).toBeUndefined();
+  });
+
   test("a build from an older CLI, or without timings, has no profile rows", () => {
     expect(cliProfileRows(null)).toEqual([]);
     const old: BuildTimings = {

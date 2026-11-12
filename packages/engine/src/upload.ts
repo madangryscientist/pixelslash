@@ -214,7 +214,7 @@ export async function uploadSnapshots(
     token: opts.token,
     warn,
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
-    onRequest: (step, ms) => log.record(step, ms),
+    onRequest: (step, ms, server) => log.record(step, ms, server),
   };
   const { id, diffLocation } = await openBuild(client, ctx, opts.projectId, opts.brief);
   progress.opened = true;
