@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import {
   Button,
   ButtonGroup,
@@ -9,14 +9,13 @@ import {
   KeyValue,
   KeyValueList,
   Pill,
-  Stack,
   SubsectionHeading,
   Text,
 } from "@hackcove/ui-react";
 import { ReviewChip, StatusBadge, useHydrated } from "#/components/ui";
 import type { BuildView, SnapshotView } from "#/db/review";
 import { formatDateTime } from "#/lib/format";
-import { type ShotLabel, variantChips } from "#/lib/shot-label";
+import { type ShotLabel, titleWords, variantChips } from "#/lib/shot-label";
 
 /** Every key the page answers to, for the `?` list. */
 const SHORTCUTS: [string, string][] = [
@@ -46,6 +45,15 @@ function ShotTitle({ snapshot, label }: { snapshot: SnapshotView; label: ShotLab
   );
 }
 
+/**
+ * The shot's own variant: its colour scheme and viewport, once, for both panes (a snapshot has
+ * exactly one of each), then the chips its name carries. "mode" keeps the scheme apart from a
+ * Storybook theme chip.
+ */
+function variantPills(snapshot: SnapshotView, label: ShotLabel): string[] {
+  return [`${titleWords(snapshot.theme)} mode`, snapshot.viewport, ...variantChips(label)];
+}
+
 /** The variant chips, the build's status, and this shot's decision: none of them truncate, so the title gives way. */
 function ShotMeta({
   build,
@@ -58,8 +66,8 @@ function ShotMeta({
 }) {
   return (
     <>
-      {variantChips(label).map((chip) => (
-        <Pill key={chip} tone="slate">
+      {variantPills(snapshot, label).map((chip) => (
+        <Pill key={chip} tone="slate" data-testid="shot-chip">
           {chip}
         </Pill>
       ))}
@@ -72,6 +80,15 @@ function ShotMeta({
         </div>
       )}
     </>
+  );
+}
+
+/** The key that does the same as a button; a phone has no keys, so it gives the room back. */
+function KeyHint({ children }: { children: string }) {
+  return (
+    <span aria-hidden="true" className="hidden sm:inline">
+      <Kbd>{children}</Kbd>
+    </span>
   );
 }
 
@@ -108,7 +125,7 @@ function Actions({
         disabled={!hydrated || !onPrevious}
         onClick={() => onPrevious?.()}
       >
-        ‹ <Kbd aria-hidden="true">k</Kbd>
+        ‹ <KeyHint>k</KeyHint>
       </Button>
       <Button
         variant="outline"
@@ -118,7 +135,7 @@ function Actions({
         disabled={!hydrated || !onNext}
         onClick={() => onNext?.()}
       >
-        › <Kbd aria-hidden="true">j</Kbd>
+        › <KeyHint>j</KeyHint>
       </Button>
       <Button
         variant="outline"
@@ -140,7 +157,7 @@ function Actions({
         title={why}
         onClick={actions.onReject}
       >
-        Reject <Kbd aria-hidden="true">r</Kbd>
+        Reject <KeyHint>r</KeyHint>
       </Button>
       <Button
         size="sm"
@@ -150,7 +167,7 @@ function Actions({
         title={why}
         onClick={actions.onAccept}
       >
-        Accept <Kbd aria-hidden="true">a</Kbd>
+        Accept <KeyHint>a</KeyHint>
       </Button>
       <Button
         variant="ghost"
@@ -167,9 +184,50 @@ function Actions({
   );
 }
 
+/** The CSS variable the sticky bar's height is published under, for what sticks below it. */
+const BAR_HEIGHT_VAR = "--shot-bar";
+
+/**
+ * Publishes the sticky bar's height as `--shot-bar` on the layout that holds it, so the pane
+ * labels and the side rail can stick right under the bar however far it wraps. The bar is the
+ * `StickyBar` around this component; the layout is its parent, which React does not style.
+ */
+function usePublishBarHeight() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const bar = ref.current?.parentElement;
+    const layout = bar?.parentElement;
+    if (!bar || !layout) return undefined;
+    const publish = () => layout.style.setProperty(BAR_HEIGHT_VAR, `${bar.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      layout.style.removeProperty(BAR_HEIGHT_VAR);
+    };
+  }, []);
+  return ref;
+}
+
+/**
+ * The side rail's content, from lg where the rail sits beside the image: it sticks under the bar,
+ * so a tall shot does not leave the column empty. One taller than what is left scrolls inside itself.
+ */
+export function StickyRail({ children }: { children: ReactNode }) {
+  return (
+    <div className="lg:sticky lg:top-[calc(var(--app-header,0px)+var(--shot-bar,6rem)+1rem)] lg:max-h-[calc(100vh-var(--app-header,0px)-var(--shot-bar,6rem)-2rem)] lg:-m-1 lg:overflow-y-auto lg:p-1">
+      {children}
+    </div>
+  );
+}
+
 /**
  * The bar that stays on screen: what this shot is, where it sits in the review, and the decision.
  * The review position counts the changed shots; the build position, the whole j/k walk.
+ *
+ * On a phone the title has its own row, the chips and counters wrap onto the row below it, and the
+ * breadcrumbs leave the bar (the page shows them above it, scrolling away), so the bar stays short.
  */
 export function ViewerBar({
   build,
@@ -195,17 +253,20 @@ export function ViewerBar({
   actions: BarActions;
 }) {
   const why = reviewable ? undefined : `This build is ${build.status}; a new build is needed.`;
-  // Three fixed rows: the title line never wraps, so the action row sits at the same y for every shot.
+  const ref = usePublishBarHeight();
   return (
-    <Stack gap="xs">
-      {breadcrumbs}
-      <Cluster gap="sm">
-        {/* The title is the only part that shrinks; the chips, the review state and the counters keep their width. */}
-        <ClusterGrow>
-          <ShotTitle snapshot={snapshot} label={label} />
-        </ClusterGrow>
-        <div className="shrink-0 whitespace-nowrap">
-          <Cluster gap="sm">
+    <div ref={ref} data-testid="viewer-bar">
+      <div className="flex flex-col gap-1 sm:gap-2">
+        <div className="hidden sm:block">{breadcrumbs}</div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {/* The title keeps at least 17rem, so beside it only what fits; the rest wraps under it. */}
+          <ClusterGrow minWidth="md">
+            <ShotTitle snapshot={snapshot} label={label} />
+          </ClusterGrow>
+          <div
+            data-testid="shot-meta"
+            className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 [&_*]:whitespace-nowrap"
+          >
             <ShotMeta build={build} snapshot={snapshot} label={label} />
             <Text data-testid="review-position" tone="muted" numeric>
               {reviewText(review)}
@@ -213,13 +274,13 @@ export function ViewerBar({
             <Text data-testid="position" tone="muted" numeric>
               {`shot ${position} of ${total}`}
             </Text>
-          </Cluster>
+          </div>
         </div>
-      </Cluster>
-      <Cluster justify="end">
-        <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
-      </Cluster>
-    </Stack>
+        <Cluster justify="end">
+          <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
+        </Cluster>
+      </div>
+    </div>
   );
 }
 
