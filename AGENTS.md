@@ -182,9 +182,9 @@ when the PR title is not already in this form.
 - **The scope is the area, never a ticket:** `cli`, `engine`, `playwright`, `web`, `site`, `bench`,
   `scripts`, `ci`, `release`, `deps`. A change across several areas takes the one it is mostly about;
   repo-wide docs and config may drop the scope (`docs: …`, `chore: …`).
-- **A ticket goes at the end of the subject**, in parentheses: `feat(web): re-run errored shots
-  (PS-289)`. A contributor cites the GitHub issue the same way, `(#12)`. GitHub appends the PR number
-  on a squash; leave it.
+- **Only a GitHub issue goes in the subject**, at the end, in parentheses: `feat(web): re-run
+  errored shots (#12)`. The maintainer's private ids (`PS-N`, `ob N`) stay out of new branch names,
+  commit messages, PR titles and PR bodies. GitHub appends the PR number on a squash; leave it.
 - **The type is honest:** `feat`, `fix` and `perf` change what a user gets and belong in the
   changelog; `docs`, `test`, `chore`, `refactor`, `build`, `ci` and `style` do not. A `!` after the
   type (`feat(cli)!: …`), or a `BREAKING CHANGE:` footer, marks a break in the CLI contract
@@ -192,8 +192,8 @@ when the PR title is not already in this form.
 - A release is `chore(release): @hackcove/pixelslash <version>`.
 - No commit, PR title or PR body carries a `Co-Authored-By` or any other AI attribution line.
 
-Older subjects on `main` use the ticket as the scope (`feat(PS-289): …`, `feat(ob 1421): …`); leave
-them, and do not copy the form.
+Older subjects on `main` carry a private ticket, as the scope (`feat(PS-289): …`, `feat(ob 1421): …`)
+or at the end (`… (PS-395)`); leave them, and do not copy either form.
 
 ## Landing: through a pull request
 
