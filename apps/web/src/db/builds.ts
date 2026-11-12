@@ -1,7 +1,7 @@
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { readPngSize } from "@hackcove/pixelslash-engine/diff";
-import { SQL, and, count, eq, getTableColumns, is, sql } from "drizzle-orm";
+import { Param, SQL, and, count, eq, getTableColumns, is, sql } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
 import { sha256Bytes } from "#/lib/crypto";
 import { type PartTimer, timeIf, timedBlobs } from "#/server/server-timing";
@@ -202,15 +202,28 @@ async function rowFields(
 ) {
   const image = await imageOf({ db, blobs, timer }, build, stem, png);
   const ciResults = await putCiResults(blobs, stem, ci, image);
+  return fieldsOf(input, image, {
+    metricsKey: await putMetrics(blobs, stem, metrics),
+    ciResults,
+    flake,
+  });
+}
+
+/** A shot's row values besides its identity: what `rowFields` writes, from parts already stored. */
+export function fieldsOf(
+  input: SnapshotInput,
+  image: Held,
+  parts: { metricsKey: string | null; ciResults: CiUpload | null; flake: SentFlake | null },
+) {
   return {
     tags: input.tags,
     diffOptions: input.diff,
     ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
     ...image,
-    metricsKey: await putMetrics(blobs, stem, metrics),
-    ciResults,
-    flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
+    metricsKey: parts.metricsKey,
+    ciResults: parts.ciResults,
+    flakyPolicy: input.flaky ?? parts.flake?.record.policy ?? null,
     ...shown(input),
   };
 }
@@ -233,21 +246,32 @@ async function putCiResults(
 }
 
 /**
- * `select <the row's values> where the build is still uploading`, for `insert ... select`: no row
- * comes out once the build has left `uploading`, so the insert (and its upsert) writes nothing.
- * `insert().values()` fills the columns it was not given from their defaults; `select` cannot, so
- * every column is listed here in table order, from the value or else the default.
+ * A row's cells for `insert ... select`, in table order: `select` cannot fill a column from its
+ * default as `insert().values()` does, so every column is listed, from the value or else the
+ * default. A null is written as a literal, not a bound parameter, so a row binds only what it holds.
  */
-function whileUploading(buildId: string, row: typeof snapshots.$inferInsert): SQL {
+export function cellsOf(row: typeof snapshots.$inferInsert): (SQL | Param)[] {
   const given: Record<string, unknown> = row;
-  const cells = Object.entries(getTableColumns(snapshots)).map(([key, col]) => {
+  return Object.entries(getTableColumns(snapshots)).map(([key, col]) => {
     const value = given[key];
+    if (value === null) return sql`null`;
     if (value !== undefined) return sql.param(value, col);
     if (col.default !== undefined && col.default !== null)
       return is(col.default, SQL) ? col.default : sql.param(col.default, col);
     return sql`null`;
   });
-  return sql`select ${sql.join(cells, sql`, `)} where exists (select 1 from ${builds} where ${builds.id} = ${buildId} and ${builds.status} = 'uploading')`;
+}
+
+/** `where` clause shared by every insert-select: the build is still uploading. */
+export const stillUploading = (buildId: string): SQL =>
+  sql`where exists (select 1 from ${builds} where ${builds.id} = ${buildId} and ${builds.status} = 'uploading')`;
+
+/**
+ * `select <the row's values> where the build is still uploading`, for `insert ... select`: no row
+ * comes out once the build has left `uploading`, so the insert (and its upsert) writes nothing.
+ */
+function whileUploading(buildId: string, row: typeof snapshots.$inferInsert): SQL {
+  return sql`select ${sql.join(cellsOf(row), sql`, `)} ${stillUploading(buildId)}`;
 }
 
 /**

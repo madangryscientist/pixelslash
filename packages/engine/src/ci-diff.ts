@@ -18,6 +18,12 @@ export type PickedShot = {
   image_url: string;
   fingerprint: unknown;
   ignore: MaskRect[];
+  /**
+   * The sha256 of the baseline's PNG, as the server stored it. Absent from a server that does not
+   * send it, and null for a baseline stored before the server hashed uploads: either way the
+   * baseline is fetched, as it always was.
+   */
+  sha256?: string | null;
 };
 
 /** The server's pick for one shot key. */
@@ -80,6 +86,22 @@ export async function measureShot(
   const results: CiResult[] = [];
   for (const picked of distinct) results.push(measure(shot, png, picked, await fetchPng(picked)));
   return results;
+}
+
+/**
+ * The pick without the shots that are this PNG's own bytes (same sha256, known only when the server
+ * sent one). Such a shot is unchanged by definition, so nothing is fetched or diffed for it; the
+ * same pick comes back when none is. A null or absent hash never matches.
+ */
+export function withoutSame(pick: BaselinePick, sha256: string): BaselinePick {
+  const same = (p: PickedShot | null) =>
+    p !== null && typeof p.sha256 === "string" && p.sha256 === sha256;
+  if (!same(pick.baseline) && !same(pick.accepted)) return pick;
+  return {
+    ...pick,
+    baseline: same(pick.baseline) ? null : pick.baseline,
+    accepted: same(pick.accepted) ? null : pick.accepted,
+  };
 }
 
 export { ENGINE_VERSION };

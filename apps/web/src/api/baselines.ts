@@ -42,6 +42,9 @@ async function shotOf(ctx: BaselinesCtx, orgId: string, shot: BaselineSnapshot |
     image_url: await imageUrl(ctx, orgId, shot.imageKey),
     fingerprint: JSON.parse(shot.envFingerprint),
     ignore: shot.ignore,
+    // The sha256 of the baseline's PNG, so a CLI holding the same bytes skips the download;
+    // null for a shot stored before the server hashed uploads.
+    sha256: shot.imageSha256,
   };
 }
 

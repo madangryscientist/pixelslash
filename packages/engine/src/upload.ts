@@ -5,6 +5,7 @@ import {
   type DiffLocation,
   type PickedShot,
   measureShot,
+  withoutSame,
 } from "./ci-diff.ts";
 import type { ChangeNoter } from "./change-note.ts";
 import { DEFAULT_FLAKE_RETRIES } from "./config-flake.ts";
@@ -25,7 +26,8 @@ import {
   type Timings,
 } from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
-import { type ShotExtras, readShot, sha256Of, snapshotForm } from "./upload-form.ts";
+import { readShot, sha256Of } from "./upload-form.ts";
+import { shotSender } from "./upload-send.ts";
 import { knownImages } from "./upload-known.ts";
 
 const CONCURRENCY = 4;
@@ -236,34 +238,24 @@ export async function uploadSnapshots(
   const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
   const stop = { on: false };
   const measuring = needsMeasure(ci, flakes.retries, deps.describe);
+  const sender = shotSender(client, id, { dir: opts.dir, known, sent: () => progress.sent++ });
+  const run = { flakes, describe: deps.describe, warn };
   const worker = async () => {
     for (let next = queue.shift(); next && !stop.on; next = queue.shift()) {
-      const { e, pick } = next;
-      const { file, png, metrics } = await readShot(opts.dir, e);
-      // A server project measures at finalise; here its diff only decides whether to re-capture
-      // and what the judge describes, and is never sent as the shot's result.
-      const mains = new Map<string, Buffer>();
-      const timing: ShotTiming = { name: identity(e) };
-      const results =
-        pick && measuring ? await measureTimed(client, { e, png, pick, mains }, timing) : [];
-      if (results.length > 0) flakes.measured();
-      const changed = results.find((r) => r.status === "changed");
-      const flake = changed ? await flakes.check(e, png) : undefined;
-      const note = await changeNote(deps.describe, { e, file, changed, mains }, warn, timing);
-      timed.push(timing);
-      const extras = { results: ci ? results : [], flake, note, metrics };
-      await putShot(client, id, { e, png, extras, known });
-      progress.sent++;
+      const shot = await measureOne(client, { ...next, dir: opts.dir, ci, measuring }, run);
+      timed.push(shot.timing);
+      await sender.send(shot);
     }
   };
   await runWorkers(worker, stop);
-  const run = uploadRun(timed, manifest.snapshots.length, loadStart);
-  const sent = timingsToSend(opts.timings, started, log.finish(), run);
+  await sender.flush();
+  const runTimings = uploadRun(timed, manifest.snapshots.length, loadStart);
+  const sent = timingsToSend(opts.timings, started, log.finish(), runTimings);
   const done = await finalise(client, id, manifest.snapshots.length, sent);
   progress.finalised = true;
   checkOutcome(id, done);
   const outcome = await flakes.finish(manifest.snapshots);
-  const timings = timingsToSend(opts.timings, started, log.finish(), run);
+  const timings = timingsToSend(opts.timings, started, log.finish(), runTimings);
   return {
     buildId: id,
     snapshots: manifest.snapshots.length,
@@ -273,34 +265,47 @@ export async function uploadSnapshots(
   };
 }
 
+/**
+ * Read one shot, measure it as far as this upload needs, and gather what its PUT or batch item
+ * carries. A server project measures at finalise; here its diff only decides whether to re-capture
+ * and what the judge describes, and is never sent as the shot's result.
+ */
+async function measureOne(
+  client: Client,
+  shot: {
+    e: SnapshotEntry;
+    pick: BaselinePick | undefined;
+    dir: string;
+    ci: boolean;
+    measuring: boolean;
+  },
+  run: {
+    flakes: ReturnType<typeof flakePass>;
+    describe: ChangeNoter | undefined;
+    warn: (m: string) => void;
+  },
+) {
+  const { e, pick, ci, measuring } = shot;
+  const { flakes } = run;
+  const { file, png, metrics } = await readShot(shot.dir, e);
+  const hash = sha256Of(png);
+  const mains = new Map<string, Buffer>();
+  const timing: ShotTiming = { name: identity(e) };
+  // A baseline with this shot's own bytes is unchanged: it is not fetched or diffed. A CI
+  // project sends a result and its mask for every baseline, so it measures them all.
+  const todo = pick && !ci ? withoutSame(pick, hash) : pick;
+  const results =
+    todo && measuring ? await measureTimed(client, { e, png, pick: todo, mains }, timing) : [];
+  if (results.length > 0 || (measuring && todo !== pick)) flakes.measured();
+  const changed = results.find((r) => r.status === "changed");
+  const flake = changed ? await flakes.check(e, png) : undefined;
+  const note = await changeNote(run.describe, { e, file, changed, mains }, run.warn, timing);
+  return { e, png, hash, timing, extras: { results: ci ? results : [], flake, note, metrics } };
+}
+
 /** Whether a shot is measured here: a CI diff sends it, a re-capture or the judge reads it. */
 const needsMeasure = (ci: boolean, retries: number, describe: ChangeNoter | undefined) =>
   ci || retries > 0 || describe !== undefined;
-
-/**
- * Send one shot. A PNG the server holds goes by hash (PS-424); if it no longer finds it (409
- * `image_unknown`), the shot is sent again with its file.
- */
-async function putShot(
-  client: Client,
-  buildId: string,
-  shot: { e: SnapshotEntry; png: Buffer; extras: ShotExtras; known: ReadonlySet<string> },
-): Promise<void> {
-  const put = (byHash: string | undefined) =>
-    send(client, {
-      step: `upload ${identity(shot.e)}`,
-      method: "PUT",
-      path: `/api/v1/builds/${buildId}/snapshots`,
-      body: snapshotForm(shot.e, shot.png, { ...shot.extras, byHash }),
-    });
-  const hash = sha256Of(shot.png);
-  try {
-    await put(shot.known.has(hash) ? hash : undefined);
-  } catch (err) {
-    if (!(err instanceof UploadError) || err.code !== "image_unknown") throw err;
-    await put(undefined);
-  }
-}
 
 /**
  * Run `CONCURRENCY` workers to the end. One failure stops the rest pulling more and is thrown once
@@ -350,7 +355,12 @@ async function changeNote(
  */
 async function measureTimed(
   client: Client,
-  shot: { e: SnapshotEntry; png: Buffer; pick: BaselinePick; mains: Map<string, Buffer> },
+  shot: {
+    e: SnapshotEntry;
+    png: Buffer;
+    pick: BaselinePick;
+    mains: Map<string, Buffer>;
+  },
   timing: ShotTiming,
 ): Promise<CiResult[]> {
   const { e, png, pick, mains } = shot;
