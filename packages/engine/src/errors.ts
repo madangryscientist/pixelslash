@@ -2,6 +2,8 @@
 export class UsageError extends Error {}
 /** A page could not be captured (down URL, HTTP error, never settled). Exit 1. */
 export class CaptureError extends Error {}
+/** A `pixelslash dev` session lock could not be taken and no other session holds it (PS-393). Exit 1. */
+export class DevLockError extends Error {}
 /** The Figma API refused or returned nothing usable. Exit 1. */
 export class FigmaError extends Error {}
 /** The server refused an upload, was unreachable, or the checkout could not be read. Exit 1. */

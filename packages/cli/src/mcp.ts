@@ -1,4 +1,10 @@
-import { CLIENT_VERSION, CaptureError, FigmaError, UsageError } from "@hackcove/pixelslash-engine";
+import {
+  CLIENT_VERSION,
+  CaptureError,
+  DevLockError,
+  FigmaError,
+  UsageError,
+} from "@hackcove/pixelslash-engine";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -237,9 +243,10 @@ const TOOLS: Record<string, Tool> = {
   },
 };
 
+const KNOWN_ERRORS = [UsageError, RemoteError, CaptureError, DevLockError, FigmaError];
 /** A tool's error the agent reads; anything else is a bug and throws. */
 function failed(e: unknown): CallToolResult {
-  const known = [UsageError, RemoteError, CaptureError, FigmaError].some((c) => e instanceof c);
+  const known = KNOWN_ERRORS.some((c) => e instanceof c);
   if (known && e instanceof Error) return { ...text(e.message), isError: true };
   throw e;
 }
