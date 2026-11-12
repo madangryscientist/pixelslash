@@ -33,7 +33,7 @@ describe("pixelslash capture", () => {
       cap.io,
       pinned,
     );
-    expect(code).toBe(0);
+    expect({ code, stderr: cap.stderr }).toMatchObject({ code: 0 });
     expect(cap.stdout).toMatch(/pixelslash: 4 snapshots/);
     expect(cap.stdout).toContain('"image":"version:test"');
     expect(cap.stdout).toContain(join(dir, "out", "manifest.json"));

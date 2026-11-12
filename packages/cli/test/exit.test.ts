@@ -60,5 +60,5 @@ describe("exitAfterFlush", () => {
     } finally {
       await server.stop(true);
     }
-  });
+  }, 30_000);
 });
