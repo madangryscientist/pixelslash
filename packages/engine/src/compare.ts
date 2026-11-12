@@ -57,6 +57,8 @@ export type CompareOptions = {
   ignore: IgnoreRect[];
 };
 
+export type SkippedRoute = { route: string; reason: string };
+
 export type CompareResult = {
   already: Violation[];
   fresh: Violation[];
@@ -64,6 +66,11 @@ export type CompareResult = {
   skipped: boolean;
   /** Why the judge was skipped, when it was: "no judge", or the named reason a configured one failed. */
   skipReason?: string;
+  /**
+   * `compareRoutes` only: every route whose judge was skipped, with its reason. `skipped` is then true
+   * only when every route was skipped, and `skipReason` is the first skipped route's reason.
+   */
+  skippedRoutes?: SkippedRoute[];
   manifest?: RunManifest;
   out: string;
   changedPixels?: number;
@@ -85,8 +92,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
   const shots: ShotTiming[] = [];
   const already: Violation[] = [];
   const fresh: Violation[] = [];
-  let skipped = false;
-  let skipReason: string | undefined;
+  const skippedRoutes: SkippedRoute[] = [];
   try {
     for (const { path, name } of routeOutNames(routes)) {
       const one = await compare(routeOptions(opts, path, name), deps, browser, path);
@@ -94,8 +100,7 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
       shots.push(...(one.timings?.shots ?? []));
       already.push(...one.already);
       fresh.push(...one.fresh);
-      skipped = one.skipped;
-      skipReason = one.skipReason;
+      noteSkip(skippedRoutes, path, one);
     }
   } finally {
     await browser?.close();
@@ -103,10 +108,28 @@ export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Prom
   const reportPath = join(opts.out, "index.html");
   const timings = buildTimings(started, shots, browserLaunchMs);
   await Bun.write(reportPath, withTimings(renderIndex(rows, pixel), timings));
-  const result: CompareResult = { already, fresh, reportPath, skipped, out: opts.out, timings };
-  if (skipReason) result.skipReason = skipReason;
+  const skips = skipFields(skippedRoutes, routes.length);
+  const result: CompareResult = { already, fresh, reportPath, out: opts.out, timings, ...skips };
   if (pixel) result.changedPixels = rows.reduce((n, r) => n + r.changedPixels, 0);
   return result;
+}
+
+function noteSkip(into: SkippedRoute[], route: string, one: CompareResult): void {
+  if (one.skipped) into.push({ route, reason: one.skipReason ?? "no judge" });
+}
+
+/**
+ * The run's skip state. One route's skip must not hide another's verdict, so `skipped` is true only
+ * when every route was skipped. `skipReason` (the first skipped route's) and `skippedRoutes` are left
+ * off when no route was skipped.
+ */
+function skipFields(
+  skippedRoutes: SkippedRoute[],
+  routeCount: number,
+): Pick<CompareResult, "skipped" | "skipReason" | "skippedRoutes"> {
+  const skipped = routeCount > 0 && skippedRoutes.length === routeCount;
+  const first = skippedRoutes[0];
+  return first ? { skipped, skipReason: first.reason, skippedRoutes } : { skipped };
 }
 
 function routeBrowser(opts: CompareOptions, deps: Deps): Promise<Browser | undefined> | undefined {
