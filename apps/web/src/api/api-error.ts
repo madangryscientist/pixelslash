@@ -9,7 +9,7 @@ import { BadRequest, Forbidden } from "./validate";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
-export type ApiError = { status: number; code: string; message: string };
+type ApiError = { status: number; code: string; message: string };
 
 export function errorOf(e: unknown): ApiError {
   if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };

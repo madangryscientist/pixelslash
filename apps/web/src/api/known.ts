@@ -1,4 +1,4 @@
-import { heldImages } from "#/db/builds";
+import { heldImages } from "#/db/held-images";
 import type { Db } from "#/db/db";
 import { parseKnown } from "./validate-known";
 

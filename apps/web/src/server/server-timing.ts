@@ -35,44 +35,28 @@ export function timedBlobs(blobs: BlobStore, timer: PartTimer | undefined): Blob
 
 export class ServerTimer implements PartTimer {
   private readonly parts = new Map<string, number>();
-  private readonly began: number;
-
-  constructor(private readonly now: () => number = () => performance.now()) {
-    this.began = now();
-  }
-
-  /** Add `ms` to `part`. */
-  add(part: string, ms: number): void {
-    this.parts.set(part, (this.parts.get(part) ?? 0) + Math.max(0, ms));
-  }
+  private readonly began = performance.now();
 
   /** Run `fn`, counting its time under `part` whether it resolves or throws. */
   async time<T>(part: string, fn: () => Promise<T>): Promise<T> {
-    const started = this.now();
+    const started = performance.now();
     try {
       return await fn();
     } finally {
-      this.add(part, this.now() - started);
+      const ms = Math.max(0, performance.now() - started);
+      this.parts.set(part, (this.parts.get(part) ?? 0) + ms);
     }
   }
 
   /** `name;dur=<ms>` entries, comma separated, `total` last. */
   header(): string {
-    const entries = [...this.parts, ["total", this.now() - this.began] as const];
+    const entries = [...this.parts, ["total", performance.now() - this.began] as const];
     return entries.map(([name, ms]) => `${name};dur=${Math.round(ms * 100) / 100}`).join(", ");
   }
 }
 
 /** `res` with its `Server-Timing` header set; the body and the status are not touched. */
 export function withServerTiming(res: Response, timer: ServerTimer): Response {
-  const value = timer.header();
-  try {
-    res.headers.set("server-timing", value);
-    return res;
-  } catch {
-    // A Response with immutable headers (one from a fetch): copy it, body and all.
-    const copy = new Response(res.body, res);
-    copy.headers.set("server-timing", value);
-    return copy;
-  }
+  res.headers.set("server-timing", timer.header());
+  return res;
 }

@@ -149,8 +149,6 @@ async function putMetrics(
   return key;
 }
 
-export { type HeldImage, heldImages };
-
 /** One upload: the shot's meta, its PNG (or the hash of one the project holds) and, from a CI project's CLI, what it measured (ob 1727). */
 export type SentSnapshot = {
   input: SnapshotInput;
