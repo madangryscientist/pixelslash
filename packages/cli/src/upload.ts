@@ -13,6 +13,7 @@ import {
   type UploadResult,
   UsageError,
   briefTooLong,
+  defaultConcurrency,
   findConfigIfAny,
   fontSetHash,
   imageId,
@@ -110,6 +111,8 @@ async function resolveTarget(flags: UploadFlags, deps: UploadDeps, cwd: string):
 
 type OwnRecapture = {
   retries: number;
+  /** The config's capture concurrency: how many re-captures may run at once. */
+  concurrency: number;
   recapture: (e: SnapshotEntry) => Promise<Shoot | undefined>;
   close: () => Promise<void>;
 };
@@ -145,6 +148,7 @@ async function configRecapture(
   let opening: Promise<CaptureSession> | undefined;
   return {
     retries: config.flake.retries,
+    concurrency: config.concurrency ?? defaultConcurrency(),
     recapture: async (e) => {
       sameMachine(e, { image: imageId(env), fonts: await (local ??= fontSetHash()) });
       const session = await (opening ??= openCaptureSession(config, { warn }));
@@ -285,7 +289,12 @@ export async function uploadDir(
             pr: prNumber(flags.pr),
           },
         },
-        { ...deps, warn, progress, ...(own && { recapture: own.recapture }) },
+        {
+          ...deps,
+          warn,
+          progress,
+          ...(own && { recapture: own.recapture, recaptureConcurrency: own.concurrency }),
+        },
       );
     } finally {
       stopped.off();

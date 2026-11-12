@@ -54,6 +54,24 @@ async function saveRuns(dir: string, rechecked: Rechecked[]): Promise<FlakyShot[
   return flaky;
 }
 
+/** `work` through at most `limit` slots at once (at least 1); the rest wait their turn. */
+function limiter(limit: number) {
+  const max = Math.max(1, Math.floor(limit));
+  let inFlight = 0;
+  const waiting: (() => void)[] = [];
+  return async <T>(work: () => Promise<T>): Promise<T> => {
+    if (inFlight >= max) await new Promise<void>((resolve) => waiting.push(resolve));
+    else inFlight++;
+    try {
+      return await work();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else inFlight--;
+    }
+  };
+}
+
 type Recapture = (e: SnapshotEntry) => Promise<Shoot | undefined>;
 
 /**
@@ -65,6 +83,8 @@ export function flakePass(opts: {
   dir: string;
   retries: number;
   recapture: Recapture | undefined;
+  /** How many re-captures may run at once; default 1. */
+  concurrency?: number | undefined;
   warn: (m: string) => void;
 }) {
   const { dir, recapture, warn } = opts;
@@ -72,18 +92,25 @@ export function flakePass(opts: {
   const rechecked: Rechecked[] = [];
   const skipped: SkippedShot[] = [];
   let measured = 0;
-  // One browser shoots one shot at a time: the upload's workers queue their re-captures here.
-  let queue: Promise<unknown> = Promise.resolve();
+  // A session shoots up to `concurrency` shots at once, each in its own context, so the upload's
+  // workers and one shot's retries share that many re-captures; without a limit, one at a time.
+  const slot = limiter(opts.concurrency ?? 1);
   const again = (e: SnapshotEntry, png: Buffer) => {
-    const run = queue.then(() =>
-      checkFlake(e, png, retries, async () => {
-        const shot = await recapture?.(e);
-        if (!shot) throw new UsageError("the config has no such route or variant");
-        return shot;
+    // Once one of a shot's captures fails the shot is skipped, so its other captures do not start.
+    let failure: { err: unknown } | undefined;
+    return checkFlake(e, png, retries, () =>
+      slot(async () => {
+        if (failure) throw failure.err;
+        try {
+          const shot = await recapture?.(e);
+          if (!shot) throw new UsageError("the config has no such route or variant");
+          return shot;
+        } catch (err) {
+          failure ??= { err };
+          throw err;
+        }
       }),
     );
-    queue = run.catch(() => undefined);
-    return run;
   };
   return {
     retries,

@@ -5,6 +5,7 @@ import {
   buildTimings,
   captureFacts,
   captureInto,
+  defaultConcurrency,
   findConfig,
   identity,
   loadConfig,
@@ -178,6 +179,7 @@ export async function runCapture(
     return await uploadDir(flags.out, { ...flags.uploadFlags, "flake-retries": retries }, io, {
       ...deps,
       recapture: (e) => recapture(session, e),
+      recaptureConcurrency: config.concurrency ?? defaultConcurrency(),
       timings,
     });
   } finally {

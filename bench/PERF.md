@@ -151,6 +151,7 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 22 | The WASM differ's overlay encode: pngjs's adaptive filter pass in the module (wasm SIMD), deflate in workerd's zlib at pngjs's level and strategy, chunks in JS | web (workerd) | ✅ measured, shipped; the only overlay encode since PS-210 | workerd, 15 rounds, wasm with pngjs's encode → its own: phone 23.1 → 12.2 ms (−47%), desktop 76.0 → 32.2 (−58%), long 528.8 → 238.0 (−55%); against pngjs −71 to −74%; overlay byte-equal | PS-205 |
 | 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1 to 4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
 | 24 | Tile hashes: hash both shots in 64 px tiles (a hand-written 4-lane multiply-rotate hash over the decoded pixels) and run the pixel loop and the region pass only over the tiles that differ, the region pass over each dirty tile row plus the rows the merge gap reaches | ts + web | ✅ measured, shipped as the default (`--no-tiles` / `tiles: false` turn it off) | dedicated, self, off → on: phone 34.3 → 28.9 ms (−16%), desktop 52.8 → 50.0 (−5%), long 367.5 → 253.3 (−31%), long + one badge 306.6 → 175.0 (−43%), long + 10 px shift 422.4 → 388.0 (−8%); hashing 0.7 / 2.9 / 10.6 / 9.6 / 9.6 ms; same result on all 157 corpus pairs, overlay included | PS-191 |
+| 25 | Flake re-captures through a limit of the capture concurrency instead of one serial queue; a shot's retries run together | CLI upload (`flakePass`, `checkFlake`) | ✅ measured, shipped | 240 re-captures on HackCove's Storybook, dedicated: 73.2 s → 18.0 s median of three, same flaky and changed lists | n/a |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -205,6 +206,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-11-12 | n/a | desktop, dedicated | the flake pass: re-captures bounded by the capture concurrency instead of one at a time, 240 re-captures, 73.2 s to 18.0 s |
 | 2026-11-12 | n/a | desktop, dedicated | capture workers 2 to 10 on a Storybook of 786 shots; the default is ten, capped by the cores |
 | 2026-10-26 | PS-191 | desktop, dedicated | tile hashes: diff.wasm compares only the 64 px tiles that differ, off against on |
 | 2026-10-26 | PS-212 | desktop, dedicated | why diff.wasm is 2.3x slower than cs on the long page: each step in wasm, natively and in cs; the unfilter fixed |
@@ -220,6 +222,46 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-11-12 · flake pass · desktop, dedicated · re-captures in parallel, not one at a time
+
+**The flake pass takes 18.0 s where it took 73.2 s (medians of three, interleaved), 4.1x faster, with
+the same flaky and changed lists.**
+
+**Question.** A changed shot is captured `retries` more times (default 2) after the first capture. Every
+re-capture went through one serial queue, although the session shoots each shot in its own browser
+context and `captureInto` already runs up to `concurrency` of them at once. A live build with 193 changed
+shots spent about 1m30s of its 1m45s upload phase there. What does bounding the re-captures by the
+capture concurrency instead (and taking one shot's retries together) do to the pass?
+
+**Setup.** `env` dedicated, as in the capture workers run above:
+`pixelslash-bench-reserve on --cpus 1-5,7-11 --mem 10G --pid $$` at the top of one script with an exit
+trap running `off`; afterwards `"active":false`. The Storybook is HackCove's whole static build at one
+theme (`catppuccin-mocha`), 786 shots, captured once with `concurrency: 10` into a snapshot dir that all
+six runs share. Each run opens a fresh capture session (the browser launch is not in the time), then runs
+`flakePass` the way `uploadSnapshots` does: 4 workers (the upload's), each calling `check(entry, png)`
+for the next of 120 changed shots, with 2 retries, so 240 real re-captures. The 120 are evenly spaced over the
+786 shots minus the `video`, `gallery` and `all-themes` shots (the video spinner flakes by itself). The
+known set: 12 of the 120 have their first capture's PNG altered on purpose (4000 bytes flipped), so every
+re-capture of them differs from it and they must be called flaky; the other 108 are as captured. The
+time is the first `check` to the last, in seconds; `finish` (the runs and the report written) is
+outside it. The base is `dcdfd54` (`main`, the serial queue) and the head is this change, both from one
+script, alternating base, head, base, head, base, head; the concurrency given to both is 10 (the base
+ignores it).
+
+| Run | Run 1 | Run 2 | Run 3 | Median |
+| --- | --- | --- | --- | --- |
+| base (serial queue) | 73.2 | 73.2 | 74.3 | 73.2 |
+| head (limit 10) | 18.0 | 17.9 | 19.2 | 18.0 |
+
+**Same answer.** All six runs return the same 12 flaky shots (exactly the 12 altered ones), the same 108
+changed shots in the same order, and no skipped shot. 240 re-captures take 18.0 s, 75 ms each, against
+305 ms each when serial. With 4 workers and 2 retries at most 8 re-captures wait on the limit of 10, so
+the limit is never the cap here; the four upload workers are, which is why this is 4.1x and not 10x.
+The live upload phase also holds the PUTs and baseline fetches; its end-to-end time is measured on a
+release, not here.
+
+The script and raw log were scratch files and are not committed.
 
 ### 2026-11-12 · capture workers · desktop, dedicated · how many shots at once
 
