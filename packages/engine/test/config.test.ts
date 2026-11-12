@@ -295,3 +295,17 @@ describe("resolveIgnore", () => {
     expect(resolveIgnore(plain, plain.routes[0]!, plain.variants[0]!)).toEqual([]);
   });
 });
+
+describe("config concurrency (PS-436)", () => {
+  test("unset is undefined, and a whole number from 1 to 32 is kept", () => {
+    expect(parseConfig(base).concurrency).toBeUndefined();
+    for (const n of [1, 8, 32])
+      expect(parseConfig({ ...base, concurrency: n }).concurrency).toBe(n);
+  });
+
+  test.each([0, 33, 2.5, "8"])("rejects %j by name", (value) => {
+    expect(() => parseConfig({ ...base, concurrency: value })).toThrow(
+      "config: concurrency must be a whole number from 1 to 32",
+    );
+  });
+});

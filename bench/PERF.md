@@ -205,6 +205,7 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-11-12 | n/a | desktop, dedicated | capture workers 2 to 10 on a Storybook of 786 shots; the default is ten, capped by the cores |
 | 2026-10-26 | PS-191 | desktop, dedicated | tile hashes: diff.wasm compares only the 64 px tiles that differ, off against on |
 | 2026-10-26 | PS-212 | desktop, dedicated | why diff.wasm is 2.3x slower than cs on the long page: each step in wasm, natively and in cs; the unfilter fixed |
 | 2026-10-25 | PS-205 | desktop, shared | the WASM differ's overlay encode: pngjs's filter pass in the module, timed in workerd |
@@ -219,6 +220,58 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-11-12 · capture workers · desktop, dedicated · how many shots at once
+
+**Question.** `captureInto` took four shots at once, fixed. Where does more stop paying?
+
+**Setup.** `env` dedicated: `pixelslash-bench-reserve on --cpus 1-5,7-11 --mem 10G --pid $$` at the top of
+one script, five whole cores (ten logical CPUs; CPUs 0 and 6 stay with the host), with the Storybook
+server, the CLI and Chromium all inside `pixelslash-bench.scope`. Status at the start:
+`{"version":2,"active":false,"reserved":[],...}`; with the reservation on:
+`{"version":2,"active":true,"reserved":[1,2,3,4,5,7,8,9,10,11],"allowed":{"system.slice":"0 6","user.slice":"0 6","init.scope":"0 6"}}`.
+Afterwards `"active":false` (the script's exit trap ran `off`). The host's load outside the reserved
+cores was about 24 and was not waited on.
+
+The workload is HackCove's whole Storybook static build at one theme (`catppuccin-mocha`): **786 shots**,
+`capture` from a config that spreads HackCove's own and sets `concurrency`. The brief's first choice, the
+`content` group alone, is 148 shots at one theme (444 would be three themes), and a run of 25 s is too short
+to separate worker counts, so the accepted substitute (the whole one-theme run) was used. A first
+attempt on `content` was stopped after round 1 and its numbers are not used.
+
+Order: 2, 4, 6, 8, 10, then again, then a third time, in one script. Wall time is the `capture` process
+start to exit, in seconds. Timeouts and crashes are lines on stderr (`settle exceeded`, `timed out`,
+`crashed`); all runs exited 0. Peak RSS is the sampled maximum, every 0.5 s, of the scope's `anon` memory
+(and in brackets the scope's `memory.current`, which includes page cache); the scope's `MemoryPeak` over all
+15 runs was 1541840896 bytes (1.44 GiB) with no OOM event, so 10G was enough.
+
+| Workers | Run 1 | Run 2 | Run 3 | Median | vs fastest | Timeouts | Crashes | Peak RSS, MB (with cache) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 337.3 | 324.1 | 317.5 | 324.1 | +284% | 0 | 0 | 307 (598) |
+| 4 | 174.6 | 165.8 | 173.6 | 173.6 | +106% | 0 | 0 | 443 (767) |
+| 6 | 124.2 | 117.3 | 117.3 | 117.3 | +39% | 0 | 0 | 628 (1071) |
+| 8 | 94.4 | 99.3 | 94.3 | 94.4 | +12% | 0 | 0 | 807 (1373) |
+| **10** | 85.7 | 82.2 | 84.3 | **84.3** | fastest | 0 | 0 | 956 (1423) |
+
+**CAP is 10.** The rule is the smallest count whose median is within 5% of the fastest median with no timeout
+and no crash in its three runs. Eight is 12% behind the fastest, so ten is the smallest, and it is the fastest.
+Four to eight is 1.84x here and eight to ten 1.12x. Because the sweep stopped at ten, this says the curve had
+not yet flattened on ten logical CPUs, not that it flattens at ten; the default is
+`min(10, os.availableParallelism())`, at least 1, so a machine with fewer CPUs gets fewer workers. The number
+is for five cores, as the brief says; on a bigger machine ten is a cap, not a measurement.
+
+**Pixels.** `sha256sum` of the 786 PNGs of each run against the first 4-worker run. Control: the three
+4-worker runs differ from one another on four shots (the three `content-video-*` shots and
+`overview-all-themes-sections-text`); those are set aside. Of the rest, the 10-worker runs differ on:
+`overview-gallery-sections-text` (all three runs; 685, 80 and 471 pixels, in one box of about 70 x 70 px, and the
+three 10-worker PNGs differ from each other) and `content-chat-thread-chat-with-a-tool-call-and-an-approval`
+(runs 2 and 3; 8 pixels in a 8 x 7 px box). So the CAP run is not byte-identical to a 4-worker run on two shots.
+`overview-gallery-sections-text` also differs from the 4-worker PNG at 2 workers (all three runs) and at 6
+and 8, so it is not a high-count effect. Other counts differ from the 4-worker run on 0 to 3 more shots each
+(`forms-date-field-open`, `forms-date-field-in-dialog`, `feedback-drawer-small`, `feedback-dialog-tall-form`;
+none at 4). The sizes of every shot are the same.
+
+The script and raw log were scratch files and are not committed.
 
 ### 2026-10-25 · PS-205 · desktop, shared · the overlay encode's filter pass in WASM, in workerd
 
@@ -668,8 +721,7 @@ Fonts, images and frames together are under 6% of settle, so they were not lever
 **Levers considered and not taken.** A shorter network-idle window (an own idle check instead of
 Playwright's 500 ms) would shoot earlier than today, which invariant 2 forbids without showing pixel
 equality on every page; overlapping gets more and changes nothing a page sees. More than four at once
-was not measured: the capture image runs on CI runners of unknown size, and four kept screenshot
-contention small here. Each shot keeps its own timeout while four share the CPU, so a page that
+was not measured here (the 2026-11-12 entry above did: the cap is now ten, fewer on a smaller machine). With four sharing the CPU, each shot keeps its own timeout, so a page that
 only just settles in time alone can now time out; none of these pages came near it.
 
 **Pixels.** All 102 PNGs from the runs (diff.png left out) hashed identically across the three runs and

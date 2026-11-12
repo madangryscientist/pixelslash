@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { writeGapsReport } from "./composition-report.ts";
@@ -14,11 +15,18 @@ import type {
 import { elapsed, type ShotTiming } from "./timings.ts";
 
 /**
- * How many shots `captureInto` takes at once (PS-195). Most of a shot is the settle's network-idle
- * window, which is the page waiting, not the machine working; four pages wait together. Each page
- * still waits for its own fonts, images, network idle and two frames, bounded by its own timeout.
+ * The most shots `captureInto` takes at once when the config does not say (PS-195, PS-436). Most of
+ * a shot is the settle's network-idle window, which is the page waiting, not the machine working,
+ * so several pages wait together. Each page still waits for its own fonts, images, network idle
+ * and two frames, bounded by its own timeout. Ten is the smallest count within 5% of the fastest
+ * median in the run logged in `bench/PERF.md` (2026-11-12, dedicated, five cores).
  */
-export const CAPTURE_CONCURRENCY = 4;
+export const DEFAULT_CONCURRENCY_CAP = 10;
+
+/** The default worker count: the cap, or fewer when the machine has fewer cores; at least 1. */
+export function defaultConcurrency(cores = availableParallelism()): number {
+  return Math.max(1, Math.min(DEFAULT_CONCURRENCY_CAP, cores));
+}
 
 /**
  * `fn` over `items`, at most `limit` at a time; the results are in `items`' order. The first failure
@@ -52,13 +60,14 @@ async function mapLimit<T, R>(
 
 /**
  * Every route × variant of the session's config into `out`, and `out/manifest.json`, in the
- * config's order. Up to `concurrency` shots run at once, so the run's summed `captureMs` can exceed
+ * config's order. Up to `concurrency` shots run at once (the config's `concurrency`, else
+ * `defaultConcurrency()`), so the run's summed `captureMs` can exceed
  * its wall clock; the result carries both, as `captureWallMs` and the workers that shared it.
  */
 export async function captureInto(
   session: CaptureSession,
   out: string,
-  concurrency = CAPTURE_CONCURRENCY,
+  concurrency: number = session.config.concurrency ?? defaultConcurrency(),
 ): Promise<SnapshotResult> {
   const { config, routes } = session;
   await mkdir(out, { recursive: true });
