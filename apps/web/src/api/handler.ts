@@ -2,6 +2,7 @@ import { type Actor, actorBuild, actorProject, actorUser } from "#/db/actor";
 import {
   type Build,
   BuildFinalisedError,
+  ImageUnknownError,
   SnapshotCountError,
   createBuild,
   finaliseBuild,
@@ -35,6 +36,8 @@ import {
 } from "./read";
 import { putProjectTwin } from "./twins-link";
 import { BadRequest, Forbidden, object, parseFinalise, parseNewBuild } from "./validate";
+import { knownImages } from "./known";
+import { belowMinimum } from "./cli-version";
 import { Unprocessable } from "./errors";
 
 export type ApiDeps = {
@@ -217,6 +220,15 @@ export const ENDPOINTS: readonly Endpoint[] = [
   },
   {
     method: "POST",
+    path: "/api/v1/builds/:id/known",
+    upload: true,
+    run: (ctx, p) =>
+      withBuild(ctx, at(p, 0), async (build) =>
+        json(await knownImages(ctx.db, build.projectId, await jsonBody(ctx.request))),
+      ),
+  },
+  {
+    method: "POST",
     path: "/api/v1/builds/:id/finalize",
     upload: true,
     run: (ctx, p) => withBuild(ctx, at(p, 0), (build, owner) => closeBuild(ctx, build, owner)),
@@ -287,6 +299,7 @@ function errorOf(e: unknown): ApiError {
   if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
   if (e instanceof Forbidden) return { status: 403, code: "forbidden", message: e.message };
   if (e instanceof Unprocessable) return { status: 422, code: "unprocessable", message: e.message };
+  if (e instanceof ImageUnknownError) return { status: 409, code: e.code, message: e.message };
   if (
     e instanceof BuildFinalisedError ||
     e instanceof SnapshotCountError ||
@@ -300,28 +313,14 @@ function errorOf(e: unknown): ApiError {
   throw e;
 }
 
-/** An upload endpoint's error is the string it always was; every other carries a code. */
+/**
+ * An upload endpoint's error is the string it always was; every other carries a code. An upload
+ * error the CLI acts on adds `code` beside the string (`ImageUnknownError.CODE`), which is additive.
+ */
 function failWith(upload: boolean, { status, code, message }: ApiError): Response {
-  if (upload) return fail(status, message);
+  if (upload)
+    return json({ error: message, ...(code === ImageUnknownError.CODE ? { code } : {}) }, status);
   return json({ api_version: API_VERSION, error: { code, message } }, status);
-}
-
-/** `pixelslash/<x.y.z>`, the CLI's User-Agent; null for any other client. */
-function cliVersion(request: Request): number[] | null {
-  const found = /^pixelslash\/(\d+)\.(\d+)\.(\d+)/.exec(request.headers.get("user-agent") ?? "");
-  return found ? found.slice(1).map(Number) : null;
-}
-
-/** True when the request is from a CLI older than `min` (`x.y.z`); other clients are never refused. */
-function belowMinimum(request: Request, min: string | undefined): boolean {
-  const have = cliVersion(request);
-  const want = min?.split(".").map(Number);
-  if (!have || !want || want.some((n) => !Number.isInteger(n))) return false;
-  for (let i = 0; i < 3; i += 1) {
-    const diff = (have[i] ?? 0) - (want[i] ?? 0);
-    if (diff !== 0) return diff < 0;
-  }
-  return false;
 }
 
 /**

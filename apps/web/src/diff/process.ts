@@ -28,6 +28,7 @@ import {
   serverComparer,
   timedComparer,
 } from "./compare";
+import { snapshotStem } from "#/db/stem";
 import { measureAgainstMain } from "./against-main";
 import { Budget, DiffCeilingError } from "./budget";
 import {
@@ -120,7 +121,7 @@ async function storeUncompared(
 
 /** Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot. */
 async function dropOwnOverlay(deps: ProcessDeps, shot: SnapshotRow): Promise<void> {
-  if (shot.diffKey && shot.diffKey === diffKeyOf(shot.imageKey))
+  if (shot.diffKey && shot.diffKey === diffKeyOf(await snapshotStem(shot)))
     await deps.blobs.delete(shot.diffKey);
 }
 

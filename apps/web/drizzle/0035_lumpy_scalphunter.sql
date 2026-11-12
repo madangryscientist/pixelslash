@@ -1,0 +1,1 @@
+CREATE INDEX `snapshots_image_sha_idx` ON `snapshots` (`image_sha256`);

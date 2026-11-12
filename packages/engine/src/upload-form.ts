@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { type CiResult, ENGINE_VERSION } from "./ci-diff.ts";
 import type { FlakeCheck } from "./flake.ts";
 import { pngPath } from "./manifest.ts";
@@ -12,7 +13,15 @@ export type ShotExtras = {
   note: string | null;
   /** The shot's layout metrics file, exactly as it is on disk (PS-294). */
   metrics: Uint8Array | undefined;
+  /**
+   * The PNG's sha256 when the server already holds that image (PS-424): the shot is registered by
+   * hash and its `file` part is left out. Everything else is sent as for any shot.
+   */
+  byHash?: string | undefined;
 };
+
+/** The sha256 of a PNG's bytes, as the server computes it for a file it receives. */
+export const sha256Of = (png: Uint8Array): string => createHash("sha256").update(png).digest("hex");
 
 /** A shot's PNG path and bytes, and its metrics file's bytes when it has one (undefined for a shot without). */
 export async function readShot(dir: string, e: SnapshotEntry) {
@@ -26,11 +35,12 @@ export async function readShot(dir: string, e: SnapshotEntry) {
  * One shot's upload: its meta and PNG; in a CI project, what it measured against each baseline;
  * for a flaky shot, the flake record and every re-capture as `flake:<run>` (ob 1737); and the
  * judge's sentence, when it wrote one (ob 1745). A shot with a metrics file sends it as `metrics`.
+ * A shot the server already holds (`byHash`, PS-424) names the image by `meta.sha256` and sends no `file`.
  */
 export function snapshotForm(
   e: SnapshotEntry,
   png: Buffer,
-  { results, flake, note, metrics }: ShotExtras,
+  { results, flake, note, metrics, byHash }: ShotExtras,
 ): FormData {
   const form = new FormData();
   const meta: Record<string, unknown> = snapshotMeta(e);
@@ -52,8 +62,9 @@ export function snapshotForm(
     for (const r of flake.retries)
       form.set(`flake:${r.run}`, new File([new Uint8Array(r.png)], `run${r.run}.png`));
   }
+  if (byHash) meta.sha256 = byHash;
   form.set("meta", JSON.stringify(meta));
-  form.set("file", new File([new Uint8Array(png)], "shot.png"));
+  if (!byHash) form.set("file", new File([new Uint8Array(png)], "shot.png"));
   if (metrics)
     form.set(
       "metrics",

@@ -13,6 +13,7 @@ import { builds, flakes, projects, snapshots } from "./schema";
  * What a build that stays can point at, and so what keeps another build alive:
  * - `baseline_key` and `main_baseline_key`: the image it was compared against, and what a removed
  *   marker shows (a marker's `image_key` is the baseline build's blob too).
+ * - `image_key`: a shot stored by hash (PS-424) has no blob of its own and reads another build's.
  * - `baseline_snapshot_id` and `carried_from`: the shot it was compared against, and the shot whose
  *   undecided change it carries.
  * A build kept for that reason keeps what it points at in turn, so the references are followed to a
@@ -72,18 +73,37 @@ async function candidatesOf(db: Db, { days, now }: RetentionOptions): Promise<Ca
 }
 
 /**
+ * The candidate build each image key belongs to. A blob belongs to the build whose folder holds it
+ * (`builds/<id>/...`), which is not always the build of the row naming it: a shot stored by hash
+ * (PS-424) reads another build's image. A key outside that layout is its row's build's own. A key
+ * whose folder is not a candidate has no owner here: that build stays for certain.
+ */
+function blobOwners(
+  shots: Array<{ buildId: string; imageKey: string }>,
+  candidates: ReadonlySet<string>,
+): Map<string, string> {
+  const owners = new Map<string, string>();
+  for (const s of shots) {
+    const folder = /^builds\/([^/]+)\//.exec(s.imageKey)?.[1] ?? s.buildId;
+    if (candidates.has(folder)) owners.set(s.imageKey, folder);
+  }
+  return owners;
+}
+
+/**
  * Who points at whom: `referencer build → builds it points at`, among `candidates`. A referencer
  * outside them is a build that stays for certain.
  */
 async function referencesAmong(db: Db, candidates: Candidate[]): Promise<Map<string, Set<string>>> {
   const ids = candidates.map((c) => c.id);
-  const own = await inChunks(ids, 0, (part) =>
+  // `heldShot()` binds `removed` beside the ids.
+  const own = await inChunks(ids, 1, (part) =>
     db
       .select({ id: snapshots.id, buildId: snapshots.buildId, imageKey: snapshots.imageKey })
       .from(snapshots)
       .where(and(inArray(snapshots.buildId, part), heldShot())),
   );
-  const ownerOfKey = new Map(own.map((s) => [s.imageKey, s.buildId]));
+  const ownerOfKey = blobOwners(own, new Set(ids));
   const ownerOfShot = new Map(own.map((s) => [s.id, s.buildId]));
 
   const edges = new Map<string, Set<string>>();
@@ -93,17 +113,25 @@ async function referencesAmong(db: Db, candidates: Candidate[]): Promise<Map<str
     set.add(to);
     edges.set(from, set);
   };
-  // Two columns are matched per statement, so each key binds twice.
-  for (const keys of chunk([...ownerOfKey.keys()], 0, 2)) {
+  // Three columns are matched per statement, so each key binds three times.
+  for (const keys of chunk([...ownerOfKey.keys()], 0, 3)) {
     const rows = await db
       .select({
         buildId: snapshots.buildId,
+        imageKey: snapshots.imageKey,
         baselineKey: snapshots.baselineKey,
         mainBaselineKey: snapshots.mainBaselineKey,
       })
       .from(snapshots)
-      .where(or(inArray(snapshots.baselineKey, keys), inArray(snapshots.mainBaselineKey, keys)));
+      .where(
+        or(
+          inArray(snapshots.imageKey, keys),
+          inArray(snapshots.baselineKey, keys),
+          inArray(snapshots.mainBaselineKey, keys),
+        ),
+      );
     for (const row of rows) {
+      point(row.buildId, ownerOfKey.get(row.imageKey));
       point(row.buildId, ownerOfKey.get(row.baselineKey ?? ""));
       point(row.buildId, ownerOfKey.get(row.mainBaselineKey ?? ""));
     }

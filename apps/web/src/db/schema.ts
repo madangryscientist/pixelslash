@@ -13,13 +13,11 @@ import type {
 } from "./diff-json";
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
+import { createdAt } from "./schema-columns";
 import { serverTimingColumns, snapshotTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
 
-export const createdAt = () =>
-  integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`);
+export { createdAt };
 
 /**
  * A user signs in with GitHub, Google or both (PS-274); each provider's subject is unique, and the
@@ -426,6 +424,7 @@ export const snapshots = sqliteTable(
     unique().on(t.buildId, t.name, t.platform, t.browser, t.viewport, t.theme),
     index("snapshots_build_idx").on(t.buildId),
     index("snapshots_carried_idx").on(t.carriedFrom),
+    index("snapshots_image_sha_idx").on(t.imageSha256),
   ],
 );
 
