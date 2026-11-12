@@ -187,7 +187,7 @@ export function suggestFixes(
   if (differing.some((r) => r.causes.includes("size"))) {
     const heights = [...new Set(repro.runs.map((r) => `${r.width}x${r.height}`))].join(", ");
     out.push({
-      text: `The page's size changed between runs (${heights}): something arrives or grows after the page settles. Give it a fixed size (a min-height, an aspect ratio on images), or make it load before network idle.`,
+      text: `The page's size changed between runs (${heights}): something arrives or grows after the page settles. Give it a fixed size (a min-height, an aspect ratio on images), or make it load before the network goes quiet.`,
     });
   }
   out.push(...stabilisation(config));

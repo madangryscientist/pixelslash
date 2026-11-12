@@ -720,7 +720,8 @@ Fonts, images and frames together are under 6% of settle, so they were not lever
 
 **Levers considered and not taken.** A shorter network-idle window (an own idle check instead of
 Playwright's 500 ms) would shoot earlier than today, which invariant 2 forbids without showing pixel
-equality on every page; overlapping gets more and changes nothing a page sees. More than four at once
+equality on every page (the CLI's capture has since replaced the window with an in-flight request
+count: 2,330 HackCove story shots came out pixel-identical to main's); overlapping gets more and changes nothing a page sees. More than four at once
 was not measured here (the 2026-11-12 entry above did: the cap is now ten, fewer on a smaller machine). With four sharing the CPU, each shot keeps its own timeout, so a page that
 only just settles in time alone can now time out; none of these pages came near it.
 

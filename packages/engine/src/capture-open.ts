@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Page } from "playwright";
-import { keepNativeRaf, settleCapture } from "./capture.ts";
+import { keepNativeRaf, settleCapture, trackInflight } from "./capture.ts";
 import type { Route, Stabilise, Variant } from "./config.ts";
 import type { Session } from "./setup.ts";
 import { CaptureError } from "./errors.ts";
@@ -43,6 +43,8 @@ export async function openPage(
   { timeoutMs, progress }: { timeoutMs: number; progress: ShotProgress },
 ): Promise<Opened> {
   page.setDefaultNavigationTimeout(timeoutMs);
+  // Before `goto`, so the requests the navigation starts are counted (the page is new: none came earlier).
+  const inflight = trackInflight(page);
   progress.step = "goto";
   const loading = performance.now();
   const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -54,7 +56,11 @@ export async function openPage(
   // A story's own render signal and the generic settle share one budget.
   const started = Date.now();
   const storyMs = route.storybook ? await storyWait(page, route.name, timeoutMs) : undefined;
-  const settle = await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
+  const settle = await settleCapture(
+    page,
+    Math.max(1, timeoutMs - (Date.now() - started)),
+    inflight,
+  );
   return {
     navigateMs: settling - loading,
     settleMs: performance.now() - settling,

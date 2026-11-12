@@ -50,7 +50,7 @@ The word at the end is the [kind](how-a-comparison-works.md#regions): `changed`,
 
 ## 7. Timings
 
-The table says where the time went: capture, navigation, settling, the screenshot and the diff. Its footer breaks the settle into fonts, images, network idle and frames. A slow settle usually has a slow network request behind it.
+The table says where the time went: capture, navigation, settling, the screenshot and the diff. Its footer breaks the settle into fonts, images, the network and frames. A slow settle usually has a slow network request behind it.
 
 ## Many pages: the index
 

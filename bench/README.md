@@ -71,7 +71,7 @@ image. Each page is captured in pairs with `pixelslash capture` and each pair di
 | bare | the same CLI on this machine | what the same stabilisation does outside the image |
 | control | bare, with animations, caret and clock left alone | proof the page flickers at all: a clean image row means nothing if the control is clean too |
 
-The settle (fonts, images, network idle, two frames) runs in every arm: it is not optional, so a
+The settle (fonts, images, the network, two frames) runs in every arm: it is not optional, so a
 page it alone makes stable (`lazy-image`) cannot flicker in the control. `caret` did not flicker in it
 either, which fits headless Chromium painting no caret (above), though three pairs do not prove that.
 The results say which pages the control did not flag. The

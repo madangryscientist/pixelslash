@@ -18,6 +18,58 @@ export type SettlePage = {
 };
 
 /**
+ * A page's requests that have started and not finished, counted from the moment it was made.
+ * `idle()` resolves when the count is zero. A websocket is not a request that finishes (Playwright
+ * reports it as its own `websocket` event), so it never holds the count.
+ */
+export type Inflight = {
+  count(): number;
+  /** How many requests have started, ever: a request that began and ended between two reads still shows. */
+  started(): number;
+  idle(): Promise<void>;
+};
+
+/** The slice of a Playwright page `trackInflight` listens on. */
+export type InflightPage = {
+  on(event: "request" | "requestfinished" | "requestfailed", listener: () => void): unknown;
+};
+
+/**
+ * Count a page's in-flight requests: plus one on `request`, minus one on `requestfinished` or
+ * `requestfailed`. Call it when the page is made, before `goto`, so the requests the navigation
+ * starts are counted; the settle waits on it in place of Playwright's fixed `networkidle` window.
+ */
+export function trackInflight(page: InflightPage): Inflight {
+  let count = 0;
+  let started = 0;
+  let waiters: Array<() => void> = [];
+  const finish = () => {
+    count = Math.max(0, count - 1);
+    if (count === 0) {
+      const ready = waiters;
+      waiters = [];
+      for (const resolve of ready) resolve();
+    }
+  };
+  page.on("request", () => {
+    count += 1;
+    started += 1;
+  });
+  page.on("requestfinished", finish);
+  page.on("requestfailed", finish);
+  return {
+    count: () => count,
+    started: () => started,
+    idle: () =>
+      count === 0
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            waiters.push(resolve);
+          }),
+  };
+}
+
+/**
  * Browser globals the settle touches, declared here because the tsconfig has no
  * DOM lib. Type-only: nothing is emitted, and the callbacks below run in the page
  * (Playwright serializes their source), where these are the real globals.
@@ -48,8 +100,12 @@ const twoFrames = () =>
   });
 
 /**
- * Wait for a page to settle before screenshotting: web fonts, every image, a
- * short network-idle window, then two animation frames. Bounded by `timeoutMs`
+ * Wait for a page to settle before screenshotting: web fonts, every image, the network, then two
+ * animation frames. With `inflight` (made by `trackInflight` before navigation) the network wait is
+ * no request in flight: after the frames the tracker is read again, and a request that started
+ * meanwhile (even one that already finished) makes the settle wait and run the frames again. Without it the wait is Playwright's
+ * `networkidle` (500ms with no connection), which is all a page the caller already navigated
+ * allows. Bounded by `timeoutMs`
  * (default CAPTURE_TIMEOUT_MS) so a page whose fonts never load does not hang
  * the capture past it. Resolves to how long each condition took.
  *
@@ -59,6 +115,7 @@ const twoFrames = () =>
 export function settleCapture(
   page: SettlePage,
   timeoutMs = CAPTURE_TIMEOUT_MS,
+  inflight?: Inflight,
 ): Promise<SettleSteps> {
   const steps = (async () => {
     const fontsMs = await timedMs(() => page.evaluate(() => document.fonts.ready));
@@ -67,8 +124,19 @@ export function settleCapture(
         Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0),
       ),
     );
-    const networkIdleMs = await timedMs(() => page.waitForLoadState("networkidle"));
-    const framesMs = await timedMs(() => page.evaluate(twoFrames));
+    if (!inflight) {
+      const networkIdleMs = await timedMs(() => page.waitForLoadState("networkidle"));
+      const framesMs = await timedMs(() => page.evaluate(twoFrames));
+      return { fontsMs, imagesMs, networkIdleMs, framesMs };
+    }
+    let networkIdleMs = 0;
+    let framesMs = 0;
+    let seen: number;
+    do {
+      seen = inflight.started();
+      networkIdleMs += await timedMs(() => inflight.idle());
+      framesMs += await timedMs(() => page.evaluate(twoFrames));
+    } while (inflight.count() > 0 || inflight.started() !== seen);
     return { fontsMs, imagesMs, networkIdleMs, framesMs };
   })();
   return withTimeout(steps, timeoutMs, `capture settle exceeded ${timeoutMs}ms`);
