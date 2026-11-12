@@ -171,6 +171,9 @@ body:has([data-art]) {
   pointer-events: none;
 }
 
+/* The blobs hang off the centre line, floored at the old edge offsets: up to 1024px they sit where
+   they always did, and on a wider screen they stay by the text's column instead of at the screen's
+   edges. */
 .home-aurora span {
   position: absolute;
   width: 42rem;
@@ -182,19 +185,19 @@ body:has([data-art]) {
 
 .home-aurora span:nth-child(1) {
   top: -14rem;
-  left: -10rem;
+  left: max(-10rem, calc(50% - 42rem));
   background: var(--home-mauve);
 }
 
 .home-aurora span:nth-child(2) {
   top: -6rem;
-  right: -14rem;
+  right: max(-14rem, calc(50% - 46rem));
   background: var(--home-blue);
 }
 
 .home-aurora span:nth-child(3) {
   top: 26rem;
-  left: 30%;
+  left: max(30%, calc(50% - 13rem));
   background: var(--home-peach);
   opacity: var(--home-aurora-soft);
 }
