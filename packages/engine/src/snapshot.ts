@@ -173,10 +173,11 @@ function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
  */
 async function shootPooled(browser: Browser, shot: Shot, pool: PreviewPool): Promise<Shoot> {
   try {
-    const taken = await pooledAttempt(pool, browser, shot, (page, opened, setupMs) =>
+    const { out, switched } = await pooledAttempt(pool, browser, shot, (page, opened, setupMs) =>
       capture(page, shot, opened, setupMs),
     );
-    return { ...taken, reused: true };
+    // A story loaded on the slot's page is a fresh page's shot; only a switched one is reused.
+    return switched ? { ...out, reused: true } : out;
   } catch {
     return shoot(browser, shot);
   }

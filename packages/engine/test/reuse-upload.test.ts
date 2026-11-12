@@ -4,6 +4,7 @@ import { afterAll, describe, expect, test } from "vitest";
 import { identity, readManifest } from "../src/manifest.ts";
 import type { Shoot, SnapshotEntry } from "../src/snapshot.ts";
 import { uploadSnapshots } from "../src/upload.ts";
+import { sha256Of } from "../src/upload-form.ts";
 import { type Call, fakeServer, metaOf } from "./fake-server.ts";
 import { FP, cleanup, entry, gitOpts, repo, snapshotDir } from "./upload-fixtures.ts";
 
@@ -30,6 +31,7 @@ const picked = {
   image_url: "/images/orgs/o/s0.png?exp=1&sig=s",
   fingerprint: FP,
   ignore: [],
+  sha256: sha256Of(png()),
 };
 
 /** A project that holds a white baseline for every shot but `fresh-story`, which is new. */

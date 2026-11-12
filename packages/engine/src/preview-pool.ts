@@ -21,7 +21,7 @@ import {
 import { elapsed } from "./timings.ts";
 
 /**
- * One Storybook preview page per capture worker, switched from story to story in place (PS-423).
+ * One Storybook preview page per capture worker, switched from story to story in place (PS-445).
  * Loading and booting the preview is most of a story shot, so a page kept open and told to render
  * the next story is several times faster than a fresh one. Its PNG is not always byte-equal to a
  * fresh page's (a focus ring, a glyph raster, an antialiased pixel), so a shot taken here is marked
@@ -64,7 +64,13 @@ export class PreviewPool {
     this.free.set(key, list);
   }
 
-  async make(browser: Browser, shot: PooledShot): Promise<Slot> {
+  /**
+   * A new page for `key`. An idle page of another key (a variant the workers are done with) is
+   * closed first, so the pool holds about one page per worker, not one per worker per variant.
+   */
+  async make(browser: Browser, key: string, shot: PooledShot): Promise<Slot> {
+    const idle = [...this.free].find(([k, list]) => k !== key && list.length > 0)?.[1].pop();
+    if (idle) await this.drop(idle);
     const context = await newShotContext(browser, shot.variant, shot.stabilise, shot.session);
     const progress: ShotProgress = { step: "goto", crashed: false };
     await context.addInitScript(hookChannel);
@@ -118,8 +124,11 @@ async function canSwitch(slot: Slot, id: string, globals: string): Promise<boole
   return slot.page.evaluate(previewHooked);
 }
 
-/** The story on the slot's page: switched in place when it can be, else loaded like a fresh page. */
-async function open(slot: Slot, shot: PooledShot): Promise<Opened> {
+/**
+ * The story on the slot's page: switched in place when it can be, else loaded like a fresh page.
+ * `switched` says which: a load is a fresh page's shot, a switch is a reused page's.
+ */
+async function open(slot: Slot, shot: PooledShot): Promise<Opened & { switched: boolean }> {
   const { page, progress } = slot;
   const { timeoutMs } = shot.stabilise;
   const { id, globals } = storyParts(shot.url);
@@ -133,7 +142,7 @@ async function open(slot: Slot, shot: PooledShot): Promise<Opened> {
       inflight: slot.inflight,
     });
     Object.assign(slot, { id, globals });
-    return opened;
+    return { ...opened, switched: false };
   }
   page.setDefaultNavigationTimeout(timeoutMs);
   progress.step = "goto";
@@ -156,22 +165,24 @@ async function open(slot: Slot, shot: PooledShot): Promise<Opened> {
     settleMs: performance.now() - settling,
     settle,
     storyMs,
+    switched: true,
   };
 }
 
 /**
  * One attempt at a story on a pooled page. The page goes back to the pool after a good shot, and
  * is closed after a failure, or after an a11y scan, which resumes a paused clock for good.
+ * `switched` says the story was switched to in place, not loaded.
  */
 export async function pooledAttempt<T>(
   pool: PreviewPool,
   browser: Browser,
   shot: PooledShot,
   capture: (page: Page, opened: Opened, setupMs: number) => Promise<T>,
-): Promise<T> {
+): Promise<{ out: T; switched: boolean }> {
   const setting = performance.now();
   const key = `${shot.variant.browser}/${shot.variant.name}`;
-  const slot = pool.take(key) ?? (await pool.make(browser, shot));
+  const slot = pool.take(key) ?? (await pool.make(browser, key, shot));
   const setupMs = elapsed(setting);
   slot.progress.step = "goto";
   let keep = false;
@@ -180,7 +191,7 @@ export async function pooledAttempt<T>(
     slot.progress.step = "screenshot";
     const out = await capture(slot.page, opened, setupMs);
     keep = !(shot.a11y && shot.stabilise.timers);
-    return out;
+    return { out, switched: opened.switched };
   } catch (e) {
     throw attemptFailure(e, shot.url, slot.progress);
   } finally {

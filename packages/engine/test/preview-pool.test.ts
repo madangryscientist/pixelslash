@@ -109,10 +109,11 @@ describe("a story may be shot on a reused preview page, only when the capture as
       // pooled page after it, since a page a story failed on is closed, not put back.
       expect(loads).toBe(3);
       const names = reused.manifest.snapshots.map((e) => e.name);
-      const throwing = reused.manifest.snapshots.find((e) => e.name.endsWith("reuse-throws"))!;
+      // Only a story switched to in place is a reused page's shot; a load, on a slot's new page or
+      // on the fresh page after a failure, is a fresh page's.
       expect([...reused.reused!].toSorted()).toEqual(
         reused.manifest.snapshots
-          .filter((e) => e !== throwing)
+          .filter((e) => /paints|two/.test(e.name))
           .map(identity)
           .toSorted(),
       );

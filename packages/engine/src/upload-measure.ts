@@ -25,13 +25,15 @@ export async function sameAsBaselines(
   png: Buffer,
   mains: Map<string, Buffer>,
 ): Promise<boolean> {
-  const named = [pick?.baseline ?? null, pick?.accepted ?? null].filter(
-    (p): p is PickedShot => p !== null,
-  );
+  const named = [pick?.baseline, pick?.accepted].filter((p): p is PickedShot => p != null);
   if (named.length === 0) return false;
   const hash = sha256Of(png);
   for (const p of named) {
-    if (p.sha256 === hash) continue;
+    // A hash the server sent settles it either way; only a shot without one is fetched.
+    if (typeof p.sha256 === "string") {
+      if (p.sha256 !== hash) return false;
+      continue;
+    }
     const main = mains.get(p.id) ?? (await baselinePng(client, p));
     mains.set(p.id, main);
     if (!main.equals(png)) return false;
