@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
+import { mkdir, open, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Region } from "./regions.ts";
 
@@ -84,6 +84,8 @@ export type DevIteration = {
   judge: DevJudge | null;
   /** Set when `--judge` ran on a target with a spec or refs (ob 1741). */
   differences?: DevDifferences | null | undefined;
+  /** Absent on a finished run; the error's message on a run that threw (PS-395). */
+  error?: string | undefined;
 };
 
 export function devStore(worktree: string): DevStore {
@@ -150,14 +152,14 @@ function isIteration(v: unknown): v is DevIteration {
   );
 }
 
-/** The newest finished iteration, of `target` when one is named. */
+/** The newest finished iteration (a failed run is not one), of `target` when one is named. */
 export async function latestIteration(
   store: DevStore,
   target?: string,
 ): Promise<DevIteration | undefined> {
   for (const id of (await listIterations(store)).toReversed()) {
     const it = await readIteration(store, id);
-    if (it && (target === undefined || it.target === target)) return it;
+    if (it && it.error === undefined && (target === undefined || it.target === target)) return it;
   }
   return undefined;
 }
@@ -175,25 +177,88 @@ async function writePins(store: DevStore, pins: string[]): Promise<void> {
   await writeJson(pinsFile(store), { pins });
 }
 
+export type PinsLockOptions = {
+  /** How long to wait for a held lock before giving up. */
+  waitMs?: number;
+  /** A lock file older than this is its dead holder's: it is removed and taken. */
+  staleMs?: number;
+  /** The pause between tries. */
+  stepMs?: number;
+};
+
+/**
+ * Run `fn` holding `pins.json.lock` (PS-395), so two pin updates, in one process or two, cannot
+ * both read the old list and lose one. The lock is an exclusive create, removed in a `finally`.
+ * The stale takeover is remove then create, so in a rare race one process can remove another's
+ * just-taken lock: accepted for a local dev tool with a 10 s stale limit.
+ */
+export async function withPinsLock<T>(
+  store: DevStore,
+  fn: () => Promise<T>,
+  opts: PinsLockOptions = {},
+): Promise<T> {
+  await mkdir(store.root, { recursive: true });
+  const lock = `${pinsFile(store)}.lock`;
+  await takePinsLock(lock, opts);
+  try {
+    return await fn();
+  } finally {
+    await rm(lock, { force: true });
+  }
+}
+
+async function takePinsLock(
+  lock: string,
+  { waitMs = 5000, staleMs = 10_000, stepMs = 20 }: PinsLockOptions,
+): Promise<void> {
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    try {
+      await (await open(lock, "wx")).close();
+      return;
+    } catch (e) {
+      if (!(e instanceof Error) || Reflect.get(e, "code") !== "EEXIST") throw e;
+    }
+    const age = await stat(lock).then(
+      (s) => Date.now() - s.mtimeMs,
+      () => 0,
+    );
+    if (age > staleMs) {
+      await rm(lock, { force: true });
+      continue;
+    }
+    if (Date.now() >= deadline)
+      throw new Error(
+        `pins.json is locked by another pixelslash; remove ${lock} if none is running`,
+      );
+    await Bun.sleep(stepMs);
+  }
+}
+
 /** Pin `id` (default: the latest iteration) as the comparison point; returns the pinned id. */
 export async function pinIteration(store: DevStore, id?: string): Promise<string | undefined> {
   const chosen = id ?? (await latestIteration(store))?.id;
-  if (!chosen || !(await readIteration(store, chosen))) return undefined;
-  const pins = (await readPins(store)).filter((p) => p !== chosen);
-  await writePins(store, [...pins, chosen]);
-  return chosen;
+  const found = chosen ? await readIteration(store, chosen) : undefined;
+  if (!chosen || !found || found.error !== undefined) return undefined;
+  return withPinsLock(store, async () => {
+    const pins = (await readPins(store)).filter((p) => p !== chosen);
+    await writePins(store, [...pins, chosen]);
+    return chosen;
+  });
 }
 
 /** Unpin `id` (default: the newest pin); returns the unpinned id, undefined when nothing was. */
 export async function unpinIteration(store: DevStore, id?: string): Promise<string | undefined> {
-  const pins = await readPins(store);
-  const chosen = id ?? pins.at(-1);
-  if (!chosen || !pins.includes(chosen)) return undefined;
-  await writePins(
-    store,
-    pins.filter((p) => p !== chosen),
-  );
-  return chosen;
+  return withPinsLock(store, async () => {
+    const pins = await readPins(store);
+    const chosen = id ?? pins.at(-1);
+    if (!chosen || !pins.includes(chosen)) return undefined;
+    await writePins(
+      store,
+      pins.filter((p) => p !== chosen),
+    );
+    return chosen;
+  });
 }
 
 /**
