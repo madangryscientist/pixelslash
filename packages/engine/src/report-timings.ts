@@ -58,7 +58,7 @@ function settleNote({ settle }: Timings): string | undefined {
     : undefined;
 }
 
-/** Pages are shot at once (a pair's two, up to four in `capture`): said only when the parts pass Capture. */
+/** Pages are shot at once (a pair's two, several in `capture`): said only when the parts pass Capture. */
 function overlapNote(t: Timings): string | undefined {
   const partsMs = (t.navigateMs ?? 0) + (t.settleMs ?? 0) + (t.screenshotMs ?? 0);
   return partsMs > (t.captureMs ?? 0)

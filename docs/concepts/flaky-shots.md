@@ -13,7 +13,7 @@ Before each shot, capture waits for the page to settle, in this order:
 
 This can't be turned off. It is bounded by `timeoutMs`, 8 seconds by default. A page that doesn't settle in time fails with `capture settle exceeded <n>ms`. It doesn't hang, and it doesn't shoot early.
 
-Capture takes up to four shots at once, each with its own timeout and all sharing the CPU. A page that only just settles when shot alone can run out of time here.
+Capture takes several shots at once (up to ten, fewer on a machine with fewer cores; the config's `concurrency` sets it), each with its own timeout and all sharing the CPU. A page that only just settles when shot alone can run out of time here: lower `concurrency`.
 
 ## Stabilisation
 

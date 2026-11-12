@@ -10,7 +10,8 @@ import {
 } from "./config-feature.ts";
 import { type CompositionConfig, parseComposition } from "./config-composition.ts";
 import { type FlakyPolicy, parseFlake, parseFlaky } from "./config-flake.ts";
-import { flag } from "./config-flag.ts";
+import { flag, uniqueNames } from "./config-flag.ts";
+import { parseConcurrency } from "./config-concurrency.ts";
 import { type Stabilise, parseStabilise } from "./config-stabilise.ts";
 import { baseUrlOf, parseStorybook, type StorybookConfig } from "./config-storybook.ts";
 import type { DiffOptions } from "./diff.ts";
@@ -91,6 +92,8 @@ export type CaptureConfig = {
   a11y: boolean;
   /** Write each shot's layout metrics file from its `[data-part]` elements (PS-294, `docs/metrics.md`). Off unless set. */
   metrics: boolean;
+  /** Shots `capture` and `check` take at once, 1 to 32; unset is `defaultConcurrency()`. */
+  concurrency: number | undefined;
 };
 
 export const CONFIG_NAMES = [
@@ -246,14 +249,6 @@ function upload(v: unknown): UploadConfig {
   };
 }
 
-function uniqueNames(items: { name: string }[], what: string): void {
-  const seen = new Set<string>();
-  for (const { name } of items) {
-    if (seen.has(name)) bad(what, `has two entries named "${name}"`);
-    seen.add(name);
-  }
-}
-
 /** Validate a raw config object and fill every default. */
 export function parseConfig(raw: unknown): CaptureConfig {
   if (!isObj(raw)) bad("file", "must hold an object");
@@ -267,8 +262,8 @@ export function parseConfig(raw: unknown): CaptureConfig {
   if (routes.length === 0 && !sb) bad("routes", "must list at least one path (or set storybook)");
   const rawVariants = list(raw.variants, "variants");
   const variants = (rawVariants.length === 0 ? [{}] : rawVariants).map(variant);
-  uniqueNames(routes, "routes");
-  uniqueNames(variants, "variants");
+  uniqueNames(routes, "routes", bad);
+  uniqueNames(variants, "variants", bad);
   for (const [i, r] of routes.entries()) {
     for (const name of Object.keys(r.variantDiff)) {
       if (!variants.some((vr) => vr.name === name))
@@ -299,6 +294,7 @@ export function parseConfig(raw: unknown): CaptureConfig {
     composition: parseComposition(raw.composition, bad),
     a11y: flag(raw.a11y, "a11y", bad),
     metrics: flag(raw.metrics, "metrics", bad),
+    concurrency: parseConcurrency(raw.concurrency, bad),
   };
 }
 
