@@ -60,6 +60,12 @@ function linkText(shot: SnapshotView, label: ShotLabel, variantOnly: boolean): s
 
 type Build = BuildView["build"];
 
+/** Links shown after a sentence before "+N more" (PS-419): a wall of them hides the sentence. */
+const LINKS_SHOWN = 8;
+
+/** Sentences shown before "Show all" (PS-419): the summary is a lead, not the page. */
+const SENTENCES_SHOWN = 3;
+
 /** One stored sentence, followed by links to the shots it names. */
 function Sentence({
   projectId,
@@ -78,31 +84,48 @@ function Sentence({
   testId: string;
   lead?: string;
 }) {
+  const [all, setAll] = useState(false);
+  const named = sentence.shots.filter((id) => byId.has(id));
+  const shown = all ? named : named.slice(0, LINKS_SHOWN);
+  const hidden = named.length - shown.length;
   return (
     <Text as="p" data-testid={testId}>
       {lead && <Text strong>{lead} </Text>}
       {sentence.text}{" "}
-      {sentence.shots.flatMap((id, _, ids) => {
+      {shown.flatMap((id) => {
         const shot = byId.get(id);
         if (!shot) return [];
         return [
-          <Pill
-            key={id}
-            tone="violet"
-            data-testid="summary-shot-link"
-            render={(props) => (
-              <Link
-                to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-                params={{ projectId, buildId, snapshotId: id }}
-                {...props}
-              />
-            )}
-          >
-            {linkText(shot, label(shot.name), oneStory(ids, byId))}
-          </Pill>,
+          // The wrapper, because a pill takes no class: a label stays on one line (truncate is
+          // nowrap), and a very long one is cut at the column's width rather than widening the page.
+          <span key={id} className="inline-block max-w-full truncate align-bottom">
+            <Pill
+              tone="violet"
+              data-testid="summary-shot-link"
+              render={(props) => (
+                <Link
+                  to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                  params={{ projectId, buildId, snapshotId: id }}
+                  {...props}
+                />
+              )}
+            >
+              {linkText(shot, label(shot.name), oneStory(named, byId))}
+            </Pill>
+          </span>,
           " ",
         ];
       })}
+      {hidden > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAll(true)}
+          data-testid="summary-more-links"
+        >
+          +{hidden} more
+        </Button>
+      )}
     </Text>
   );
 }
@@ -124,11 +147,26 @@ function Sentences({
   const byId = new Map(snapshots.map((shot) => [shot.id, shot]));
   const summary = build.aiSummary;
   const shared = { projectId, buildId: build.id, byId, label };
+  const [all, setAll] = useState(false);
+  const sentences = summary?.sentences ?? [];
+  const shown = all ? sentences : sentences.slice(0, SENTENCES_SHOWN);
   return (
     <Stack gap="xs" data-testid="summary-text">
-      {summary?.sentences.map((sentence, i) => (
+      {shown.map((sentence, i) => (
         <Sentence key={i} {...shared} sentence={sentence} testId="summary-sentence" />
       ))}
+      {shown.length < sentences.length && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAll(true)}
+            data-testid="summary-show-all"
+          >
+            Show all {sentences.length} sentences
+          </Button>
+        </div>
+      )}
       {summary?.match && (
         <Sentence
           {...shared}

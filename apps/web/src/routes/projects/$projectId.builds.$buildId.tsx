@@ -99,7 +99,6 @@ function BuildNotices({
 }: Pick<Loaded, "project" | "build"> & { error: string | null }) {
   return (
     <>
-      <RunCard />
       <BuildError project={project} build={build} />
       {error && (
         <Callout tone="danger" role="alert">
@@ -184,6 +183,8 @@ function BuildPage() {
         <UnlinkedShots projectId={project.id} buildId={build.id} twins={twins} />
         <RejectionNote />
         <BuildOverrideChanges changes={thresholdChanges} />
+        {/* Diagnostics, not review: folded, and below everything a reviewer acts on (PS-419). */}
+        <RunCard />
       </ListLayout>
     </Page>
   );
