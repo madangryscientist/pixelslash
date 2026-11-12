@@ -161,7 +161,6 @@ function SideColumn({
   const { project, build, snapshot } = data;
   return (
     <StickyRail>
-      {" "}
       <SidePanel
         projectId={project.id}
         buildId={build.id}

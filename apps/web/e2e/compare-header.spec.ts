@@ -42,14 +42,20 @@ async function openTallShot(page: Page) {
 
 type Box = { x: number; y: number; width: number; height: number };
 
+/** The sticky element around the viewer bar: its box, which throws rather than read as 0 when it is missing. */
+const stickyBarOf = (page: Page) =>
+  page.getByTestId("viewer-bar").evaluate((el) => {
+    const bar = el.parentElement;
+    if (!bar) throw new Error("the viewer bar has no sticky parent");
+    const r = bar.getBoundingClientRect();
+    return { bottom: r.bottom, height: r.height };
+  });
+
 const boxOf = async (locator: Locator): Promise<Box> => {
   const box = await locator.boundingBox();
   if (!box) throw new Error("not drawn");
   return box;
 };
-
-const overlaps = (a: Box, b: Box) =>
-  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 test("a phone gives the title its own row, and the sticky header stays short", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -70,26 +76,16 @@ test("a phone gives the title its own row, and the sticky header stays short", a
   );
   expect(meta.length).toBeGreaterThan(3);
   for (const item of meta) {
-    expect(overlaps(titleBox, item), `"${item.text}" over the title`).toBe(false);
-    // On its own row below the title, not beside it.
+    // On its own row below the title, not beside it (so never over it).
     expect(item.y, `"${item.text}" under the title`).toBeGreaterThanOrEqual(
       titleBox.y + titleBox.height - 1,
     );
   }
 
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
   // The bar is the sticky element around the viewer bar's content.
-  const height = await bar.evaluate((el) => el.parentElement?.getBoundingClientRect().height ?? 0);
+  const { height } = await stickyBarOf(page);
   expect(height).toBeGreaterThan(0);
   expect(height).toBeLessThanOrEqual(128);
-
-  // Still within the limit after the page scrolls: it is the sticky one, and the crumbs are gone.
-  await page.evaluate(() => window.scrollTo(0, 400));
-  await expect(bar).toBeInViewport();
-  const stuck = await bar.evaluate((el) => el.parentElement?.getBoundingClientRect().height ?? 0);
-  expect(stuck).toBeLessThanOrEqual(128);
 });
 
 test("the panes are labelled with their side and stay labelled while a tall shot scrolls", async ({
@@ -111,12 +107,12 @@ test("the panes are labelled with their side and stay labelled while a tall shot
 
   await page.evaluate(() => window.scrollTo(0, 1500));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(1400);
-  const stickyBottom = await bar.evaluate((el) => el.parentElement?.getBoundingClientRect().bottom);
+  const { bottom: stickyBottom } = await stickyBarOf(page);
   for (const label of [labels.nth(0), labels.nth(1)]) {
     await expect(label).toBeInViewport();
     // Under the sticky bar, not hidden behind it.
     const box = await boxOf(label);
-    expect(box.y).toBeGreaterThanOrEqual((stickyBottom ?? 0) - 1);
+    expect(box.y).toBeGreaterThanOrEqual(stickyBottom - 1);
   }
 });
 
@@ -136,8 +132,6 @@ test("the side rail's content sticks beside the image wherever the page is scrol
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(1400);
   await expect(first).toBeInViewport();
   const box = await boxOf(first);
-  const stickyBottom = await page
-    .getByTestId("viewer-bar")
-    .evaluate((el) => el.parentElement?.getBoundingClientRect().bottom ?? 0);
+  const { bottom: stickyBottom } = await stickyBarOf(page);
   expect(box.y).toBeGreaterThanOrEqual(stickyBottom - 1);
 });

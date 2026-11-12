@@ -216,7 +216,7 @@ function usePublishBarHeight() {
  */
 export function StickyRail({ children }: { children: ReactNode }) {
   return (
-    <div className="lg:sticky lg:top-[calc(var(--app-header,0px)+var(--shot-bar,6rem)+1rem)] lg:max-h-[calc(100vh-var(--app-header,0px)-var(--shot-bar,6rem)-2rem)] lg:overflow-y-auto">
+    <div className="lg:sticky lg:top-[calc(var(--app-header,0px)+var(--shot-bar,6rem)+1rem)] lg:max-h-[calc(100vh-var(--app-header,0px)-var(--shot-bar,6rem)-2rem)] lg:-m-1 lg:overflow-y-auto lg:p-1">
       {children}
     </div>
   );
