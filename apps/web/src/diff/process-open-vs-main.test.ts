@@ -187,7 +187,12 @@ describe("open changes against main (PS-284)", () => {
     ]);
     expect(tabCounts(view?.snapshots ?? [])).toMatchObject({ changed: 1, new: 1, unchanged: 1 });
     // The API's counts and each shot's `group` are the measured ones, as before.
-    expect(counts && apiCounts(counts)).toMatchObject({ changed: 0, new: 0, unchanged: 3 });
+    expect(counts && apiCounts(counts)).toMatchObject({
+      changed: 0,
+      new: 0,
+      unchanged: 3,
+      against_main: { changed: 1, new: 1 },
+    });
   });
 
   test("accepting the open shots turns the build and the check run to passed", async () => {
