@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Page } from "playwright";
-import { keepNativeRaf, settleCapture, trackInflight } from "./capture.ts";
+import { type Inflight, keepNativeRaf, settleCapture, trackInflight } from "./capture.ts";
 import type { Route, Stabilise, Variant } from "./config.ts";
 import type { Session } from "./setup.ts";
 import { CaptureError } from "./errors.ts";
@@ -35,16 +35,21 @@ export type ShotStep = "goto" | "settle" | "screenshot";
 /** Where a shot is, written as it goes so a failure can name the step it was in, and whether its page crashed. */
 export type ShotProgress = { step: ShotStep; crashed: boolean };
 
-/** Load the page and wait for it to settle; returns how long each took, the page's own time. */
+/**
+ * Load the page and wait for it to settle; returns how long each took, the page's own time. A page
+ * that is used again (a pooled preview page) passes the tracker it has counted requests on since it
+ * was made.
+ */
 export async function openPage(
   page: Page,
   url: string,
   route: Route,
-  { timeoutMs, progress }: { timeoutMs: number; progress: ShotProgress },
+  opts: { timeoutMs: number; progress: ShotProgress; inflight?: Inflight },
 ): Promise<Opened> {
+  const { timeoutMs, progress } = opts;
   page.setDefaultNavigationTimeout(timeoutMs);
-  // Before `goto`, so the requests the navigation starts are counted (the page is new: none came earlier).
-  const inflight = trackInflight(page);
+  // Before `goto`, so the requests the navigation starts are counted (a new page has had none).
+  const inflight = opts.inflight ?? trackInflight(page);
   progress.step = "goto";
   const loading = performance.now();
   const resp = await page.goto(url, { waitUntil: "domcontentloaded" });

@@ -185,6 +185,7 @@ function printFlakes(result: UploadResult, io: Io): void {
     );
   }
   if (result.report) io.stdout.write(`report: ${pathToFileURL(result.report).href}\n`);
+  if (result.reshot > 0) io.stderr.write(`reuse: ${result.reshot} re-shot on a fresh page\n`);
 }
 
 /** The errors `failedUpload` made: the only ones that are an upload failure, whatever their text says. */

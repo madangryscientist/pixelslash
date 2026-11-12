@@ -1,32 +1,16 @@
-import type { Browser, Page } from "playwright";
-import { scanA11y } from "./a11y.ts";
+import type { Browser } from "playwright";
 import type { A11y } from "./a11y-entry.ts";
 import type { Metrics } from "./metrics-entry.ts";
-import { measureMetrics } from "./metrics-walk.ts";
 import { launchSessionBrowsers } from "./capture-browsers.ts";
-import {
-  newShotContext,
-  openPage,
-  pinClock,
-  stepsOf,
-  type Opened,
-  type ShotProgress,
-} from "./capture-open.ts";
+import { newShotContext, openPage, pinClock, type ShotProgress } from "./capture-open.ts";
 import { attemptFailure, retryOnCrash } from "./crash-retry.ts";
-import {
-  loadLibrary,
-  measureComposition,
-  type Composition,
-  type CompositionLibrary,
-} from "./composition.ts";
+import { loadLibrary, type Composition } from "./composition.ts";
 import {
   resolveIgnore,
   type BrowserName,
   type CaptureConfig,
   type FlakyPolicy,
-  type Ignore,
   type Route,
-  type Stabilise,
   type Variant,
 } from "./config.ts";
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
@@ -38,26 +22,17 @@ import {
   type Fingerprint,
   type ListFonts,
 } from "./fingerprint.ts";
-import {
-  maskLocators,
-  measureIgnore,
-  measureMedia,
-  MASK_COLOR,
-  toImageRects,
-  unexcluded,
-  type MediaBox,
-} from "./page-areas.ts";
+import { MASK_COLOR, toImageRects, type MediaBox } from "./page-areas.ts";
 import { mediaWarner } from "./media.ts";
 import { joinOrigin } from "./routes.ts";
 import { captureInto } from "./capture-into.ts";
-import type { Session } from "./setup.ts";
+import { PreviewPool, pooledAttempt } from "./preview-pool.ts";
+import { capture, type Shot } from "./shot-capture.ts";
 import { startApp, type StopApp } from "./start.ts";
-import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
-import { elapsed, timed, type CaptureSteps, type ShotTiming } from "./timings.ts";
+import { unmatchedTally } from "./unmatched.ts";
+import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
 import type { NativeFields } from "./native.ts";
 import { storybookRoutes } from "./storybook.ts";
-import { paintRects } from "./paint-rects.ts";
-import { measureStoryBox, shiftBoxes, storyShot, type Crop } from "./story-crop.ts";
 
 /** One snapshot in the manifest: what it is (name + variant + tags), what made it, and its PNG. */
 export type SnapshotEntry = {
@@ -127,6 +102,8 @@ export type SnapshotResult = {
   captureWallMs?: number;
   /** How many shots ran at once: the concurrency, or fewer when there were fewer shots. */
   captureWorkers?: number;
+  /** The shots (`identity`) taken on a pooled preview page; set only when the capture could reuse one (PS-445). */
+  reused?: ReadonlySet<string>;
 };
 
 export { MASK_COLOR, toImageRects };
@@ -135,47 +112,6 @@ export { captureInto, defaultConcurrency } from "./capture-into.ts";
 
 /** Launch flags that take host-specific rendering choices out of the picture. */
 const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];
-
-/** The shot as it is kept: its size in image px and, for a cropped story, the crop origin in full-page CSS px. */
-type Frame = { image: { width: number; height: number }; origin?: Crop["origin"] | undefined };
-
-/**
- * Resolve ignore areas on the live page to image-px boxes: every match of every selector, every
- * `[data-pixelslash-ignore]` element, and the fixed rectangles. Nothing is painted. A selector that
- * matches nothing is tallied for the run, like a mask's.
- */
-async function resolveIgnoreBoxes(
-  page: Page,
-  areas: Ignore[],
-  shot: Pick<Shot, "stabilise" | "unmatched">,
-  frame: Frame,
-): Promise<IgnoreRect[]> {
-  const selectors = areas.filter((a) => typeof a === "string");
-  const misses = shot.unmatched.checked("ignore", selectors);
-  const boxes = await measureIgnore(page, selectors, true, misses);
-  boxes.push(...areas.filter((a) => typeof a !== "string"));
-  const scale = shot.stabilise.deviceScaleFactor;
-  return toImageRects(shiftBoxes(boxes, frame.origin), scale, frame.image);
-}
-
-type Shot = {
-  url: string;
-  route: Route;
-  variant: Variant;
-  stabilise: Stabilise;
-  /** Ignore areas to resolve at screenshot time; the pixels are left as they are. */
-  ignore: Ignore[];
-  /** What the config's `setup` left signed in, if it has one. */
-  session: Session | undefined;
-  /** The library a composition-only project is measured against; undefined for any other project. */
-  library: CompositionLibrary | undefined;
-  /** Scan the settled page for accessibility violations (PS-238). */
-  a11y: boolean;
-  /** Read every `[data-part]` element's box and style into the layout metrics file (PS-294). */
-  metrics: boolean;
-  warn: (m: string) => void;
-  unmatched: UnmatchedTally;
-};
 
 /**
  * One capture of a shot: its PNG, its ignore areas in image px, the page's load + settle time, and
@@ -198,75 +134,12 @@ export type Shoot = {
   a11y?: A11y;
   /** The page's layout metrics (PS-294); absent when not asked for or when the page has no `data-part`. */
   metrics?: Metrics;
+  /**
+   * Shot on a pooled preview page, not a fresh one (PS-445): its PNG may differ from a fresh
+   * page's, so it is kept only where it equals its baseline. Absent on a fresh shot.
+   */
+  reused?: true;
 };
-
-/**
- * What is read off the settled page once it is shot: the ignore boxes, media, composition and a11y
- * scan. `png` is the shot as it is kept; a story's crop moves its `origin` (full-page CSS px) to the
- * top left, so every box is shifted to sit on the same pixels.
- */
-async function measure(page: Page, shot: Shot, png: Buffer, origin?: Crop["origin"]) {
-  const { stabilise } = shot;
-  // The PNG's size from its IHDR chunk, without decoding the image.
-  const frame = {
-    image: { width: png.readUInt32BE(16), height: png.readUInt32BE(20) },
-    origin,
-  };
-  const ignore = await resolveIgnoreBoxes(page, shot.ignore, shot, frame);
-  const media = unexcluded(
-    shiftBoxes(await measureMedia(page), origin),
-    ignore,
-    stabilise.deviceScaleFactor,
-    frame.image,
-  );
-  const composition =
-    shot.library &&
-    (await measureComposition(page, shot.library, {
-      scale: stabilise.deviceScaleFactor,
-      image: frame.image,
-      origin,
-      warn: shot.warn,
-    }));
-  // Read like the boxes above: the settled page, after the shot, before anything is let run.
-  const metrics = shot.metrics ? ((await measureMetrics(page)) ?? undefined) : undefined;
-  // After the screenshot and the measurements, so nothing the scan lets run can reach the PNG.
-  // axe waits on timers, which `timers` has paused for good: let the page clock run again first.
-  if (shot.a11y && stabilise.timers) await page.clock.resume();
-  const a11y = shot.a11y ? await scanA11y(page) : undefined;
-  return { ignore, media, composition, a11y, metrics };
-}
-
-/** The settled page shot: cropped to its story when it is one, then measured in the frame it is kept in. */
-async function capture(page: Page, shot: Shot, opened: Opened, setupMs: number): Promise<Shoot> {
-  const { stabilise, route } = shot;
-  const selectors = route.masks.filter((m) => typeof m === "string");
-  const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
-  // Measured before the shot, on the settled page, in the frame the shot is taken in.
-  const story = route.storybook ? await measureStoryBox(page, stabilise.animations) : null;
-  const shooting = performance.now();
-  const full = await page.screenshot({
-    fullPage: true,
-    animations: stabilise.animations ? "disabled" : "allow",
-    caret: stabilise.caret ? "hide" : "initial",
-    mask: locators,
-    maskColor: MASK_COLOR,
-  });
-  const screenshotMs = elapsed(shooting);
-  const { png, origin } = storyShot(full, story, stabilise.deviceScaleFactor);
-  const { value: measured, ms: measureMs } = await timed(() => measure(page, shot, png, origin));
-  const { ignore, media, composition, a11y, metrics } = measured;
-  const rects = route.masks.filter((m) => typeof m !== "string");
-  return {
-    png: paintRects(png, shiftBoxes(rects, origin), stabilise.deviceScaleFactor),
-    ignore,
-    media,
-    loadMs: opened.navigateMs + opened.settleMs,
-    steps: stepsOf(opened, { setupMs, screenshotMs, measureMs }),
-    ...(composition && { composition }),
-    ...(a11y && { a11y }),
-    ...(metrics && { metrics }),
-  };
-}
 
 /** One attempt at a shot, in a context of its own. It throws `PageCrash` for a crash, a `CaptureError` for anything else. */
 async function attempt(browser: Browser, shot: Shot): Promise<Shoot> {
@@ -295,6 +168,21 @@ function shoot(browser: Browser, shot: Shot): Promise<Shoot> {
 }
 
 /**
+ * A story on a pooled preview page (PS-445). Anything that goes wrong there (a crash, a throw, a
+ * timeout) shoots it again on a fresh page, so a failure is only ever a fresh page's failure.
+ */
+async function shootPooled(browser: Browser, shot: Shot, pool: PreviewPool): Promise<Shoot> {
+  try {
+    const taken = await pooledAttempt(pool, browser, shot, (page, opened, setupMs) =>
+      capture(page, shot, opened, setupMs),
+    );
+    return { ...taken, reused: true };
+  } catch {
+    return shoot(browser, shot);
+  }
+}
+
+/**
  * A browser on the config's app, held open: the app started (when the config starts one), signed
  * in, the routes read. `captureInto` shoots every route through it, and an upload re-captures a
  * shot through it (ob 1737), with the same route, variant and stabilisation as the first time.
@@ -306,11 +194,15 @@ export type CaptureSession = {
   fingerprintFor: (browser: BrowserName) => Fingerprint;
   /** How long the browsers took to launch, together (PS-195). */
   browserLaunchMs: number;
-  /** `scan` asks for the accessibility scan (PS-238); only `captureInto` keeps its result, so a flake re-capture or a dev loop skips it. */
+  /**
+   * `scan` asks for the accessibility scan (PS-238); only `captureInto` keeps its result, so a flake
+   * re-capture or a dev loop skips it. `reuse` lets a story be shot on a pooled preview page
+   * (PS-445); without it, as for every re-capture, the shot is on a fresh page.
+   */
   shoot: (
     route: Route,
     variant: Variant,
-    scan?: { a11y?: boolean; metrics?: boolean },
+    scan?: { a11y?: boolean; metrics?: boolean; reuse?: boolean },
   ) => Promise<Shoot>;
   /** Print the selectors that matched nothing since the last flush (PS-241); `close` does too. */
   flush: () => void;
@@ -335,8 +227,10 @@ export async function openCaptureSession(
   const library = config.composition && (await loadLibrary(config.composition));
   let stopApp: StopApp | undefined;
   const browsers = new Map<BrowserName, Browser>();
+  const pool = new PreviewPool();
   const close = async () => {
     unmatched.flush();
+    await pool.close();
     await Promise.all([...browsers.values()].map((b) => b.close()));
     await stopApp?.();
   };
@@ -363,7 +257,8 @@ export async function openCaptureSession(
       }),
       browserLaunchMs: held.launchMs,
       shoot: async (route, variant, scan) => {
-        const taken = await shoot(held.of(variant.browser), {
+        const browser = held.of(variant.browser);
+        const shot: Shot = {
           url: joinOrigin(route.storybook?.origin ?? config.baseUrl, route.path),
           route,
           variant,
@@ -375,7 +270,11 @@ export async function openCaptureSession(
           metrics: config.metrics && scan?.metrics === true,
           warn,
           unmatched,
-        });
+        };
+        const taken =
+          scan?.reuse && route.storybook
+            ? await shootPooled(browser, shot, pool)
+            : await shoot(browser, shot);
         warnMedia(route, variant, taken.media);
         return taken;
       },

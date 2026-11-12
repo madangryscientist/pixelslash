@@ -63,11 +63,14 @@ async function mapLimit<T, R>(
  * config's order. Up to `concurrency` shots run at once (the config's `concurrency`, else
  * `defaultConcurrency()`), so the run's summed `captureMs` can exceed
  * its wall clock; the result carries both, as `captureWallMs` and the workers that shared it.
+ * With `reuse` (`capture --upload` only, PS-445) a story may be shot on a pooled preview page; the
+ * result's `reused` names those shots, so the upload can shoot again on a fresh page any that differs.
  */
 export async function captureInto(
   session: CaptureSession,
   out: string,
   concurrency: number = session.config.concurrency ?? defaultConcurrency(),
+  { reuse = false }: { reuse?: boolean } = {},
 ): Promise<SnapshotResult> {
   const { config, routes } = session;
   await mkdir(out, { recursive: true });
@@ -78,10 +81,10 @@ export async function captureInto(
   const taken = await mapLimit(pairs, concurrency, async ({ route, variant }) => {
     const file = `${route.name}/${variant.name}.png`;
     const started = performance.now();
-    const { png, ignore, media, composition, a11y, metrics, steps } = await session.shoot(
+    const { png, ignore, media, composition, a11y, metrics, steps, reused } = await session.shoot(
       route,
       variant,
-      { a11y: true, metrics: true },
+      { a11y: true, metrics: true, reuse },
     );
     const captureMs = elapsed(started);
     await mkdir(join(out, route.name), { recursive: true });
@@ -103,7 +106,7 @@ export async function captureInto(
       ...(metricsFile && { metrics: metricsFile }),
     };
     const shot: ShotTiming = { name: identity(entry), captureMs, ...steps };
-    return { entry, shot, media };
+    return { entry, shot, media, reused: reused === true };
   });
   const captureWallMs = elapsed(shooting);
   const snapshots = taken.map((t) => t.entry);
@@ -114,7 +117,8 @@ export async function captureInto(
   const manifest: SnapshotManifest = { version: 1, snapshots };
   const manifestPath = join(out, "manifest.json");
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  const wall = { captureWallMs, captureWorkers: workers };
+  const reused = new Set(taken.filter((t) => t.reused).map((t) => t.shot.name));
+  const wall = { captureWallMs, captureWorkers: workers, ...(reuse && { reused }) };
   if (!config.composition) return { manifest, manifestPath, shots, media, ...wall };
   const gapsPath = await writeGapsReport(out, manifest, config.composition.name);
   return { manifest, manifestPath, shots, media, gapsPath, ...wall };
