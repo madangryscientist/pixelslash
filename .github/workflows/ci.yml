@@ -106,6 +106,7 @@ jobs:
     outputs:
       web: ${{ steps.diff.outputs.web }}
       site: ${{ steps.diff.outputs.site }}
+      site_e2e: ${{ steps.diff.outputs.site_e2e }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,8 +123,14 @@ jobs:
             # A release calls this workflow on a tag and its publish needs the result; an npm publish of the
             # CLI does not ship the site, so a site failure must not stop one.
             case "$REF" in
-              refs/tags/*) echo "site=false" >> "$GITHUB_OUTPUT" ;;
-              *) echo "site=true" >> "$GITHUB_OUTPUT" ;;
+              refs/tags/*)
+                echo "site=false" >> "$GITHUB_OUTPUT"
+                echo "site_e2e=false" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                echo "site=true" >> "$GITHUB_OUTPUT"
+                echo "site_e2e=true" >> "$GITHUB_OUTPUT"
+                ;;
             esac
             exit 0
           fi
@@ -142,6 +149,16 @@ jobs:
           else
             echo "site=false" >> "$GITHUB_OUTPUT"
           fi
+          # The e2e needs less than the build: the docs the site renders are checked by the build itself
+          # (a dead internal link or a missing cli.md anchor fails it) and by the site's unit tests, so a
+          # docs-only edit skips the browser run. A spec that quotes a docs sentence is only run on a site
+          # change or on main. Keep this list inside the one above.
+          if git diff --name-only "origin/$BASE_REF...HEAD" \
+            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|nx\.json$|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            echo "site_e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "site_e2e=false" >> "$GITHUB_OUTPUT"
+          fi
 
   web:
     name: Web gate (build, e2e, deploy dry run)
@@ -149,9 +166,11 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache.
+    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache. It does not use
+    # engines/dotnet, so it installs no SDK and tells the @nx/dotnet plugin to stand down (AGENTS.md).
     env:
       NX_NO_CLOUD: "true"
+      NX_DOTNET_DISABLE: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,18 +180,18 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
       - run: bunx nx build web
       - run: bunx nx test:e2e web
-      - name: e2e against vite dev
+      # Only the specs that make the server diff: the upload, and the review of its result. The dev run is
+      # there so the pngjs diff inside workerd stays under an e2e run (apps/web/playwright.config.ts); the
+      # production run above already covers every spec.
+      - name: e2e against vite dev (upload and review)
         working-directory: apps/web
-        run: bun run test:e2e:dev
+        run: bun run test:e2e:dev -- e2e/upload.spec.ts e2e/review.spec.ts
       - name: Deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry"
@@ -182,17 +201,20 @@ jobs:
           CLOUDFLARE_ENV=production bun run build
           bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry-production"
 
-  # apps/site's Playwright suite (desktop and phone) on the build. Not a required check and not run on a
-  # tag: a release publishes the CLI, which does not ship the site (PS-326).
+  # apps/site's build always (it fails on a dead internal link), and its Playwright suite (the desktop
+  # project) only when the site itself changed. Not a required check and not run on a tag: a release
+  # publishes the CLI, which does not ship the site.
   site:
     name: Site gate (build, e2e)
     needs: changes
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache.
+    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache. It does not use
+    # engines/dotnet, so it installs no SDK and tells the @nx/dotnet plugin to stand down (AGENTS.md).
     env:
       NX_NO_CLOUD: "true"
+      NX_DOTNET_DISABLE: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -200,12 +222,15 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
+        if: needs.changes.outputs.site_e2e == 'true'
         working-directory: apps/site
         run: bunx playwright install --with-deps chromium-headless-shell
-      # Builds first, through dependsOn.
-      - run: bunx nx test:e2e site
+      # Prerenders every page with crawlLinks and failOnError, so a dead internal link or a missing
+      # cli.md anchor fails here.
+      - run: bunx nx build site
+      # Desktop project only: the phone (Pixel 7) project is not run in CI.
+      - name: e2e (desktop)
+        if: needs.changes.outputs.site_e2e == 'true'
+        run: bunx nx test:e2e site -- --project desktop

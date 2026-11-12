@@ -152,5 +152,13 @@ bunx nx test:e2e web       # the happy paths in a real browser
 bunx nx test <project>     # integration + unit
 ```
 
+In CI the web e2e runs every spec once on the production build (with the diff in the sidecar). A second run
+on `vite dev` is cut to `e2e/upload.spec.ts` and `e2e/review.spec.ts`: it exists so the pngjs diff inside
+workerd, as on Cloudflare, stays under an e2e run, and those two specs are the ones that make the server diff
+and read its result. The site's e2e runs the `desktop` project only (not the phone one), and only when the site
+itself changed (`apps/site/` or what decides how it installs) or on `main`; a docs-only edit is checked by
+`nx build site` (a dead internal link or a missing `cli.md` anchor fails the prerender) and the site's unit
+tests, and a spec that quotes a docs sentence waits for the next site change or the push to `main`.
+
 The smoke state is `apps/web/.wrangler/smoke` (gitignored), recreated on every run; its scratch is under
 `TMPDIR`, which `scripts/test-tmp-scope.ts` scopes and removes.

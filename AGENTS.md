@@ -122,7 +122,7 @@ A change to `apps/web` also runs the standard's web gate (from the worktree root
 ```bash
 bunx nx build web
 bunx nx test:e2e web              # Playwright: a local build on a fresh local D1, GitHub stubbed
-(cd apps/web && bun run test:e2e:dev)   # the same specs against `vite dev` (after the build run: same ports)
+(cd apps/web && bun run test:e2e:dev -- e2e/upload.spec.ts e2e/review.spec.ts)   # the two specs that make the server diff, against `vite dev` (after the build run: same ports)
 (cd apps/web && bunx wrangler deploy --dry-run --outdir /tmp/ps-web-dry)
 (cd apps/web && CLOUDFLARE_ENV=production bun run build && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry-production")   # env.production, app.pixelslash.dev (PS-277)
 ```
@@ -147,16 +147,21 @@ A change to `apps/site`, or to a file it renders (`docs/cli.md`, `apps/web/SELF-
 
 ```bash
 bunx nx build site
-bunx nx test:e2e site             # Playwright on the build, desktop and phone: nav, footer, no dead links
+bunx nx test:e2e site             # Playwright on the build, desktop and phone: nav, footer, no dead links (CI: `-- --project desktop`)
 (cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-site-dry")
 ```
 
-CI runs the build and `bunx nx test:e2e site` as `Site gate (build, e2e)` on a pull request that touches
-`apps/site/`, `docs/`, a root file the site renders or installs from (`README.md`, `SECURITY.md`,
+CI runs `Site gate (build, e2e)` in two tiers. The build (`bunx nx build site`) runs on a pull request that
+touches `apps/site/`, `docs/`, a root file the site renders or installs from (`README.md`, `SECURITY.md`,
 `apps/web/SELF-HOST.md`, `apps/web/github-app/manifest.json`, `package.json`, `nx.json`,
 `tsconfig.base.json`, `bun.lock`, `bunfig.toml`, `scripts/test-tmp-scope.ts`) or `ci.yml`, and on every push to
-`main`. A tag (a release) does not run it. The check is not required, so a skipped job blocks nothing; the hand
-run above is no longer the only run, but the wrangler dry run stays yours.
+`main`. The build prerenders with `crawlLinks` and `failOnError`, and `resolve-links.ts` throws on a missing
+`cli.md` anchor, so a docs-only edit is checked by the build and the site's unit tests, not a browser. The e2e
+(`bunx nx test:e2e site -- --project desktop`, the phone project is not run in CI) runs only on the short list:
+`apps/site/`, `scripts/test-tmp-scope.ts`, `package.json`, `nx.json`, `tsconfig.base.json`, `bun.lock`,
+`bunfig.toml` and `ci.yml`, and on every push to `main`. A tag (a release) runs neither. The check is not
+required, so a skipped job blocks nothing; the hand run above is no longer the only run, but the wrangler dry
+run stays yours. The `web` and `site` jobs install no .NET SDK and set `NX_DOTNET_DISABLE`; only `gate` has it.
 
 `apps/web` keeps its schema in `src/db/schema.ts`; `bun run db:generate` (in
 `apps/web`) writes the next additive migration to `apps/web/drizzle/`. All
