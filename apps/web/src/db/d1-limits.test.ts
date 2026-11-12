@@ -3,8 +3,9 @@ import { memoryStore } from "#/api/test-support";
 import { rediffShots } from "#/diff/rerun";
 import { type Uploads, rows, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
+import { sha256Bytes } from "#/lib/crypto";
 import { orgBlobs } from "#/storage/blobs";
-import { snapshotDiffOptions } from "./builds";
+import { heldImages, snapshotDiffOptions } from "./builds";
 import { listBuilds } from "./build-list";
 import type { Db } from "./db";
 import { snapshotIgnoreBoxes, snapshotOverrides } from "./override-export";
@@ -128,5 +129,13 @@ describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
       diffStatus: "changed",
       baselineKey: (await rows(ctx, old))[0]?.imageKey,
     });
+  }, 60_000);
+
+  test("150 hashes are looked up in parts, the held one found (PS-424)", async () => {
+    await upload(ctx, { branch: "main", commit: sha(7001), shots: [{ png: white }] });
+    const real = await sha256Bytes(white.buffer);
+    const absent = Array.from({ length: 150 }, (_, i) => i.toString(16).padStart(64, "0"));
+    const found = await heldImages(ctx.db, ctx.projectId, [...absent, real]);
+    expect([...found.keys()]).toEqual([real]);
   }, 60_000);
 });

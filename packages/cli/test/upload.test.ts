@@ -21,6 +21,7 @@ describe("pixelslash upload", () => {
     expect(cap.stdout).toMatch(/uploaded 1 snapshots\nbuild: build-1 \([0-9a-f]{7} on feat\)/);
     expect(api.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       "POST /api/v1/builds",
+      "POST /api/v1/builds/build-1/known",
       "PUT /api/v1/builds/build-1/snapshots",
       "POST /api/v1/builds/build-1/finalize",
     ]);
@@ -150,7 +151,7 @@ describe("pixelslash upload", () => {
     });
     expect(code).toBe(0);
     expect(cap.stdout).toMatch(/^skip: no judge\n[\s\S]*uploaded 1 snapshots/);
-    expect(api.calls.map((c) => c.method)).toEqual(["POST", "PUT", "POST"]);
+    expect(api.calls.map((c) => c.method)).toEqual(["POST", "POST", "PUT", "POST"]);
   });
 });
 
@@ -262,7 +263,7 @@ describe("capture --upload", () => {
     );
     expect(code).toBe(0);
     expect(cap.stdout).toMatch(/pixelslash: 1 snapshots[\s\S]*uploaded 1 snapshots/);
-    expect(api.calls.map((c) => c.method)).toEqual(["POST", "PUT", "POST"]);
+    expect(api.calls.map((c) => c.method)).toEqual(["POST", "POST", "PUT", "POST"]);
   }, 60_000);
 
   test("without --upload nothing is sent, and upload-only flags are refused", async () => {

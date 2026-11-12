@@ -6,6 +6,7 @@ import type { Db } from "#/db/db";
 import type { SentFlake } from "#/db/flakes";
 import { type FlakyPolicy, snapshots } from "#/db/schema";
 import { TEST_MODEL_KEY_SECRET } from "#/db/test-db";
+import { sha256Bytes } from "#/lib/crypto";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import type { ConsumerDeps } from "#/ai/explain-queue";
 import { type MemoryQueue, memoryQueue } from "#/ai/explain-queue-kit";
@@ -27,6 +28,8 @@ export type Shot = {
   ignore?: Array<{ x: number; y: number; width: number; height: number }>;
   flaky?: FlakyPolicy | null;
   flake?: SentFlake | null;
+  /** Send the shot by its hash alone, as a CLI does for an image the project holds (PS-424). */
+  byHash?: boolean;
 };
 
 export type Ctx = Awaited<ReturnType<typeof setup>> & {
@@ -87,7 +90,7 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
         fingerprint: s.fingerprint ?? FINGERPRINT,
         flaky: s.flaky ?? null,
       },
-      png: s.png.buffer,
+      png: s.byHash ? { sha256: await sha256Bytes(s.png.buffer) } : s.png.buffer,
       flake: s.flake ?? null,
     });
   }

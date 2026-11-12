@@ -1,13 +1,15 @@
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { readPngSize } from "@hackcove/pixelslash-engine/diff";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, inArray, ne } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
-import { sha256Bytes, sha256Hex } from "#/lib/crypto";
+import { sha256Bytes } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
+import { chunk } from "./chunks";
 import { type Db, NotFoundError } from "./db";
 import { type SentFlake, labelFlake } from "./flakes";
 import { heldShot } from "./markers";
+import { snapshotStem } from "./stem";
 import {
   type BuildTimings,
   type DiffOptions,
@@ -66,6 +68,19 @@ export class BuildFinalisedError extends Error {
   }
 }
 
+/**
+ * A shot was sent by hash and the project holds no image with that hash (PS-424): a 409 with the
+ * code `image_unknown`. The CLI then sends that shot with its file.
+ */
+export class ImageUnknownError extends Error {
+  static readonly CODE = "image_unknown";
+  readonly code = ImageUnknownError.CODE;
+  constructor() {
+    super("no image with that sha256 is held by this project: send the PNG");
+    this.name = "ImageUnknownError";
+  }
+}
+
 /** Finalise named a snapshot count the build does not hold. */
 export class SnapshotCountError extends Error {
   constructor(expected: number, actual: number) {
@@ -96,13 +111,17 @@ export async function getBuild(db: Db, projectId: string, buildId: string): Prom
  */
 export type CiShot = {
   engineVersion: string;
-  /** The shot's size, from its PNG header. */
-  image: { width: number; height: number };
+  /** The shot's size, from its PNG header; null on a shot sent by hash, which takes the held image's. */
+  image: { width: number; height: number } | null;
   results: { baselineId: string; status: unknown; diffResult: unknown; mask: ArrayBuffer }[];
 };
 
 /** Store each CI mask beside the shot, one per baseline, and return what `ci_results` holds. */
-async function putMasks(blobs: BlobStore, stem: string, ci: CiShot): Promise<CiUpload> {
+async function putMasks(
+  blobs: BlobStore,
+  stem: string,
+  ci: CiShot & { image: CiUpload["image"] },
+): Promise<CiUpload> {
   const results = await Promise.all(
     ci.results.map(async ({ mask, ...result }) => {
       const diffKey = `${stem}.vs-${result.baselineId}.diff.png`;
@@ -129,10 +148,54 @@ async function putMetrics(
   return key;
 }
 
-/** One upload: the shot's meta, its PNG and, from a CI project's CLI, what it measured (ob 1727). */
+/** An image the project already holds, named by the hash of its bytes instead of being sent (PS-424). */
+export type HeldImage = { sha256: string };
+
+/** The columns a held image lends the shot that names it. */
+type Held = Pick<typeof snapshots.$inferSelect, "imageKey" | "imageSha256" | "imageSize">;
+
+/**
+ * The rows of this project's finished builds that hold an image with one of these hashes (PS-424),
+ * one per hash. Finished means past `uploading`: `putSnapshot` can still overwrite the blob of a
+ * build that is open, and a key shared with another build must never change under it. Scoped to
+ * the project (never the org, never another project): a token learns nothing about its siblings.
+ * A removed marker holds no image of its own and never matches. The lookup is chunked for D1's
+ * 100-parameter limit.
+ */
+export async function heldImages(
+  db: Db,
+  projectId: string,
+  hashes: readonly string[],
+): Promise<Map<string, Held>> {
+  const found = new Map<string, Held>();
+  // Three more values are bound beside the hashes: the project, `uploading` and `removed`.
+  for (const part of chunk(hashes, 3)) {
+    const rows = await db
+      .select({
+        imageKey: snapshots.imageKey,
+        imageSha256: snapshots.imageSha256,
+        imageSize: snapshots.imageSize,
+      })
+      .from(snapshots)
+      .innerJoin(builds, eq(builds.id, snapshots.buildId))
+      .where(
+        and(
+          inArray(snapshots.imageSha256, part),
+          eq(builds.projectId, projectId),
+          ne(builds.status, "uploading"),
+          heldShot(),
+        ),
+      );
+    for (const row of rows)
+      if (row.imageSha256 && !found.has(row.imageSha256)) found.set(row.imageSha256, row);
+  }
+  return found;
+}
+
+/** One upload: the shot's meta, its PNG (or the hash of one the project holds) and, from a CI project's CLI, what it measured (ob 1727). */
 export type SentSnapshot = {
   input: SnapshotInput;
-  png: ArrayBuffer;
+  png: ArrayBuffer | HeldImage;
   /** The layout metrics file's bytes (PS-294), already checked; absent or null is none. */
   metrics?: ArrayBuffer | null;
   ci?: CiShot | null;
@@ -147,36 +210,90 @@ const shown = (input: SnapshotInput) => ({
   a11y: input.a11y ?? null,
 });
 
-/**
- * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
- * the blob key comes from that identity, so the second PNG overwrites the first in place.
- * The blob goes first, so a failed put leaves no row to count.
- */
-export async function putSnapshot(
+/** The shot's image: stored under its own stem when it came with its bytes, else the one a hash names. */
+async function imageOf(
   { db, blobs }: { db: Db; blobs: BlobStore },
   build: Build,
-  { input, png, metrics = null, ci = null, flake = null }: SentSnapshot,
-): Promise<{ id: string }> {
-  if (build.status !== "uploading") throw new BuildFinalisedError();
-  const { name, platform, browser, viewport, theme } = input;
-  const identity = await sha256Hex(JSON.stringify([name, platform, browser, viewport, theme]));
-  const stem = `builds/${build.id}/${identity.slice(0, 32)}`;
+  stem: string,
+  png: ArrayBuffer | HeldImage,
+): Promise<Held> {
+  if (!(png instanceof ArrayBuffer)) {
+    const held = (await heldImages(db, build.projectId, [png.sha256])).get(png.sha256);
+    if (!held) throw new ImageUnknownError();
+    return held;
+  }
   const imageKey = `${stem}.png`;
-  const metricsKey = await putMetrics(blobs, stem, metrics);
   await blobs.put(imageKey, png, "image/png");
-  const fields = {
+  return {
+    imageKey,
+    imageSha256: await sha256Bytes(png),
+    imageSize: readPngSize(new Uint8Array(png)),
+  };
+}
+
+/**
+ * What `putSnapshot` writes besides the shot's identity. The image comes first: a hash the project
+ * does not hold is refused before anything is written (PS-424).
+ */
+async function rowFields(
+  { db, blobs }: { db: Db; blobs: BlobStore },
+  build: Build,
+  stem: string,
+  { input, png, metrics = null, ci = null, flake = null }: SentSnapshot,
+) {
+  const image = await imageOf({ db, blobs }, build, stem, png);
+  const ciResults = await putCiResults(blobs, stem, ci, image);
+  return {
     tags: input.tags,
     diffOptions: input.diff,
     ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
-    imageKey,
-    metricsKey,
-    imageSha256: await sha256Bytes(png),
-    imageSize: readPngSize(new Uint8Array(png)),
-    ciResults: ci && (await putMasks(blobs, stem, ci)),
+    ...image,
+    metricsKey: await putMetrics(blobs, stem, metrics),
+    ciResults,
     flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
     ...shown(input),
   };
+}
+
+/**
+ * A CI project's results with their masks stored, sized by the CLI's image or, for a shot sent by
+ * hash, by the held image. A held image with no recorded size cannot be checked against its masks:
+ * the shot is refused so the client sends the PNG.
+ */
+async function putCiResults(
+  blobs: BlobStore,
+  stem: string,
+  ci: CiShot | null,
+  image: Held,
+): Promise<CiUpload | null> {
+  if (!ci) return null;
+  const size = ci.image ?? image.imageSize;
+  if (!size) throw new ImageUnknownError();
+  return putMasks(blobs, stem, { ...ci, image: size });
+}
+
+/**
+ * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
+ * the blob key comes from that identity, so the second PNG overwrites the first in place.
+ * The blob goes first, so a failed put leaves no row to count.
+ *
+ * A shot sent by hash (PS-424) has no PNG: its row takes `imageKey`, `imageSha256` and `imageSize`
+ * from a finished build of the same project that holds that hash, and everything else (masks,
+ * metrics, flake captures) is stored under the shot's own stem as for any shot. With no such
+ * build it throws `ImageUnknownError` before anything is written. A hash is never trusted for
+ * bytes the server received: a shot sent with its PNG is hashed here.
+ */
+export async function putSnapshot(
+  { db, blobs }: { db: Db; blobs: BlobStore },
+  build: Build,
+  sent: SentSnapshot,
+): Promise<{ id: string }> {
+  if (build.status !== "uploading") throw new BuildFinalisedError();
+  const { name, platform, browser, viewport, theme } = sent.input;
+  const stem = await snapshotStem({ buildId: build.id, name, platform, browser, viewport, theme });
+  const fields = await rowFields({ db, blobs }, build, stem, sent);
+  const { flake = null } = sent;
   const [row] = await db
     .insert(snapshots)
     .values({
@@ -205,7 +322,14 @@ export async function putSnapshot(
   const key = { name, platform, browser, viewport, theme };
   await labelFlake(
     { db, blobs },
-    { id: row.id, buildId: build.id, projectId: build.projectId, key, imageKey, stem },
+    {
+      id: row.id,
+      buildId: build.id,
+      projectId: build.projectId,
+      key,
+      imageKey: fields.imageKey,
+      stem,
+    },
     flake,
   );
   return row;

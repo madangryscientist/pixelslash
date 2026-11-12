@@ -17,7 +17,8 @@ import { identity, readManifest } from "./manifest.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
 import { elapsed, requestLog, timingsToSend, type ShotTiming, type Timings } from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
-import { readShot, snapshotForm } from "./upload-form.ts";
+import { type ShotExtras, readShot, sha256Of, snapshotForm } from "./upload-form.ts";
+import { knownImages } from "./upload-known.ts";
 
 const CONCURRENCY = 4;
 export type UploadOptions = {
@@ -214,9 +215,11 @@ export async function uploadSnapshots(
     warn,
   });
   await clearFlakeOutput(opts.dir);
+  const known = await knownImages(client, id, opts.dir, manifest.snapshots);
   const timed: ShotTiming[] = [];
   const queue = manifest.snapshots.map((e, i) => ({ e, pick: picked.picks[i] }));
   const stop = { on: false };
+  const measuring = needsMeasure(ci, flakes.retries, deps.describe);
   const worker = async () => {
     for (let next = queue.shift(); next && !stop.on; next = queue.shift()) {
       const { e, pick } = next;
@@ -226,20 +229,14 @@ export async function uploadSnapshots(
       const mains = new Map<string, Buffer>();
       const timing: ShotTiming = { name: identity(e) };
       const results =
-        pick && (ci || flakes.retries > 0 || deps.describe)
-          ? await measureTimed(client, { e, png, pick, mains }, timing)
-          : [];
+        pick && measuring ? await measureTimed(client, { e, png, pick, mains }, timing) : [];
       if (results.length > 0) flakes.measured();
       const changed = results.find((r) => r.status === "changed");
       const flake = changed ? await flakes.check(e, png) : undefined;
       const note = await changeNote(deps.describe, { e, file, changed, mains }, warn, timing);
       timed.push(timing);
-      await send(client, {
-        step: `upload ${identity(e)}`,
-        method: "PUT",
-        path: `/api/v1/builds/${id}/snapshots`,
-        body: snapshotForm(e, png, { results: ci ? results : [], flake, note, metrics }),
-      });
+      const extras = { results: ci ? results : [], flake, note, metrics };
+      await putShot(client, id, { e, png, extras, known });
       progress.sent++;
     }
   };
@@ -257,6 +254,35 @@ export async function uploadSnapshots(
     timings,
     ...outcome,
   };
+}
+
+/** Whether a shot is measured here: a CI diff sends it, a re-capture or the judge reads it. */
+const needsMeasure = (ci: boolean, retries: number, describe: ChangeNoter | undefined) =>
+  ci || retries > 0 || describe !== undefined;
+
+/**
+ * Send one shot. A PNG the server holds goes by hash (PS-424); if it no longer finds it (409
+ * `image_unknown`), the shot is sent again with its file.
+ */
+async function putShot(
+  client: Client,
+  buildId: string,
+  shot: { e: SnapshotEntry; png: Buffer; extras: ShotExtras; known: ReadonlySet<string> },
+): Promise<void> {
+  const put = (byHash: string | undefined) =>
+    send(client, {
+      step: `upload ${identity(shot.e)}`,
+      method: "PUT",
+      path: `/api/v1/builds/${buildId}/snapshots`,
+      body: snapshotForm(shot.e, shot.png, { ...shot.extras, byHash }),
+    });
+  const hash = sha256Of(shot.png);
+  try {
+    await put(shot.known.has(hash) ? hash : undefined);
+  } catch (err) {
+    if (!(err instanceof UploadError) || err.code !== "image_unknown") throw err;
+    await put(undefined);
+  }
 }
 
 /**

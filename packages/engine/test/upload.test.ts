@@ -201,6 +201,7 @@ describe("uploadSnapshots", () => {
           totalMs: expect.any(Number),
           batches: [
             { step: "open build", count: 1, ms: expect.any(Number) },
+            { step: "check known images", count: 1, ms: expect.any(Number) },
             { step: "upload", count: 2, ms: expect.any(Number) },
           ],
         },
