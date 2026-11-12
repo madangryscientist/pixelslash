@@ -1,13 +1,14 @@
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { readPngSize } from "@hackcove/pixelslash-engine/diff";
-import { SQL, and, count, eq, getTableColumns, inArray, is, ne, sql } from "drizzle-orm";
+import { SQL, and, count, eq, getTableColumns, is, sql } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
 import { sha256Bytes } from "#/lib/crypto";
+import { type PartTimer, timeIf, timedBlobs } from "#/server/server-timing";
 import type { BlobStore } from "#/storage/blobs";
-import { chunk } from "./chunks";
 import { type Db, NotFoundError } from "./db";
 import { type SentFlake, labelFlake } from "./flakes";
+import { type Held, type HeldImage, heldImages } from "./held-images";
 import { heldShot } from "./markers";
 import { snapshotStem } from "./stem";
 import {
@@ -148,49 +149,7 @@ async function putMetrics(
   return key;
 }
 
-/** An image the project already holds, named by the hash of its bytes instead of being sent (PS-424). */
-export type HeldImage = { sha256: string };
-
-/** The columns a held image lends the shot that names it. */
-type Held = Pick<typeof snapshots.$inferSelect, "imageKey" | "imageSha256" | "imageSize">;
-
-/**
- * The rows of this project's finished builds that hold an image with one of these hashes (PS-424),
- * one per hash. Finished means past `uploading`: `putSnapshot` can still overwrite the blob of a
- * build that is open, and a key shared with another build must never change under it. Scoped to
- * the project (never the org, never another project): a token learns nothing about its siblings.
- * A removed marker holds no image of its own and never matches. The lookup is chunked for D1's
- * 100-parameter limit.
- */
-export async function heldImages(
-  db: Db,
-  projectId: string,
-  hashes: readonly string[],
-): Promise<Map<string, Held>> {
-  const found = new Map<string, Held>();
-  // Three more values are bound beside the hashes: the project, `uploading` and `removed`.
-  for (const part of chunk(hashes, 3)) {
-    const rows = await db
-      .select({
-        imageKey: snapshots.imageKey,
-        imageSha256: snapshots.imageSha256,
-        imageSize: snapshots.imageSize,
-      })
-      .from(snapshots)
-      .innerJoin(builds, eq(builds.id, snapshots.buildId))
-      .where(
-        and(
-          inArray(snapshots.imageSha256, part),
-          eq(builds.projectId, projectId),
-          ne(builds.status, "uploading"),
-          heldShot(),
-        ),
-      );
-    for (const row of rows)
-      if (row.imageSha256 && !found.has(row.imageSha256)) found.set(row.imageSha256, row);
-  }
-  return found;
-}
+export { type HeldImage, heldImages };
 
 /** One upload: the shot's meta, its PNG (or the hash of one the project holds) and, from a CI project's CLI, what it measured (ob 1727). */
 export type SentSnapshot = {
@@ -212,13 +171,15 @@ const shown = (input: SnapshotInput) => ({
 
 /** The shot's image: stored under its own stem when it came with its bytes, else the one a hash names. */
 async function imageOf(
-  { db, blobs }: { db: Db; blobs: BlobStore },
+  { db, blobs, timer }: { db: Db; blobs: BlobStore; timer?: PartTimer | undefined },
   build: Build,
   stem: string,
   png: ArrayBuffer | HeldImage,
 ): Promise<Held> {
   if (!(png instanceof ArrayBuffer)) {
-    const held = (await heldImages(db, build.projectId, [png.sha256])).get(png.sha256);
+    const held = (
+      await timeIf(timer, "db", () => heldImages(db, build.projectId, [png.sha256]))
+    ).get(png.sha256);
     if (!held) throw new ImageUnknownError();
     return held;
   }
@@ -226,7 +187,7 @@ async function imageOf(
   await blobs.put(imageKey, png, "image/png");
   return {
     imageKey,
-    imageSha256: await sha256Bytes(png),
+    imageSha256: await timeIf(timer, "digest", () => sha256Bytes(png)),
     imageSize: readPngSize(new Uint8Array(png)),
   };
 }
@@ -236,12 +197,12 @@ async function imageOf(
  * does not hold is refused before anything is written (PS-424).
  */
 async function rowFields(
-  { db, blobs }: { db: Db; blobs: BlobStore },
+  { db, blobs, timer }: { db: Db; blobs: BlobStore; timer?: PartTimer | undefined },
   build: Build,
   stem: string,
   { input, png, metrics = null, ci = null, flake = null }: SentSnapshot,
 ) {
-  const image = await imageOf({ db, blobs }, build, stem, png);
+  const image = await imageOf({ db, blobs, timer }, build, stem, png);
   const ciResults = await putCiResults(blobs, stem, ci, image);
   return {
     tags: input.tags,
@@ -303,56 +264,62 @@ function whileUploading(buildId: string, row: typeof snapshots.$inferInsert): SQ
  * bytes the server received: a shot sent with its PNG is hashed here.
  */
 export async function putSnapshot(
-  { db, blobs }: { db: Db; blobs: BlobStore },
+  { db, blobs, timer }: { db: Db; blobs: BlobStore; timer?: PartTimer | undefined },
   build: Build,
   sent: SentSnapshot,
 ): Promise<{ id: string }> {
   if (build.status !== "uploading") throw new BuildFinalisedError();
   const { name, platform, browser, viewport, theme } = sent.input;
-  const stem = await snapshotStem({ buildId: build.id, name, platform, browser, viewport, theme });
-  const fields = await rowFields({ db, blobs }, build, stem, sent);
+  const stem = await timeIf(timer, "digest", () =>
+    snapshotStem({ buildId: build.id, name, platform, browser, viewport, theme }),
+  );
+  const fields = await rowFields({ db, blobs: timedBlobs(blobs, timer), timer }, build, stem, sent);
   const { flake = null } = sent;
   // The row is written only while the build is still `uploading`, in the same statement: a
   // finalise between the check above and here (PS-398) leaves no row and no change to one.
-  const [row] = await db
-    .insert(snapshots)
-    .select(
-      whileUploading(build.id, {
-        id: crypto.randomUUID(),
-        buildId: build.id,
-        name,
-        platform,
-        browser,
-        viewport,
-        theme,
-        ...fields,
-      }),
-    )
-    .onConflictDoUpdate({
-      target: [
-        snapshots.buildId,
-        snapshots.name,
-        snapshots.platform,
-        snapshots.browser,
-        snapshots.viewport,
-        snapshots.theme,
-      ],
-      set: fields,
-    })
-    .returning({ id: snapshots.id });
+  const [row] = await timeIf(timer, "db", () =>
+    db
+      .insert(snapshots)
+      .select(
+        whileUploading(build.id, {
+          id: crypto.randomUUID(),
+          buildId: build.id,
+          name,
+          platform,
+          browser,
+          viewport,
+          theme,
+          ...fields,
+        }),
+      )
+      .onConflictDoUpdate({
+        target: [
+          snapshots.buildId,
+          snapshots.name,
+          snapshots.platform,
+          snapshots.browser,
+          snapshots.viewport,
+          snapshots.theme,
+        ],
+        set: fields,
+      })
+      .returning({ id: snapshots.id }),
+  );
   if (!row) throw new BuildFinalisedError();
   const key = { name, platform, browser, viewport, theme };
-  await labelFlake(
-    { db, blobs },
-    {
-      id: row.id,
-      buildId: build.id,
-      projectId: build.projectId,
-      key,
-      imageKey: fields.imageKey,
-      stem,
-    },
-    flake,
+  await timeIf(timer, "flake", () =>
+    labelFlake(
+      { db, blobs },
+      {
+        id: row.id,
+        buildId: build.id,
+        projectId: build.projectId,
+        key,
+        imageKey: fields.imageKey,
+        stem,
+      },
+      flake,
+    ),
   );
   return row;
 }

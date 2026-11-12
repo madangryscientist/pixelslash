@@ -53,6 +53,11 @@ export type ShotTiming = Partial<CaptureSteps> & {
  */
 type RequestBatch = {
   step: string;
+  /**
+   * The server's own split of these requests (its `Server-Timing` parts, summed over the kind, in
+   * whole milliseconds): where the time went on the server. Absent when the server sent none.
+   */
+  server?: Record<string, number>;
   count: number;
   ms: number;
   p50Ms: number;
@@ -212,27 +217,42 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)] ?? 0;
 }
 
-type Seen = { durations: number[]; first: number; last: number };
+type Seen = {
+  durations: number[];
+  first: number;
+  last: number;
+  server: Map<string, number>;
+};
 
 /** Collects the requests of an upload by kind. */
 export function requestLog() {
   const seen = new Map<string, Seen>();
   const started = performance.now();
   return {
-    record(step: string, ms: number): void {
+    record(step: string, ms: number, server?: Record<string, number>): void {
       const kind = requestKind(step);
       const end = performance.now();
-      const batch = seen.get(kind) ?? { durations: [], first: end - ms, last: end };
+      const batch = seen.get(kind) ?? {
+        durations: [],
+        first: end - ms,
+        last: end,
+        server: new Map<string, number>(),
+      };
+      for (const [part, partMs] of Object.entries(server ?? {}))
+        batch.server.set(part, (batch.server.get(part) ?? 0) + partMs);
       batch.durations.push(Math.round(ms));
       batch.first = Math.min(batch.first, end - ms);
       batch.last = Math.max(batch.last, end);
       seen.set(kind, batch);
     },
     finish(): UploadTiming {
-      const batches = [...seen].map(([step, { durations, first, last }]) => {
+      const batches = [...seen].map(([step, { durations, first, last, server }]) => {
         const sorted = durations.toSorted((a, b) => a - b);
         return {
           step,
+          ...(server.size > 0 && {
+            server: Object.fromEntries([...server].map(([part, ms]) => [part, Math.round(ms)])),
+          }),
           count: sorted.length,
           ms: sorted.reduce((n, d) => n + d, 0),
           p50Ms: percentile(sorted, 0.5),

@@ -96,4 +96,40 @@ describe("the timings a finalize stores", () => {
       shots: [{ name: "pricing", captureMs: 3200, measureMs: 40 }],
     });
   });
+  test("a batch's server split is stored: whole ms, long names and parts past 16 dropped, a malformed split dropped alone", async () => {
+    const { db, deps, acme } = await setup();
+    const stored = async (server: unknown) => {
+      const id = await openBuild(deps, acme.token);
+      await call(deps, `PUT /api/v1/builds/${id}/snapshots`, acme.token, snapshotForm());
+      const timings = {
+        totalMs: 100,
+        upload: { totalMs: 50, batches: [{ step: "upload", count: 3, ms: 90, server }] },
+        shots: [],
+      };
+      const res = await call(
+        deps,
+        `POST /api/v1/builds/${id}/finalize`,
+        acme.token,
+        JSON.stringify({ snapshots: 1, timings }),
+      );
+      expect(res.status).toBe(200);
+      const [row] = await db.select().from(builds).where(eq(builds.id, id));
+      return row?.timings?.upload?.batches[0];
+    };
+    expect(await stored({ db: 21.6, blob: 3, total: 40 })).toEqual({
+      step: "upload",
+      count: 3,
+      ms: 90,
+      server: { db: 22, blob: 3, total: 40 },
+    });
+    const many = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`p${i}`, i]));
+    const kept = await stored({ ...many, ["x".repeat(33)]: 1 });
+    expect(Object.keys(kept?.server ?? {})).toHaveLength(16);
+    expect(await stored({ ["x".repeat(33)]: 1, db: -4, blob: "slow" })).toEqual({
+      step: "upload",
+      count: 3,
+      ms: 90,
+    });
+    expect(await stored("db;dur=3")).toEqual({ step: "upload", count: 3, ms: 90 });
+  });
 });

@@ -6,6 +6,9 @@ type Parts = Partial<Record<(typeof CAPTURE_PARTS)[number], number>> & { settle?
 
 const MAX_TIMED_SHOTS = 5000;
 const MAX_BATCHES = 20;
+/** The server parts a batch keeps: more, or a longer name, is dropped, not refused. */
+const MAX_SERVER_PARTS = 16;
+const MAX_PART_NAME = 32;
 
 function isObj(v: unknown): v is Obj {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -80,6 +83,18 @@ function timedShot(s: unknown): BuildTimings["shots"][number] | undefined {
 
 const BATCH_SPREAD = ["p50Ms", "p90Ms", "maxMs", "wallMs"] as const;
 
+/** The batch's server split: well formed parts only, at most MAX_SERVER_PARTS; none left is none. */
+function serverParts(v: unknown): Record<string, number> | undefined {
+  if (!isObj(v)) return undefined;
+  const parts: Record<string, number> = {};
+  for (const [name, value] of Object.entries(v)) {
+    if (Object.keys(parts).length >= MAX_SERVER_PARTS) break;
+    if (name.length > 0 && name.length <= MAX_PART_NAME && ms(value))
+      parts[name] = Math.round(value);
+  }
+  return Object.keys(parts).length > 0 ? parts : undefined;
+}
+
 function batch(b: unknown): Batch | undefined {
   if (!isObj(b) || typeof b.step !== "string" || b.step.length > 100) return undefined;
   if (!ms(b.count) || !ms(b.ms)) return undefined;
@@ -89,6 +104,8 @@ function batch(b: unknown): Batch | undefined {
     const v = b[k];
     if (ms(v)) out[k] = Math.round(v);
   }
+  const server = serverParts(b.server);
+  if (server) out.server = server;
   return out;
 }
 
