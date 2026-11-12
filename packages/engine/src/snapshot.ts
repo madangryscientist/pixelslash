@@ -131,7 +131,7 @@ export type SnapshotResult = {
 
 export { MASK_COLOR, toImageRects };
 export type { MediaBox };
-export { captureInto } from "./capture-into.ts";
+export { captureInto, defaultConcurrency } from "./capture-into.ts";
 
 /** Launch flags that take host-specific rendering choices out of the picture. */
 const LAUNCH_ARGS = ["--force-color-profile=srgb", "--font-render-hinting=none"];

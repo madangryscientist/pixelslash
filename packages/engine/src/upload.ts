@@ -85,6 +85,11 @@ export type UploadDeps = {
    */
   recapture?: (e: SnapshotEntry) => Promise<Shoot | undefined>;
   /**
+   * How many re-captures may run at once (PS-447): the capture concurrency of the session that
+   * `recapture` shoots on. Default 1.
+   */
+  recaptureConcurrency?: number | undefined;
+  /**
    * `upload --judge` (ob 1745): a sentence for each shot that changed, sent as its `changeNote`.
    * Each shot with a baseline is then measured here, whatever the project's diff location, to know
    * which changed; the sentence is read on the review pages and decides nothing.
@@ -230,6 +235,7 @@ export async function uploadSnapshots(
     dir: opts.dir,
     retries: opts.flakeRetries ?? DEFAULT_FLAKE_RETRIES,
     recapture: deps.recapture,
+    concurrency: deps.recaptureConcurrency,
     warn,
   });
   await clearFlakeOutput(opts.dir);

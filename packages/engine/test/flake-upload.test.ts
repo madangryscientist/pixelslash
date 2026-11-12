@@ -50,21 +50,38 @@ function server(where: "ci" | "server") {
  * Three shots against a white baseline: `same` is white too, `real` has the square at 4 in every
  * capture, `flicker` has it at 4 first and at 4, 16 on its re-captures (run 3 moved).
  */
-async function upload(opts: { where?: "ci" | "server"; retries?: number; flaky?: string } = {}) {
+async function upload(
+  opts: {
+    where?: "ci" | "server";
+    retries?: number;
+    flaky?: string;
+    /** `recaptureConcurrency` given to the upload; unset passes none. */
+    concurrency?: number;
+    /** More changed shots (`more0`, `more1`, ...) that never flicker. */
+    more?: number;
+  } = {},
+) {
   const { dir: cwd } = await repo(1, 1);
   const flicker = entry("flicker", "desktop", opts.flaky ? { flaky: opts.flaky } : {});
-  const dir = await snapshotDir([entry("same"), entry("real"), flicker]);
+  const extra = Array.from({ length: opts.more ?? 0 }, (_, i) => `more${i}`);
+  const dir = await snapshotDir([
+    entry("same"),
+    entry("real"),
+    flicker,
+    ...extra.map((n) => entry(n)),
+  ]);
+  for (const n of extra) await Bun.write(join(dir, `${n}/desktop.png`), png(4));
   await Bun.write(join(dir, "same/desktop.png"), png());
   await Bun.write(join(dir, "real/desktop.png"), png(4));
   await Bun.write(join(dir, "flicker/desktop.png"), png(4));
   const flickers = [png(4), png(16)];
   const asked: string[] = [];
   let busy = 0;
-  let overlapped = false;
+  let peak = 0;
   const recapture = async (e: SnapshotEntry): Promise<Shoot> => {
     asked.push(e.name);
-    overlapped ||= busy > 0;
     busy++;
+    peak = Math.max(peak, busy);
     await Bun.sleep(5);
     busy--;
     const bytes = e.name === "flicker" ? flickers.shift() : png(4);
@@ -80,23 +97,40 @@ async function upload(opts: { where?: "ci" | "server"; retries?: number; flaky?:
       git: gitOpts(cwd),
       ...(opts.retries !== undefined && { flakeRetries: opts.retries }),
     },
-    { fetch: fake.fetch, recapture },
+    {
+      fetch: fake.fetch,
+      recapture,
+      ...(opts.concurrency !== undefined && { recaptureConcurrency: opts.concurrency }),
+    },
   );
   const puts = new Map(
     fake.calls
       .filter((c) => c.method === "PUT")
       .map((c) => [metaOf(c.body).name, c.body instanceof FormData ? c.body : new FormData()]),
   );
-  return { dir, result, asked, puts, overlapped: () => overlapped };
+  return { dir, result, asked, puts, peak: () => peak };
 }
 
 const metaFor = (puts: Map<string, FormData>, name: string) => metaOf(puts.get(name));
 
 describe("a changed shot is captured again, and a flaky one says so (ob 1737)", () => {
-  test("only changed shots are re-captured, each the default 2 more times, one at a time", async () => {
-    const { asked, overlapped } = await upload();
+  test("only changed shots are re-captured, each the default 2 more times", async () => {
+    const { asked } = await upload();
     expect(asked.toSorted()).toEqual(["flicker", "flicker", "real", "real"]);
-    expect(overlapped()).toBe(false);
+  });
+
+  test("with no concurrency given, re-captures run one at a time", async () => {
+    const { asked, peak } = await upload({ more: 6 });
+    expect(asked).toHaveLength(2 * 8);
+    expect(peak()).toBe(1);
+  });
+
+  test("with a concurrency of 3, up to 3 re-captures are in flight and more than 1 are", async () => {
+    const { asked, peak, result } = await upload({ more: 6, concurrency: 3 });
+    expect(asked).toHaveLength(2 * 8);
+    expect(peak()).toBe(3);
+    expect(result.flaky.map((f) => f.entry.name)).toEqual(["flicker"]);
+    expect(result.changed).toHaveLength(7);
   });
 
   test("every shot sends its resolved policy, flaky or not", async () => {
@@ -166,14 +200,19 @@ describe("a changed shot is captured again, and a flaky one says so (ob 1737)", 
     await Bun.write(join(dir, "real/desktop.png"), png(4));
     const fake = server("server");
     const warnings: string[] = [];
+    let tried = 0;
     const result = await uploadSnapshots(
       { dir, server: "https://ps.example", token: "psci_t", git: gitOpts(cwd) },
       {
         fetch: fake.fetch,
         warn: (m) => warnings.push(m),
-        recapture: async () => undefined,
+        recapture: async () => {
+          tried++;
+          return undefined;
+        },
       },
     );
+    expect(tried).toBe(1);
     expect(warnings).toEqual([
       expect.stringContaining("real / chromium / 1280x720 / light: not captured again"),
     ]);

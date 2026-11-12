@@ -73,6 +73,7 @@ export { identity, pngPath, readManifest } from "./manifest.ts";
 export {
   MASK_COLOR,
   captureInto,
+  defaultConcurrency,
   captureSnapshots,
   openCaptureSession,
   recapture,
