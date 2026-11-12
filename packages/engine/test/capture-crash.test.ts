@@ -250,6 +250,7 @@ describe(
         });
       };
       const { warnings, rgb, error } = await run("/slow", 4_000);
+      // PS-431: flaked once on the CI runner with `net::ERR_ABORTED; maybe frame was detached?`; not root-caused.
       expect(error).toBeUndefined();
       expect(warnings.filter((w) => /crashed/.test(w))).toEqual([
         "warning: slow (desktop): the page crashed during goto; captured again in a fresh context",
