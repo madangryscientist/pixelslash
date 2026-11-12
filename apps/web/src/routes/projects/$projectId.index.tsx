@@ -2,31 +2,21 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   Breadcrumbs,
   Button,
-  Caption,
   Card,
-  Cluster,
   Code,
   CopyLine,
   EmptyState,
   ListLayout,
   Step,
   Steps,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
   TextLink,
   Text,
 } from "@hackcove/ui-react";
-import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
 import { orgCrumb } from "#/components/crumbs";
 import { ProjectFlags } from "#/components/detection-flag";
+import { BuildsList } from "#/components/builds-list";
 import { StaleList } from "#/components/stale";
-import { Page, StatusBadge, useHydrated } from "#/components/ui";
-import type { BuildSummary } from "#/db/build-list";
-import { formatRelative } from "#/lib/format";
+import { Page, useHydrated } from "#/components/ui";
 import { getProjectPage } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/")({
@@ -78,101 +68,17 @@ function ProjectPage() {
         {builds.length === 0 ? (
           <EmptyProject projectId={project.id} serverUrl={serverUrl} />
         ) : (
-          <Table caption="Builds">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Branch</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Snapshots</TableHeaderCell>
-                <TableHeaderCell>Review</TableHeaderCell>
-                <TableHeaderCell>When</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {builds.map((build) => (
-                <BuildRow
-                  key={build.id}
-                  projectId={project.id}
-                  defaultBranch={project.defaultBranch}
-                  build={build}
-                  now={now}
-                />
-              ))}
-            </TableBody>
-          </Table>
+          <BuildsList
+            projectId={project.id}
+            defaultBranch={project.defaultBranch}
+            builds={builds}
+            now={now}
+          />
         )}
         <StaleList items={stale} />
         <ProjectFlags projectId={project.id} flags={flags} />
       </ListLayout>
     </Page>
-  );
-}
-
-function BuildRow({
-  projectId,
-  defaultBranch,
-  build,
-  now,
-}: {
-  projectId: string;
-  defaultBranch: string;
-  build: BuildSummary;
-  now: Date;
-}) {
-  return (
-    <TableRow data-testid="build-row" stripe={stripeToneOf(build)}>
-      <TableCell
-        secondary={
-          <Cluster gap="xs" wrap>
-            <Caption mono>{build.commitSha.slice(0, 7)}</Caption>
-            {build.prNumber !== null && <Caption>PR #{build.prNumber}</Caption>}
-            {build.branch !== defaultBranch && (
-              <TextLink
-                size="sm"
-                tone="muted"
-                data-testid="branch-link"
-                render={(props) => (
-                  <Link
-                    to="/projects/$projectId/branches/$branch"
-                    params={{ projectId, branch: build.branch }}
-                    {...props}
-                  />
-                )}
-              >
-                whole branch
-              </TextLink>
-            )}
-          </Cluster>
-        }
-      >
-        <TextLink
-          stretch
-          render={(props) => (
-            <Link
-              to="/projects/$projectId/builds/$buildId"
-              params={{ projectId, buildId: build.id }}
-              {...props}
-            />
-          )}
-        >
-          {build.branch}
-        </TextLink>
-      </TableCell>
-      <TableCell>
-        <StatusBadge status={build.status} />
-      </TableCell>
-      <TableCell>
-        <MixBar counts={build.counts} />
-      </TableCell>
-      <TableCell>
-        <ToReview build={build} defaultBranch={defaultBranch} />
-      </TableCell>
-      <TableCell tone="muted">
-        <span data-testid="rel-time" title={build.createdAt.toISOString()}>
-          {formatRelative(build.createdAt, now)}
-        </span>
-      </TableCell>
-    </TableRow>
   );
 }
 
