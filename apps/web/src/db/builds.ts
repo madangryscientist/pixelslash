@@ -279,17 +279,13 @@ async function putCiResults(
  * `insert().values()` fills the columns it was not given from their defaults; `select` cannot, so
  * every column is listed here in table order, from the value or else the default.
  */
-function whileUploading(buildId: string, row: Partial<typeof snapshots.$inferInsert>): SQL {
+function whileUploading(buildId: string, row: typeof snapshots.$inferInsert): SQL {
   const given: Record<string, unknown> = row;
   const cells = Object.entries(getTableColumns(snapshots)).map(([key, col]) => {
     const value = given[key];
     if (value !== undefined) return sql.param(value, col);
     if (col.default !== undefined && col.default !== null)
       return is(col.default, SQL) ? col.default : sql.param(col.default, col);
-    if (col.defaultFn) {
-      const made = col.defaultFn();
-      return is(made, SQL) ? made : sql.param(made, col);
-    }
     return sql`null`;
   });
   return sql`select ${sql.join(cells, sql`, `)} where exists (select 1 from ${builds} where ${builds.id} = ${buildId} and ${builds.status} = 'uploading')`;

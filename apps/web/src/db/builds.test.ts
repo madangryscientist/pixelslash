@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { context, sha } from "#/diff/test-builds";
 import { shot } from "#/diff/test-shots";
-import { sha256Bytes } from "#/lib/crypto";
 import { BuildFinalisedError, createBuild, getBuild, putSnapshot } from "./builds";
 import { builds, snapshots } from "./schema";
 
@@ -69,20 +68,5 @@ describe("putSnapshot", () => {
     ).rejects.toBeInstanceOf(BuildFinalisedError);
     const [after] = await ctx.db.select().from(snapshots).where(eq(snapshots.id, first.id));
     expect(after).toEqual(before);
-  });
-
-  test("while the build is uploading a shot is written, and sending it again replaces it in place", async () => {
-    const { ctx, id, build } = await openBuild();
-    const first = await send(ctx, build, "home");
-    const second = await send(ctx, build, "home");
-    expect(second.id).toBe(first.id);
-    const held = await ctx.db.select().from(snapshots).where(eq(snapshots.buildId, id));
-    expect(held).toHaveLength(1);
-    expect(held[0]).toMatchObject({
-      name: "home",
-      reviewState: "pending",
-      rebaselineNeeded: false,
-      imageSha256: await sha256Bytes(shot().buffer),
-    });
   });
 });

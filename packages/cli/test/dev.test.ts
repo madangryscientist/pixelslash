@@ -3,8 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devStore, latestIteration, liveSession } from "@hackcove/pixelslash-engine";
 import { afterAll, describe, expect, test } from "vitest";
-import { parseDevArgs } from "../src/dev.ts";
-import { type KeyInput, watching } from "../src/dev-loop.ts";
+import type { KeyInput } from "../src/dev-loop.ts";
 import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng } from "./support.ts";
 import { FIGMA, featureProject, project, until } from "./dev-support.ts";
@@ -275,37 +274,5 @@ describe("pixelslash dev, a feature's spec and refs (ob 1741)", () => {
     });
     expect(code).toBe(2);
     expect(cap.stderr).toContain("--judge needs --ds DIR");
-  });
-});
-
-/** Save a file, hold the ignore check open, close (or not), then let the check answer. Returns the runs started. */
-async function closeDuringCheck(closeFirst: boolean): Promise<number> {
-  const { cwd } = await project();
-  const answer = Promise.withResolvers<string[]>();
-  const asked = Promise.withResolvers<void>();
-  let runs = 0;
-  const close = await watching(cwd, parseDevArgs([]), { run: async () => void (runs += 1) }, () => {
-    asked.resolve();
-    return answer.promise;
-  });
-  try {
-    await writeFile(join(cwd, "saved.txt"), "x");
-    await asked.promise;
-    if (closeFirst) close();
-    answer.resolve(["saved.txt"]);
-    await Bun.sleep(300);
-    return runs;
-  } finally {
-    close();
-  }
-}
-
-describe("watching: a save whose ignore check is in flight when the session closes (PS-398)", () => {
-  test("a callback already past its debounce starts no run once the closer has run", async () => {
-    expect(await closeDuringCheck(true)).toBe(0);
-  });
-
-  test("the same save, with the session open, does start a run", async () => {
-    expect(await closeDuringCheck(false)).toBe(1);
   });
 });

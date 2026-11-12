@@ -1214,7 +1214,7 @@ Send the token as `Authorization: Bearer <token>`. There are three kinds:
 | `POST /api/v1/detection-flags/:id/exported` | personal | n/a | `200 { detection_flag: flag }`, with `exported_at` set: the flag was turned into a bench case (`bun run bench:import-flags`); marking it again keeps the first time, and a CI token gets 403 |
 | `GET /api/v1/projects/:id/stale` | CI, org or personal | `platform?` (`android` or `ios`; anything else is a 400) | `200 { stale: [item], next_cursor: null }`: the project's [stale twins](#stale-twins), each `{ name, theme, platform, sentence, cause, shots }`; a CI token reads its own project only. With `platform` also `baselines: { platform, linked: [entry] }`, the accepted baseline pairs for `parity --release` |
 | `GET /api/v1/projects/:id/flakes` | CI, org or personal | n/a | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
-| `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; a CI token gets 403 |
+| `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; resolving a flake that is already resolved changes nothing and keeps the first resolver, time and note; a CI token gets 403 |
 
 There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), linking a twin project (`PUT /api/v1/projects/:id/twin`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 

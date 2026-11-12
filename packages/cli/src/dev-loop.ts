@@ -150,22 +150,24 @@ export async function devOnce(
 /**
  * Debounced saves (filtered through git's ignores unless `--watch` named the paths) start a run.
  * The closer is final (PS-398): a callback that was awaiting the ignore check when it ran starts
- * no run after it. `ignores` is the check, a parameter so a test can hold it.
+ * no run after it. `seams` are the ignore check, the watcher and the quiet period, so a test can
+ * hold the check and raise a save without a real file event.
  */
 export async function watching(
   root: string,
   args: DevArgs,
   ctl: Pick<DevController, "run">,
-  ignores: typeof notIgnored = notIgnored,
+  seams: { ignores?: typeof notIgnored; watch?: typeof watchTree; quietMs?: number } = {},
 ): Promise<() => void> {
+  const { ignores = notIgnored, watch = watchTree, quietMs = DEFAULT_QUIET_MS } = seams;
   const explicit = args.watch.length > 0;
   let closed = false;
-  const bounce = debounce(DEFAULT_QUIET_MS, async (paths) => {
+  const bounce = debounce(quietMs, async (paths) => {
     if (!explicit && paths.length > 0 && (await ignores(root, paths)).length === 0) return;
     if (closed) return;
     await ctl.run();
   });
-  const stop = await watchTree({ root, paths: explicit ? args.watch : undefined }, bounce.touch);
+  const stop = await watch({ root, paths: explicit ? args.watch : undefined }, bounce.touch);
   return () => {
     closed = true;
     stop();
