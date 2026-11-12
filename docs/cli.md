@@ -1097,7 +1097,7 @@ export PIXELSLASH_TOKEN="$PIXELSLASH_CI_TOKEN"   # the CI's secret store, never 
 
 pixelslash capture --config pixelslash.config.ts     # or `pixelslash import PNG_DIR`
 pixelslash upload pixelslash-snapshots --wait --timeout 30m
-# exit 0 accepted or unchanged · 4 rejected · 5 still waiting · 3 server or build error · 2 usage
+# exit 0 accepted or unchanged · 1 capture or upload failed · 2 usage · 3 server or build error · 4 rejected · 5 still waiting · 7 a pixelslash bug, escalate
 ```
 
 To keep the upload and the wait in separate steps (a separate job, or a retry of the wait alone), run `pixelslash upload pixelslash-snapshots`, then `pixelslash status --wait` from the same working dir: it reads the build from `pixelslash-snapshots/build.json`. A job with no snapshot dir names the build with `--build`, `--commit "$COMMIT_SHA"` or `--branch NAME`. This calls no GitHub or GitLab API and comments on no PR; the job's own pass or fail is the signal.

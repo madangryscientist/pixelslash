@@ -1,7 +1,7 @@
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { readPngSize } from "@hackcove/pixelslash-engine/diff";
-import { and, count, eq, inArray, ne } from "drizzle-orm";
+import { SQL, and, count, eq, getTableColumns, inArray, is, ne, sql } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
 import { sha256Bytes } from "#/lib/crypto";
 import type { BlobStore } from "#/storage/blobs";
@@ -274,6 +274,28 @@ async function putCiResults(
 }
 
 /**
+ * `select <the row's values> where the build is still uploading`, for `insert ... select`: no row
+ * comes out once the build has left `uploading`, so the insert (and its upsert) writes nothing.
+ * `insert().values()` fills the columns it was not given from their defaults; `select` cannot, so
+ * every column is listed here in table order, from the value or else the default.
+ */
+function whileUploading(buildId: string, row: Partial<typeof snapshots.$inferInsert>): SQL {
+  const given: Record<string, unknown> = row;
+  const cells = Object.entries(getTableColumns(snapshots)).map(([key, col]) => {
+    const value = given[key];
+    if (value !== undefined) return sql.param(value, col);
+    if (col.default !== undefined && col.default !== null)
+      return is(col.default, SQL) ? col.default : sql.param(col.default, col);
+    if (col.defaultFn) {
+      const made = col.defaultFn();
+      return is(made, SQL) ? made : sql.param(made, col);
+    }
+    return sql`null`;
+  });
+  return sql`select ${sql.join(cells, sql`, `)} where exists (select 1 from ${builds} where ${builds.id} = ${buildId} and ${builds.status} = 'uploading')`;
+}
+
+/**
  * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
  * the blob key comes from that identity, so the second PNG overwrites the first in place.
  * The blob goes first, so a failed put leaves no row to count.
@@ -294,18 +316,22 @@ export async function putSnapshot(
   const stem = await snapshotStem({ buildId: build.id, name, platform, browser, viewport, theme });
   const fields = await rowFields({ db, blobs }, build, stem, sent);
   const { flake = null } = sent;
+  // The row is written only while the build is still `uploading`, in the same statement: a
+  // finalise between the check above and here (PS-398) leaves no row and no change to one.
   const [row] = await db
     .insert(snapshots)
-    .values({
-      id: crypto.randomUUID(),
-      buildId: build.id,
-      name,
-      platform,
-      browser,
-      viewport,
-      theme,
-      ...fields,
-    })
+    .select(
+      whileUploading(build.id, {
+        id: crypto.randomUUID(),
+        buildId: build.id,
+        name,
+        platform,
+        browser,
+        viewport,
+        theme,
+        ...fields,
+      }),
+    )
     .onConflictDoUpdate({
       target: [
         snapshots.buildId,
@@ -318,7 +344,7 @@ export async function putSnapshot(
       set: fields,
     })
     .returning({ id: snapshots.id });
-  if (!row) throw new Error("snapshot upsert returned nothing");
+  if (!row) throw new BuildFinalisedError();
   const key = { name, platform, browser, viewport, theme };
   await labelFlake(
     { db, blobs },

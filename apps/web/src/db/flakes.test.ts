@@ -4,7 +4,14 @@ import { type Ctx, context, onlyShot, rows, sha, upload } from "#/diff/test-buil
 import { RED, shot } from "#/diff/test-shots";
 import { awaitsDecision, skippedFlaky } from "#/lib/snapshot-groups";
 import { NotFoundError } from "./db";
-import { type SentFlake, listFlakes, markFlaky, resolveFlake, setFlakeStatus } from "./flakes";
+import {
+  type SentFlake,
+  listFlakes,
+  markFlaky,
+  reopenFlake,
+  resolveFlake,
+  setFlakeStatus,
+} from "./flakes";
 import { countBuilds } from "./build-counts";
 import { acceptAllSnapshots } from "./review";
 import { type FlakyPolicy, flakes } from "./schema";
@@ -81,6 +88,58 @@ describe("flakes are stored per key (ob 1724)", () => {
       resolutionNote: null,
     });
     expect(reopened?.evidence).toHaveLength(2);
+  });
+
+  test("resolving a resolved flake changes nothing: the first resolver, time and note stay (PS-398)", async () => {
+    const ctx = await context();
+    await mainThen(ctx, 2, { flake: flakeOf("review") });
+    const [flake] = await listFlakes(ctx.db, ctx.userId, ctx.projectId);
+    if (!flake) throw new Error("no flake");
+    const grace = await signInGithubUser(ctx.db, {
+      githubId: 3,
+      login: "grace",
+      name: null,
+      avatarUrl: null,
+    });
+    const at = { projectId: ctx.projectId, flakeId: flake.id };
+    await resolveFlake(ctx.db, { ...at, userId: ctx.userId, note: "first" });
+    const [first] = await ctx.db.select().from(flakes).where(eq(flakes.id, flake.id));
+    await resolveFlake(ctx.db, { ...at, userId: grace.id, note: "second" });
+    const [again] = await ctx.db.select().from(flakes).where(eq(flakes.id, flake.id));
+    expect(first).toMatchObject({ status: "resolved", resolvedBy: ctx.userId });
+    expect(again).toEqual(first);
+    expect(again?.resolutionNote).toBe("first");
+  });
+
+  test("reopening an open flake changes nothing, and an unknown id still throws (PS-398)", async () => {
+    const ctx = await context();
+    await mainThen(ctx, 2, { flake: flakeOf("review") });
+    const [flake] = await ctx.db.select().from(flakes);
+    if (!flake) throw new Error("no flake");
+    expect(flake.status).toBe("open");
+    await reopenFlake(ctx.db, { projectId: ctx.projectId, flakeId: flake.id });
+    const [after] = await ctx.db.select().from(flakes).where(eq(flakes.id, flake.id));
+    expect(after).toEqual(flake);
+    await expect(
+      reopenFlake(ctx.db, { projectId: ctx.projectId, flakeId: "no-such-flake" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      resolveFlake(ctx.db, {
+        projectId: ctx.projectId,
+        flakeId: "no-such-flake",
+        userId: ctx.userId,
+        note: null,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    // A flake of another project is not found either.
+    await expect(
+      resolveFlake(ctx.db, {
+        projectId: "other-project",
+        flakeId: flake.id,
+        userId: ctx.userId,
+        note: null,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   test("a shot uploaded while its key's flake is open is labelled; after resolve it is not", async () => {

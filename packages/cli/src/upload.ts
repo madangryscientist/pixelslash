@@ -183,6 +183,9 @@ function printFlakes(result: UploadResult, io: Io): void {
   if (result.report) io.stdout.write(`report: ${pathToFileURL(result.report).href}\n`);
 }
 
+/** The errors `failedUpload` made: the only ones that are an upload failure, whatever their text says. */
+const FAILED_UPLOADS = new WeakSet<Error>();
+
 /**
  * A refused or failed upload ends on `UPLOAD FAILED: <reason>`, after what reached the server
  * (PS-223): the last lines a runner sees are never a link. The exit code is the error's own.
@@ -191,7 +194,14 @@ function failedUpload(e: unknown, progress: UploadProgress): unknown {
   if (!(e instanceof UploadError || e instanceof RemoteError)) return e;
   const reason = e.message.replace(/^upload failed: /, "");
   const message = `${uploadLine(progress)}\nUPLOAD FAILED: ${reason}`;
-  return e instanceof RemoteError ? new RemoteError(message) : new UploadError(message);
+  const failed = e instanceof RemoteError ? new RemoteError(message) : new UploadError(message);
+  FAILED_UPLOADS.add(failed);
+  return failed;
+}
+
+/** Whether `e` came from `failedUpload` (PS-398): Sentry's test, by identity and not by message. */
+export function isUploadFailure(e: unknown): boolean {
+  return e instanceof Error && FAILED_UPLOADS.has(e);
 }
 
 /** How long a stopped upload waits for the recapture browser to close before it exits anyway. */

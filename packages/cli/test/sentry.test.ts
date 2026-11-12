@@ -3,7 +3,7 @@ import { gunzipSync } from "node:zlib";
 import { CLIENT_VERSION } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { capture, cleanup, faintPair, tmp } from "./support.ts";
-import { gitRepo, snapshotDir as uploadDir } from "./upload-support.ts";
+import { fakeUploadApi, gitRepo, snapshotDir as uploadDir } from "./upload-support.ts";
 
 // The engine's `diffPngs`, made to throw an error that carries what must never leave the machine.
 const LEAK = {
@@ -146,6 +146,27 @@ describe("the CLI reports to Sentry only when PIXELSLASH_SENTRY_DSN is set (PS-2
       });
       expect(ingest.raw.join("\n")).toContain("UPLOAD FAILED");
       expect(ingest.raw.join("\n")).not.toContain("psci_neverleaves123");
+    } finally {
+      await ingest.stop();
+    }
+  });
+
+  test("an UploadError that says UPLOAD FAILED but did not come from failedUpload is not reported (PS-398)", async () => {
+    const ingest = fakeIngest();
+    try {
+      const [cwd, dir, api, cap] = [await gitRepo(), await uploadDir(), fakeUploadApi(), capture()];
+      // The upload goes through; the wait phase then reads a server error whose text is the marker.
+      const code = await run(["upload", dir, "--server", "https://ps.example", "--wait"], cap.io, {
+        fetch: async (url: string, init?: RequestInit) =>
+          init?.method === undefined || init.method === "GET"
+            ? Response.json({ error: "UPLOAD FAILED: said by the server" }, { status: 500 })
+            : api.fetch(url, init),
+        cwd,
+        env: { PIXELSLASH_TOKEN: "psci_neverleaves123", PIXELSLASH_SENTRY_DSN: ingest.dsn },
+      });
+      expect(code).toBe(3);
+      expect(cap.stderr).toContain("UPLOAD FAILED: said by the server");
+      expect(ingest.raw).toEqual([]);
     } finally {
       await ingest.stop();
     }
