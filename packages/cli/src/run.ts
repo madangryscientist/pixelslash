@@ -90,6 +90,18 @@ function report(cli: Cli, result: CompareResult, io: Io): number {
   return code;
 }
 
+/**
+ * The skip lines of a run. Every route skipped for one shared reason (or a single-route run) is the
+ * one bare `skip: <reason>` line; otherwise one `skip: <route>: <reason>` line per skipped route,
+ * so no route's skip is hidden behind another's verdict.
+ */
+function skipLines(result: CompareResult): string {
+  const skips = result.skippedRoutes ?? [];
+  const shared = new Set(skips.map((s) => s.reason)).size <= 1;
+  if (result.skipped && shared) return `skip: ${result.skipReason ?? "no judge"}\n`;
+  return skips.map((s) => `skip: ${s.route}: ${s.reason}\n`).join("");
+}
+
 function summary(cli: Cli, result: CompareResult, io: Io): number {
   const link = `report: ${fileUrl(result.reportPath)}\n`;
   if (!cli.ds) {
@@ -97,8 +109,9 @@ function summary(cli: Cli, result: CompareResult, io: Io): number {
     io.stdout.write(`pixelslash: ${px} changed pixels\n${link}`);
     return 0;
   }
+  io.stdout.write(skipLines(result));
   if (result.skipped) {
-    io.stdout.write(`skip: ${result.skipReason ?? "no judge"}\n${link}`);
+    io.stdout.write(link);
     return 0;
   }
   const n = result.fresh.length;
