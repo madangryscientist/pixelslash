@@ -15,7 +15,15 @@ import { type FlakeOutcome, clearFlakeOutput, flakePass } from "./flake-upload.t
 import { type GitContext, type GitOptions, gitContext } from "./git.ts";
 import { identity, readManifest } from "./manifest.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
-import { elapsed, requestLog, timingsToSend, type ShotTiming, type Timings } from "./timings.ts";
+import {
+  elapsed,
+  loadNow,
+  requestLog,
+  timingsToSend,
+  type UploadRun,
+  type ShotTiming,
+  type Timings,
+} from "./timings.ts";
 import { type Client, isObj, send } from "./upload-client.ts";
 import { type ShotExtras, readShot, sha256Of, snapshotForm } from "./upload-form.ts";
 import { knownImages } from "./upload-known.ts";
@@ -171,6 +179,13 @@ async function openBuild(
   return { id: body.id, diffLocation: at === "ci" || at === "server" ? at : undefined };
 }
 
+/** What the upload adds to the timings it sends: its shots' steps, its worker count and the load it began at. */
+const uploadRun = (shots: ShotTiming[], count: number, loadStart: number): UploadRun => ({
+  shots,
+  workers: { upload: Math.max(1, Math.min(CONCURRENCY, count)) },
+  loadStart,
+});
+
 /**
  * Send a snapshot dir to a PixelSlash server: open a build, upload each PNG, finalise.
  * The only network this package does for a page shot, and only to `server`. If anything
@@ -186,6 +201,7 @@ export async function uploadSnapshots(
   const base = opts.server.replace(/\/+$/, "");
   const fetcher = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const started = performance.now();
+  const loadStart = loadNow();
   const manifest = await readManifest(opts.dir);
   const progress = deps.progress ?? newUploadProgress();
   progress.total = manifest.snapshots.length;
@@ -241,12 +257,13 @@ export async function uploadSnapshots(
     }
   };
   await runWorkers(worker, stop);
-  const sent = timingsToSend(opts.timings, started, log.finish(), timed);
+  const run = uploadRun(timed, manifest.snapshots.length, loadStart);
+  const sent = timingsToSend(opts.timings, started, log.finish(), run);
   const done = await finalise(client, id, manifest.snapshots.length, sent);
   progress.finalised = true;
   checkOutcome(id, done);
   const outcome = await flakes.finish(manifest.snapshots);
-  const timings = timingsToSend(opts.timings, started, log.finish(), timed);
+  const timings = timingsToSend(opts.timings, started, log.finish(), run);
   return {
     buildId: id,
     snapshots: manifest.snapshots.length,

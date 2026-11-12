@@ -135,11 +135,61 @@ export type AiUsage = {
  */
 export type BuildTimings = {
   totalMs: number;
+  /** Launching the browser, once per run. */
+  browserLaunchMs?: number;
+  /** The capture's wall clock; `captureMs` is the workers' time added up, so it can be more. */
+  captureWallMs?: number;
+  workers?: { capture?: number; upload?: number };
+  /** The machine the CLI ran on: its cores, and the one-minute load average at the run's start and end. */
+  host?: { cores: number; loadStart: number; loadEnd: number };
+  captureMs?: number;
+  /** Parts of `captureMs`, summed over the shots (`storyMs` sits inside `settleMs`). */
+  navigateMs?: number;
+  settleMs?: number;
+  screenshotMs?: number;
+  setupMs?: number;
+  storyMs?: number;
+  measureMs?: number;
+  settle?: TimedSettle;
+  diffMs?: number;
+  judgeMs?: number;
+  upload?: {
+    totalMs: number;
+    /** `p50Ms`, `p90Ms`, `maxMs` are one request's latency; `wallMs` is the kind's first start to last end. A build from an older CLI has only the first three. */
+    batches: {
+      step: string;
+      count: number;
+      ms: number;
+      p50Ms?: number;
+      p90Ms?: number;
+      maxMs?: number;
+      wallMs?: number;
+    }[];
+  };
+  shots: TimedShot[];
+};
+
+/** How long each settle condition waited, in the order they run. */
+export type TimedSettle = {
+  fontsMs: number;
+  imagesMs: number;
+  networkIdleMs: number;
+  framesMs: number;
+};
+
+/** One shot's steps and, when the CLI sent them, the parts of its capture. */
+type TimedShot = {
+  name: string;
   captureMs?: number;
   diffMs?: number;
   judgeMs?: number;
-  upload?: { totalMs: number; batches: { step: string; count: number; ms: number }[] };
-  shots: { name: string; captureMs?: number; diffMs?: number; judgeMs?: number }[];
+  navigateMs?: number;
+  settleMs?: number;
+  screenshotMs?: number;
+  setupMs?: number;
+  storyMs?: number;
+  measureMs?: number;
+  settle?: TimedSettle;
 };
 
 /** One sentence of a build's summary and the shots it describes, for links. */

@@ -53,7 +53,7 @@ async function mapLimit<T, R>(
 /**
  * Every route × variant of the session's config into `out`, and `out/manifest.json`, in the
  * config's order. Up to `concurrency` shots run at once, so the run's summed `captureMs` can exceed
- * its wall clock.
+ * its wall clock; the result carries both, as `captureWallMs` and the workers that shared it.
  */
 export async function captureInto(
   session: CaptureSession,
@@ -64,6 +64,8 @@ export async function captureInto(
   await mkdir(out, { recursive: true });
   await clearFlakeOutput(out);
   const pairs = config.variants.flatMap((variant) => routes.map((route) => ({ route, variant })));
+  const workers = Math.max(1, Math.min(concurrency, pairs.length));
+  const shooting = performance.now();
   const taken = await mapLimit(pairs, concurrency, async ({ route, variant }) => {
     const file = `${route.name}/${variant.name}.png`;
     const started = performance.now();
@@ -94,6 +96,7 @@ export async function captureInto(
     const shot: ShotTiming = { name: identity(entry), captureMs, ...steps };
     return { entry, shot, media };
   });
+  const captureWallMs = elapsed(shooting);
   const snapshots = taken.map((t) => t.entry);
   const shots = taken.map((t) => t.shot);
   const media = Object.fromEntries(
@@ -102,7 +105,8 @@ export async function captureInto(
   const manifest: SnapshotManifest = { version: 1, snapshots };
   const manifestPath = join(out, "manifest.json");
   await Bun.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  if (!config.composition) return { manifest, manifestPath, shots, media };
+  const wall = { captureWallMs, captureWorkers: workers };
+  if (!config.composition) return { manifest, manifestPath, shots, media, ...wall };
   const gapsPath = await writeGapsReport(out, manifest, config.composition.name);
-  return { manifest, manifestPath, shots, media, gapsPath };
+  return { manifest, manifestPath, shots, media, gapsPath, ...wall };
 }
