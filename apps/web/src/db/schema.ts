@@ -236,7 +236,10 @@ export const builds = sqliteTable(
      * due, or once it is written or failed. Older than `EXPLAIN_STALE_MS` is given up.
      */
     aiSummaryQueuedAt: integer("ai_summary_queued_at", { mode: "timestamp_ms" }),
-    /** When a consumer took the queued summary to write (ob 1875); the summary stays pending meanwhile. */
+    /**
+     * When a consumer took the queued summary to write (ob 1875); the summary stays pending
+     * meanwhile. A claim older than `EXPLAIN_STALE_MS` may be taken over by a later call (PS-396).
+     */
     aiSummaryClaimedAt: integer("ai_summary_claimed_at", { mode: "timestamp_ms" }),
     /** The CLI's step timings, sent at finalize (ob 1791); null when the client sent none. */
     timings: text("timings", { mode: "json" }).$type<BuildTimings>(),
