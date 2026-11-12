@@ -84,7 +84,48 @@ async function sideOf(opts: DevRunOptions, dir: string, entries: SnapshotEntry[]
 export async function runIteration(opts: DevRunOptions): Promise<DevIteration> {
   const started = performance.now();
   const { id, dir } = await newIteration(opts.store);
-  const timed = timedSession(opts.session);
+  const run: Run = { opts, timed: timedSession(opts.session), id, dir, started };
+  try {
+    return await runInto(run);
+  } catch (e) {
+    // A run that throws is stored as failed, so `dev` and the page can say so (PS-395).
+    await saveIteration(failedIteration(run, e));
+    throw e;
+  }
+}
+
+/** One run in flight: its options, the timed session, its id and dir and when it started. */
+type Run = {
+  opts: DevRunOptions;
+  timed: ReturnType<typeof timedSession>;
+  id: string;
+  dir: string;
+  started: number;
+};
+
+/** The record of a run that threw: nothing was compared, so every count is zero. */
+function failedIteration({ opts, timed, id, dir, started }: Run, e: unknown): DevIteration {
+  const totalMs = performance.now() - started;
+  const settleMs = timed.settled();
+  return {
+    id,
+    target: opts.target,
+    at: new Date().toISOString(),
+    against: { kind: "none", iteration: null },
+    note: null,
+    counts: { changed: 0, unchanged: 0, new: 0, removed: 0 },
+    regions: 0,
+    changedPixels: 0,
+    timings: { oursMs: Math.max(0, totalMs - settleMs), settleMs, totalMs },
+    dir,
+    report: "",
+    shots: [],
+    judge: null,
+    error: e instanceof Error ? e.message : String(e),
+  };
+}
+
+async function runInto({ opts, timed, id, dir, started }: Run): Promise<DevIteration> {
   const shots = join(dir, "shots");
   // One shot at a time: `oursMs` is the run less the summed settle, which needs the shots apart.
   // The session outlives the run: its unmatched selectors are this run's summary, failed or not (PS-241).
