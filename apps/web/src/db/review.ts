@@ -1,12 +1,13 @@
 import type { A11yDiff } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { and, eq, ne } from "drizzle-orm";
-import { SNAPSHOT_GROUPS, awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
+import { SNAPSHOT_GROUPS, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { cacheHit } from "./cache-hit";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
+import { type Verdict, refreshBuildStatus } from "./verdict";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import {
@@ -23,41 +24,20 @@ import {
   users,
 } from "./schema";
 
-/**
- * Build status after the diff (ob 1470, review model 1422). A changed shot blocks until it is
- * accepted or rejected, and so does an unchanged one that carries a change still open on the
- * branch's previous build (ob 1712) or one that differs from main and was never accepted (PS-284). A
- * new shot waits like a change (PS-284); removed shots never block; any rejection fails the build
- * until a new build arrives. `passed` therefore means "nothing left to decide", not "no
- * differences".
- */
-export type Verdict = "changes" | "passed" | "failed";
-
-export function verdictOf(rows: Parameters<typeof awaitsDecision>[0][]): Verdict {
-  if (rows.some((row) => row.reviewState === "rejected")) return "failed";
-  if (rows.some(awaitsDecision)) return "changes";
-  return "passed";
-}
-
-export async function refreshBuildStatus(db: Db, buildId: string): Promise<Verdict> {
-  const rows = await db
-    .select({
-      diffStatus: snapshots.diffStatus,
-      reviewState: snapshots.reviewState,
-      carriedFrom: snapshots.carriedFrom,
-      staleOf: snapshots.staleOf,
-      flakeId: snapshots.flakeId,
-      flakyPolicy: snapshots.flakyPolicy,
-    })
-    .from(snapshots)
-    .where(eq(snapshots.buildId, buildId));
-  const status = verdictOf(rows);
-  await db.update(builds).set({ status }).where(eq(builds.id, buildId));
-  return status;
-}
-
+/** The builds a decision moved besides the decided one: one that is not at a verdict is left as it is. */
 async function refreshBuilds(db: Db, buildIds: string[]): Promise<void> {
   for (const buildId of buildIds) await refreshBuildStatus(db, buildId);
+}
+
+/** The decided build's verdict. A build that left its verdict since the decision began is not reviewable. */
+async function refreshDecided(db: Db, buildId: string): Promise<Verdict> {
+  const verdict = await refreshBuildStatus(db, buildId);
+  if (verdict !== null) return verdict;
+  const [row] = await db
+    .select({ status: builds.status })
+    .from(builds)
+    .where(eq(builds.id, buildId));
+  throw new NotReviewableError(row?.status ?? "missing");
 }
 
 /** A decision's outcome: the decided build's verdict, and every build whose status it refreshed. */
@@ -313,7 +293,7 @@ export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> 
   const group = groupOfShot(shot.carriedFrom ?? input.snapshotId);
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
-  const verdict = await refreshBuildStatus(db, shot.buildId);
+  const verdict = await refreshDecided(db, shot.buildId);
   return { verdict, buildIds: [shot.buildId, ...moved] };
 }
 
@@ -347,5 +327,5 @@ export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> 
   const group = groupsOfBuild(db, buildId);
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
-  return { verdict: await refreshBuildStatus(db, buildId), buildIds: [buildId, ...moved] };
+  return { verdict: await refreshDecided(db, buildId), buildIds: [buildId, ...moved] };
 }

@@ -4,7 +4,7 @@ import type { BlobStore } from "#/storage/blobs";
 import type { SnapshotKey } from "./baselines";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
-import { refreshBuildStatus } from "./review";
+import { refreshBuildStatus } from "./verdict";
 import {
   type DiffRegion,
   type FlakeEvidence,

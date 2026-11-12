@@ -10,10 +10,8 @@ import {
 } from "#/db/baselines";
 import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
-import { refreshBuildStatus } from "#/db/review";
 import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
-import { recordRun, runFields } from "#/db/server-timings";
 import type { BlobStore } from "#/storage/blobs";
 import { CiResultError } from "./ci-result";
 import { NoRecoveryError, claim, dead } from "./claim";
@@ -41,9 +39,10 @@ import {
   projectOf,
 } from "./build-writes";
 import { ShotsUnmeasuredError, UnmeasuredError, assertMeasured } from "./measured";
+import { currentResult, endErrored, endRun } from "./run-end";
 import { carryOpenFromMain } from "./open-vs-main";
 import { withOverrides } from "./with-overrides";
-import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
+import type { ExplainQueue } from "#/ai/explain-queue";
 import { reportError } from "#/server/sentry";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
@@ -339,9 +338,12 @@ export async function measureAll(
  */
 async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<ProcessResult> {
   const current = await getBuild(db, build.projectId, build.id);
-  if (ci && dead(current)) {
+  const startedAt = current.processingStartedAt;
+  if (ci && startedAt && dead(current)) {
     const died = "the run measuring this build died; re-run the CI job";
-    await markErrored(db, current, new Error(died));
+    // The dead run's claim: a run started since holds a newer one, and its build is not ended here.
+    const ended = await markErrored(db, current, new Error(died), { startedAt });
+    if (ended === null) return currentResult(db, current);
     return { status: "errored", error: died, unmeasured: 0 };
   }
   return { status: current.status, error: current.error, unmeasured: 0 };
@@ -405,16 +407,13 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
     // Before the default branch accepts: a native shot of a stale key is left for a person (PS-297).
     await markStale(deps.db, build.id);
     await acceptDefaultBranchBuild(deps.db, build, project);
-    const status = await refreshBuildStatus(deps.db, build.id);
-    await recordRun(deps.db, build.id, timer.ended());
-    // After the verdict, and off the request (ob 1875): the model explains each shot, then writes
-    // the summary (ob 1668), from the queue. It never throws, so it cannot mark the build errored.
-    await queueExplain(deps, build);
-    return { status, error: null, unmeasured: 0 };
+    // Awaited: a verdict write that throws is this catch's to end at errored (ob 1561).
+    return await endRun(deps, build, timer);
   } catch (e) {
     reportBuildFailure(e);
-    const error = await markErrored(deps.db, build, e, runFields(timer.ended()));
-    const unmeasured = e instanceof DiffCeilingError ? e.unmeasured : 0;
-    return { status: "errored", error, unmeasured };
+    const ended = await endErrored(deps.db, build, e, timer);
+    return e instanceof DiffCeilingError && ended.status === "errored"
+      ? { ...ended, unmeasured: e.unmeasured }
+      : ended;
   }
 }

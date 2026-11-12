@@ -2,8 +2,10 @@ import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { getBuild } from "#/db/builds";
 import { reviewSnapshot } from "#/db/review";
+import { finishRun } from "#/db/verdict";
 import { builds, snapshots } from "#/db/schema";
 import { usageCounts } from "#/db/usage";
+import { markErrored } from "./build-writes";
 import { STALE_PROCESSING_MS, processBuild } from "./process";
 import { type Ctx, context, FINGERPRINT, onlyShot, rows, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
@@ -20,6 +22,22 @@ async function pair(ctx: Ctx, scoped = ctx.scoped) {
     { ...ctx, scoped },
     { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: red }] },
   );
+}
+
+/** Run A claimed the build at `old`; run B took it over at `newer` and finished with a verdict. */
+async function takenOver() {
+  const ctx = await context();
+  const done = await pair(ctx);
+  const old = new Date(Date.now() - STALE_PROCESSING_MS - 1000);
+  const newer = new Date();
+  await ctx.db
+    .update(builds)
+    .set({ status: "processing", processingStartedAt: newer })
+    .where(eq(builds.id, done.id));
+  expect(await finishRun(ctx.db, done.id, newer)).toBe("changes");
+  const successor = await getBuild(ctx.db, ctx.projectId, done.id);
+  expect(successor).toMatchObject({ status: "changes", error: null });
+  return { ctx, done, old, newer, successor };
 }
 
 describe("recovery (ob 1545)", () => {
@@ -115,5 +133,64 @@ describe("recovery (ob 1545)", () => {
     const result = await processBuild({ db: ctx.db, blobs: ctx.scoped }, passed);
     expect(result).toEqual({ status: "passed", error: null, unmeasured: 0 });
     expect(await onlyShot(ctx, done)).toMatchObject({ reviewState: "accepted" });
+  });
+
+  describe("a run that outlived its claim (PS-392)", () => {
+    test("its error does not turn the successor's verdict into errored", async () => {
+      const { ctx, done, old, successor } = await takenOver();
+      expect(
+        await markErrored(ctx.db, successor, new Error("late"), { startedAt: old }),
+      ).toBeNull();
+      expect(await getBuild(ctx.db, ctx.projectId, done.id)).toMatchObject({
+        status: "changes",
+        error: null,
+      });
+    });
+
+    test("nor does it end the successor's run while that run still holds the build", async () => {
+      const { ctx, done, old, successor, newer } = await takenOver();
+      await ctx.db.update(builds).set({ status: "processing" }).where(eq(builds.id, done.id));
+      expect(
+        await markErrored(ctx.db, successor, new Error("late"), { startedAt: old }),
+      ).toBeNull();
+      expect(await getBuild(ctx.db, ctx.projectId, done.id)).toMatchObject({
+        status: "processing",
+        processingStartedAt: newer,
+        error: null,
+      });
+    });
+
+    test("its verdict is not written: finishRun says so and the successor's status stands", async () => {
+      const { ctx, done, old } = await takenOver();
+      // The successor is running again (a re-diff of a shot) when the old run finishes.
+      const again = new Date(Date.now() + 1000);
+      await ctx.db
+        .update(builds)
+        .set({ status: "processing", processingStartedAt: again })
+        .where(eq(builds.id, done.id));
+      expect(await finishRun(ctx.db, done.id, old)).toBeNull();
+      expect(await getBuild(ctx.db, ctx.projectId, done.id)).toMatchObject({
+        status: "processing",
+        processingStartedAt: again,
+      });
+      // The run that holds the claim still finishes it.
+      expect(await finishRun(ctx.db, done.id, again)).toBe("changes");
+    });
+
+    test("the run that holds the claim ends the build errored and says what it stored", async () => {
+      const ctx = await context();
+      const done = await pair(ctx);
+      const held = new Date();
+      await ctx.db
+        .update(builds)
+        .set({ status: "processing", processingStartedAt: held })
+        .where(eq(builds.id, done.id));
+      const build = await getBuild(ctx.db, ctx.projectId, done.id);
+      expect(await markErrored(ctx.db, build, new Error("boom"), { startedAt: held })).toBe("boom");
+      expect(await getBuild(ctx.db, ctx.projectId, done.id)).toMatchObject({
+        status: "errored",
+        error: "boom",
+      });
+    });
   });
 });

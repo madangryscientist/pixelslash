@@ -5,17 +5,15 @@ import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
 import { ABANDONED_REASON } from "#/db/abandoned";
 import { isMarker } from "#/db/markers";
-import { refreshBuildStatus } from "#/db/review";
 import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
-import { recordRun, runFields } from "#/db/server-timings";
 import { NoRecoveryError, claimForRerun } from "./claim";
 import type { SnapshotRow } from "./compare";
-import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
+import { type ProjectOfBuild, projectOf } from "./build-writes";
+import { endErrored, endRun } from "./run-end";
 import { assertMeasured } from "./measured";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
 import { RunTimer } from "./run-timer";
-import { queueExplain } from "#/ai/explain-queue";
 
 /**
  * Partial re-runs (ob 1738): measure again only the shots of a build that errored, or one shot
@@ -180,15 +178,10 @@ export async function rediffShots(
     await markStale(deps.db, build.id);
     await settleReviews(deps.db, { build, project }, targets);
     await assertMeasured(deps.db, build, project);
-    const status = await refreshBuildStatus(deps.db, build.id);
-    await recordRun(deps.db, build.id, timer.ended());
-    // The moved shots are explained again, and the summary written, off the request (ob 1875).
-    await queueExplain(deps, build, { only: ids });
-    return { status, error: null, unmeasured: 0 };
+    return await endRun(deps, build, timer, ids);
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await reopenReviews(deps.db, ids);
-    const error = await markErrored(deps.db, build, e, runFields(timer.ended()));
-    return { status: "errored", error, unmeasured: 0 };
+    return endErrored(deps.db, build, e, timer);
   }
 }
