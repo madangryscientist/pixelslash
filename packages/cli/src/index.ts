@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { exitAfterFlush } from "./exit.ts";
 import { run } from "./run.ts";
 
-process.exit(await run(process.argv.slice(2)));
+await exitAfterFlush(await run(process.argv.slice(2)));
