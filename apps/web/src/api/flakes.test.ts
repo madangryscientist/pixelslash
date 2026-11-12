@@ -59,6 +59,39 @@ describe("flakes over the API (ob 1724)", () => {
     );
   });
 
+  test("a shot sent again keeps, drops or gains its label; the reply stays {id}", async () => {
+    const { db, deps, acme, ada, buildId } = await flakyUpload();
+    const [flake] = await db.select().from(flakes);
+    const labelOf = async () => {
+      const [shot] = await db.select().from(snapshots).where(eq(snapshots.buildId, buildId));
+      return shot?.flakeId;
+    };
+    const again = async () => {
+      const res = await call(
+        deps,
+        `PUT /api/v1/builds/${buildId}/snapshots`,
+        acme.token,
+        snapshotForm(META),
+      );
+      expect(Object.keys(await res.json())).toEqual(["id"]);
+    };
+    // The key's flake is open: the same shot sent without a record is still labelled with it.
+    await again();
+    expect(await labelOf()).toBe(flake?.id);
+    // Resolved: the next upload of the shot no longer takes the label.
+    await call(deps, `POST /api/v1/flakes/${flake?.id}/resolve`, ada, "{}");
+    await again();
+    expect(await labelOf()).toBeNull();
+    // A fresh record reopens the flake and labels the shot again.
+    await call(
+      deps,
+      `PUT /api/v1/builds/${buildId}/snapshots`,
+      acme.token,
+      flakyForm({ ...META, flaky: "skip", flake: FLAKE }),
+    );
+    expect(await labelOf()).toBe(flake?.id);
+  });
+
   test("a garbage flake record or policy is dropped, not refused", async () => {
     const { db, deps, acme } = await setup();
     const id = await openBuild(deps, acme.token);

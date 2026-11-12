@@ -303,7 +303,7 @@ export async function putSnapshot(
         ],
         set: fields,
       })
-      .returning({ id: snapshots.id }),
+      .returning({ id: snapshots.id, flakeId: snapshots.flakeId }),
   );
   if (!row) throw new BuildFinalisedError();
   const key = { name, platform, browser, viewport, theme };
@@ -317,11 +317,12 @@ export async function putSnapshot(
         key,
         imageKey: fields.imageKey,
         stem,
+        flakeId: row.flakeId,
       },
       flake,
     ),
   );
-  return row;
+  return { id: row.id };
 }
 
 /**
