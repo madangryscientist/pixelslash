@@ -4,10 +4,17 @@ import { fileURLToPath } from "node:url";
 import { chromium, firefox, webkit, type Browser } from "playwright";
 import type { BrowserName } from "./config.ts";
 import { CaptureError } from "./errors.ts";
-import { CAPTURE_TIMEOUT_MS, settleCapture } from "./settle.ts";
+import { CAPTURE_TIMEOUT_MS, settleCapture, trackInflight } from "./settle.ts";
 import { addSteps, elapsed, type CaptureSteps } from "./timings.ts";
 
-export { keepNativeRaf, settleCapture, withTimeout, type SettlePage } from "./settle.ts";
+export {
+  keepNativeRaf,
+  settleCapture,
+  trackInflight,
+  withTimeout,
+  type Inflight,
+  type SettlePage,
+} from "./settle.ts";
 
 /** The browser `capture` launches by default: what `pixelslash install-browser` installs. */
 export const CAPTURE_BROWSER = "chromium-headless-shell";
@@ -88,6 +95,7 @@ async function shot(
 ): Promise<CaptureSteps> {
   const page = await browser.newPage({ viewport: { width, height: 720 } });
   page.setDefaultNavigationTimeout(CAPTURE_TIMEOUT_MS);
+  const inflight = trackInflight(page);
   try {
     const navigating = performance.now();
     const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -96,7 +104,7 @@ async function shot(
     if (resp.status() >= 400)
       throw new CaptureError(`capture failed for ${url}: HTTP ${resp.status()}`);
     const settling = performance.now();
-    const settle = await settleCapture(page);
+    const settle = await settleCapture(page, CAPTURE_TIMEOUT_MS, inflight);
     const settleMs = elapsed(settling);
     const shooting = performance.now();
     await page.screenshot({ path: dest, fullPage: true });

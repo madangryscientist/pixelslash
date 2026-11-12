@@ -44,9 +44,9 @@ export function HowItWorksPage(): ReactNode {
       <Steps>
         <Step title="Capture Main and Branch">
           Playwright opens both URLs, or you hand it two PNGs. Each capture waits for the page to
-          settle (fonts, images, network idle, two animation frames) and fails after a timeout
-          rather than shooting early or hanging. The command does not start a dev server: both URLs
-          must already be up.
+          settle (fonts, images, the network, two animation frames) and fails after a timeout rather
+          than shooting early or hanging. The command does not start a dev server: both URLs must
+          already be up.
         </Step>
         <Step title="Diff the pixels, perceptually">
           A pixel counts as changed only when its colour moves by more than a small threshold and it

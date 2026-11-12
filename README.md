@@ -38,7 +38,7 @@ npx @hackcove/pixelslash install-browser   # once per machine: Playwright's chro
 npx @hackcove/pixelslash --live https://example.com --local http://localhost:3000 --out out
 ```
 
-Each capture waits for the page to settle (fonts, images, network idle, two animation frames) and
+Each capture waits for the page to settle (fonts, images, the network, two animation frames) and
 fails after a timeout rather than shooting early or hanging. Exit code 0 means the run finished,
 whatever it found in pixels; 1 means a design-system judge found new violations on Branch; 2 is a
 usage error. A crash never exits 1; [Exit codes](docs/cli.md#exit-codes-and-the-failed-line) has

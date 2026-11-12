@@ -8,7 +8,7 @@ Before each shot, capture waits for the page to settle, in this order:
 
 1. Web fonts are ready.
 2. Every image has loaded.
-3. The network has gone idle.
+3. No request is in flight.
 4. Two animation frames have been drawn.
 
 This can't be turned off. It is bounded by `timeoutMs`, 8 seconds by default. A page that doesn't settle in time fails with `capture settle exceeded <n>ms`. It doesn't hang, and it doesn't shoot early.

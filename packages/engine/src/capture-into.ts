@@ -16,10 +16,10 @@ import { elapsed, type ShotTiming } from "./timings.ts";
 
 /**
  * The most shots `captureInto` takes at once when the config does not say (PS-195, PS-436). Most of
- * a shot is the settle's network-idle window, which is the page waiting, not the machine working,
- * so several pages wait together. Each page still waits for its own fonts, images, network idle
- * and two frames, bounded by its own timeout. Ten is the smallest count within 5% of the fastest
- * median in the run logged in `bench/PERF.md` (2026-11-12, dedicated, five cores).
+ * a shot is the page waiting (the network, fonts, images), not the machine working, so several
+ * pages wait together. Each page still waits for its own fonts, images, the network and two
+ * frames, bounded by its own timeout. Ten is the smallest count within 5% of the fastest median
+ * in the run logged in `bench/PERF.md` (2026-11-12, dedicated, five cores).
  */
 export const DEFAULT_CONCURRENCY_CAP = 10;
 

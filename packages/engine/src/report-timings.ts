@@ -29,7 +29,7 @@ const HEAD: Record<(typeof STEP_KEYS)[number], string> = {
 const SETTLE_HEAD = [
   ["fontsMs", "fonts"],
   ["imagesMs", "images"],
-  ["networkIdleMs", "network idle"],
+  ["networkIdleMs", "network"],
   ["framesMs", "frames"],
 ] as const;
 

@@ -1,4 +1,4 @@
-import { settleCapture } from "@hackcove/pixelslash-engine";
+import * as engine from "@hackcove/pixelslash-engine";
 import { chromium } from "playwright";
 
 const WARMUP = 1;
@@ -43,8 +43,10 @@ export async function timeCapture(): Promise<number[]> {
       const started = performance.now();
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       try {
+        // The probe is also copied into a base tree whose engine has no tracker; that one settles as it always did.
+        const inflight = "trackInflight" in engine ? engine.trackInflight(page) : undefined;
         await page.goto(`http://localhost:${server.port}/`, { waitUntil: "domcontentloaded" });
-        await settleCapture(page);
+        await engine.settleCapture(page, undefined, inflight);
         await page.screenshot({ fullPage: true });
       } finally {
         await page.close();

@@ -288,8 +288,8 @@ dependencies.
    only the overlapping rectangle is diffed and the report states both sizes;
    the non-overlap is not painted as changed. With no judge available the run
    prints `skip: no judge` and invents no violations.
-2. **Capture waits for the page to settle** (fonts, images, network idle, two
-   frames), bounded by the timeout: a page that never settles fails, it does
+2. **Capture waits for the page to settle** (fonts, images, no request in flight, two
+   frames; the Playwright helper keeps `networkidle`), bounded by the timeout: a page that never settles fails, it does
    not hang and it does not shoot early.
 3. **Exit codes are a contract.** Exit 1 only on NEW violations on Branch;
    pixel-only runs exit 0. CI will read this.

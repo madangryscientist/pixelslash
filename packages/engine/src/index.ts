@@ -19,7 +19,9 @@ export {
   keepNativeRaf,
   playwrightCli,
   settleCapture,
+  trackInflight,
   type CapturePage,
+  type Inflight,
 } from "./capture.ts";
 export { CaptureError, DevLockError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { BRIEF_LIMIT, briefTooLong, trimBrief } from "./brief.ts";
