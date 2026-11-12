@@ -106,6 +106,9 @@ export function counts(c: BuildCounts) {
     rejected: c.rejected,
     to_review: c.toReview,
     skipped_flaky: c.skippedFlaky,
+    // What the branch changes against main, as the build page's Changed and New tabs count it:
+    // the carried shots are in here, which `changed` and `new` above leave out (PS-429).
+    against_main: { changed: c.changed, new: c.new },
   };
 }
 

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { flagSnapshot } from "#/db/flags";
 import { reviewSnapshot } from "#/db/review";
-import { sha } from "#/diff/test-builds";
+import { sha, upload } from "#/diff/test-builds";
+import { RED, shot } from "#/diff/test-shots";
 import { verifySignedImagePath } from "#/storage/signed";
 import { get, world } from "./test-read";
 
@@ -54,6 +55,7 @@ describe("the read API (ob 1729)", () => {
         rejected: 0,
         to_review: 2,
         skipped_flaky: 0,
+        against_main: { changed: 1, new: 1 },
       },
       created_at: expect.any(String),
       web_url: `http://app.test/projects/${w.projectId}/builds/${w.feature.id}`,
@@ -95,6 +97,26 @@ describe("the read API (ob 1729)", () => {
     });
     expect((await get(w.deps, `/api/v1/projects/${w.projectId}/builds`, w.eve)).status).toBe(404);
     expect((await get(w.deps, other, w.ada)).status).toBe(200);
+  });
+
+  test("counts: a branch re-upload carried from main reads changed 0 but against_main says what it changes (PS-429)", async () => {
+    const w = await world();
+    // Feature changed `about` against main. Upload it again, same pixels.
+    const again = await upload(w, {
+      branch: "feature",
+      commit: sha(3),
+      mergeBase: sha(1),
+      shots: [
+        { name: "home", png: shot() },
+        { name: "about", png: shot({ blocks: [{ x: 8, y: 8, w: 12, h: 12, rgb: RED }] }) },
+      ],
+    });
+    const res = await get(w.deps, `/api/v1/builds/${again.id}`, w.acme.token);
+    expect(res.status).toBe(200);
+    // Measured against the branch's previous build the change is unchanged (as before PS-429)...
+    expect(res.body.build.counts).toMatchObject({ changed: 0, new: 0, to_review: 1 });
+    // ...and against main it is the one changed shot the build page's Changed tab shows.
+    expect(res.body.build.counts.against_main).toEqual({ changed: 1, new: 0 });
   });
 
   test("a build carries its shots in review order, with what the diff measured", async () => {
