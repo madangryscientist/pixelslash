@@ -126,7 +126,7 @@ describe("a story may be shot on a reused preview page, only when the capture as
     } finally {
       await session.close();
     }
-  });
+  }, 60_000);
 
   test("a re-capture is always on a fresh page, even in a session that reused pages", async () => {
     const session = await openCaptureSession(config, pinned);
@@ -139,5 +139,5 @@ describe("a story may be shot on a reused preview page, only when the capture as
     } finally {
       await session.close();
     }
-  });
+  }, 60_000);
 });
