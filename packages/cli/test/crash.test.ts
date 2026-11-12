@@ -157,6 +157,7 @@ describe("an upload failure ends on UPLOAD FAILED (PS-223)", () => {
     });
     expect(code).toBe(1);
     const lines = cap.stderr.trimEnd().split("\n");
+    expect(lines.at(-2)).toBe("1/1 shots sent and finalised; the failure came after");
     expect(lines.at(-1)).toBe(
       `UPLOAD FAILED: build build-1 errored on the server: database is locked (${SERVER}/projects/p1/builds/build-1)`,
     );
