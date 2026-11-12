@@ -6,6 +6,7 @@ import {
   CLI_TOTAL_NOTE,
   RERUN_NOTE,
   type StepRow,
+  cliProfileRows,
   cliStepRows,
   serverStepRows,
 } from "#/lib/timings";
@@ -80,6 +81,7 @@ export function BuildTimings(input: RunCardInput & { build: BuildView["build"] }
   const card = runCard(input);
   const server = serverStepRows(build, build.aiSummary !== null);
   const cli = cliStepRows(build.timings);
+  const profile = cliProfileRows(build.timings);
   const timed = card.wall || card.compare || server.length > 0 || cli.length > 0;
   return (
     <Disclosure bordered summary="This run" data-testid="run-disclosure">
@@ -97,6 +99,13 @@ export function BuildTimings(input: RunCardInput & { build: BuildView["build"] }
             steps={cli}
             note={cli.some((step) => step.key === "total") ? CLI_TOTAL_NOTE : undefined}
           />
+          {profile.map((row) => (
+            <KeyValue key={row.key} label={row.label} data-testid={`profile-${row.key}`}>
+              <Text mono numeric data-testid={`profile-${row.key}-text`}>
+                {row.text}
+              </Text>
+            </KeyValue>
+          ))}
           {card.counts.map((line) => (
             <Figure key={line.key} line={line} />
           ))}

@@ -122,7 +122,7 @@ export {
   type Suggestion,
 } from "./flake-repro.ts";
 export type { Region, RegionKind, Specks } from "./regions.ts";
-export { buildTimings, timingLine, type Timings } from "./timings.ts";
+export { buildTimings, captureFacts, loadNow, timingLine, type Timings } from "./timings.ts";
 export { CLIENT_VERSION, USER_AGENT } from "./version.ts";
 export {
   DEFAULT_MAX_BYTES,

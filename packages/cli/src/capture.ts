@@ -3,10 +3,12 @@ import { pathToFileURL } from "node:url";
 import {
   UsageError,
   buildTimings,
+  captureFacts,
   captureInto,
   findConfig,
   identity,
   loadConfig,
+  loadNow,
   onlyRoutes,
   openCaptureSession,
   recapture,
@@ -89,6 +91,7 @@ export async function captureLocal(
   watch: Watch = {},
 ): Promise<TimedSnapshotResult> {
   const started = performance.now();
+  const loadStart = loadNow();
   const config = await loadConfig(findConfig(flags.config, deps.cwd ?? process.cwd()));
   const session = await openCaptureSession(config, deps);
   try {
@@ -97,7 +100,12 @@ export async function captureLocal(
     const result = await captureInto(watched(shooting, watch, total), flags.out);
     return {
       ...result,
-      timings: buildTimings(started, result.shots, session.browserLaunchMs),
+      timings: buildTimings(
+        started,
+        result.shots,
+        session.browserLaunchMs,
+        captureFacts(result, loadStart),
+      ),
     };
   } finally {
     await session.close();
@@ -150,6 +158,7 @@ export async function runCapture(
     return 0;
   }
   const started = performance.now();
+  const loadStart = loadNow();
   const config = await loadConfig(findConfig(flags.uploadFlags.config, cwd));
   const session = await openCaptureSession(config, {
     ...deps,
@@ -157,7 +166,12 @@ export async function runCapture(
   });
   try {
     const result = await captureInto(session, flags.out);
-    const timings = buildTimings(started, result.shots, session.browserLaunchMs);
+    const timings = buildTimings(
+      started,
+      result.shots,
+      session.browserLaunchMs,
+      captureFacts(result, loadStart),
+    );
     printCaptured(result, io);
     // The config's retries unless the flag says otherwise; the shots were just shot here.
     const retries = flags.uploadFlags["flake-retries"] ?? String(config.flake.retries);

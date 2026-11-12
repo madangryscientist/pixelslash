@@ -1,3 +1,5 @@
+import { availableParallelism, loadavg } from "node:os";
+
 /**
  * How long a run's steps took (ob 1791), in whole milliseconds. A step the run did not do is
  * absent, never 0: a run with no judge has no `judgeMs`. Timings stay on the machine; the only
@@ -15,14 +17,22 @@ export type SettleSteps = {
 /**
  * Where a capture's time went (PS-195): `navigateMs` is the `goto` until DOMContentLoaded,
  * `settleMs` the settle wait (split per condition in `settle`), `screenshotMs` the screenshot
- * call with Chromium's PNG encode. Parts of `captureMs`, which also holds the page's setup. A pair's
- * two pages are shot at once, so its parts add both pages' time and can exceed its `captureMs`.
+ * call with Chromium's PNG encode. Parts of `captureMs`. A pair's two pages are shot at once, so its
+ * parts add both pages' time and can exceed its `captureMs`.
+ *
+ * Three more parts, each present only when the shot did the step: `setupMs` is the browser context
+ * and page the shot is taken in (with the clock pin), `storyMs` is the Storybook render wait,
+ * which sits inside `settleMs` (the story and the generic settle share one wait), and `measureMs` is
+ * what is read off the page once it is shot (ignore boxes, media, composition, metrics, a11y scan).
  */
 export type CaptureSteps = {
   navigateMs: number;
   settleMs: number;
   screenshotMs: number;
   settle: SettleSteps;
+  setupMs?: number;
+  storyMs?: number;
+  measureMs?: number;
 };
 
 /** One shot (or one route / pair): the steps it went through. */
@@ -35,15 +45,38 @@ export type ShotTiming = Partial<CaptureSteps> & {
   judgeMs?: number;
 };
 
-/** The requests of one kind sent to the server: `open build`, `fetch baseline`, `upload`, `finalize`. */
-type RequestBatch = { step: string; count: number; ms: number };
+/**
+ * The requests of one kind sent to the server: `open build`, `fetch baseline`, `upload`, `finalize`.
+ * `ms` adds every request's own time (worker time); `wallMs` runs from the first request's start to
+ * the last one's end, and with requests in flight together it is less than `ms`. `p50Ms`, `p90Ms`
+ * and `maxMs` are the spread of one request's latency.
+ */
+type RequestBatch = {
+  step: string;
+  count: number;
+  ms: number;
+  p50Ms: number;
+  p90Ms: number;
+  maxMs: number;
+  wallMs: number;
+};
 
 type UploadTiming = { totalMs: number; batches: RequestBatch[] };
+
+/** The machine the run was on: its cores, and the one-minute load average at the start and the end of the run. */
+type HostTiming = { cores: number; loadStart: number; loadEnd: number };
+
+/** How many things ran at once: capture's shots and the upload's PUTs. */
+type WorkerCounts = { capture?: number; upload?: number };
 
 export type Timings = Partial<CaptureSteps> & {
   totalMs: number;
   /** Launching the browser, once per run (PS-195); absent when the run launched none. */
   browserLaunchMs?: number;
+  /** The wall clock of the capture, with the shots overlapping: `captureMs` below is the workers' time added up. */
+  captureWallMs?: number;
+  workers?: WorkerCounts;
+  host?: HostTiming;
   /** The sums of the per-shot steps; each present only when some shot did the step. */
   captureMs?: number;
   diffMs?: number;
@@ -55,7 +88,14 @@ export type Timings = Partial<CaptureSteps> & {
 
 const STEPS = ["captureMs", "diffMs", "judgeMs"] as const;
 /** Parts of `captureMs`: summed like the steps, never added to a shot's total. */
-const PARTS = ["navigateMs", "settleMs", "screenshotMs"] as const;
+const PARTS = [
+  "navigateMs",
+  "settleMs",
+  "screenshotMs",
+  "setupMs",
+  "storyMs",
+  "measureMs",
+] as const;
 const SETTLE = ["fontsMs", "imagesMs", "networkIdleMs", "framesMs"] as const;
 
 /** `a` and `b` added up, part by part: a pair's two captures as one shot's steps. */
@@ -67,6 +107,31 @@ export function addSteps(a: CaptureSteps, b: CaptureSteps): CaptureSteps {
     settleMs: a.settleMs + b.settleMs,
     screenshotMs: a.screenshotMs + b.screenshotMs,
     settle,
+  };
+}
+
+/** The one-minute load average now, to two places; 0 where the platform has none. */
+export function loadNow(): number {
+  return Math.round((loadavg()[0] ?? 0) * 100) / 100;
+}
+
+/** What a run knows beyond its shots: how its capture overlapped, its worker counts, and the load when it began. */
+type RunFacts = {
+  captureWallMs?: number | undefined;
+  workers?: WorkerCounts | undefined;
+  /** `loadNow()` read when the run began; with it, the timings carry a `host`. */
+  loadStart?: number | undefined;
+};
+
+/** The run facts of a capture: what `captureInto` measured, and the load read before it began. */
+export function captureFacts(
+  result: { captureWallMs?: number | undefined; captureWorkers?: number | undefined },
+  loadStart?: number,
+): RunFacts {
+  return {
+    captureWallMs: result.captureWallMs,
+    workers: result.captureWorkers === undefined ? undefined : { capture: result.captureWorkers },
+    loadStart,
   };
 }
 
@@ -86,28 +151,52 @@ function shotTotal(s: ShotTiming): number {
   return STEPS.reduce((n, k) => n + (s[k] ?? 0), 0);
 }
 
-/** The timings of `shots` over a run that began at `started`; sums and the slowest-first order are made here. */
-export function buildTimings(
-  started: number,
-  shots: ShotTiming[],
-  browserLaunchMs?: number,
-): Timings {
-  const timings: Timings = {
-    totalMs: elapsed(started),
-    ...(browserLaunchMs !== undefined && { browserLaunchMs }),
-    shots: shots.toSorted((a, b) => shotTotal(b) - shotTotal(a)),
+/** The run-wide facts that are present: the launch, the capture wall, the worker counts and the host. */
+function runFields(browserLaunchMs: number | undefined, facts: RunFacts): Partial<Timings> {
+  const { capture, upload } = facts.workers ?? {};
+  const workers: WorkerCounts = {
+    ...(capture !== undefined && { capture }),
+    ...(upload !== undefined && { upload }),
   };
+  return {
+    ...(browserLaunchMs !== undefined && { browserLaunchMs }),
+    ...(facts.captureWallMs !== undefined && { captureWallMs: facts.captureWallMs }),
+    ...(Object.keys(workers).length > 0 && { workers }),
+    ...(facts.loadStart !== undefined && {
+      host: { cores: availableParallelism(), loadStart: facts.loadStart, loadEnd: loadNow() },
+    }),
+  };
+}
+
+/** The sums of the per-shot steps and parts, and of the settle split, over the shots that did them. */
+function sumShots(shots: ShotTiming[]): Partial<Timings> {
+  const sums: Partial<Timings> = {};
   for (const k of [...STEPS, ...PARTS]) {
     const has = shots.filter((s) => s[k] !== undefined);
-    if (has.length > 0) timings[k] = has.reduce((n, s) => n + (s[k] ?? 0), 0);
+    if (has.length > 0) sums[k] = has.reduce((n, s) => n + (s[k] ?? 0), 0);
   }
   const settled = shots.flatMap((s) => (s.settle ? [s.settle] : []));
   if (settled.length > 0) {
     const settle = { fontsMs: 0, imagesMs: 0, networkIdleMs: 0, framesMs: 0 };
     for (const s of settled) for (const k of SETTLE) settle[k] += s[k];
-    timings.settle = settle;
+    sums.settle = settle;
   }
-  return timings;
+  return sums;
+}
+
+/** The timings of `shots` over a run that began at `started`; sums and the slowest-first order are made here. */
+export function buildTimings(
+  started: number,
+  shots: ShotTiming[],
+  browserLaunchMs?: number,
+  facts: RunFacts = {},
+): Timings {
+  return {
+    totalMs: elapsed(started),
+    ...runFields(browserLaunchMs, facts),
+    ...sumShots(shots),
+    shots: shots.toSorted((a, b) => shotTotal(b) - shotTotal(a)),
+  };
 }
 
 const KIND_PREFIXES = ["upload ", "fetch baseline"];
@@ -118,20 +207,41 @@ function requestKind(step: string): string {
   return prefix ? prefix.trim() : step;
 }
 
+/** The `p`th percentile (nearest rank) of `sorted`, ascending and not empty. */
+function percentile(sorted: number[], p: number): number {
+  return sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)] ?? 0;
+}
+
+type Seen = { durations: number[]; first: number; last: number };
+
 /** Collects the requests of an upload by kind. */
 export function requestLog() {
-  const batches = new Map<string, RequestBatch>();
+  const seen = new Map<string, Seen>();
   const started = performance.now();
   return {
     record(step: string, ms: number): void {
       const kind = requestKind(step);
-      const batch = batches.get(kind) ?? { step: kind, count: 0, ms: 0 };
-      batch.count += 1;
-      batch.ms += Math.round(ms);
-      batches.set(kind, batch);
+      const end = performance.now();
+      const batch = seen.get(kind) ?? { durations: [], first: end - ms, last: end };
+      batch.durations.push(Math.round(ms));
+      batch.first = Math.min(batch.first, end - ms);
+      batch.last = Math.max(batch.last, end);
+      seen.set(kind, batch);
     },
     finish(): UploadTiming {
-      return { totalMs: elapsed(started), batches: [...batches.values()] };
+      const batches = [...seen].map(([step, { durations, first, last }]) => {
+        const sorted = durations.toSorted((a, b) => a - b);
+        return {
+          step,
+          count: sorted.length,
+          ms: sorted.reduce((n, d) => n + d, 0),
+          p50Ms: percentile(sorted, 0.5),
+          p90Ms: percentile(sorted, 0.9),
+          maxMs: sorted.at(-1) ?? 0,
+          wallMs: Math.max(0, Math.round(last - first)),
+        };
+      });
+      return { totalMs: elapsed(started), batches };
     },
   };
 }
@@ -143,20 +253,29 @@ export function mergeShots(...lists: ShotTiming[][]): ShotTiming[] {
   return [...by.values()];
 }
 
+/** What the upload itself contributes at finalize: its per-shot steps, its worker count and the load it began at. */
+export type UploadRun = { shots: ShotTiming[] } & Pick<RunFacts, "workers" | "loadStart">;
+
 /**
  * What the upload sends the server at finalize: the CLI's timings so far (its capture, when it
- * captured) and the upload's own per-shot `shots` (diff, judge; a shot with neither is left out), with the upload's requests up to,
+ * captured) and the upload's own per-shot `run.shots` (diff, judge; a shot with neither is left out), with the upload's requests up to,
  * not including, the finalize itself.
  */
 export function timingsToSend(
   base: Timings | undefined,
   started: number,
   upload: UploadTiming,
-  shots: ShotTiming[],
+  run: UploadRun,
 ): Timings {
-  const did = shots.filter((s) => s.diffMs !== undefined || s.judgeMs !== undefined);
-  const sums = buildTimings(started, mergeShots(base?.shots ?? [], did), base?.browserLaunchMs);
-  return { ...sums, totalMs: (base?.totalMs ?? 0) + elapsed(started), upload };
+  const prior: Partial<Timings> = base ?? {};
+  const did = run.shots.filter((s) => s.diffMs !== undefined || s.judgeMs !== undefined);
+  const sums = buildTimings(started, mergeShots(prior.shots ?? [], did), prior.browserLaunchMs, {
+    captureWallMs: prior.captureWallMs,
+    workers: { ...prior.workers, ...run.workers },
+    // The capture's start load when there was a capture, else the upload's own.
+    loadStart: prior.host?.loadStart ?? run.loadStart,
+  });
+  return { ...sums, totalMs: (prior.totalMs ?? 0) + elapsed(started), upload };
 }
 
 function seconds(ms: number): string {

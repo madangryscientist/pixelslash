@@ -18,7 +18,7 @@ import { identity, pngPath } from "./manifest.ts";
 import { isHttpUrl } from "./routes.ts";
 import { type CaptureSession, type SnapshotEntry, captureInto, recapture } from "./snapshot.ts";
 import { withTimings } from "./report-timings.ts";
-import { buildTimings, mergeShots } from "./timings.ts";
+import { buildTimings, captureFacts, mergeShots } from "./timings.ts";
 import { type Client, isObj } from "./upload-client.ts";
 
 /**
@@ -49,6 +49,8 @@ export type CheckDeps = {
   sleep?: (ms: number) => Promise<void>;
   /** A `performance.now()` reading the run's total counts from; default: when the check begins. */
   started?: number;
+  /** `loadNow()` read when the run began, for the host in the timings. */
+  startLoad?: number;
 };
 
 export type { CheckShot } from "./check-rows.ts";
@@ -254,7 +256,8 @@ export async function checkAgainstServer(
   };
   await rm(dirs.main, { recursive: true, force: true });
   await rm(dirs.report, { recursive: true, force: true });
-  const { manifest, shots: captured, media } = await captureInto(shooting, dirs.branch);
+  const capture = await captureInto(shooting, dirs.branch);
+  const { manifest, shots: captured, media } = capture;
   const client = clientOf(opts, deps);
   const { picks, removed } = await preview(client, ctx, opts.projectId, manifest.snapshots);
   await writeBaselines(client, dirs, manifest.snapshots, picks);
@@ -274,6 +277,7 @@ export async function checkAgainstServer(
     started,
     mergeShots(captured, result.timings.shots),
     session.browserLaunchMs,
+    captureFacts(capture, deps.startLoad),
   );
   await Bun.write(
     result.indexPath,

@@ -8,6 +8,7 @@ import {
   newShotContext,
   openPage,
   pinClock,
+  stepsOf,
   type Opened,
   type ShotProgress,
 } from "./capture-open.ts";
@@ -52,7 +53,7 @@ import { captureInto } from "./capture-into.ts";
 import type { Session } from "./setup.ts";
 import { startApp, type StopApp } from "./start.ts";
 import { unmatchedTally, type UnmatchedTally } from "./unmatched.ts";
-import { elapsed, type CaptureSteps, type ShotTiming } from "./timings.ts";
+import { elapsed, timed, type CaptureSteps, type ShotTiming } from "./timings.ts";
 import type { NativeFields } from "./native.ts";
 import { storybookRoutes } from "./storybook.ts";
 import { paintRects } from "./paint-rects.ts";
@@ -122,6 +123,10 @@ export type SnapshotResult = {
   gapsPath?: string;
   /** The media no ignore area covers, by shot (`identity`), for the shots that have any (PS-230). Not in the manifest. */
   media: Record<string, MediaBox[]>;
+  /** The capture's wall clock, shots overlapping; the shots' `captureMs` add up to more. */
+  captureWallMs?: number;
+  /** How many shots ran at once: the concurrency, or fewer when there were fewer shots. */
+  captureWorkers?: number;
 };
 
 export { MASK_COLOR, toImageRects };
@@ -232,7 +237,7 @@ async function measure(page: Page, shot: Shot, png: Buffer, origin?: Crop["origi
 }
 
 /** The settled page shot: cropped to its story when it is one, then measured in the frame it is kept in. */
-async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
+async function capture(page: Page, shot: Shot, opened: Opened, setupMs: number): Promise<Shoot> {
   const { stabilise, route } = shot;
   const selectors = route.masks.filter((m) => typeof m === "string");
   const locators = await maskLocators(page, selectors, shot.unmatched.checked("mask", selectors));
@@ -246,21 +251,17 @@ async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
     mask: locators,
     maskColor: MASK_COLOR,
   });
-  const steps: CaptureSteps = {
-    navigateMs: Math.round(opened.navigateMs),
-    settleMs: Math.round(opened.settleMs),
-    screenshotMs: elapsed(shooting),
-    settle: opened.settle,
-  };
+  const screenshotMs = elapsed(shooting);
   const { png, origin } = storyShot(full, story, stabilise.deviceScaleFactor);
-  const { ignore, media, composition, a11y, metrics } = await measure(page, shot, png, origin);
+  const { value: measured, ms: measureMs } = await timed(() => measure(page, shot, png, origin));
+  const { ignore, media, composition, a11y, metrics } = measured;
   const rects = route.masks.filter((m) => typeof m !== "string");
   return {
     png: paintRects(png, shiftBoxes(rects, origin), stabilise.deviceScaleFactor),
     ignore,
     media,
     loadMs: opened.navigateMs + opened.settleMs,
-    steps,
+    steps: stepsOf(opened, { setupMs, screenshotMs, measureMs }),
     ...(composition && { composition }),
     ...(a11y && { a11y }),
     ...(metrics && { metrics }),
@@ -270,15 +271,17 @@ async function capture(page: Page, shot: Shot, opened: Opened): Promise<Shoot> {
 /** One attempt at a shot, in a context of its own. It throws `PageCrash` for a crash, a `CaptureError` for anything else. */
 async function attempt(browser: Browser, shot: Shot): Promise<Shoot> {
   const { variant, stabilise, route, url } = shot;
+  const setting = performance.now();
   const context = await newShotContext(browser, variant, stabilise, shot.session);
   const progress: ShotProgress = { step: "goto", crashed: false };
   try {
     await pinClock(context, stabilise);
     const page = await context.newPage();
+    const setupMs = elapsed(setting);
     page.on("crash", () => (progress.crashed = true));
     const opened = await openPage(page, url, route, { timeoutMs: stabilise.timeoutMs, progress });
     progress.step = "screenshot";
-    return await capture(page, shot, opened);
+    return await capture(page, shot, opened, setupMs);
   } catch (e) {
     throw attemptFailure(e, url, progress);
   } finally {

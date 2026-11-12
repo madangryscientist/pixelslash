@@ -10,6 +10,7 @@ import {
   checkAgainstServer,
   findConfig,
   loadConfig,
+  loadNow,
   onlyRoutes,
   openCaptureSession,
   timingLine,
@@ -113,6 +114,7 @@ export async function checkLocal(
   watch: Watch = {},
 ): Promise<CheckResult> {
   const started = performance.now();
+  const startLoad = loadNow();
   const retries = flakeRetries(flags["flake-retries"]);
   const cwd = deps.cwd ?? process.cwd();
   const config = await loadConfig(findConfig(flags.config, cwd));
@@ -124,7 +126,11 @@ export async function checkLocal(
   try {
     const total = onlyRoutes(session, only).routes.length * config.variants.length;
     // The total counts from the command's start, the browser launch included.
-    return await checkAgainstServer(watched(session, watch, total), opts, { ...deps, started });
+    return await checkAgainstServer(watched(session, watch, total), opts, {
+      ...deps,
+      started,
+      startLoad,
+    });
   } catch (e) {
     if (e instanceof UploadError) throw new RemoteError(e.message);
     throw e;

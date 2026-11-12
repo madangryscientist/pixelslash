@@ -60,6 +60,96 @@ test("a diffed build shows its server timings, and the org's Timings tab their p
   );
 });
 
+const SETTLE = { fontsMs: 120, imagesMs: 340, networkIdleMs: 5500, framesMs: 40 };
+
+/** What a current CLI sends: the capture's wall and workers, its parts, the requests' spread and the host. */
+const PROFILE = {
+  totalMs: 21_000,
+  browserLaunchMs: 400,
+  captureWallMs: 4_200,
+  workers: { capture: 4, upload: 4 },
+  host: { cores: 16, loadStart: 3.2, loadEnd: 4.1 },
+  captureMs: 10_000,
+  navigateMs: 1_000,
+  settleMs: 7_000,
+  screenshotMs: 1_200,
+  setupMs: 500,
+  storyMs: 600,
+  measureMs: 300,
+  settle: SETTLE,
+  upload: {
+    totalMs: 9_000,
+    batches: [
+      { step: "upload", count: 120, ms: 20_000, p50Ms: 180, p90Ms: 420, maxMs: 900, wallMs: 3_200 },
+      {
+        step: "finalize",
+        count: 1,
+        ms: 9_500,
+        p50Ms: 9_500,
+        p90Ms: 9_500,
+        maxMs: 9_500,
+        wallMs: 9_500,
+      },
+    ],
+  },
+  shots: [{ name: "hero", captureMs: 10_000, navigateMs: 1_000, settleMs: 7_000, settle: SETTLE }],
+};
+
+test("a build shows the CLI's full speed profile in both themes, at desktop and phone width", async ({
+  page,
+}) => {
+  const { token, projectId } = await provision(page, "Profile Co", "profiled");
+  const buildId = await uploadBuild(
+    token,
+    { branch: "work", commitSha: SHA_WORK },
+    [{ name: "hero", png: WHITE }],
+    { timings: PROFILE },
+  );
+  for (const colorScheme of ["light", "dark"] as const) {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.emulateMedia({ colorScheme });
+      await page.setViewportSize(viewport);
+      await open(page, `/projects/${projectId}/builds/${buildId}`);
+      await openRunCard(page);
+      const where = `${colorScheme} at ${viewport.width}`;
+      await expect(page.getByTestId("profile-capture-wall-text"), where).toHaveText(
+        /^4\.2.s against 10.s of worker time, on 4 workers$/,
+      );
+      const parts = page.getByTestId("profile-capture-parts-text");
+      await expect(parts, where).toContainText("settle 70% (");
+      await expect(parts, where).toContainText("network idle 55%");
+      await expect(page.getByTestId("profile-requests-upload-text"), where).toHaveText(
+        /p50 180.ms, p90 420.ms, max 900.ms/,
+      );
+      await expect(page.getByTestId("profile-requests-finalize-text"), where).toContainText("p90");
+      await expect(page.getByTestId("profile-host-text"), where).toHaveText(
+        "16 cores, load 3.2 at the start and 4.1 at the end",
+      );
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, where).toBeLessThanOrEqual(0);
+    }
+  }
+});
+
+test("a build from an older CLI shows its steps and no profile", async ({ page }) => {
+  const { token, projectId } = await provision(page, "Older Co", "older");
+  const buildId = await uploadBuild(
+    token,
+    { branch: "work", commitSha: SHA_WORK },
+    [{ name: "hero", png: WHITE }],
+    { timings: CLI },
+  );
+  await open(page, `/projects/${projectId}/builds/${buildId}`);
+  await openRunCard(page);
+  await expect(page.getByTestId("timing-cli-capture")).toBeVisible();
+  await expect(page.locator("[data-testid^='profile-']")).toHaveCount(0);
+});
+
 test("with no build the Timings tab says so, not a row of dashes", async ({ page }) => {
   await provision(page, "Quiet Co", "quiet");
   await openTimings(page, "Quiet Co");
