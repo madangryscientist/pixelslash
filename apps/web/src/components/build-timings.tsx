@@ -1,4 +1,4 @@
-import { Card, Cluster, KeyValue, KeyValueList, Overline, Stack, Text } from "@hackcove/ui-react";
+import { Cluster, Disclosure, KeyValue, KeyValueList, Stack, Text } from "@hackcove/ui-react";
 import type { BuildView } from "#/db/review";
 import { formatDuration } from "#/lib/format";
 import { type CardLine, NO_TIMINGS, type RunCardInput, runCard } from "#/lib/run-card";
@@ -72,7 +72,8 @@ function Figure({ line }: { line: CardLine }) {
 /**
  * The build page's "This run" card (PS-233): the wall time and the server's and CLI's steps, the
  * build's counts, its per-compare time and the model's tokens. When no timing was recorded it says
- * so in a sentence; a figure nobody recorded is left out, never shown as 0.
+ * so in a sentence; a figure nobody recorded is left out, never shown as 0. It is folded, under the
+ * shots (PS-419): diagnostics, not review.
  */
 export function BuildTimings(input: RunCardInput & { build: BuildView["build"] }) {
   const { build } = input;
@@ -81,11 +82,8 @@ export function BuildTimings(input: RunCardInput & { build: BuildView["build"] }
   const cli = cliStepRows(build.timings);
   const timed = card.wall || card.compare || server.length > 0 || cli.length > 0;
   return (
-    <Card size="sm" aria-label="This run" data-testid="build-timings">
-      <Stack gap="sm">
-        <Overline as="h2" tone="muted">
-          This run
-        </Overline>
+    <Disclosure bordered summary="This run" data-testid="run-disclosure">
+      <Stack gap="sm" data-testid="build-timings">
         {!timed && (
           <Text as="p" tone="muted" data-testid="run-no-timings">
             {NO_TIMINGS}
@@ -108,6 +106,6 @@ export function BuildTimings(input: RunCardInput & { build: BuildView["build"] }
           ))}
         </KeyValueList>
       </Stack>
-    </Card>
+    </Disclosure>
   );
 }

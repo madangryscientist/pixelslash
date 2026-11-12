@@ -1,3 +1,4 @@
+import { openRunCard } from "./build-workspace";
 import { type Page, expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
 
@@ -29,7 +30,7 @@ test("a diffed build shows its server timings, and the org's Timings tab their p
   );
 
   await open(page, `/projects/${projectId}/builds/${buildId}`);
-  await expect(page.getByTestId("build-timings")).toBeVisible();
+  await openRunCard(page);
   await expect(page.getByTestId("timing-server-diff")).toHaveText(/diff\s+\d/);
   await expect(page.getByTestId("timing-server-queue")).toBeVisible();
   // The label says what the total leaves out: the wait before the diff is its own step.

@@ -55,3 +55,11 @@ export async function expectBaselineBuild(page: Page, row: Locator) {
   await expect(page.getByText("accepted", { exact: true })).toHaveCount(0);
   await page.goBack();
 }
+
+/** Opens the build page's folded "This run" card (PS-419) and returns it. */
+export async function openRunCard(page: Page) {
+  await page.getByTestId("run-disclosure").getByRole("button", { name: "This run" }).click();
+  const card = page.getByTestId("build-timings");
+  await expect(card).toBeVisible();
+  return card;
+}

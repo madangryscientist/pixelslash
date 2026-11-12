@@ -1,3 +1,4 @@
+import { openRunCard } from "./build-workspace";
 import { type Page, expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
 import { openSection } from "./snapshot-viewer";
@@ -37,7 +38,7 @@ test("a diffed build states its wall time, counts and compare time, and the bran
   ]);
 
   await open(page, `/projects/${projectId}/builds/${buildId}`);
-  const card = page.getByTestId("build-timings");
+  const card = await openRunCard(page);
   await expect(card.getByTestId("run-wall-value")).toHaveText(/\d/);
   await expect(card.getByTestId("run-wall-source")).toContainText("derived");
   await expect(card.getByTestId("run-shots-value")).toHaveText("2");
