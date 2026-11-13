@@ -85,6 +85,7 @@ GitHub scopes a PR's cache to that PR, so a branch cannot poison `main`'s, and a
 neither restores nor saves it. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
+Real-browser tests run Chromium only; set `PIXELSLASH_TEST_BROWSERS=firefox,webkit` (or `all`) to add the others, and a browser named there that does not launch fails the run.
 
 The bench regression guard is part of `test`: `bench:test` depends on `bench:check`
 (`bun bench/src/check.ts`, no VM, no browser), which fails when a score is worse than the

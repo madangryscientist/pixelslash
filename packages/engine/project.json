@@ -18,7 +18,8 @@
         "{workspaceRoot}/engines/wasm/**/*",
         "!{workspaceRoot}/engines/wasm/target/**/*",
         "{workspaceRoot}/bench/corpus/**/*",
-        "{workspaceRoot}/bench/src/perf/fixtures.ts"
+        "{workspaceRoot}/bench/src/perf/fixtures.ts",
+        { "env": "PIXELSLASH_TEST_BROWSERS" }
       ]
     }
   }

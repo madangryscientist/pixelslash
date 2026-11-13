@@ -15,6 +15,7 @@ import {
   tmp,
   readManifest,
 } from "./support.ts";
+import { testBrowsers } from "./test-browsers.ts";
 
 afterAll(cleanup);
 
@@ -131,14 +132,9 @@ describe("capture", () => {
   }, 30_000);
 });
 
-const firefoxLaunches = await (await import("playwright")).firefox.launch().then(
-  (b) => b.close().then(() => true),
-  () => false,
-);
-
 describe("--browser", () => {
-  // This machine may have no Firefox: the capture image proves it.
-  test.skipIf(!firefoxLaunches)(
+  // Firefox runs only when PIXELSLASH_TEST_BROWSERS asks for it (AGENTS.md, the gate).
+  test.skipIf(!testBrowsers.has("firefox"))(
     "firefox shoots the pair and the report names the browser",
     async () => {
       const pages = await servePages();
