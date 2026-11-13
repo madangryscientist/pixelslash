@@ -1,3 +1,4 @@
+import { chmodSync } from "node:fs";
 import { mkdir, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
@@ -6,6 +7,7 @@ import { runIteration } from "../src/dev-run.ts";
 import {
   comparisonPoint,
   devStore,
+  iterationDir,
   latestIteration,
   listIterations,
   pinIteration,
@@ -145,6 +147,52 @@ describe("a failed iteration (PS-395)", () => {
     expect(state.timeline.map((t) => t.id)).toEqual([(await listIterations(store))[1], good.id]);
     expect(state.timeline[0]?.error).toBe("page crashed");
     expect(state.timeline[1]?.error).toBeUndefined();
+  });
+
+  test("a failed record that cannot be saved leaves the run's own error to be reported", async () => {
+    const store = await tmpStore();
+    const { session } = fakeSession(0);
+    const opts = { store, session, target: "index", maxBytes: MAX };
+    let runDir = "";
+    session.shoot = async () => {
+      // A store that cannot take the failed record (a read-only dir, a full disk): the caller still
+      // hears about the page, not about the store.
+      runDir = iterationDir(store, (await listIterations(store)).at(-1) ?? "");
+      chmodSync(runDir, 0o555);
+      throw new Error("page crashed");
+    };
+    try {
+      await expect(runIteration(opts)).rejects.toThrow("page crashed");
+    } finally {
+      chmodSync(runDir, 0o755);
+    }
+  });
+
+  test("a prune that throws does not overwrite the result the run just saved", async () => {
+    const store = await tmpStore();
+    const { session, page } = fakeSession(0);
+    const opts = { store, session, target: "index", maxBytes: 1 };
+    await runIteration(opts);
+    page.at = 1;
+    await runIteration(opts);
+    const iterations = join(store.root, "iterations");
+    const shoot = session.shoot;
+    session.shoot = async (route, variant, scan) => {
+      // Nothing old can be removed from a read-only iterations dir, so only the prune fails; this
+      // run's own dir stays writable, so its result still saves.
+      chmodSync(iterations, 0o555);
+      return shoot(route, variant, scan);
+    };
+    try {
+      page.at = 2;
+      const third = await runIteration(opts);
+      const saved = await readIteration(store, third.id);
+      expect(saved?.error).toBeUndefined();
+      expect(saved?.counts.changed).toBe(1);
+      expect(saved?.shots).toHaveLength(1);
+    } finally {
+      chmodSync(iterations, 0o755);
+    }
   });
 });
 
