@@ -167,7 +167,7 @@ With `--ds` or `--file`, one URL run captures both at the page width, then check
 
 PNG mode with `--ds` copies the given files into `--out` as `live.png` / `local.png` and runs the same judge.
 
-Reports violations already on Main vs NEW violations on Branch. Exit 1 if any NEW violations, else 0.
+Reports violations already on Main vs NEW violations on Branch. Exit 1 if any NEW violations or if the run itself failed, else 0.
 
 ### mlx or ollama
 
@@ -513,7 +513,7 @@ A project that builds its pages only from one design-system library's components
 - It runs the WCAG 2.0, 2.1 and 2.2 level A and AA rules and keeps the violations only (not "incomplete" or "passed"). axe is evaluated through the browser's debugging protocol, so a page's Content-Security-Policy does not block it, and the page is not sent anywhere. A scan that fails or exceeds 20 s fails the shot like a capture error; it is never skipped silently. With `stabilise.timers` the page clock is let run again for the scan, after the screenshot.
 - Each violation is `{ rule, impact, help, selector }`: axe's rule id, its impact (`minor`, `moderate`, `serious`, `critical` or null), the rule's one-line help and axe's path to the element (frames joined with ` >> `). They are written to the shot's manifest entry as `a11y: { violations, omitted? }` and uploaded with the shot. A shot keeps at most 200 violations and `omitted` counts the rest; a selector or help text longer than 500 characters is cut. A shot that was not scanned has no `a11y`, which is not the same as `{ "violations": [] }`.
 - **New on Branch** is a violation (the same rule on the same selector) that is on Branch's scan and not on the baseline's. `compare` reads it from the two manifests: stdout gains `a11y: N new on Branch in M of K scanned shots` and up to 10 lines `  name (browser WxH): rule (impact) on selector: help`, then `a11y: N shots have no Main scan, so none of their violations is called new` when Main was not scanned, and a note when a scan kept only its first violations. `index.html` has an "Accessibility" section per shot with "New on Branch" and "Already on Main". A run where no shot was scanned prints nothing about it.
-- **It never changes an exit code.** `compare` still exits 0 for a viewer and `check` still exits 1 only on new design-system violations; there is no flag that makes accessibility fail a run.
+- **It never changes an exit code.** `compare` still exits 0 for a viewer and `check` still exits 1 only on new design-system violations or a failed run; there is no flag that makes accessibility fail a run.
 - On the server the snapshot page lists the shot's violations that are new against the baseline it was diffed against, with the ones already there folded below, and the build page's shot card gives the count. A baseline that was not scanned calls nothing new. The baseline is the shot's own (the branch's previous shot when there is one), so a violation introduced earlier on the branch reads as already there. The violations are stored per shot in `snapshots.a11y`, shown only, and decide no review state.
 
 ### Layout metrics per shot
@@ -807,14 +807,14 @@ pixelslash --version
 | Code | Meaning |
 | --- | --- |
 | 0 | ok. For `status`: every changed shot accepted, or nothing changed. |
-| 1 | **Reserved for NEW design-system violations on Branch** (invariant 3); no remote command uses it, except `upload`'s exit 1 for a refused upload or a build the server `errored` (PS-228) and `project create`'s for a server that refuses it. |
+| 1 | **NEW design-system violations on Branch, or the run itself failed** (invariant 3): a capture that failed (a page that is down, a `start` command that died, a `setup` that threw), a Figma failure, a `dev` lock the run could not take, `upload`'s refused upload or a build the server `errored` (PS-228), and `project create`'s server that refuses it. A pixel-only run that completes is 0, and a crash is 7, never 1. No other remote command uses 1. |
 | 2 | A usage error: a bad flag or duration, no server, not logged in, no project picked, more than one build picked. |
 | 3 | **The server did not give what was asked**: a refused, expired or revoked token (401), an id the token cannot reach (404), a server error, or a server that cannot be reached. For `status`, also a build that `errored`, a build status it does not know, and no build at the commit or branch. `install-browser` also exits 3 when the install fails. |
 | 4 | `status`: a reviewer rejected a shot, so the build `failed`. |
 | 5 | `status`: the build still waits, for processing or for review. Under `--wait`, still waiting at `--timeout`. |
-| 6 | `flake`: the shot is still unstable here, some run differed from the first. Not 1: 1 stays reserved for new violations. |
+| 6 | `flake`: the shot is still unstable here, some run differed from the first. Not 1, which means new violations or a failed run. |
 | 7 | **An internal error: a bug in pixelslash**, never a problem with your page or your config. A crash in capture, compare, the report or upload, or a `compare` shot the diff could not measure. A runner that sees 7 must **escalate to the PixelSlash planner**, not retry and not read it as a visual result. |
-| 8 | `parity`: a twin pair's layout metrics differ beyond tolerance and the manifest does not declare it ([Parity between twins](#parity-between-twins)); with `--release`, also a [stale twin](#stale-twins) on the platform ([Release check](#release-check)). Not 1, which stays reserved for new violations. |
+| 8 | `parity`: a twin pair's layout metrics differ beyond tolerance and the manifest does not declare it ([Parity between twins](#parity-between-twins)); with `--release`, also a [stale twin](#stale-twins) on the platform ([Release check](#release-check)). Not 1, which means new violations or a failed run. |
 
 ### Exit codes and the `FAILED` line
 
@@ -840,7 +840,7 @@ The client sends `User-Agent: pixelslash/<version>`.
 `pixelslash` reports its own crashes to Sentry **only when `PIXELSLASH_SENTRY_DSN` is set** in the
 environment. Unset (the default) the Sentry SDK is never loaded and nothing goes over the network
 for it. Set, it reports two things: a crash (the exit **7** path above) and an `UPLOAD FAILED`
-path. It never reports exit 1 (new violations), a usage error or any other result of a page: those
+path. It never reports a new-violations exit 1, a usage error or any other result of a page: those
 are verdicts, not bugs.
 
 ```sh
