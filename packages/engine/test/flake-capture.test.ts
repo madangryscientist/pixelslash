@@ -17,14 +17,31 @@ import { FP, gitOpts, repo, cleanup } from "./upload-fixtures.ts";
  */
 
 const SITE = fileURLToPath(new URL("../../../fixtures/capture/site", import.meta.url));
+/**
+ * `/random` is handed a new left on every load, one pixel on from the one before, so no two loads
+ * in a run can land on the same x: a position the page drew itself could repeat one (1 in 600),
+ * and a re-capture that matched run 1 does not count as differed. There is room for 660 lefts
+ * before the box would leave the viewport, and a run that asks for more fails, not reuses one.
+ */
+const LEFTS = 660;
+let randomLoads = 0;
+const OPENING = '<html lang="en">';
 const site = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
   async fetch(req) {
     const path = new URL(req.url).pathname;
-    const file = Bun.file(join(SITE, `${path === "/" ? "index" : path.slice(1)}.html`));
+    const name = path === "/" ? "index" : path.slice(1);
+    const file = Bun.file(join(SITE, `${name}.html`));
     if (!(await file.exists())) return new Response("not found", { status: 404 });
-    return new Response(file, { headers: { "content-type": "text/html" } });
+    if (name !== "random") return new Response(file, { headers: { "content-type": "text/html" } });
+    const page = await file.text();
+    if (!page.includes(OPENING))
+      throw new Error('random.html has no <html lang="en"> for data-left');
+    if (randomLoads === LEFTS) throw new Error(`/random was loaded more than ${LEFTS} times`);
+    const left = 24 + randomLoads++;
+    const html = page.replace(OPENING, `<html lang="en" data-left="${left}">`);
+    return new Response(html, { headers: { "content-type": "text/html" } });
   },
 });
 let out = "";
