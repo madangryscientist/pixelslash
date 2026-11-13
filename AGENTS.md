@@ -309,8 +309,9 @@ dependencies.
 2. **Capture waits for the page to settle** (fonts, images, no request in flight, two
    frames; the Playwright helper keeps `networkidle`), bounded by the timeout: a page that never settles fails, it does
    not hang and it does not shoot early.
-3. **Exit codes are a contract.** Exit 1 only on NEW violations on Branch;
-   pixel-only runs exit 0. CI will read this.
+3. **Exit codes are a contract.** Exit 1 on NEW violations on Branch, or when the
+   run itself failed (a capture, Figma, the dev lock, a refused upload); pixel-only
+   runs that complete exit 0; a crash is 7, never 1. CI will read this.
 4. **Local unless told to upload.** Without `--upload`, page shots never leave
    the machine. With it, they go only to the server the project is configured
    for (ours or self-hosted) and nowhere else. The one exception is opt-in per
