@@ -32,6 +32,8 @@ beforeAll(async () => {
     diffLocation: "server",
   });
   ctx = { db: held.db, projectId: project.id, scoped: orgBlobs(memoryStore().store, org.id) };
+  // The baseline both tests diff against. It is setup, and the file's first diff run pays its one-off costs here.
+  await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: shot() }] });
 }, 60_000);
 
 afterAll(() => held?.dispose());
@@ -76,14 +78,12 @@ function locked(d1: D1Database, sql: RegExp, times: number) {
   return { binding, state };
 }
 
-const white = shot();
 const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
 // The write the repro failed on: a shot's resolved diff, stored when the run starts measuring it.
 const RESOLVED = /update "snapshots" set .*"resolved_diff"/;
 
 describe("a D1 write that meets the lock (PS-228)", () => {
   test("busy twice, then free: the diff completes", async () => {
-    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
     const { binding, state } = locked(held.d1, RESOLVED, 2);
     const db: Db = drizzle(retryBusy(binding));
 
