@@ -33,7 +33,9 @@ export default defineConfig({
   reporter: "list",
   // One local D1 holds every spec's rows: concurrent writers fail with SQLITE_BUSY.
   workers: 1,
-  use: { baseURL: SERVER, trace: "on-first-retry" },
+  // A failure keeps its trace and `error-context.md` in test-results, which CI uploads (ci.yml). There
+  // are no retries, so `on-first-retry` never recorded anything.
+  use: { baseURL: SERVER, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {

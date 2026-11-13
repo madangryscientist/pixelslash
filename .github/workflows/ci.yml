@@ -185,13 +185,28 @@ jobs:
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
       - run: bunx nx build web
-      - run: bunx nx test:e2e web
+      - name: e2e (production build)
+        id: e2e
+        run: bunx nx test:e2e web
       # Only the specs that make the server diff: the upload, and the review of its result. The dev run is
       # there so the pngjs diff inside workerd stays under an e2e run (apps/web/playwright.config.ts); the
       # production run above already covers every spec.
       - name: e2e against vite dev (upload and review)
+        id: e2e_dev
         working-directory: apps/web
         run: bun run test:e2e:dev -- e2e/upload.spec.ts e2e/review.spec.ts
+      # A failed e2e test leaves its trace and `error-context.md` (the page snapshot) in test-results
+      # (`trace: "retain-on-failure"`); without this the runner takes them away and a flake leaves no
+      # evidence. Open a trace with `npx playwright show-trace <trace.zip>`. The dev step only runs
+      # when the production one passed, so the two never overwrite each other's directory.
+      - name: Keep the e2e traces of a failure
+        if: failure() && (steps.e2e.outcome == 'failure' || steps.e2e_dev.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-e2e-test-results-${{ steps.e2e.outcome == 'failure' && 'production' || 'dev' }}
+          path: apps/web/test-results
+          retention-days: 7
+          if-no-files-found: warn
       - name: Deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry"
