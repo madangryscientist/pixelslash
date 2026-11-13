@@ -146,6 +146,17 @@ function pairOf(
   return { base, shots: { ...given, names, mainUrl, diffUrl, result }, boxesByDefault };
 }
 
+/**
+ * Whether the boxes are drawn: the reviewer's ask, else the pair's default. The ask belongs to the
+ * shot it was made on, as the base does: an off on one carried shot must not close the boxes the next
+ * one opens with.
+ */
+function useHighlight(snapshotId: string, byDefault: boolean) {
+  const [asked, setAsked] = useState<{ snapshotId: string; on: boolean } | null>(null);
+  const on = asked?.snapshotId === snapshotId ? asked.on : byDefault;
+  return [on, (next: boolean) => setAsked({ snapshotId, on: next })] as const;
+}
+
 /** The toolbar part that belongs to the slider or the overlay; nothing for side by side. */
 function modeControlsOf(
   mode: Mode,
@@ -199,8 +210,7 @@ export function SnapshotViewer({
   const { scale } = view;
   // Off on load: the shot is read as it is first, and the boxes are asked for. Opening on main to
   // decide a carried change is the exception: the change is what is being decided.
-  const [asked, setHighlight] = useState<boolean | null>(null);
-  const highlight = asked ?? boxesByDefault;
+  const [highlight, setHighlight] = useHighlight(snapshotId, boxesByDefault);
   const [showFindings, setShowFindings] = useState(true);
   const slider = useSlider();
   const overlay = useOverlay();
