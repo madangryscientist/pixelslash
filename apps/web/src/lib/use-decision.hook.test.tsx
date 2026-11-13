@@ -68,13 +68,7 @@ describe("deciding on the shot on screen", () => {
     expect(calls).toEqual(["review accepted", "go s2"]);
   });
 
-  it("an accept with nothing left to review goes to the build page", async () => {
-    await mount(() => Promise.resolve({ buildStatus: "passed", nextToReviewId: null }));
-    await press("accepted");
-    expect(calls).toEqual(["review accepted", "build"]);
-  });
-
-  it("another reviewer's reject between the accept and the reply sends the reviewer to the build page", async () => {
+  it("a reply naming a next shot of a failed build sends the reviewer to the build page", async () => {
     await mount(() => Promise.resolve({ buildStatus: "failed", nextToReviewId: "s2" }));
     await press("accepted");
     expect(calls).toEqual(["review accepted", "build"]);

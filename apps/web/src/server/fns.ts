@@ -29,6 +29,7 @@ import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/t
 import { projectStale } from "#/db/stale";
 import { twinsOfBuild } from "#/db/twins";
 import { nextToReviewId } from "#/lib/build-tabs";
+import { warn } from "#/lib/log";
 import { walkAround } from "#/lib/review-walk";
 import { buildExpiry } from "#/lib/retention";
 import { holdsChange, reviewGroupOf } from "#/lib/snapshot-groups";
@@ -314,12 +315,7 @@ export const reviewShot = createServerFn({ method: "POST" })
     const state = typeof d === "object" && d !== null ? Reflect.get(d, "state") : null;
     if (state !== "accepted" && state !== "rejected") throw new Error("state is required");
     const next = typeof d === "object" && d !== null && Reflect.get(d, "next") === true;
-    return {
-      projectId: field(d, "projectId"),
-      snapshotId: field(d, "snapshotId"),
-      state,
-      next,
-    };
+    return { projectId: field(d, "projectId"), snapshotId: field(d, "snapshotId"), state, next };
   })
   .handler(async ({ data }) => {
     const user = await requireViewer();
@@ -337,7 +333,10 @@ export const reviewShot = createServerFn({ method: "POST" })
       projectId: data.projectId,
       buildId: decided.buildId,
       snapshotId: data.snapshotId,
-    }).catch(() => toBuild);
+    }).catch((e: unknown) => {
+      warn(`reviewShot: next shot not read: ${e instanceof Error ? e.message : String(e)}`);
+      return toBuild;
+    });
     return { status: decided.verdict, ...after };
   });
 

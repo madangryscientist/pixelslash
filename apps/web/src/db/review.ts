@@ -307,16 +307,21 @@ export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> 
 /**
  * What the reviewer needs once a decision on `snapshotId` is written: the build's status as it is
  * now (another reviewer's reject may have failed it since) and the next shot still awaiting a
- * decision. One read of the build, taken after the write, so the client moves on without a second
- * round trip.
+ * decision, both read after the write, so the client moves on without a second round trip.
  */
 export async function afterDecision(
   db: Db,
   input: { projectId: string; buildId: string; snapshotId: string },
 ): Promise<{ buildStatus: BuildStatus; nextToReviewId: string | null }> {
   const view = await buildView(db, input.projectId, input.buildId);
+  // The status is read again after the shots: a reject that lands after `buildView` read the build
+  // but before it read the shots must still show, or the reply names a shot of a failed build.
+  const [row] = await db
+    .select({ status: builds.status })
+    .from(builds)
+    .where(eq(builds.id, input.buildId));
   return {
-    buildStatus: view.build.status,
+    buildStatus: row?.status ?? view.build.status,
     nextToReviewId: nextToReviewId(view.snapshots, input.snapshotId),
   };
 }

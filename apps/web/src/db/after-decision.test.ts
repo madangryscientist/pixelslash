@@ -63,7 +63,7 @@ describe("what a decision answers", () => {
     expect(await after("about")).toEqual({ buildStatus: "passed", nextToReviewId: null });
   });
 
-  test("another reviewer's reject after the accept shows as the build's status", async () => {
+  test("a reject on another shot after the accept shows as the build's status", async () => {
     const { decide, after } = await changedBuild();
     await decide("about", "accepted");
     await decide("pricing", "rejected");
