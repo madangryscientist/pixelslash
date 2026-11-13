@@ -125,13 +125,12 @@ describe("captureSnapshots", () => {
     expect(pixel(img, 0, 241)).toEqual([255, 255, 255, 255]);
   }, 60_000);
 
-  test("a page changing on a 100 ms setInterval captures identically twice, and timers: false lets it run", async () => {
+  test("a page changing on timers captures identically twice when they are frozen", async () => {
     const [a, b] = [await shootPage("/ticker", true), await shootPage("/ticker", true)];
     expect(Buffer.compare(a, b)).toBe(0);
-    // Frozen means the interval never ran: "Ticks: 0" in the shot. Let it run and the count has moved on.
-    expect(Buffer.compare(a, await shootPage("/ticker", false))).not.toBe(0);
   }, 60_000);
 
+  // Also the running half: `timers: false` lets a 1 ms timer fire before the settle's two frames.
   test("no page timer fires while the settle runs, however short", async () => {
     const frozen = PNG.sync.read(await shootPage("/early-timers", true));
     expect(pixel(frozen, 700, 300)).toEqual([255, 255, 255, 255]);
