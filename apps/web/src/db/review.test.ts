@@ -4,10 +4,19 @@ import { context, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
 import { groupOf } from "#/lib/snapshot-groups";
 import { createBuild } from "./builds";
+import { createOrg } from "./orgs";
+import { signInGithubUser } from "./users";
 import { NotFoundError } from "./db";
-import { builds as buildRows } from "./schema";
+import { builds as buildRows, snapshots as snapshotRows } from "./schema";
 import { listBuilds } from "./build-list";
-import { NotReviewableError, acceptAllSnapshots, buildView, reviewSnapshot } from "./review";
+import {
+  NotReviewableError,
+  acceptAllSnapshots,
+  buildView,
+  decideAll,
+  decideShot,
+  reviewSnapshot,
+} from "./review";
 import { isFirstBuild } from "./first-build";
 
 const block = { x: 8, y: 8, w: 12, h: 12, rgb: RED };
@@ -242,5 +251,69 @@ describe("the review model reads", () => {
         userId: ctx.userId,
       }),
     ).rejects.toThrow(NotReviewableError);
+  });
+});
+
+type Ctx = Awaited<ReturnType<typeof twoBuilds>>["ctx"];
+
+/** A signed-in user of another org: the case a project id from a shared link reaches. */
+async function outsider(ctx: Ctx) {
+  const user = await signInGithubUser(ctx.db, {
+    githubId: 2,
+    login: "eve",
+    name: null,
+    avatarUrl: null,
+  });
+  await createOrg(ctx.db, user.id, "Elsewhere");
+  return user;
+}
+
+const reviewStates = async (ctx: Ctx) =>
+  (await ctx.db.select().from(snapshotRows)).map((s) => [s.id, s.reviewState, s.reviewedBy]);
+
+describe("a decision needs a member of the project's org", () => {
+  test("a non-member's shot decision is not-found and changes nothing", async () => {
+    const { ctx, feature } = await twoBuilds();
+    const eve = await outsider(ctx);
+    const view = await buildView(ctx.db, ctx.projectId, feature.id);
+    const about = view.snapshots.find((s) => s.name === "about");
+    if (!about) throw new Error("no about shot");
+    const before = await reviewStates(ctx);
+    for (const state of ["accepted", "rejected"] as const)
+      await expect(
+        decideShot(ctx.db, {
+          projectId: ctx.projectId,
+          snapshotId: about.id,
+          state,
+          userId: eve.id,
+        }),
+      ).rejects.toThrow(NotFoundError);
+    expect(await reviewStates(ctx)).toEqual(before);
+    const after = await buildView(ctx.db, ctx.projectId, feature.id);
+    expect(after.build.status).toBe("changes");
+  });
+
+  test("a non-member's accept-all is not-found and changes nothing", async () => {
+    const { ctx, feature } = await twoBuilds();
+    const eve = await outsider(ctx);
+    const before = await reviewStates(ctx);
+    await expect(
+      decideAll(ctx.db, { projectId: ctx.projectId, buildId: feature.id, userId: eve.id }),
+    ).rejects.toThrow(NotFoundError);
+    expect(await reviewStates(ctx)).toEqual(before);
+    const after = await buildView(ctx.db, ctx.projectId, feature.id);
+    expect(after.build.status).toBe("changes");
+  });
+
+  test("the refusal is the one a missing project gets, so it leaks nothing", async () => {
+    const { ctx, feature } = await twoBuilds();
+    const eve = await outsider(ctx);
+    const missing = new NotFoundError("project");
+    await expect(
+      decideAll(ctx.db, { projectId: ctx.projectId, buildId: feature.id, userId: eve.id }),
+    ).rejects.toThrow(missing.message);
+    await expect(
+      decideAll(ctx.db, { projectId: "no-such-project", buildId: feature.id, userId: ctx.userId }),
+    ).rejects.toThrow(missing.message);
   });
 });

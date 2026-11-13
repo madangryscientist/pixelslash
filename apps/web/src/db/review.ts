@@ -10,6 +10,7 @@ import { a11yDiffsOf } from "./review-a11y";
 import { type Verdict, refreshBuildStatus } from "./verdict";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
+import { getProject } from "./orgs";
 import {
   type AiReview,
   type DiffLocation,
@@ -285,8 +286,12 @@ export async function reviewSnapshot(db: Db, input: ShotDecision): Promise<Verdi
   return (await decideShot(db, input)).verdict;
 }
 
-/** `reviewSnapshot`, also naming the builds it moved: the carried shots' builds as well (PS-23). */
+/**
+ * `reviewSnapshot`, also naming the builds it moved: the carried shots' builds as well (PS-23).
+ * Only a member of the project's org may decide; anyone else gets the not-found of a missing project.
+ */
 export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> {
+  await getProject(db, input.userId, input.projectId);
   const shot = await reviewableSnapshot(db, input.projectId, input.snapshotId);
   const decision = { reviewState: input.state, reviewedBy: input.userId, reviewedAt: new Date() };
   await db.update(snapshots).set(decision).where(eq(snapshots.id, input.snapshotId));
@@ -309,8 +314,12 @@ export async function acceptAllSnapshots(db: Db, input: BuildDecision): Promise<
 
 type BuildDecision = { projectId: string; buildId: string; userId: string };
 
-/** `acceptAllSnapshots`, also naming the builds it moved (PS-23). */
+/**
+ * `acceptAllSnapshots`, also naming the builds it moved (PS-23). Only a member of the project's
+ * org may decide; anyone else gets the not-found of a missing project.
+ */
 export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> {
+  await getProject(db, input.userId, input.projectId);
   const buildId = await reviewableBuildId(db, input.projectId, input.buildId);
   const decision = {
     reviewState: "accepted",
