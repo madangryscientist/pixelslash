@@ -50,7 +50,9 @@ function useShotDecision(data: ReturnType<typeof Route.useLoaderData>, reviewabl
   const go = useWalk(projectId, buildId);
   const navigate = useNavigate();
   const review = useCallback(
-    (state: DecisionState) => reviewShot({ data: { projectId, snapshotId, state } }),
+    (state: DecisionState) =>
+      // Only an accept moves on to another shot, so only an accept asks where to.
+      reviewShot({ data: { projectId, snapshotId, state, next: state === "accepted" } }),
     [projectId, snapshotId],
   );
   const toBuild = useCallback(

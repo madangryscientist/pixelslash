@@ -43,8 +43,8 @@ async function refreshDecided(db: Db, buildId: string): Promise<Verdict> {
   throw new NotReviewableError(row?.status ?? "missing");
 }
 
-/** A decision's outcome: the decided build's verdict, and every build whose status it refreshed. */
-export type Decided = { verdict: Verdict; buildIds: string[] };
+/** A decision's outcome: the decided build, its verdict, and every build whose status it refreshed. */
+export type Decided = { buildId: string; verdict: Verdict; buildIds: string[] };
 
 /** A build still uploading, processing or errored has no verdict to review. */
 export class NotReviewableError extends Error {
@@ -301,7 +301,7 @@ export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> 
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
   const verdict = await refreshDecided(db, shot.buildId);
-  return { verdict, buildIds: [shot.buildId, ...moved] };
+  return { buildId: shot.buildId, verdict, buildIds: [shot.buildId, ...moved] };
 }
 
 /**
@@ -355,5 +355,5 @@ export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> 
   const group = groupsOfBuild(db, buildId);
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
-  return { verdict: await refreshDecided(db, buildId), buildIds: [buildId, ...moved] };
+  return { buildId, verdict: await refreshDecided(db, buildId), buildIds: [buildId, ...moved] };
 }

@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
+import type { BuildStatus } from "#/db/schema";
 
 export type DecisionState = "accepted" | "rejected";
 
 /** What a decision on the server answers: the build's status after the write, and the next shot to review. */
-export type DecisionReply = { buildStatus: string; nextToReviewId: string | null };
+export type DecisionReply = { buildStatus: BuildStatus; nextToReviewId: string | null };
 
 type Options = {
   /** False when the build takes no decisions: `decide` then does nothing. */

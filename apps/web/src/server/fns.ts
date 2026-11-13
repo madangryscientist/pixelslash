@@ -313,28 +313,32 @@ export const reviewShot = createServerFn({ method: "POST" })
   .validator((d: unknown) => {
     const state = typeof d === "object" && d !== null ? Reflect.get(d, "state") : null;
     if (state !== "accepted" && state !== "rejected") throw new Error("state is required");
+    const next = typeof d === "object" && d !== null && Reflect.get(d, "next") === true;
     return {
       projectId: field(d, "projectId"),
       snapshotId: field(d, "snapshotId"),
       state,
+      next,
     };
   })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const decided = await orConflict(decideShot(db, { ...data, userId: user.id }));
+    const { next, ...decision } = data;
+    const decided = await orConflict(decideShot(db, { ...decision, userId: user.id }));
     await syncChecks(db, decided.buildIds);
-    // The decided build is the first of `buildIds`. Read after the write, so the reviewer can move on
-    // without another round trip, and another reviewer's reject in between shows in `buildStatus`.
-    const [buildId = ""] = decided.buildIds;
-    return {
-      status: decided.verdict,
-      ...(await afterDecision(db, {
-        projectId: data.projectId,
-        buildId,
-        snapshotId: data.snapshotId,
-      })),
-    };
+    // Nowhere to go next: the build page. That is also the answer when the read below fails, since the
+    // decision is already written and only the next shot is lost.
+    const toBuild = { buildStatus: decided.verdict, nextToReviewId: null };
+    if (!next) return { status: decided.verdict, ...toBuild };
+    // `next` asks where the reviewer goes, read after the write, so moving on takes no second round
+    // trip and another reviewer's reject in between shows in `buildStatus`.
+    const after = await afterDecision(db, {
+      projectId: data.projectId,
+      buildId: decided.buildId,
+      snapshotId: data.snapshotId,
+    }).catch(() => toBuild);
+    return { status: decided.verdict, ...after };
   });
 
 export const acceptBuild = createServerFn({ method: "POST" })
