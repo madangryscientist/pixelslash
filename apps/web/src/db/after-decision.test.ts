@@ -5,9 +5,17 @@ import { afterDecision, buildView, decideShot } from "./review";
 
 const block = { x: 8, y: 8, w: 12, h: 12, rgb: RED };
 
-/** A main build plus a feature build whose "about" and "pricing" shots change and "home" does not. */
+/**
+ * A main build plus a feature build whose "about" and "pricing" shots change and "home" does not.
+ * `between` runs one statement just before the next read of the build's shots.
+ */
 async function changedBuild() {
-  const ctx = await context();
+  let pending: string | null = null;
+  const ctx = await context((query, exec) => {
+    if (pending === null || !query.includes('from "snapshots" left join')) return;
+    exec(pending);
+    pending = null;
+  });
   await upload(ctx, {
     branch: "main",
     commit: sha(1),
@@ -42,7 +50,10 @@ async function changedBuild() {
       buildId: feature.id,
       snapshotId: idOf(name),
     });
-  return { idOf, decide, after };
+  const between = (sql: string) => {
+    pending = sql;
+  };
+  return { idOf, decide, after, between };
 }
 
 describe("what a decision answers", () => {
@@ -67,6 +78,14 @@ describe("what a decision answers", () => {
     const { decide, after } = await changedBuild();
     await decide("about", "accepted");
     await decide("pricing", "rejected");
+    expect((await after("about")).buildStatus).toBe("failed");
+  });
+
+  test("a reject whose shot is written but whose build status is not yet refreshed shows", async () => {
+    const { idOf, decide, after, between } = await changedBuild();
+    await decide("about", "accepted");
+    // Another reviewer's reject lands its shot after the build row is read, before the shots are.
+    between(`UPDATE snapshots SET review_state = 'rejected' WHERE id = '${idOf("pricing")}'`);
     expect((await after("about")).buildStatus).toBe("failed");
   });
 });

@@ -8,7 +8,7 @@ import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { cacheHit } from "./cache-hit";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
-import { type Verdict, refreshBuildStatus } from "./verdict";
+import { type Verdict, refreshBuildStatus, verdictOf } from "./verdict";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
@@ -313,16 +313,15 @@ export async function afterDecision(
   db: Db,
   input: { projectId: string; buildId: string; snapshotId: string },
 ): Promise<{ buildStatus: BuildStatus; nextToReviewId: string | null }> {
-  const view = await buildView(db, input.projectId, input.buildId);
-  // The status is read again after the shots: a reject that lands after `buildView` read the build
-  // but before it read the shots must still show, or the reply names a shot of a failed build.
-  const [row] = await db
-    .select({ status: builds.status })
-    .from(builds)
-    .where(eq(builds.id, input.buildId));
+  const { build, snapshots: shots } = await buildView(db, input.projectId, input.buildId);
+  // A build at a verdict takes it from the same shots the next one is picked from, so the two
+  // cannot disagree: another reviewer's reject shows once its shot is written, before its build
+  // status is refreshed. A build that left its verdict (a re-run) keeps that status.
+  const atVerdict =
+    build.status === "changes" || build.status === "passed" || build.status === "failed";
   return {
-    buildStatus: row?.status ?? view.build.status,
-    nextToReviewId: nextToReviewId(view.snapshots, input.snapshotId),
+    buildStatus: atVerdict ? verdictOf(shots) : build.status,
+    nextToReviewId: nextToReviewId(shots, input.snapshotId),
   };
 }
 

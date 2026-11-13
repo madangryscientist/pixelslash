@@ -51,8 +51,8 @@ export type Ctx = Awaited<ReturnType<typeof setup>> & {
 /** What uploading a build needs: a store, a project and its blobs, on any database (ob 1773: a local D1 too). */
 export type Uploads = Pick<Ctx, "projectId" | "scoped"> & { db: Db };
 
-export async function context(): Promise<Ctx> {
-  const held = await setup();
+export async function context(beforeQuery?: Parameters<typeof setup>[0]): Promise<Ctx> {
+  const held = await setup(beforeQuery);
   return {
     ...held,
     projectId: held.acme.project.id,
