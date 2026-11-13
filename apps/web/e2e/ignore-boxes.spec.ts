@@ -28,8 +28,10 @@ const isAdd = (url: string, method: string) => method === "POST" && url.includes
 test("a box drawn over the change flips the verdict, exports as config, and stays in its org", async ({
   page,
   browser,
-}) => {
-  const { token, projectId } = await provision(page, "Ignore Co", "ignores");
+}, testInfo) => {
+  // Unique per repeat, so `--repeat-each` runs on one server and one D1 (every id below is unique).
+  const n = testInfo.repeatEachIndex;
+  const { token, projectId } = await provision(page, `Ignore Co ${n}`, "ignores");
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
   await page.waitForTimeout(1100);
@@ -97,7 +99,7 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
   // Another org: the screens are not found, and the same write, replayed, adds nothing.
   const rival = await rivalContext(
     browser,
-    await rivalSession("ignore-rival", 9998, "Ignore Rival"),
+    await rivalSession(`ignore-rival-${n}`, 90000 + n, `Ignore Rival ${n}`),
   );
   const other = await rival.newPage();
   for (const url of [`/projects/${projectId}/settings`, snapshotPath]) {
