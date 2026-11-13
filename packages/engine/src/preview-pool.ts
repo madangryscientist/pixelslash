@@ -193,7 +193,7 @@ export async function pooledAttempt<T>(
     keep = !(shot.a11y && shot.stabilise.timers);
     return { out, switched: opened.switched };
   } catch (e) {
-    throw attemptFailure(e, shot.url, slot.progress);
+    throw await attemptFailure(e, shot.url, slot.progress);
   } finally {
     if (keep) pool.put(key, slot);
     else await pool.drop(slot);

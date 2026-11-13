@@ -1,4 +1,4 @@
-import type { Browser } from "playwright";
+import type { Browser, Page } from "playwright";
 import type { A11y } from "./a11y-entry.ts";
 import type { Metrics } from "./metrics-entry.ts";
 import { launchSessionBrowsers } from "./capture-browsers.ts";
@@ -147,16 +147,17 @@ async function attempt(browser: Browser, shot: Shot): Promise<Shoot> {
   const setting = performance.now();
   const context = await newShotContext(browser, variant, stabilise, shot.session);
   const progress: ShotProgress = { step: "goto", crashed: false };
+  let page: Page | undefined;
   try {
     await pinClock(context, stabilise);
-    const page = await context.newPage();
+    page = await context.newPage();
     const setupMs = elapsed(setting);
     page.on("crash", () => (progress.crashed = true));
     const opened = await openPage(page, url, route, { timeoutMs: stabilise.timeoutMs, progress });
     progress.step = "screenshot";
     return await capture(page, shot, opened, setupMs);
   } catch (e) {
-    throw attemptFailure(e, url, progress);
+    throw await attemptFailure(e, url, progress, page);
   } finally {
     await context.close();
   }

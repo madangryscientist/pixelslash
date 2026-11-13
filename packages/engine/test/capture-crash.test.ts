@@ -139,11 +139,9 @@ function failing(
           // A blank page cannot be crashed; load one first.
           await load(`http://127.0.0.1:${server.port}/`);
           const crashed = new Promise((resolve) => page.once("crash", resolve));
-          // The renderer dies without answering, so the send is not awaited.
-          void context
-            .newCDPSession(page)
-            .then((cdp) => cdp.send("Page.crash"))
-            .catch(() => {});
+          // Not `Page.crash`: Chromium sometimes accepts it and crashes nothing (see the
+          // real-Chromium test), which would leave this awaiting a crash that never comes.
+          await killRenderers(context);
           await crashed;
         }
         throw new Error(message);
@@ -151,6 +149,31 @@ function failing(
       return page;
     };
   };
+}
+
+/**
+ * SIGKILL every renderer process of the context's browser. These tests capture one route in one
+ * variant, so the browser has one page and one renderer, the page's. Throws when it finds none, so a kill that did nothing
+ * is a failure of its own and not a timeout later.
+ */
+async function killRenderers(context: BrowserContext): Promise<void> {
+  const browser = context.browser();
+  if (!browser) throw new Error("the context has no browser");
+  const session = await browser.newBrowserCDPSession();
+  const { processInfo } = await session.send("SystemInfo.getProcessInfo");
+  const renderers = processInfo.filter((p) => p.type === "renderer");
+  if (renderers.length === 0) throw new Error("no renderer process to kill");
+  let killed = 0;
+  for (const { id } of renderers) {
+    try {
+      process.kill(id, "SIGKILL");
+      killed += 1;
+    } catch (e) {
+      // A renderer that exited between the listing and the kill is already dead.
+      if (!(e instanceof Error && "code" in e && e.code === "ESRCH")) throw e;
+    }
+  }
+  if (killed === 0) throw new Error("every renderer had already exited");
 }
 
 /** The run's error, narrowed: a test that expects the capture to fail reads its message. */
@@ -233,24 +256,34 @@ describe(
     });
 
     // The stubs above cannot show that the message text is what Playwright throws; this can. The
-    // first context's renderer is killed through the DevTools protocol while the page is loading
-    // (`chrome://crash` aborts the navigation with ERR_ABORTED before the crash is reported, so it
-    // cannot stand in), and Playwright rejects the pending goto with `Page crashed`.
+    // first context's renderer is killed from outside while the page is loading (`chrome://crash`
+    // aborts the navigation with ERR_ABORTED before the crash is reported, so it cannot stand in).
+    //
+    // It flaked as `goto: Timeout 4000ms` because the kill was `Page.crash` over the DevTools
+    // protocol: Chromium refuses it until the navigation has committed ("Page has pending
+    // navigations, not killing"), and even after the commit it sometimes accepts it and crashes
+    // nothing (re-sending does not help), so the goto waited out the stall. The kill is now a
+    // SIGKILL by pid, sent once the navigation has committed and the server holds the response,
+    // and a kill that cannot be made fails the test with its own error, not a timeout.
     test("real Chromium: a renderer killed mid-load is retried and the retry's PNG is kept", async () => {
+      let killFailed: Error | undefined;
       plan = (n, context) => {
         if (n !== 1) return;
-        // Killed when the server holds the first hit, not after a delay: on a loaded runner the
-        // request can reach the server later than any fixed wait. A crash that lands first leaves
-        // the retry as the server's first hit, and that one stalls, so the retry's goto times out.
         context.on("page", (page) => {
-          void slowHeld.promise
-            .then(() => context.newCDPSession(page))
-            .then((cdp) => cdp.send("Page.crash"))
-            .catch(() => {});
+          const committed = new Promise<void>((resolve) => {
+            page.on("framenavigated", (frame) => {
+              if (frame === page.mainFrame() && frame.url().endsWith("/slow")) resolve();
+            });
+          });
+          void Promise.all([slowHeld.promise, committed])
+            .then(() => killRenderers(context))
+            .catch((e: unknown) => {
+              killFailed = e instanceof Error ? e : new Error(String(e));
+            });
         });
       };
       const { warnings, rgb, error } = await run("/slow", 4_000);
-      // PS-431: flaked once on the CI runner with `net::ERR_ABORTED; maybe frame was detached?`; not root-caused.
+      expect(killFailed, "the renderer could not be killed").toBeUndefined();
       expect(error).toBeUndefined();
       expect(warnings.filter((w) => /crashed/.test(w))).toEqual([
         "warning: slow (desktop): the page crashed during goto; captured again in a fresh context",
