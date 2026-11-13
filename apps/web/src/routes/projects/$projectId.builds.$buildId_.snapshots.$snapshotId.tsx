@@ -1,6 +1,6 @@
 import { Breadcrumbs, Callout, FullBleedLayout, Stack } from "@hackcove/ui-react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { RegionNotesProvider } from "#/components/ai-notes";
 import { A11yPanel } from "#/components/a11y";
 import { CompositionFocus, CompositionPanel } from "#/components/composition";
@@ -22,6 +22,7 @@ import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
 import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { useReviewKeys } from "#/lib/use-review-keys";
+import { useWalk } from "#/lib/use-walk";
 import { usePanelFold } from "#/lib/use-panel-fold";
 import { basesOf } from "#/lib/viewer-bases";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
@@ -53,12 +54,15 @@ function useDecision(data: ReturnType<typeof Route.useLoaderData>, reviewable: b
   const buildId = build.id;
   const snapshotId = snapshot.id;
   const [busy, setBusy] = useState(false);
+  // A ref as well as state: a second key in the same task as the first must see the first in flight.
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const go = useWalk(projectId, buildId);
   const navigate = useNavigate();
   const decide = useCallback(
     (state: "accepted" | "rejected") => {
-      if (!reviewable) return;
+      if (!reviewable || inFlight.current) return;
+      inFlight.current = true;
       setBusy(true);
       setError(null);
       const toBuild = () =>
@@ -81,26 +85,14 @@ function useDecision(data: ReturnType<typeof Route.useLoaderData>, reviewable: b
           () => (state === "rejected" ? toBuild() : advance()),
           (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
         )
-        .finally(() => setBusy(false));
+        .finally(() => {
+          inFlight.current = false;
+          setBusy(false);
+        });
     },
     [reviewable, projectId, buildId, snapshotId, go, navigate],
   );
   return { busy, error, decide };
-}
-
-/** Go to another shot of the same build; null (the end of the walk) goes nowhere. */
-function useWalk(projectId: string, buildId: string) {
-  const navigate = useNavigate();
-  return useCallback(
-    (id: string | null) => {
-      if (!id) return;
-      void navigate({
-        to: "/projects/$projectId/builds/$buildId/snapshots/$snapshotId",
-        params: { projectId, buildId, snapshotId: id },
-      });
-    },
-    [navigate, projectId, buildId],
-  );
 }
 
 function DecisionError({ error }: { error: string | null }) {
