@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { startTransition, useLayoutEffect } from "react";
+import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { useReviewKeys } from "#/lib/use-review-keys";
@@ -48,12 +49,12 @@ type Props = { id: string; nextId: string; previousId: string; typeOnCommit?: st
 const two: Props = { id: "s2", nextId: "s3", previousId: "s1" };
 const three: Props = { id: "s3", nextId: "s1", previousId: "s2" };
 
-/** Mount shot 2 and let its effects bind, then commit shot 3 typing `keys` as it commits. */
+/** Mount shot 2 with its effects bound, then commit shot 3 typing `keys` as it commits. */
 async function navigateTyping(keys: string[]) {
   const root = createRoot(document.createElement("div"));
   mounted.push(root);
-  root.render(<Shot {...two} />);
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  // A synchronous commit runs its passive effects before it returns, so the listener is bound.
+  flushSync(() => root.render(<Shot {...two} />));
   const typed = new Promise<void>((resolve) => (done = resolve));
   startTransition(() => root.render(<Shot {...three} typeOnCommit={keys} />));
   await typed;
