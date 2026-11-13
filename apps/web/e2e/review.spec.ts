@@ -142,8 +142,10 @@ async function provision(
     page.getByRole("button", { name: "Issue token" }),
   );
   const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
-  await page.goto(`/orgs?org=${orgId}`);
+  await open(page, `/orgs?org=${orgId}`);
   await page.getByRole("link", { name: "shop", exact: true }).click();
+  // `click()` resolves once the click is dispatched, not when the client navigation commits.
+  await expect(page).toHaveURL(/\/projects\/[^/]+/);
   const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1];
   if (!projectId) throw new Error(`no project id in ${page.url()}`);
   return { token, projectId };
@@ -218,6 +220,7 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
 
   // The build page: five shots in their groups.
   await rows.first().getByRole("link", { name: "review" }).click();
+  await expect(page).toHaveURL(/\/builds\/[^/?]+/);
   const buildUrl = page.url();
   const buildId = /\/builds\/([^/]+)/.exec(buildUrl)?.[1] ?? "";
   await expectBuildWorkspaceOpen(page);
