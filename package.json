@@ -29,15 +29,15 @@
     "wasm:check": "bun scripts/build-wasm.ts --check"
   },
   "devDependencies": {
-    "@nx/dotnet": "24.0.1",
+    "@nx/dotnet": "24.0.6",
     "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
-    "nx": "24.0.1",
-    "oxfmt": "0.74.0",
-    "oxlint": "1.89.0",
-    "oxlint-tsgolint": "7.0.2005",
+    "nx": "24.0.6",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2006",
     "pngjs": "^7.0.0",
     "typescript": "7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   }
 }
