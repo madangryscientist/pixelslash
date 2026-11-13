@@ -7,8 +7,9 @@ import { describe, expect, it } from "vitest";
  * ob 1876. On the CT, workerd closes the connection a moment after it answers a long finalize, and
  * the CLI's next finalize, sent at once, was dispatched on the socket miniflare's undici pool had
  * kept: `read ECONNRESET`, which the Cloudflare plugin turned into a 500 `fetch failed`. The
- * repro script stands in for workerd with a server that does that and sends through the `Pool`
- * miniflare loads, with `reset: false` as miniflare sets it. The hold is 200 ms, not 25 s: the
+ * repro script stands in for workerd with a server that cuts off a second request on the same socket
+ * (a clock for the close would race a loaded host) and sends through the `Pool` miniflare loads,
+ * with `reset: false` as miniflare sets it. The hold is 200 ms, not 25 s: the
  * length is not what fails, the socket kept after it is.
  */
 async function finalizeTwice(mode: "plain" | "fresh"): Promise<unknown> {
