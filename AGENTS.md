@@ -177,6 +177,19 @@ bunx playwright install chromium-headless-shell   # once per machine
 bun run pixelslash -- --live-png <main.png> --local-png <branch.png> --out /tmp/ps-check
 ```
 
+## Flaky tests come first
+
+A flaky test (one that fails and then passes on the same code, here or in CI) is the project's highest
+priority from the moment it is seen. It costs every PR and every run on `main` until it is gone, so it is
+not left for later.
+
+- File it at once, with the failing output and the run it came from, and fix it before any other work
+  starts. Work already in flight finishes; nothing new is picked up ahead of it.
+- Fixed means the cause is found from a reproduction and the test, or the code under it, is corrected. No
+  retry, no bigger timeout, no skip or quarantine.
+- Until the fix lands, a PR whose only failure is that known flake may be rerun. It is not merged past it
+  without the maintainer's go for that PR.
+
 ## Commits: conventional, as in Hack Cove
 
 Every commit is `<type>(<scope>): <subject>`, as in `fix(engine): diff only the overlap when sizes
