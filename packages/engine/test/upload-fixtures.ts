@@ -31,6 +31,20 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
   return out.trim();
 }
 
+/** Feeds one `git fast-import` stream: one spawn for any number of commits. */
+async function fastImport(cwd: string, stream: string) {
+  const proc = Bun.spawn(["git", "fast-import", "--quiet"], {
+    cwd,
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await proc.stdin.write(stream);
+  await proc.stdin.end();
+  if ((await proc.exited) !== 0)
+    throw new Error(`git fast-import: ${await new Response(proc.stderr).text()}`);
+}
+
 /**
  * Appends `n` empty commits to the checked-out branch in one `git fast-import` stream. One spawn
  * instead of `n`: a `git commit` per row is what made the 200-ancestor test hit Vitest's timeout.
@@ -44,29 +58,45 @@ export async function emptyCommits(cwd: string, n: number, prefix: string) {
     const msg = `${prefix}${i}`;
     stream += `${head}data ${msg.length}\n${msg}\n${i ? "" : `from ${tip}\n`}`;
   }
-  const proc = Bun.spawn(["git", "fast-import", "--quiet"], {
-    cwd,
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  await proc.stdin.write(stream);
-  await proc.stdin.end();
-  if ((await proc.exited) !== 0)
-    throw new Error(`git fast-import: ${await new Response(proc.stderr).text()}`);
+  await fastImport(cwd, stream);
 }
 
-/** main has `mainCommits` commits; branch `feat` forks from the first and adds `featCommits`. */
+/**
+ * main has `mainCommits` commits; branch `feat` forks from the first and adds `featCommits`.
+ * Both branches are one `git fast-import` stream, four processes whatever the counts: a `git
+ * commit` per commit cost one each, and a starved runner spent a test's whole budget starting them.
+ * Committer dates step along each branch, so the order a `rev-list` gives back is fixed.
+ */
 export async function repo(mainCommits: number, featCommits: number) {
   const dir = await tmp();
   await git(dir, "init", "-q", "-b", "main");
-  const commit = (n: string) => git(dir, "commit", "-q", "--allow-empty", "-m", n);
-  await commit("m0");
-  const fork = await git(dir, "rev-parse", "HEAD");
-  await git(dir, "checkout", "-q", "-b", "feat");
-  for (let i = 0; i < featCommits; i++) await commit(`f${i}`);
-  await git(dir, "checkout", "-q", "main");
-  for (let i = 1; i < mainCommits; i++) await commit(`m${i}`);
+  let stream = "";
+  let mark = 0;
+  let date = 0;
+  /** Writes one commit and returns its mark, so the next one on that ref can name it as `from`. */
+  const commit = (ref: string, message: string, from: number | null) => {
+    const id = ++mark;
+    stream += `commit ${ref}\nmark :${id}\ncommitter t <t@example.com> ${1_700_000_000 + date++} +0000\n`;
+    stream += `data ${message.length}\n${message}\n`;
+    if (from !== null) stream += `from :${from}\n`;
+    return id;
+  };
+  const mains = Math.max(1, mainCommits);
+  let forkMark = 0;
+  let parent: number | null = null;
+  for (let i = 0; i < mains; i++) {
+    parent = commit("refs/heads/main", `m${i}`, parent);
+    if (i === 0) forkMark = parent;
+  }
+  if (featCommits > 0) {
+    parent = forkMark;
+    for (let i = 0; i < featCommits; i++) parent = commit("refs/heads/feat", `f${i}`, parent);
+  } else {
+    // No commit to carry `feat`, so name the branch at the fork; HEAD still ends up on it.
+    stream += `reset refs/heads/feat\nfrom :${forkMark}\n`;
+  }
+  await fastImport(dir, stream);
+  const fork = await git(dir, "rev-parse", `main~${mains - 1}`);
   await git(dir, "checkout", "-q", "feat");
   return { dir, fork };
 }
