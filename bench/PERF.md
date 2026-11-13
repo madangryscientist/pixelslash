@@ -13,6 +13,11 @@ Perf runs are on demand only and never in the gate.
 > the desktop as it was, with the browser and the editor running; `dedicated` is `--env dedicated`,
 > with whole cores and memory reserved and boost off. Only rows from the same run and the same env
 > are compared; a `dedicated` number is not "faster" than a `shared` one, it is steadier.
+> The dedicated env is for short timing runs only, never for repro or test loops: it squeezes every
+> other process on the machine onto the cores left. The helper now keeps at least 4 CPUs for the
+> host and ends a reservation after 30 minutes unless `renew` is run (`bench/README.md`, "A quiet
+> machine"). The setups below that name `--cpus 1-5,7-11` record what was run; the helper now
+> refuses that list because it leaves the host two CPUs.
 >
 > **Compare within a run, not across runs.** Interleaving makes A against B fair inside one run.
 > Two runs on different days differ by machine load: TS long-page wall time was 1132 ms in the

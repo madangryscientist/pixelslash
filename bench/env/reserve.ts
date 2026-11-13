@@ -1,8 +1,13 @@
 /**
- * `pixelslash-bench-reserve on|off|status` (ob 1947): the one root step of `bench:perf --env dedicated`.
+ * `pixelslash-bench-reserve on|off|renew|status` (ob 1947): the one root step of `bench:perf --env dedicated`.
  * It takes whole cores out of the host's CPU sets, puts the caller's runner in a scope that owns
  * them with its memory guaranteed, turns boost off and keeps the performance governor, and puts
  * all of it back on `off`. Everything is `--runtime`, so a reboot undoes it too.
+ *
+ * A reservation squeezes every other process onto the CPUs left, so it is bounded twice: the host
+ * keeps at least MIN_HOST_CPUS, and `on` arms a systemd timer that runs `off` after LIFETIME_S
+ * unless `renew` moves it. systemd enforces the bound, not the caller, because the callers that
+ * forget are the ones that would not renew.
  *
  * Root runs this through one sudoers line, so it takes no free-form input: three flags, each
  * validated here, and every command it runs is a fixed argv (no shell). All effects go through
@@ -10,66 +15,50 @@
  * journal `on` wrote before it changed anything, so it is safe to run twice, after a crash, or
  * when `on` never finished.
  */
+import { HelperError } from "./error.ts";
 import { formatCpus, parseCpus, without } from "./cpulist.ts";
+import { armLapse, LapseError, LIFETIME_S } from "./lapse.ts";
+import { SCOPE, systemctl, type Host } from "./machine.ts";
+import { releaseAfter, restore, stopLapse } from "./restore.ts";
+import {
+  BOOST,
+  cpuFile,
+  HOST_UNITS,
+  JOURNAL_VERSION,
+  readJournal,
+  show,
+  snapshot,
+  STATE_DIR,
+  STATE_FILE,
+  type Journal,
+} from "./journal.ts";
 
 /** Bumped when the helper's behaviour changes; the runner refuses a helper that does not match. */
-export const HELPER_VERSION = 2;
-/** The shape of the journal in /run, which outlives a reinstall: it changes only when the shape does. */
-const JOURNAL_VERSION = 1;
-export const SCOPE = "pixelslash-bench.scope";
-export const HOST_UNITS = ["system.slice", "user.slice", "init.scope"] as const;
-export const STATE_DIR = "/run/pixelslash-bench";
-export const STATE_FILE = `${STATE_DIR}/state.json`;
-/** Written for as long as an `on` runs, so a hand-run `off` cannot restore under it. */
+export const HELPER_VERSION = 3;
+/** CPUs the host must keep: two whole cores, so desktop work and captures are never squeezed onto one. */
+export const MIN_HOST_CPUS = 4;
+/** Written for as long as an `on` or a `renew` runs, so an `off` cannot restore under it. */
 export const ON_FILE = `${STATE_DIR}/on.pid`;
 export const DEFAULT_CPUS = "4,5,10,11";
 export const DEFAULT_MEM = "4G";
 
-const BOOST = "/sys/devices/system/cpu/cpufreq/boost";
 const ONLINE = "/sys/devices/system/cpu/online";
-const cpuFile = (cpu: number, leaf: string): string => `/sys/devices/system/cpu/cpu${cpu}/${leaf}`;
-const dropIn = (unit: string): string =>
-  `/run/systemd/system.control/${unit}.d/50-AllowedCPUs.conf`;
-
-export type Out = { code: number; out: string; err: string };
-
-/** Everything the helper does to the machine. */
-export type Host = {
-  exec(cmd: string[]): Promise<Out>;
-  /** The file's text, or null when it is not there. */
-  read(path: string): string | null;
-  write(path: string, text: string): void;
-  /** Create `path` only if it does not exist; false when it does. */
-  create(path: string, text: string): boolean;
-  remove(path: string): void;
-  mkdir(path: string): void;
-  /** Owner of the process, or null when there is no such process. */
-  procUid(pid: number): number | null;
-  /** The user who ran sudo, or null when not run through sudo. */
-  callerUid: number | null;
-  /** This helper's own process id. */
-  self: number;
-  /** Whether this process is itself inside the scope (the runner called it from there). */
-  insideScope(): boolean;
-};
-
-/** A request that cannot be honoured: the message is for the person at the terminal. */
-export class HelperError extends Error {}
 
 export type Request =
   | { cmd: "on"; cpus: number[]; mem: string; pid: number }
   | { cmd: "off" }
+  | { cmd: "renew" }
   | { cmd: "status" };
 
 const FLAGS = ["--cpus", "--mem", "--pid"];
 
 export function parseRequest(argv: string[]): Request {
   const [cmd, ...rest] = argv;
-  if (cmd === "off" || cmd === "status") {
+  if (cmd === "off" || cmd === "renew" || cmd === "status") {
     if (rest.length > 0) throw new HelperError(`${cmd} takes no arguments`);
     return { cmd };
   }
-  if (cmd !== "on") throw new HelperError("usage: pixelslash-bench-reserve on|off|status");
+  if (cmd !== "on") throw new HelperError("usage: pixelslash-bench-reserve on|off|renew|status");
   const given = onFlags(rest);
   return {
     cmd,
@@ -118,7 +107,10 @@ function checkAgainstHost(host: Host, req: Extract<Request, { cmd: "on" }>): num
   if (missing.length > 0) throw new HelperError(`CPU ${formatCpus(missing)} is not online`);
   checkMem(host, req.mem);
   const rest = without(online, req.cpus);
-  if (rest.length < 2) throw new HelperError("the host must keep at least two CPUs");
+  if (rest.length < MIN_HOST_CPUS)
+    throw new HelperError(
+      `the host must keep at least ${MIN_HOST_CPUS} CPUs; --cpus ${formatCpus(req.cpus)} leaves ${rest.length}`,
+    );
   for (const cpu of req.cpus) {
     const siblings = parseCpus(host.read(cpuFile(cpu, "topology/thread_siblings_list")) ?? "");
     const split = siblings.filter((s) => !req.cpus.includes(s));
@@ -132,43 +124,6 @@ function checkAgainstHost(host: Host, req: Extract<Request, { cmd: "on" }>): num
   if (host.procUid(req.pid) !== host.callerUid)
     throw new HelperError(`--pid ${req.pid} is not a process of the user who ran sudo`);
   return rest;
-}
-
-/** What the machine looked like before `on`: the one thing `off` needs. */
-type Journal = {
-  version: number;
-  reserved: number[];
-  /** Per host unit; "" is "not set". */
-  allowed: Record<string, string>;
-  boost: string | null;
-  governors: Record<string, string>;
-};
-
-async function show(host: Host, unit: string): Promise<string> {
-  const r = await host.exec(["systemctl", "show", "-p", "AllowedCPUs", "--value", unit]);
-  if (r.code !== 0) throw new HelperError(`systemctl show ${unit}: ${r.err}`);
-  const value = r.out.trim();
-  return value === "[not set]" ? "" : value;
-}
-
-async function snapshot(host: Host, reserved: number[]): Promise<Journal> {
-  const allowed: Record<string, string> = {};
-  for (const unit of HOST_UNITS) allowed[unit] = await show(host, unit);
-  const governors: Record<string, string> = {};
-  for (const cpu of reserved)
-    governors[String(cpu)] = (host.read(cpuFile(cpu, "cpufreq/scaling_governor")) ?? "").trim();
-  return {
-    version: JOURNAL_VERSION,
-    reserved,
-    allowed,
-    boost: host.read(BOOST)?.trim() ?? null,
-    governors,
-  };
-}
-
-async function systemctl(host: Host, args: string[]): Promise<void> {
-  const r = await host.exec(["systemctl", ...args]);
-  if (r.code !== 0) throw new Error(`systemctl ${args.join(" ")}: ${r.err.trim() || r.code}`);
 }
 
 /** Start the scope around the runner: a transient unit under `-.slice`, outside the user's slice. */
@@ -223,140 +178,161 @@ async function apply(
     `MemoryMax=${req.mem}`,
     "MemorySwapMax=0",
   ]);
-}
-
-function readJournal(host: Host): Journal | null {
-  const text = host.read(STATE_FILE);
-  if (text === null) return null;
-  try {
-    const raw: unknown = JSON.parse(text);
-    return isJournal(raw) ? raw : null;
-  } catch {
-    return null;
-  }
-}
-
-function isJournal(raw: unknown): raw is Journal {
-  if (typeof raw !== "object" || raw === null) return false;
-  const allowed: unknown = Reflect.get(raw, "allowed");
-  return (
-    Reflect.get(raw, "version") === JOURNAL_VERSION &&
-    Array.isArray(Reflect.get(raw, "reserved")) &&
-    typeof allowed === "object" &&
-    allowed !== null &&
-    HOST_UNITS.every((u) => /^[0-9 ,-]*$/.test(String(Reflect.get(allowed, u))))
-  );
-}
-
-/** Put one host unit's CPU set back; an unset one loses its drop-in too. Returns whether a drop-in went. */
-async function restoreUnit(host: Host, unit: string, prior: string): Promise<boolean> {
-  await systemctl(host, ["set-property", "--runtime", unit, `AllowedCPUs=${prior}`]);
-  if (prior !== "") return false;
-  host.remove(dropIn(unit));
-  return true;
-}
-
-/** Called from inside the scope (the runner's own `off`), stopping it would kill the caller: it ends with the runner. From outside (a stale run) the processes in it go. */
-async function stopScope(host: Host): Promise<string[]> {
-  if (host.insideScope()) return [];
-  const stopped = await host.exec(["systemctl", "stop", SCOPE]);
-  const fine = stopped.code === 0 || /not loaded|not found/i.test(stopped.err);
-  return fine ? [] : [`systemctl stop ${SCOPE}: ${stopped.err.trim()}`];
-}
-
-/** Undo `on` from its journal. Every step runs even if an earlier one failed; the failures come back together. */
-async function restore(host: Host, journal: Journal): Promise<string[]> {
-  const failures = await stopScope(host);
-  const step = async (what: () => unknown): Promise<unknown> => {
-    try {
-      return await what();
-    } catch (e) {
-      failures.push(e instanceof Error ? e.message : String(e));
-      return undefined;
-    }
-  };
-  let dropped = false;
-  for (const unit of HOST_UNITS)
-    dropped =
-      (await step(() => restoreUnit(host, unit, journal.allowed[unit] ?? ""))) === true || dropped;
-  if (dropped) await step(() => systemctl(host, ["daemon-reload"]));
-  if (journal.boost !== null) await step(() => host.write(BOOST, journal.boost ?? ""));
-  for (const [cpu, governor] of Object.entries(journal.governors))
-    if (governor !== "" && /^[0-9]+$/.test(cpu))
-      await step(() => host.write(cpuFile(Number(cpu), "cpufreq/scaling_governor"), governor));
-  return failures;
+  // The timer starts when `systemd-run` returns, not at the snapshot: the arm stamps the deadline it was given.
+  const lapses = await armLapse(host);
+  host.write(STATE_FILE, `${JSON.stringify({ ...before, lapses })}\n`);
 }
 
 export async function reserveOn(host: Host, req: Extract<Request, { cmd: "on" }>): Promise<string> {
   const rest = checkAgainstHost(host, req);
   host.mkdir(STATE_DIR);
-  if (!host.create(STATE_FILE, "{}\n"))
+  // The record is the lock against a second `on`; the marker is the lock against `off` and `renew`.
+  const release = takeMarker(host);
+  if (!host.create(STATE_FILE, "{}\n")) {
+    release();
     throw new HelperError("already reserved (or a run died): run `pixelslash-bench-reserve off`");
-  host.write(ON_FILE, `${host.self}\n`);
+  }
   try {
     const before = await snapshot(host, req.cpus);
     host.write(STATE_FILE, `${JSON.stringify(before)}\n`);
     await apply(host, req, rest, before);
   } catch (e) {
-    const journal = readJournal(host);
-    const failures = journal ? await restore(host, journal) : [];
-    if (failures.length === 0) host.remove(STATE_FILE);
-    const why = e instanceof Error ? e.message : String(e);
-    throw new HelperError(
-      failures.length === 0
-        ? `${why} (restored)`
-        : `${why}; restoring also failed: ${failures.join("; ")}; run off`,
-    );
+    throw await releaseAfter(host, e);
   } finally {
-    host.remove(ON_FILE);
+    release();
   }
-  return `reserved CPUs ${formatCpus(req.cpus)} and ${req.mem} for ${SCOPE}; the host keeps ${formatCpus(rest)}`;
+  return `reserved CPUs ${formatCpus(req.cpus)} and ${req.mem} for ${SCOPE}; the host keeps ${formatCpus(rest)}; ends in ${LIFETIME_S / 60} minutes unless renewed`;
 }
 
-/** Another helper process is in the middle of `on` (a record left by a killed one does not count). */
-function onRunning(host: Host): boolean {
+/** Another helper process holds the marker (one a killed helper left does not count: its process is gone). */
+function helperRunning(host: Host): boolean {
   const pid = Number(host.read(ON_FILE));
   const comm = host.read(`/proc/${pid}/comm`) ?? "";
   return pid > 0 && pid !== host.self && comm.startsWith("pixelslash-ben");
 }
 
-export async function reserveOff(host: Host): Promise<string> {
-  if (onRunning(host))
-    throw new HelperError("an `on` is still running; run off when it has finished");
-  const text = host.read(STATE_FILE);
-  if (text === null) return "nothing reserved";
-  const journal = readJournal(host);
-  if (journal === null) {
-    // `{}` is the placeholder `on` writes before it changes anything; any other record is one this
-    // helper cannot read (another version), so it stays for a human rather than being lost.
-    if (text.trim() !== "{}")
+/**
+ * Take the marker that serialises `on`, `off` and `renew`, so no two of them change the machine at once. It is
+ * created exclusively, and a marker a killed helper left is cleared and taken over. Returns the release, which
+ * removes the marker only while it still holds this process.
+ */
+function takeMarker(host: Host): () => void {
+  const mine = `${host.self}\n`;
+  if (!host.create(ON_FILE, mine)) {
+    if (helperRunning(host))
       throw new HelperError(
-        `${STATE_FILE} is not a record this helper version can restore from; leaving it, reinstall the matching helper and run off`,
+        "another helper is running (on, off or renew); try again when it has finished",
+      );
+    host.remove(ON_FILE);
+    if (!host.create(ON_FILE, mine))
+      throw new HelperError("another helper took the marker; try again");
+  }
+  return () => {
+    if (host.read(ON_FILE) === mine) host.remove(ON_FILE);
+  };
+}
+
+export async function reserveOff(host: Host): Promise<string> {
+  host.mkdir(STATE_DIR);
+  const release = takeMarker(host);
+  try {
+    const text = host.read(STATE_FILE);
+    if (text === null) return "nothing reserved";
+    const journal = readJournal(host);
+    if (journal === null) {
+      // `{}` is the placeholder `on` writes before it changes anything; any other record is one this
+      // helper cannot read (another version), so it stays for a human rather than being lost.
+      if (text.trim() !== "{}")
+        throw new HelperError(
+          `${STATE_FILE} is not a record this helper version can restore from; leaving it, reinstall the matching helper and run off`,
+        );
+      host.remove(STATE_FILE);
+      return "nothing reserved (the record was empty)";
+    }
+    const failures = await restore(host, journal);
+    if (failures.length > 0)
+      throw new HelperError(
+        `restore incomplete, record kept, run off again: ${failures.join("; ")}`,
+      );
+    // The timer goes last: until the machine is back, it is the only thing that can end the reservation.
+    const unstopped = await stopLapse(host);
+    if (unstopped.length > 0)
+      throw new HelperError(
+        `the machine is back but the lapse stays: ${unstopped.join("; ")}; run off again`,
       );
     host.remove(STATE_FILE);
-    return "nothing reserved (the record was empty)";
+    return "restored";
+  } finally {
+    release();
   }
-  const failures = await restore(host, journal);
-  if (failures.length > 0)
-    throw new HelperError(`restore incomplete, record kept, run off again: ${failures.join("; ")}`);
-  host.remove(STATE_FILE);
-  return "restored";
+}
+
+/**
+ * Move the lapse to LIFETIME_S from now. A timer cannot be edited, so it is stopped and armed again;
+ * if that fails the reservation would have no bound, so it is released rather than left unbounded.
+ * It holds the marker while it works, so an `off` (a hand-run one, or the lapse's) cannot restore the
+ * machine and remove the record between the read and the write at the end.
+ */
+export async function reserveRenew(host: Host): Promise<string> {
+  host.mkdir(STATE_DIR);
+  const release = takeMarker(host);
+  try {
+    const journal = readJournal(host);
+    if (journal === null) {
+      if (host.read(STATE_FILE) === null) throw new HelperError("nothing reserved");
+      throw new HelperError("the record is not usable; run off");
+    }
+    if (journal.version !== JOURNAL_VERSION)
+      throw new HelperError("reserved by an older helper; run off");
+    try {
+      const lapses = await armLapse(host);
+      host.write(STATE_FILE, `${JSON.stringify({ ...journal, lapses })}\n`);
+      return `renewed: ends ${new Date(lapses).toISOString()} unless renewed again`;
+    } catch (e) {
+      // A timer that would not stop is still the bound, so the reservation is left as it is. Only a failed arm
+      // leaves it unbounded, and that is released rather than kept.
+      if (e instanceof LapseError && e.bounded)
+        throw new HelperError(`renew failed, the lapse still stands: ${e.message}`);
+      // `releaseAfter` already says whether that worked ("(restored)", or "run off"): do not restate it.
+      throw new HelperError(`renew failed: ${(await releaseAfter(host, e)).message}`);
+    }
+  } finally {
+    release();
+  }
+}
+
+/** The timestamp as epoch ms when a `Date` can represent it, else null. */
+function knownMs(ms: number | undefined): number | null {
+  return ms !== undefined && Number.isFinite(new Date(ms).getTime()) ? ms : null;
+}
+
+/** A journal stamp as an ISO time: null when there is none, or when a `Date` cannot hold it. */
+function stamp(active: boolean, ms: number | undefined): string | null {
+  const at = knownMs(ms);
+  return active && at !== null ? new Date(at).toISOString() : null;
 }
 
 export async function reserveStatus(host: Host): Promise<string> {
   const journal = readJournal(host);
   const live: Record<string, string> = {};
   for (const unit of HOST_UNITS) live[unit] = await show(host, unit);
+  const active = host.read(STATE_FILE) !== null;
+  // A record this helper did not write can hold a timestamp no Date can represent: report it as unknown, not a throw.
+  const start = knownMs(journal?.started);
   return JSON.stringify({
     version: HELPER_VERSION,
-    active: host.read(STATE_FILE) !== null,
+    active,
     reserved: journal?.reserved ?? [],
     allowed: live,
+    started: stamp(active, journal?.started),
+    lapses: stamp(active, journal?.lapses),
+    age_s: active && start !== null ? Math.floor((host.now() - start) / 1000) : null,
   });
 }
 
 export async function runHelper(host: Host, argv: string[]): Promise<string> {
   const req = parseRequest(argv);
   if (req.cmd === "on") return reserveOn(host, req);
-  return req.cmd === "off" ? reserveOff(host) : reserveStatus(host);
+  if (req.cmd === "off") return reserveOff(host);
+  return req.cmd === "renew" ? reserveRenew(host) : reserveStatus(host);
 }

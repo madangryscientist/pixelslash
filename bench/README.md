@@ -332,23 +332,38 @@ bun run bench:perf -- --env dedicated --impl "bun bench/src/impl/ts-diff.ts" --i
 
 The desktop is shared with a browser and an editor, so a shared-run spread (p95 over the median, the
 `p95/med` column) can be large. `--env dedicated` reserves whole cores for the run: CPUs 4,5,10,11 by
-default (`--env-cpus`; a core and its SMT sibling go together, and the host keeps at least two CPUs),
+default (`--env-cpus`; a core and its SMT sibling go together, and the helper keeps at least four CPUs, two whole cores, for the host: it refuses a list that leaves fewer),
 and 4G of memory (`--env-mem`, at most half the machine's; set as both `MemoryMin` and `MemoryMax`, no swap). The default is
 `--env none`, which measures the machine as it is. It needs `--impl` (the ref comparison builds the web
 app and is not timed this way).
 
-What the runner does, through the one root helper `pixelslash-bench-reserve on|off|status`:
+**Short timing runs only.** The dedicated env squeezes every other process on the machine (the
+desktop, the browser, every other capture) onto the cores left. Use it for a timing run and nothing
+else: never for repro loops, test loops or anything left running, because whatever shares the
+machine then competes for a few cores and times out. The helper bounds this itself. It keeps at
+least four CPUs for the host (`--cpus 1-5,7-11` on a 12-CPU machine leaves two and is refused;
+`--cpus 2-5,8-11` is the largest list), and `on` arms a systemd timer (`pixelslash-bench-lapse`)
+that runs `off` 30 minutes later unless `pixelslash-bench-reserve renew` is run, which starts the 30
+minutes again. A lapse is the ordinary `off`, so it also stops whatever is still in
+`pixelslash-bench.scope`: that is the bound working. A hand-run `off` stops the timer only once the
+machine is back, so a restore that fails keeps the timer it had and `off` can be run again. A lapse's
+own `off` has no timer left to keep, so a restore that fails there needs a hand-run `off`. `status`
+reports `started`, `lapses` and `age_s`.
+
+What the runner does, through the one root helper `pixelslash-bench-reserve on|off|renew|status`:
 
 - sets `AllowedCPUs` on `system.slice`, `user.slice` and `init.scope` to the other CPUs (`--runtime`,
   so a reboot also undoes it) and moves the runner itself into `pixelslash-bench.scope`, limited to
   the reserved CPUs, so every child it starts runs there;
 - turns boost off (`/sys/devices/system/cpu/cpufreq/boost`) and keeps the performance governor;
+- arms the 30-minute lapse timer (the runner never renews: a timing run is short);
 - restores all of it at the end, on SIGINT or SIGTERM and after a failure. The helper writes its
   prior values to `/run/pixelslash-bench/state.json` before changing anything, and `off` is a full,
   repeatable restore from that.
 
 If a run was killed so hard that nothing could restore (`kill -9`), the reservation stays until a
-reboot (`--runtime`) or an `off`: the next `--env dedicated` refuses to start and says so. Restore with
+reboot (`--runtime`), the lapse timer or an `off`: the next `--env dedicated` refuses to start and says so. A run
+killed before `on` armed the timer (a fraction of a second) has only `off` and the reboot. Restore with
 `sudo -n /usr/local/sbin/pixelslash-bench-reserve off`.
 
 **The helper.** `bench/env/install.sh` builds it (`bun build --compile`, as you), prints what it will
