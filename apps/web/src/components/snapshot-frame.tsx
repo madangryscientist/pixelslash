@@ -1,4 +1,4 @@
-import { type PointerEvent, type ReactNode, useState } from "react";
+import { type PointerEvent, type ReactNode, useRef, useState } from "react";
 import { OutlineRegion } from "@hackcove/ui-react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { useRegionNote } from "#/components/ai-notes";
@@ -197,6 +197,9 @@ export function DrawLayer({
 }) {
   const [start, setStart] = useState<Point | null>(null);
   const [end, setEnd] = useState<Point | null>(null);
+  // Where the drag began, read by the move and up handlers. State alone would be read from the
+  // render closure, which is stale when a move or up arrives before React has re-rendered.
+  const origin = useRef<Point | null>(null);
   const toImage = (event: PointerEvent<HTMLDivElement>): Point => {
     const box = event.currentTarget.getBoundingClientRect();
     return {
@@ -213,14 +216,16 @@ export function DrawLayer({
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         const at = toImage(event);
+        origin.current = at;
         setStart(at);
         setEnd(at);
       }}
       onPointerMove={(event) => {
-        if (start) setEnd(toImage(event));
+        if (origin.current) setEnd(toImage(event));
       }}
       onPointerUp={(event) => {
-        const rect = start ? rectOf(start, toImage(event)) : null;
+        const rect = origin.current ? rectOf(origin.current, toImage(event)) : null;
+        origin.current = null;
         setStart(null);
         setEnd(null);
         if (rect && rect.width > 0 && rect.height > 0) onDraw(rect);

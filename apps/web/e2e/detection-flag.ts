@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { dragOver } from "./draw";
 import { SERVER } from "./ports";
 import { showPanel } from "./snapshot-viewer";
 
@@ -23,13 +24,7 @@ export async function flagFalsePositive(page: Page) {
   await form.getByText("False positive", { exact: true }).click();
   await form.getByLabel("Note (optional)").fill("anti-aliasing on the heading");
   await form.getByRole("button", { name: "Mark an area" }).click();
-  const layer = page.getByTestId("flag-draw").last();
-  const box = await layer.boundingBox();
-  if (!box) throw new Error("no drawing layer");
-  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5, { steps: 4 });
-  await page.mouse.up();
+  await dragOver(page, page.getByTestId("flag-draw").last(), [0.2, 0.2], [0.6, 0.5]);
   await expect(form.getByTestId("flag-rect")).toBeVisible();
   await form.getByRole("button", { name: "Flag", exact: true }).click();
   await expect(form).toHaveCount(0);
