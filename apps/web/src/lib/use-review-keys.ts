@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /** A keystroke typed into a control belongs to that control, not to the review walk. */
 function isTyping(target: EventTarget | null): boolean {
@@ -25,6 +25,11 @@ export function reviewKeyAction(key: string, canDecide: boolean): ReviewKeyActio
  * j/k walk the build in its review order, a/r decide the shot on screen, `?` opens the shortcut
  * list. A modified key belongs to the browser. While that list is open no key walks or decides,
  * wherever focus is: the browser closes it on Esc.
+ *
+ * The listener is bound once and reads the latest options from a ref that a layout effect
+ * refreshes in the commit itself. A listener that was re-bound by a passive effect would, for the
+ * gap between a navigation's paint and that effect, still hold the shot just left: a key typed in
+ * the gap would decide or walk from the wrong shot.
  */
 export function useReviewKeys(opts: {
   canDecide: boolean;
@@ -35,9 +40,13 @@ export function useReviewKeys(opts: {
   help: () => void;
   helpOpen: boolean;
 }) {
-  const { canDecide, nextId, previousId, go, decide, help, helpOpen } = opts;
+  const latest = useRef(opts);
+  useLayoutEffect(() => {
+    latest.current = opts;
+  });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const { canDecide, nextId, previousId, go, decide, help, helpOpen } = latest.current;
       const modified = event.metaKey || event.ctrlKey || event.altKey;
       if (helpOpen || modified || isTyping(event.target)) return;
       const action = reviewKeyAction(event.key, canDecide);
@@ -48,5 +57,5 @@ export function useReviewKeys(opts: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canDecide, nextId, previousId, go, decide, help, helpOpen]);
+  }, []);
 }
