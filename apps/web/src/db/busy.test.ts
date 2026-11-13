@@ -36,7 +36,10 @@ beforeAll(async () => {
 
 afterAll(() => held?.dispose());
 
-/** The binding, but a statement whose SQL matches `sql` throws SQLITE_BUSY its first `times` runs. */
+/**
+ * The binding, but a statement whose SQL matches `sql`, or a batch holding one, throws SQLITE_BUSY its
+ * first `times` runs.
+ */
 function locked(d1: D1Database, sql: RegExp, times: number) {
   const state = { left: times, tries: 0 };
   const statement = (inner: D1PreparedStatement, hit: boolean): D1PreparedStatement =>
@@ -48,16 +51,24 @@ function locked(d1: D1Database, sql: RegExp, times: number) {
         if (!hit || !["run", "all", "raw", "first"].includes(String(prop)))
           return member.bind(target);
         return async (...args: unknown[]) => {
-          state.tries++;
-          if (state.left-- > 0) throw new Error("D1_ERROR: database is locked: SQLITE_BUSY");
+          busy();
           return member.apply(target, args);
         };
       },
     });
+  const busy = () => {
+    state.tries++;
+    if (state.left-- > 0) throw new Error("D1_ERROR: database is locked: SQLITE_BUSY");
+  };
   const binding = new Proxy(d1, {
     get(target, prop) {
       if (prop === "prepare")
         return (query: string) => statement(target.prepare(query), sql.test(query));
+      if (prop === "batch")
+        return async (statements: D1PreparedStatement[]) => {
+          if (statements.some((s) => sql.test(String(Reflect.get(s, "statement"))))) busy();
+          return target.batch(statements);
+        };
       const member = Reflect.get(target, prop, target);
       return typeof member === "function" ? member.bind(target) : member;
     },
@@ -117,5 +128,20 @@ describe("a D1 write that meets the lock (PS-228)", () => {
     const d1 = fake as unknown as D1Database;
     await expect(retryBusy(d1).prepare("select 1").all()).rejects.toThrow(/no such table/);
     expect(tries).toBe(1);
+  });
+
+  test("a batch that meets the lock is tried again whole: it is one transaction, so none of it ran", async () => {
+    let tries = 0;
+    const fake = {
+      batch: async () => {
+        tries++;
+        if (tries < 3) throw new Error("D1_ERROR: database is locked: SQLITE_BUSY");
+        return [];
+      },
+    };
+    // oxlint-disable-next-line no-unsafe-type-assertion -- a fake with only the members under test
+    const d1 = fake as unknown as D1Database;
+    await expect(retryBusy(d1).batch([])).resolves.toEqual([]);
+    expect(tries).toBe(3);
   });
 });

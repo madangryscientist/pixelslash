@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { type BaselineSnapshot, type Baselines, snapshotKeyOf } from "#/db/baselines";
 import type { Db } from "#/db/db";
 import { snapshots } from "#/db/schema";
+import type { SnapshotWrites } from "#/db/snapshot-writes";
 import type { BlobStore } from "#/storage/blobs";
 import type { Budget } from "./budget";
 import { type Comparer, type SnapshotRow, serverComparer } from "./compare";
@@ -71,15 +72,14 @@ async function against(
   };
 }
 
-/** Measure one shot against main and store it. */
+/** Measure one shot against main and queue its row's write. */
 export async function diffAgainstMain(
-  deps: { db: Db },
+  writes: SnapshotWrites,
   compare: Comparer | null,
   shot: SnapshotRow,
   main: BaselineSnapshot | undefined,
 ): Promise<void> {
-  const fields = await against(compare, shot, main);
-  await deps.db.update(snapshots).set(fields).where(eq(snapshots.id, shot.id));
+  writes.update(shot.id, await against(compare, shot, main));
 }
 
 /**
@@ -94,6 +94,8 @@ export async function measureAgainstMain(
     blobs: BlobStore;
     diff?: typeof diffPngs | undefined;
     diffSidecar?: string | undefined;
+    /** The run's writes; the caller writes what is left queued when this returns or throws. */
+    writes: SnapshotWrites;
   },
   { buildId, only }: { buildId: string; only?: Set<string> | undefined },
   baselines: Baselines,
@@ -107,7 +109,8 @@ export async function measureAgainstMain(
     const main = baselines.main.get(snapshotKeyOf(shot));
     if (mainStands(shot, main)) continue;
     if (budget && !budget.fits()) return;
-    const work = () => diffAgainstMain(deps, compare, shot, main);
+    const work = () => diffAgainstMain(deps.writes, compare, shot, main);
     await (budget ? budget.spend(work) : work());
+    if (deps.writes.full) await deps.writes.flush();
   }
 }
