@@ -85,13 +85,19 @@ export async function runIteration(opts: DevRunOptions): Promise<DevIteration> {
   const started = performance.now();
   const { id, dir } = await newIteration(opts.store);
   const run: Run = { opts, timed: timedSession(opts.session), id, dir, started };
+  let it: DevIteration;
   try {
-    return await runInto(run);
+    it = await runInto(run);
   } catch (e) {
-    // A run that throws is stored as failed, so `dev` and the page can say so (PS-395).
-    await saveIteration(failedIteration(run, e));
+    // A run that throws is stored as failed, so `dev` and the page can say so (PS-395). The save is
+    // best effort: the run's own error is what the caller reports, not the store's.
+    await saveIteration(failedIteration(run, e)).catch(() => {});
     throw e;
   }
+  // Pruning is best effort and outside the try: a prune that throws must not fail a run that saved
+  // a good result, which would hide it from the caller. Every run prunes again, so it heals.
+  await pruneIterations(opts.store, opts.maxBytes).catch(() => {});
+  return it;
 }
 
 /** One run in flight: its options, the timed session, its id and dir and when it started. */
@@ -173,6 +179,5 @@ async function runInto({ opts, timed, id, dir, started }: Run): Promise<DevItera
     judge: null,
   };
   await saveIteration(it);
-  await pruneIterations(opts.store, opts.maxBytes);
   return it;
 }

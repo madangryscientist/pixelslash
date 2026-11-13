@@ -165,26 +165,24 @@ Gaps:
 
 ## Dev iterations, pins and the comparison point
 
-`packages/engine/src/dev-store.ts:108` `newIteration`, `122` `saveIteration`, `179` to `197` pins, `203` to `211` `comparisonPoint`, `226` to `242` prune; `dev-run.ts:243`.
+`packages/engine/src/dev-store.ts:110` `newIteration`, `130` `saveIteration`, `189` to `208` `withPinsLock` (the `pins.json` lock), `239` and `251` pin and unpin, `268` `comparisonPoint`, `291` `pruneIterations`; `dev-run.ts:84` `runIteration`.
 
 ```mermaid
 flowchart LR
   S((start)) -->|newIteration| run["running<br/>dir, no result.json"]
   run -->|"saveIteration<br/>temp file + rename"| done["complete"]
   done -->|"judgeIteration, explainIteration<br/>save again"| done
-  run -->|"runIteration throws"| stuck(["running forever"]):::gap
+  run -->|"runIteration throws<br/>result.json with error"| failed["failed<br/>never the comparison point"]
   done -->|"pruneIterations<br/>not pinned, not newest"| gone(["pruned"])
   done -->|"dev pin"| pinned["pinned"]
   pinned -->|"dev unpin"| done
-  classDef gap fill:#fbeceb,stroke:#b3362b,color:#7a1d14
 ```
 
 Comparison point, in order: the newest pin for the target (`pin`), else the latest iteration (`previous`), else `none`. Against main, a failed fetch falls back to local with the note "main's baselines unavailable". The session's mode is `previous` or `main` (toggled with `m`), and runs are serialised through one promise queue.
 
 Gaps:
 
-- A run that throws leaves its directory with no result, read as still running until it is no longer the newest and gets pruned.
-- `pins.json` is read, changed and written with no lock, and `dev pin` from another process bypasses the session queue, so pin updates can be lost.
+- A failed record whose own save throws (a read-only dir, a full disk) is dropped: the dir keeps no `result.json`, read as still running until it is no longer the newest and gets pruned. The caller is told the run's error all the same.
 
 ## Watch debouncer
 
