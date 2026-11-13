@@ -2,7 +2,6 @@ import { afterAll, describe, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { launchBrowser } from "../src/capture.ts";
 import { captureInto, RETRIED_ALONE } from "../src/capture-into.ts";
 import { CaptureError } from "../src/errors.ts";
 import { IMAGE_BROWSERS, parseConfig, type BrowserName } from "../src/config.ts";
@@ -16,6 +15,7 @@ import {
   type CaptureSession,
 } from "../src/snapshot.ts";
 import { cleanupDev, png, tmpDir } from "./dev-fixtures.ts";
+import { testBrowsers } from "./test-browsers.ts";
 
 const dirs: string[] = [];
 const server = Bun.serve({
@@ -45,18 +45,6 @@ async function out(): Promise<string> {
   dirs.push(dir);
   return dir;
 }
-
-/** Whether this machine can launch `name`: WebKit needs system libraries a dev box may lack. */
-async function launches(name: BrowserName): Promise<boolean> {
-  try {
-    await (await launchBrowser(name)).close();
-    return true;
-  } catch {
-    return false;
-  }
-}
-const launchable = new Set<BrowserName>();
-for (const b of IMAGE_BROWSERS) if (await launches(b)) launchable.add(b);
 
 const pinned = { env: { PIXELSLASH_IMAGE_VERSION: "test" }, listFonts: async () => [] };
 /** The settle timeout the never-settling page is given. */
@@ -180,7 +168,7 @@ describe("one page × three browsers", { timeout: 60_000 }, () => {
 });
 
 describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
-  test.skipIf(!launchable.has(name))(
+  test.skipIf(!testBrowsers.has(name))(
     "captures a page, fingerprints itself, and writes the same bytes twice",
     async () => {
       const config = parseConfig({
@@ -204,7 +192,7 @@ describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
     60_000,
   );
 
-  test.skipIf(!launchable.has(name))(
+  test.skipIf(!testBrowsers.has(name))(
     "fails a page that never settles with the settle timeout, not Playwright's",
     async () => {
       const config = parseConfig({
