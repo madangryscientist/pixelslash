@@ -303,7 +303,7 @@ export async function captureSnapshots(
 ): Promise<SnapshotResult> {
   const session = await openCaptureSession(config, deps);
   try {
-    return await captureInto(session, out);
+    return await captureInto(session, out, undefined, deps.warn ? { warn: deps.warn } : {});
   } finally {
     await session.close();
   }

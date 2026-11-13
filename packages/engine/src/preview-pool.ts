@@ -9,7 +9,7 @@ import {
 } from "./capture-open.ts";
 import type { Route, Stabilise, Variant } from "./config.ts";
 import { attemptFailure } from "./crash-retry.ts";
-import { CaptureError } from "./errors.ts";
+import { CaptureError, CaptureTimeout } from "./errors.ts";
 import type { Session } from "./setup.ts";
 import {
   emitStory,
@@ -99,7 +99,12 @@ export class PreviewPool {
  * Wait for the preview to say `id` has rendered after an in-place switch, or that it failed. The
  * body's `sb-show-main` is still there from the story before, so this reads the channel's phases.
  */
-async function awaitSwitched(page: Page, id: string, name: string, timeoutMs: number) {
+export async function awaitSwitched(
+  page: Pick<Page, "waitForFunction">,
+  id: string,
+  name: string,
+  timeoutMs: number,
+) {
   let state: { error: string | null } | null;
   try {
     state = await (
@@ -107,7 +112,7 @@ async function awaitSwitched(page: Page, id: string, name: string, timeoutMs: nu
     ).jsonValue();
   } catch (e) {
     if (e instanceof Error && e.name === "TimeoutError")
-      throw new CaptureError(`story ${name} did not render within ${timeoutMs}ms`);
+      throw new CaptureTimeout(`story ${name} did not render within ${timeoutMs}ms`);
     throw e;
   }
   if (state?.error) throw new CaptureError(`story ${name} errored: ${state.error}`);

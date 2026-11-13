@@ -1,4 +1,4 @@
-import { CaptureError } from "./errors.ts";
+import { CaptureError, CaptureTimeout } from "./errors.ts";
 import { elapsed, type SettleSteps } from "./timings.ts";
 
 // The page settle, apart from the launchers in capture.ts so the Playwright helper's Node bundle takes
@@ -148,13 +148,19 @@ async function timedMs(fn: () => Promise<unknown>): Promise<number> {
   return elapsed(started);
 }
 
-export async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+/** `fail` builds the error a timeout rejects with: a `CaptureTimeout` (retried alone) unless the caller says otherwise. */
+export async function withTimeout<T>(
+  work: Promise<T>,
+  ms: number,
+  message: string,
+  fail: (message: string) => CaptureError = (m) => new CaptureTimeout(m),
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       work,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new CaptureError(message)), ms);
+        timer = setTimeout(() => reject(fail(message)), ms);
       }),
     ]);
   } finally {

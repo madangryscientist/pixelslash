@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { FLAKY_POLICIES, type FlakyPolicy, type Route, type StorybookConfig } from "./config.ts";
-import { CaptureError, UsageError } from "./errors.ts";
+import { CaptureError, CaptureTimeout, UsageError } from "./errors.ts";
 import { joinOrigin } from "./routes.ts";
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -199,7 +199,11 @@ function storyState(): StoryState | null {
  * Wait until Storybook says the story rendered, within `timeoutMs`. A story that errors, or one
  * that never renders, fails the capture naming the snapshot.
  */
-export async function awaitStory(page: Page, name: string, timeoutMs: number): Promise<void> {
+export async function awaitStory(
+  page: Pick<Page, "waitForFunction">,
+  name: string,
+  timeoutMs: number,
+): Promise<void> {
   let state: StoryState | null;
   try {
     state = await (
@@ -207,7 +211,7 @@ export async function awaitStory(page: Page, name: string, timeoutMs: number): P
     ).jsonValue();
   } catch (e) {
     if (e instanceof Error && e.name === "TimeoutError")
-      throw new CaptureError(`story ${name} did not render within ${timeoutMs}ms`);
+      throw new CaptureTimeout(`story ${name} did not render within ${timeoutMs}ms`);
     throw e;
   }
   if (state?.state === "error") throw new CaptureError(`story ${name} errored: ${state.message}`);

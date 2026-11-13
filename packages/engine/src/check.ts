@@ -256,7 +256,12 @@ export async function checkAgainstServer(
   };
   await rm(dirs.main, { recursive: true, force: true });
   await rm(dirs.report, { recursive: true, force: true });
-  const capture = await captureInto(shooting, dirs.branch);
+  const capture = await captureInto(
+    shooting,
+    dirs.branch,
+    undefined,
+    deps.warn ? { warn: deps.warn } : {},
+  );
   const { manifest, shots: captured, media } = capture;
   const client = clientOf(opts, deps);
   const { picks, removed } = await preview(client, ctx, opts.projectId, manifest.snapshots);

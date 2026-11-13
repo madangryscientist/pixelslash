@@ -98,7 +98,12 @@ export async function captureLocal(
   try {
     const shooting = onlyRoutes(session, flags.only);
     const total = shooting.routes.length * config.variants.length;
-    const result = await captureInto(watched(shooting, watch, total), flags.out);
+    const result = await captureInto(
+      watched(shooting, watch, total),
+      flags.out,
+      undefined,
+      deps.warn ? { warn: deps.warn } : {},
+    );
     return {
       ...result,
       timings: buildTimings(
@@ -166,10 +171,12 @@ export async function runCapture(
     ...deps,
     warn,
   });
+  // Read before the run: its own workers raise the load average, and the re-captures should not give way to that.
+  const recaptureConcurrency = config.concurrency ?? defaultConcurrency();
   try {
     // Stories may be shot on a reused preview page here, and only here: each shot meets its
     // baseline in the upload, and one that is not byte for byte its baseline is shot again fresh.
-    const result = await captureInto(session, flags.out, undefined, { reuse: true });
+    const result = await captureInto(session, flags.out, undefined, { reuse: true, warn });
     const timings = buildTimings(
       started,
       result.shots,
@@ -182,7 +189,7 @@ export async function runCapture(
     return await uploadDir(flags.out, { ...flags.uploadFlags, "flake-retries": retries }, io, {
       ...deps,
       recapture: (e) => recapture(session, e),
-      recaptureConcurrency: config.concurrency ?? defaultConcurrency(),
+      recaptureConcurrency,
       reused: result.reused,
       timings,
     });
