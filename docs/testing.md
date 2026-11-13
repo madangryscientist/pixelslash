@@ -84,7 +84,7 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | `apps/web/src/api` | 15 | integration | the `/api/v1` handler over a real `Db` and blob store, including the `ENDPOINTS` / `docs/cli.md` agreement |
 | `apps/web/src/diff` | 21 | integration | `processBuild` end to end on a real `Db`: baselines, retries, resume, timings. `wasm`, `measure`, `identical-bytes` are unit |
 | `apps/web/src/github`, `storage`, `server`, `preview` | 11 | integration | the GitHub client against a local stand-in, R2-shaped blobs, the connection patch |
-| `apps/web/src/lib`, `auth`, `ai` | 31 | unit | pure helpers and the model client against a fake endpoint. `use-review-keys.hook.test.tsx` renders a hook in happy-dom (its `@vitest-environment` line) to type a key in the commit that shows another shot, which no pure function can reach |
+| `apps/web/src/lib`, `auth`, `ai` | 32 | unit | pure helpers and the model client against a fake endpoint. `use-review-keys.hook.test.tsx` renders a hook in happy-dom (its `@vitest-environment` line) to type a key in the commit that shows another shot, which no pure function can reach; `use-decision.hook.test.tsx` does the same for the decide-then-move flow, with a stubbed server call |
 | `apps/web/deploy` | 7 | integration | the Docker and SSH scripts, run against temp dirs |
 | `apps/site/src/content` | 3 | integration | the pages are built from the repo's own docs, so a heading or a code block cannot drift |
 | `packages/playwright`, `examples/playwright-node` | 2 | integration | the Playwright integration against an upload stub |
