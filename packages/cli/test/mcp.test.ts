@@ -1,5 +1,7 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -8,60 +10,11 @@ import { isObj } from "../src/api.ts";
 import { mcpServer } from "../src/mcp.ts";
 import { run } from "../src/run.ts";
 import { capture, cleanup, tmp } from "./support.ts";
-import { SERVER, USER_TOKEN, fakeApi } from "./remote-support.ts";
+import { SERVER, USER_TOKEN } from "./remote-support.ts";
+import { PNG_BYTES, api } from "./mcp-support.ts";
 import { button, manifestDir, metricsFile, parityApi } from "./parity-support.ts";
 
 afterAll(cleanup);
-
-const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
-
-/** The fake API, plus the read endpoints the MCP tools add and a signed image route. */
-function api(server = SERVER) {
-  const base = fakeApi();
-  Object.assign(base.replies, {
-    "/api/v1/snapshots/s1": {
-      api_version: 1,
-      snapshot: {
-        id: "s1",
-        name: "home",
-        group: "changed",
-        images: {
-          head: `${server}/images/head`,
-          baseline: `${server}/images/base`,
-          diff: null,
-        },
-      },
-    },
-    "/api/v1/snapshots/s3": {
-      api_version: 1,
-      snapshot: { id: "s3", images: {}, metrics_url: `${server}/images/orgs/o/m.metrics.json` },
-    },
-    "/api/v1/snapshots/s2": {
-      api_version: 1,
-      snapshot: { id: "s2", images: { head: "https://elsewhere.example/x.png" } },
-    },
-    "/api/v1/projects/p1/flakes": { api_version: 1, flakes: [{ id: "f1" }], next_cursor: null },
-    "/api/v1/projects/p1/detection-flags": {
-      api_version: 1,
-      detection_flags: [{ id: "d1", kind: "missed" }],
-      next_cursor: null,
-    },
-  });
-  const images: string[] = [];
-  const fetch = async (raw: string, init?: RequestInit) => {
-    const url = new URL(raw);
-    if (!url.pathname.startsWith("/images/")) return base.fetch(raw, init);
-    images.push(url.pathname);
-    if (url.pathname.endsWith(".metrics.json"))
-      return Response.json({
-        version: "1.0",
-        root: "a",
-        parts: { a: { box: { x: 0, y: 0, w: 1, h: 2 } } },
-      });
-    return new Response(PNG_BYTES, { headers: { "content-type": "image/png" } });
-  };
-  return { ...base, fetch, images };
-}
 
 async function connected(
   fake = api(),
@@ -280,10 +233,17 @@ describe("pixelslash mcp", () => {
 });
 
 describe("pixelslash mcp over stdio", () => {
-  test("a client spawning the bin lists projects and reads a snapshot's images", async () => {
+  let client: Client;
+  let http: ReturnType<typeof Bun.serve>;
+
+  // The spawn and the handshake are the fixture, and the whole cost of this file's one slow
+  // test: a process starting from cold, which a busy host stretches by many times. The test
+  // times only what the server does once it is up. The hook keeps the 5 s the test had: the
+  // gain is the shared cache above, not a bigger budget.
+  beforeAll(async () => {
     let origin = "";
     const fake = api("http://placeholder");
-    const http = Bun.serve({
+    http = Bun.serve({
       port: 0,
       hostname: "127.0.0.1",
       fetch: (req) => {
@@ -300,22 +260,33 @@ describe("pixelslash mcp over stdio", () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [fileURLToPath(new URL("../src/index.ts", import.meta.url)), "mcp", "--server", origin],
-      env: { PATH: process.env.PATH ?? "", HOME: await tmp(), PIXELSLASH_TOKEN: USER_TOKEN },
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: await tmp(),
+        // A fresh HOME has no Bun cache, so the bin transpiled the whole CLI and the MCP SDK from
+        // nothing on every spawn (0.44 s against 0.27 s idle). The cache is the machine's, not the
+        // user's login, so the child shares the parent's.
+        XDG_CACHE_HOME: process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"),
+        PIXELSLASH_TOKEN: USER_TOKEN,
+      },
       stderr: "pipe",
     });
-    const client = new Client({ name: "test", version: "0" });
-    try {
-      await client.connect(transport);
-      const projects = await tool(client, "list_projects");
-      expect(json(projects).projects).toHaveLength(1);
-      const shots = await tool(client, "get_snapshot_images", {
-        snapshot_id: "s1",
-        which: "head",
-      });
-      expect(shots.content[1]).toMatchObject({ type: "image", mimeType: "image/png" });
-    } finally {
-      await client.close();
-      await http.stop(true);
-    }
+    client = new Client({ name: "test", version: "0" });
+    await client.connect(transport);
+  }, 5_000);
+
+  afterAll(async () => {
+    await client?.close();
+    await http?.stop(true);
+  });
+
+  test("a client spawning the bin lists projects and reads a snapshot's images", async () => {
+    const projects = await tool(client, "list_projects");
+    expect(json(projects).projects).toHaveLength(1);
+    const shots = await tool(client, "get_snapshot_images", {
+      snapshot_id: "s1",
+      which: "head",
+    });
+    expect(shots.content[1]).toMatchObject({ type: "image", mimeType: "image/png" });
   });
 });
