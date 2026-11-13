@@ -69,11 +69,29 @@ jobs:
       - name: Install the Playwright browser
         working-directory: packages/engine
         run: bunx playwright install --with-deps chromium-headless-shell
+      - name: DEBUG pre-run state
+        run: |
+          mkdir -p "$RUNNER_TEMP/hd"
+          git status --porcelain --ignored | grep -v node_modules | head -50 > "$RUNNER_TEMP/hd/status-before.txt" || true
+          ls -la .nx/workspace-data .nx/cache | head -60 > "$RUNNER_TEMP/hd/nx-dirs.txt" || true
       - run: bun run typecheck
+        env: { NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs", NX_HASH_DUMP: "${{ runner.temp }}/hd/typecheck.json" }
       - run: bun run lint
+        env: { NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs", NX_HASH_DUMP: "${{ runner.temp }}/hd/lint.json" }
       - run: bun run format:check
       # Includes bench:check (the regression guard); never bench:perf.
       - run: bun run test
+        env: { NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs", NX_HASH_DUMP: "${{ runner.temp }}/hd/test.json" }
+      - name: DEBUG post-run state
+        if: always()
+        run: |
+          git status --porcelain --ignored | grep -v node_modules | head -80 > "$RUNNER_TEMP/hd/status-after.txt" || true
+      - name: DEBUG upload hash dumps
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nx-hash-dump-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hd
 
   # The Playwright helper on plain Node, outside the workspace (PS-237): both packages are packed,
   # installed from their tarballs into a copy of examples/playwright-node, its tests run with no `bun`
