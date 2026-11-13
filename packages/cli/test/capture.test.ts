@@ -105,6 +105,25 @@ describe("pixelslash capture", () => {
     expect(await run(["capture", "--config", config], bad.io, pinned)).toBe(2);
     expect(bad.stderr).toMatch(/variants\[0\]\.browser/);
   });
+
+  test.each([
+    [{ threshold: 2 }, /diff\.threshold must be a number from 0 to 1/],
+    [{ minChangedPixels: 1.5 }, /diff\.minChangedPixels must be a non-negative integer/],
+    [{ thresold: 0.1 }, /diff\.thresold is not a diff option/],
+  ])(
+    "a bad `diff` in the config, %j, is a usage error naming the key, exit 2",
+    async (diff, message) => {
+      const dir = await tmp();
+      const config = join(dir, "pixelslash.config.json");
+      await Bun.write(config, JSON.stringify({ baseUrl: "http://x", routes: ["/"], diff }));
+      const cap = capture();
+      expect(
+        await run(["capture", "--config", config, "--out", join(dir, "out")], cap.io, pinned),
+      ).toBe(2);
+      expect(cap.stderr).toMatch(message);
+      expect(cap.stderr).toContain("pixelslash capture [--config FILE]");
+    },
+  );
 });
 
 describe("pixelslash capture, media (PS-230)", () => {

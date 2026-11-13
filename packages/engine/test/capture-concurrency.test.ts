@@ -1,8 +1,12 @@
-import { afterAll, describe, expect, test } from "vitest";
+import { createHash } from "node:crypto";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { parseConfig } from "../src/config.ts";
 import { CaptureError, CaptureTimeout } from "../src/errors.ts";
 import { DEFAULT_CONCURRENCY_CAP, captureInto, defaultConcurrency } from "../src/capture-into.ts";
-import type { CaptureSession } from "../src/snapshot.ts";
+import { openCaptureSession, type CaptureSession } from "../src/snapshot.ts";
 import { runIteration } from "../src/dev-run.ts";
 import { cleanupDev, png, tmpDir, tmpStore } from "./dev-fixtures.ts";
 
@@ -219,4 +223,81 @@ describe("dev still takes one shot at a time (PS-436)", () => {
     expect(seen.started).toHaveLength(ROUTES.length * 2);
     expect(seen.most).toBe(1);
   });
+});
+
+const SITE = fileURLToPath(new URL("../../../fixtures/capture/site", import.meta.url));
+/** `/masks` draws random colours and text on every load; only its masks make it capture the same. */
+const MASKS = [".ad", { x: 0, y: 200, width: 320, height: 40 }];
+
+/** Every file under `dir`, relative, sorted, with the sha256 of its bytes. */
+async function hashes(dir: string): Promise<Record<string, string>> {
+  const files = (await readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((e) => e.isFile() && e.name.endsWith(".png"))
+    .map((e) => join(e.parentPath, e.name).slice(dir.length + 1))
+    .toSorted();
+  return Object.fromEntries(
+    await Promise.all(
+      files.map(async (f) => [
+        f,
+        createHash("sha256")
+          .update(await Bun.file(join(dir, f)).bytes())
+          .digest("hex"),
+      ]),
+    ),
+  );
+}
+
+describe("captureInto keeps the pixels at any concurrency (real Chromium)", () => {
+  let site: ReturnType<typeof Bun.serve>;
+  beforeAll(() => {
+    site = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      async fetch(req) {
+        const path = new URL(req.url).pathname;
+        const file = Bun.file(join(SITE, `${path === "/" ? "index" : path.slice(1)}.html`));
+        if (!(await file.exists())) return new Response("not found", { status: 404 });
+        return new Response(file, { headers: { "content-type": "text/html" } });
+      },
+    });
+  });
+  afterAll(async () => {
+    await site.stop(true);
+  });
+
+  /** One browser launch, one capture of the stable pages at `concurrency`, into a fresh dir. */
+  async function captureAt(concurrency: number) {
+    const config = parseConfig({
+      baseUrl: `http://127.0.0.1:${site.port}`,
+      // Pages that render the same every time; `random`, `motion` and `ticker` change by design.
+      routes: ["/", "/ignore", { path: "/masks", masks: MASKS }, "/early-timers"],
+      variants: [
+        { name: "desktop", viewport: { width: 800, height: 400 } },
+        { name: "phone", viewport: { width: 375, height: 600 } },
+      ],
+    });
+    const browser = await openCaptureSession(config, {
+      env: { PIXELSLASH_IMAGE_VERSION: "test" },
+      listFonts: async () => [],
+    });
+    try {
+      const out = await tmpDir();
+      const { manifest, captureWorkers } = await captureInto(browser, out, concurrency);
+      return { out, manifest, captureWorkers, shots: await hashes(out) };
+    } finally {
+      await browser.close();
+    }
+  }
+
+  test("one worker and six write the same shots, with the same bytes", async () => {
+    const one = await captureAt(1);
+    const six = await captureAt(6);
+    const names = (m: typeof one.manifest) =>
+      m.snapshots.map((e) => `${e.name}/${e.variant.name} ${e.file}`);
+    expect(names(one.manifest)).toHaveLength(8);
+    expect([one.captureWorkers, six.captureWorkers]).toEqual([1, 6]);
+    expect(names(six.manifest)).toEqual(names(one.manifest));
+    expect(Object.keys(one.shots)).toHaveLength(8);
+    expect(six.shots).toEqual(one.shots);
+  }, 60_000);
 });
