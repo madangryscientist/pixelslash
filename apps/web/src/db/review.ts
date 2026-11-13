@@ -1,6 +1,7 @@
 import type { A11yDiff } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { and, eq, ne } from "drizzle-orm";
+import { nextToReviewId } from "#/lib/build-tabs";
 import { SNAPSHOT_GROUPS, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
@@ -13,6 +14,7 @@ import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
 import {
   type AiReview,
+  type BuildStatus,
   type DiffLocation,
   type DiffOptions,
   type DiffResult,
@@ -300,6 +302,23 @@ export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> 
   await refreshBuilds(db, moved);
   const verdict = await refreshDecided(db, shot.buildId);
   return { verdict, buildIds: [shot.buildId, ...moved] };
+}
+
+/**
+ * What the reviewer needs once a decision on `snapshotId` is written: the build's status as it is
+ * now (another reviewer's reject may have failed it since) and the next shot still awaiting a
+ * decision. One read of the build, taken after the write, so the client moves on without a second
+ * round trip.
+ */
+export async function afterDecision(
+  db: Db,
+  input: { projectId: string; buildId: string; snapshotId: string },
+): Promise<{ buildStatus: BuildStatus; nextToReviewId: string | null }> {
+  const view = await buildView(db, input.projectId, input.buildId);
+  return {
+    buildStatus: view.build.status,
+    nextToReviewId: nextToReviewId(view.snapshots, input.snapshotId),
+  };
 }
 
 /**

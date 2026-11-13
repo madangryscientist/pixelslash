@@ -21,7 +21,7 @@ import {
   withdrawInvite,
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
-import { NotReviewableError, buildView, decideAll, decideShot } from "#/db/review";
+import { NotReviewableError, afterDecision, buildView, decideAll, decideShot } from "#/db/review";
 import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS } from "#/db/schema";
@@ -324,7 +324,17 @@ export const reviewShot = createServerFn({ method: "POST" })
     const db = database();
     const decided = await orConflict(decideShot(db, { ...data, userId: user.id }));
     await syncChecks(db, decided.buildIds);
-    return { status: decided.verdict };
+    // The decided build is the first of `buildIds`. Read after the write, so the reviewer can move on
+    // without another round trip, and another reviewer's reject in between shows in `buildStatus`.
+    const [buildId = ""] = decided.buildIds;
+    return {
+      status: decided.verdict,
+      ...(await afterDecision(db, {
+        projectId: data.projectId,
+        buildId,
+        snapshotId: data.snapshotId,
+      })),
+    };
   });
 
 export const acceptBuild = createServerFn({ method: "POST" })
