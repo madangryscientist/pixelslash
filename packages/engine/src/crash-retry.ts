@@ -1,5 +1,5 @@
 import type { ShotProgress, ShotStep } from "./capture-open.ts";
-import { CaptureError } from "./errors.ts";
+import { CaptureError, CaptureTimeout } from "./errors.ts";
 
 /**
  * Whether a failed attempt was the page crashing (PS-332): Playwright rejects the pending call
@@ -65,7 +65,11 @@ export async function attemptFailure(
   const crashed =
     pageCrashed(e, progress.crashed) || (page !== undefined && (await crashReportedSoon(page)));
   if (crashed) return new PageCrash(progress.step, message);
-  return e instanceof CaptureError ? e : new CaptureError(`capture failed for ${url}: ${message}`);
+  if (e instanceof CaptureError) return e;
+  const failed = `capture failed for ${url}: ${message}`;
+  return progress.step === "goto" && e instanceof Error && e.name === "TimeoutError"
+    ? new CaptureTimeout(failed)
+    : new CaptureError(failed);
 }
 
 /** One attempt's crash, kept apart from every other failure so `retryOnCrash` retries only this. */

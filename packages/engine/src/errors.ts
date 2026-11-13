@@ -2,6 +2,13 @@
 export class UsageError extends Error {}
 /** A page could not be captured (down URL, HTTP error, never settled). Exit 1. */
 export class CaptureError extends Error {}
+/**
+ * A capture step ran out of its time (a story that never rendered, a `goto` that never answered, a
+ * page that never settled). Its own class so `captureInto` can set such a shot aside and shoot it
+ * once more, alone, after the run: on a busy machine a timeout says the machine was slow, which a
+ * quiet retry tells apart from a page that really never renders. Never classify by message text.
+ */
+export class CaptureTimeout extends CaptureError {}
 /** A `pixelslash dev` session lock could not be taken and no other session holds it (PS-393). Exit 1. */
 export class DevLockError extends Error {}
 /** The Figma API refused or returned nothing usable. Exit 1. */

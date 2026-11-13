@@ -6,5 +6,6 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.test.ts"],
     globalSetup: ["../../scripts/test-tmp-scope.ts"],
+    setupFiles: ["../../scripts/test-idle-machine.ts"],
   },
 });

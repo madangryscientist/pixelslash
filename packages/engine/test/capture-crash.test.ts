@@ -239,12 +239,18 @@ describe(
       expect(contexts).toBe(2);
     });
 
-    test("a timeout is not retried", async () => {
+    // Not the crash retry's: that is only for a crash. `captureInto` sets a timeout aside and shoots
+    // it once more alone after the run (PS-474), so the page that never answers is tried twice and
+    // then fails, saying so.
+    test("a timeout is not a crash: it is shot once more alone, then fails", async () => {
       const { warnings, error } = await run("/hang", 600);
       expect(error).toBeInstanceOf(CaptureError);
-      expect(failure(error).message).toMatch(/^capture failed for .*\/hang: /);
+      expect(failure(error).message).toMatch(
+        /^capture failed for .*\/hang: [\s\S]*; retried alone after the run and timed out again$/,
+      );
       expect(warnings.filter((w) => /crashed/.test(w))).toEqual([]);
-      expect(contexts).toBe(1);
+      expect(warnings.filter((w) => w.startsWith("retry: 1 shot timed out"))).toHaveLength(1);
+      expect(contexts).toBe(2);
     });
 
     test("an HTTP 500 is not retried", async () => {
