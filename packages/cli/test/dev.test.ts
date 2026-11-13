@@ -137,59 +137,54 @@ describe("pixelslash dev --once", () => {
 });
 
 describe("pixelslash dev", () => {
-  // Not run on CI: it timed out at 90s there on PR #85 (a file-watch race) and passes locally. Run it on CI again once the cause is found.
-  test.runIf(!process.env["CI"])(
-    "re-runs on a save, and a second dev attaches to the live session",
-    async () => {
-      const { cwd, file } = await project();
-      const [keys, cap] = [keyboard(), capture()];
-      const store = devStore(cwd);
-      const first = run(["dev", "index"], cap.io, { ...base, cwd, env: pinned, keys });
-      try {
-        const owner = await until(async () =>
-          (await liveSession(store))?.url ? await liveSession(store) : undefined,
-        );
-        await until(async () => (cap.stdout.includes("#1 vs") ? true : undefined));
-        await writeFile(file, `<body style="margin:0;background:#fff"><h1>saved</h1></body>`);
-        await until(async () => (cap.stdout.includes("#2 vs #1") ? true : undefined));
-        expect(cap.stdout).toMatch(
-          /#2 vs #1: \d+ regions changed · \d+ px · ours \d+\.\d s · settle \d+\.\d s · http:\/\/127\.0\.0\.1:\d+/,
-        );
+  test("re-runs on a save, and a second dev attaches to the live session", async () => {
+    const { cwd, file } = await project();
+    const [keys, cap] = [keyboard(), capture()];
+    const store = devStore(cwd);
+    const first = run(["dev", "index"], cap.io, { ...base, cwd, env: pinned, keys });
+    try {
+      const owner = await until(async () =>
+        (await liveSession(store))?.url ? await liveSession(store) : undefined,
+      );
+      await until(async () => (cap.stdout.includes("#1 vs") ? true : undefined));
+      await writeFile(file, `<body style="margin:0;background:#fff"><h1>saved</h1></body>`);
+      await until(async () => (cap.stdout.includes("#2 vs #1") ? true : undefined));
+      expect(cap.stdout).toMatch(
+        /#2 vs #1: \d+ regions changed · \d+ px · ours \d+\.\d s · settle \d+\.\d s · http:\/\/127\.0\.0\.1:\d+/,
+      );
 
-        const once = capture();
-        const second = await run(["dev", "--once", "--json"], once.io, {
-          ...base,
-          cwd,
-          keys: keyboard(),
-        });
-        expect(second).toBe(0);
-        expect(JSON.parse(once.stdout)).toMatchObject({
-          page: owner?.url,
-          against: { kind: "previous" },
-        });
+      const once = capture();
+      const second = await run(["dev", "--once", "--json"], once.io, {
+        ...base,
+        cwd,
+        keys: keyboard(),
+      });
+      expect(second).toBe(0);
+      expect(JSON.parse(once.stdout)).toMatchObject({
+        page: owner?.url,
+        against: { kind: "previous" },
+      });
 
-        const elsewhere = capture();
-        expect(
-          await run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd }),
-        ).toBe(2);
-        expect(elsewhere.stderr).toMatch(/session is on index, not other/);
+      const elsewhere = capture();
+      expect(await run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd })).toBe(
+        2,
+      );
+      expect(elsewhere.stderr).toMatch(/session is on index, not other/);
 
-        const otherKeys = keyboard();
-        const attached = capture();
-        const following = run(["dev"], attached.io, { ...base, cwd, keys: otherKeys });
-        await until(async () =>
-          attached.stdout.includes("attached to the session on index") ? true : undefined,
-        );
-        otherKeys.press("q");
-        expect(await following).toBe(0);
-      } finally {
-        keys.press("q");
-      }
-      expect(await first).toBe(0);
-      expect(await liveSession(store)).toBeUndefined();
-    },
-    90_000,
-  );
+      const otherKeys = keyboard();
+      const attached = capture();
+      const following = run(["dev"], attached.io, { ...base, cwd, keys: otherKeys });
+      await until(async () =>
+        attached.stdout.includes("attached to the session on index") ? true : undefined,
+      );
+      otherKeys.press("q");
+      expect(await following).toBe(0);
+    } finally {
+      keys.press("q");
+    }
+    expect(await first).toBe(0);
+    expect(await liveSession(store)).toBeUndefined();
+  }, 90_000);
 
   test("SIGTERM ends it like q, and the next dev starts its own session (ob 1761)", async () => {
     const { cwd } = await project();
