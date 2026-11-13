@@ -1,5 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { dragOver } from "./draw";
 import { openSection } from "./snapshot-viewer";
 import { rivalContext, rivalSession } from "./rival";
 
@@ -10,17 +11,12 @@ import { rivalContext, rivalSession } from "./rival";
 
 /** Drag over the 40px Branch shot from image px `from` to `to`, at whatever size it is drawn. */
 async function drag(page: Page, from: number, to: number) {
-  const layer = page.getByTestId("flag-draw").nth(1);
-  // The side panel's button scrolled the page down; the shot is back up top.
-  await layer.scrollIntoViewIfNeeded();
-  const box = await layer.boundingBox();
-  if (!box) throw new Error("no draw layer");
-  const at = (px: number) =>
-    [box.x + (px * box.width) / 40, box.y + (px * box.height) / 40] as const;
-  await page.mouse.move(...at(from));
-  await page.mouse.down();
-  await page.mouse.move(...at(to), { steps: 4 });
-  await page.mouse.up();
+  await dragOver(
+    page,
+    page.getByTestId("flag-draw").nth(1),
+    [from / 40, from / 40],
+    [to / 40, to / 40],
+  );
 }
 
 const isAdd = (url: string, method: string) => method === "POST" && url.includes("/_serverFn/");
@@ -28,8 +24,10 @@ const isAdd = (url: string, method: string) => method === "POST" && url.includes
 test("a box drawn over the change flips the verdict, exports as config, and stays in its org", async ({
   page,
   browser,
-}) => {
-  const { token, projectId } = await provision(page, "Ignore Co", "ignores");
+}, testInfo) => {
+  // Unique per repeat, so `--repeat-each` runs on one server and one D1 (every id below is unique).
+  const n = testInfo.repeatEachIndex;
+  const { token, projectId } = await provision(page, `Ignore Co ${n}`, "ignores");
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
   await page.waitForTimeout(1100);
@@ -97,7 +95,7 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
   // Another org: the screens are not found, and the same write, replayed, adds nothing.
   const rival = await rivalContext(
     browser,
-    await rivalSession("ignore-rival", 9998, "Ignore Rival"),
+    await rivalSession(`ignore-rival-${n}`, 90000 + n, `Ignore Rival ${n}`),
   );
   const other = await rival.newPage();
   for (const url of [`/projects/${projectId}/settings`, snapshotPath]) {
