@@ -11,6 +11,7 @@ import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
 import { useHydrated } from "#/components/ui";
 import type { DiffResult } from "#/db/schema";
+import type { BaseNames } from "#/lib/viewer-bases";
 
 /** Where the divider sits (0 is all Branch, 100 all Main), or Branch's opacity in onion skin. */
 type SliderState = {
@@ -48,7 +49,7 @@ function keyStep(event: KeyboardEvent, position: number): number | null {
  * focusable `role=slider`, so the wipe works without a pointer. hackcove has no Slider, so the
  * line is drawn here (listed as a kit gap in the PR).
  */
-function Handle({ slider }: { slider: SliderState }) {
+function Handle({ slider, baseName }: { slider: SliderState; baseName: string }) {
   const { position, setPosition } = slider;
   return (
     <div
@@ -58,7 +59,7 @@ function Handle({ slider }: { slider: SliderState }) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={position}
-      aria-valuetext={`Main to ${position}%, Branch after`}
+      aria-valuetext={`${baseName} to ${position}%, Branch after`}
       onKeyDown={(event) => {
         const next = keyStep(event, position);
         if (next === null) return;
@@ -117,11 +118,13 @@ function ShotLayers({
   mains,
   branches,
   boxes,
+  names,
 }: {
   name: string;
   mainUrl: string | null;
   branchUrl: string | null;
   slider: SliderState;
+  names: Pick<BaseNames, "short" | "alt">;
   mains: string;
   branches: string;
   boxes: ReactNode;
@@ -139,7 +142,7 @@ function ShotLayers({
       {mainUrl ? (
         <img
           src={mainUrl}
-          alt={`${name} on main`}
+          alt={`${name} ${names.alt}`}
           className="block"
           draggable={false}
           style={{ width: mains }}
@@ -163,11 +166,11 @@ function ShotLayers({
           />
         </div>
       )}
-      {wipe && <Handle slider={slider} />}
+      {wipe && <Handle slider={slider} baseName={names.short} />}
       {boxes}
       {wipe && (
         <div className="pointer-events-none absolute inset-x-2 top-2 flex justify-between">
-          <Pill>Main</Pill>
+          <Pill>{names.short}</Pill>
           <Pill>Branch</Pill>
         </div>
       )}
@@ -179,20 +182,25 @@ function ShotLayers({
 export function SliderControls({
   slider,
   branchUrl,
+  baseName = "Main",
 }: {
   slider: SliderState;
   branchUrl: string | null;
+  /** The left side's short name: "Main", or the earlier build the shot is being compared with. */
+  baseName?: string;
 }) {
   const hydrated = useHydrated();
   const { position, onion, setPosition, setOnion } = slider;
   return (
     <>
       <label className="flex items-center gap-2">
-        <Caption>Main</Caption>
+        <Caption>{baseName}</Caption>
         <input
           type="range"
           aria-label="Compare position"
-          title={onion ? `Branch at ${position}% opacity` : `Main to ${position}%, Branch after`}
+          title={
+            onion ? `Branch at ${position}% opacity` : `${baseName} to ${position}%, Branch after`
+          }
           min={0}
           max={100}
           value={position}
@@ -207,7 +215,7 @@ export function SliderControls({
         size="sm"
         pressed={onion}
         disabled={!hydrated}
-        title="Fade Branch over Main instead of wiping"
+        title={`Fade Branch over ${baseName} instead of wiping`}
         onClick={() => setOnion(!onion)}
       >
         Onion skin
@@ -236,6 +244,7 @@ export function SnapshotSlider({
   scale,
   crop,
   slider,
+  names,
 }: {
   name: string;
   mainUrl: string | null;
@@ -245,6 +254,7 @@ export function SnapshotSlider({
   scale: Scale;
   crop: Crop | null;
   slider: SliderState;
+  names: BaseNames;
 }) {
   const mainW = result?.mainWidth ?? 0;
   const branchW = result?.branchWidth ?? 0;
@@ -257,6 +267,7 @@ export function SnapshotSlider({
         mainUrl={mainUrl}
         branchUrl={branchUrl}
         slider={slider}
+        names={names}
         mains={share(mainW || 1)}
         branches={share(branchW || 1)}
         boxes={highlight && mainUrl ? <FrameBoxes result={result} frameW={frameW} /> : null}
