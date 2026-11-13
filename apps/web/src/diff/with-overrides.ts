@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
 import type { Db } from "#/db/db";
 import { loadIgnoreBoxes } from "#/db/ignore-boxes";
 import { loadOverrides, optionsKey } from "#/db/overrides";
-import { type ResolvedDiff, snapshots } from "#/db/schema";
+import type { ResolvedDiff } from "#/db/schema";
+import type { SnapshotWrites } from "#/db/snapshot-writes";
 import type { SnapshotRow } from "./compare";
 
 /** The options a stored result was measured with: the resolved set, or as uploaded before ob 1495. */
@@ -31,9 +31,11 @@ const stood = (shot: SnapshotRow) => shot.diffStatus !== null || shot.rebaseline
  * ignore boxes (ob 1499), and store them with it, so the comparer measures with them and the page
  * can say where each came from. A shot whose options or boxes moved since it was measured (one set
  * or cleared) loses its result, against its baseline and against main, so it is measured again.
+ * The rows' writes are queued in the run's `writes`, written with the results that follow them.
  */
 export async function withOverrides(
   db: Db,
+  writes: SnapshotWrites,
   projectId: string,
   rows: SnapshotRow[],
 ): Promise<SnapshotRow[]> {
@@ -51,10 +53,8 @@ export async function withOverrides(
       boxesKey(resolvedDiff) !== boxesKey(shot.resolvedDiff);
     const cleared = moved ? { ...UNMEASURED, ...(stood(shot) ? UNREVIEWED : {}) } : {};
     if (moved || JSON.stringify(resolvedDiff) !== JSON.stringify(shot.resolvedDiff))
-      await db
-        .update(snapshots)
-        .set({ resolvedDiff, ...cleared })
-        .where(eq(snapshots.id, shot.id));
+      writes.update(shot.id, { resolvedDiff, ...cleared });
+    if (writes.full) await writes.flush();
     out.push({ ...shot, resolvedDiff, ...cleared });
   }
   return out;

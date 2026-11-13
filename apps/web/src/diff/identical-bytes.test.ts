@@ -144,6 +144,37 @@ describe("identical bytes", () => {
     expect(await ctx.scoped.get(overlay)).toBeNull();
   });
 
+  test("an old overlay whose delete fails is left behind, and the shot keeps its result", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const branch = await upload(ctx, branchSpec(reEncoded));
+    const measured = await onlyShot(ctx, branch);
+    const overlay = measured.diffKey ?? "";
+
+    const [main] = await ctx.db.select().from(snapshots).where(eq(snapshots.diffStatus, "new"));
+    await ctx.db
+      .update(snapshots)
+      .set({
+        imageSha256: main?.imageSha256 ?? null,
+        imageSize: main?.imageSize ?? null,
+        diffStatus: null,
+      })
+      .where(eq(snapshots.id, measured.id));
+    await ctx.db.update(builds).set({ status: "errored" }).where(eq(builds.id, branch.id));
+    const failing: BlobStore = {
+      ...ctx.scoped,
+      delete: async () => {
+        throw new Error("the store is down");
+      },
+    };
+    const again = await getBuild(ctx.db, ctx.projectId, branch.id);
+    const ended = await processBuild({ db: ctx.db, blobs: failing }, again);
+
+    expect(ended).toMatchObject({ status: "passed", error: null });
+    expect(await onlyShot(ctx, branch)).toMatchObject({ diffStatus: "unchanged", diffKey: null });
+    expect(await ctx.scoped.get(overlay)).not.toBeNull();
+  });
+
   test("carry (ob 1712) is as before: identical to an undecided change carries it, without reading it", async () => {
     const ctx = await context();
     await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
