@@ -3,8 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { launchBrowser } from "../src/capture.ts";
-import { captureInto } from "../src/capture-into.ts";
-import { CRASH_GRACE_MS } from "../src/crash-retry.ts";
+import { captureInto, RETRIED_ALONE } from "../src/capture-into.ts";
+import { CaptureError } from "../src/errors.ts";
 import { IMAGE_BROWSERS, parseConfig, type BrowserName } from "../src/config.ts";
 import { compareSnapshots } from "../src/compare-snapshots.ts";
 import { readManifest } from "../src/manifest.ts";
@@ -205,7 +205,7 @@ describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
   );
 
   test.skipIf(!launchable.has(name))(
-    "fails a page that never settles, inside the timeout",
+    "fails a page that never settles with the settle timeout, not Playwright's",
     async () => {
       const config = parseConfig({
         ...base,
@@ -213,25 +213,28 @@ describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
         variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
         stabilise: { timeoutMs: SETTLE_MS },
       });
-      // The clock starts once the browser is up: launching and closing a browser is the host's
-      // cost, and says nothing about whether the settle timeout ends the capture. What is timed
-      // is two attempts (a shot that times out is retried alone once the run has drained, so a
-      // hang is paid twice), each the timeout plus the crash grace, and 8 s of margin for a busy
-      // host. A capture that ignored the timeout would wait out Playwright's own 30 s, so the
-      // bound still fails it.
+      // Proved from the error, not the clock. The settle gives up with `capture settle exceeded
+      // <n>ms`; Playwright's own 30 s timeout would reject as `page.waitForFunction: Timeout
+      // 30000ms exceeded`, so the message says which one ended the capture, however slow the host
+      // is. The hang is paid twice (a shot that times out is retried alone once the run has
+      // drained), so the second timeout carries `RETRIED_ALONE`.
       const session = await openCaptureSession(config, pinned);
       const dir = await out();
-      let took: number;
+      let failure: unknown;
       try {
-        const began = Date.now();
-        await expect(captureInto(session, dir, undefined, { warn() {} })).rejects.toThrow(
-          /capture settle exceeded|Timeout/,
+        failure = await captureInto(session, dir, undefined, { warn() {} }).then(
+          () => undefined,
+          (e: unknown) => e,
         );
-        took = Date.now() - began;
       } finally {
         await session.close();
       }
-      expect(took).toBeLessThan(2 * (SETTLE_MS + CRASH_GRACE_MS) + 8_000);
+      if (!(failure instanceof CaptureError))
+        throw new Error(
+          `expected the capture to reject with a CaptureError, got ${String(failure)}`,
+        );
+      expect(failure.message).toMatch(/^capture settle exceeded \d+ms/);
+      expect(failure.message.endsWith(RETRIED_ALONE)).toBe(true);
     },
     60_000,
   );
