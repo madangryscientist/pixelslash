@@ -29,7 +29,8 @@ function sql(command: string) {
 
 /**
  * A rival member: a real user in another org, with a session inserted straight into D1. `id` keeps
- * one spec's rival apart from another's in the same database; returns the session token.
+ * one spec's rival apart from another's in the same database; returns the session token. Seeding the
+ * same rival again (a repeated test on one database) keeps its rows and renews its session.
  */
 export async function rivalSession(
   id = "rival",
@@ -39,12 +40,14 @@ export async function rivalSession(
   const token = `pss_e2e_${id}`;
   const hash = createHash("sha256").update(token).digest("hex");
   const user = sql(
-    `INSERT INTO users (id, github_id, login) VALUES ('${id}-user', ${githubId}, '${id}')`,
+    `INSERT OR IGNORE INTO users (id, github_id, login) VALUES ('${id}-user', ${githubId}, '${id}')`,
   );
-  const made = sql(`INSERT INTO orgs (id, name) VALUES ('${id}-org', '${org}')`);
-  const member = sql(`INSERT INTO members (org_id, user_id) VALUES ('${id}-org', '${id}-user')`);
+  const made = sql(`INSERT OR IGNORE INTO orgs (id, name) VALUES ('${id}-org', '${org}')`);
+  const member = sql(
+    `INSERT OR IGNORE INTO members (org_id, user_id) VALUES ('${id}-org', '${id}-user')`,
+  );
   const session = sql(
-    `INSERT INTO sessions (id, user_id, expires_at) VALUES ('${hash}', '${id}-user', ${Date.now() + 3_600_000})`,
+    `INSERT OR REPLACE INTO sessions (id, user_id, expires_at) VALUES ('${hash}', '${id}-user', ${Date.now() + 3_600_000})`,
   );
   for (const result of [user, made, member, session]) {
     if (result.status !== 0) throw new Error(`seeding the rival failed: ${result.stderr}`);
