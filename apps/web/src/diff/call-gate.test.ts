@@ -15,32 +15,57 @@ function fakeTime() {
   };
 }
 
-/** A call the test ends by hand, and the order calls began in. */
+/** A call the test ends by hand, and the order calls began in. `began` resolves when the call runs. */
 function started(gate: CallGate, order: string[], name: string) {
   const held = Promise.withResolvers<void>();
+  const began = Promise.withResolvers<void>();
   const done = gate(async () => {
     order.push(name);
+    began.resolve();
     await held.promise;
   });
-  return { finish: held.resolve, done };
+  return { finish: held.resolve, done, began: began.promise };
+}
+
+/** The gate's poll timer, counted: a test awaits `afterPolls(n)` to know waiters looked again while a call ran. */
+function countedPolls() {
+  let polls = 0;
+  const waiters: { at: number; resolve: () => void }[] = [];
+  return {
+    sleep: () => {
+      polls++;
+      for (const w of waiters) if (polls >= w.at) w.resolve();
+      return new Promise<void>((resolve) => setTimeout(resolve, 1));
+    },
+    afterPolls: (n: number) => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      waiters.push({ at: polls + n, resolve });
+      return promise;
+    },
+  };
 }
 
 describe("callGate", () => {
   test("runs one call at a time, in the order they came", async () => {
     const order: string[] = [];
-    const gate = callGate(1, LEASE_MS, { sleep: () => new Promise((r) => setTimeout(r, 1)) });
+    const { sleep, afterPolls } = countedPolls();
+    const gate = callGate(1, LEASE_MS, { sleep });
     const a = started(gate, order, "a");
     const b = started(gate, order, "b");
     const c = started(gate, order, "c");
-    await new Promise((r) => setTimeout(r, 20));
+    // b and c each look again while a still runs, and neither is let in.
+    await a.began;
+    await afterPolls(2);
     expect(order).toEqual(["a"]);
     a.finish();
     await a.done;
-    await new Promise((r) => setTimeout(r, 20));
+    await b.began;
+    // c looks again while b runs.
+    await afterPolls(1);
     expect(order).toEqual(["a", "b"]);
     b.finish();
     await b.done;
-    await new Promise((r) => setTimeout(r, 20));
+    await c.began;
     expect(order).toEqual(["a", "b", "c"]);
     c.finish();
     await c.done;
