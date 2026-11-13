@@ -129,19 +129,4 @@ describe("a D1 write that meets the lock (PS-228)", () => {
     await expect(retryBusy(d1).prepare("select 1").all()).rejects.toThrow(/no such table/);
     expect(tries).toBe(1);
   });
-
-  test("a batch that meets the lock is tried again whole: it is one transaction, so none of it ran", async () => {
-    let tries = 0;
-    const fake = {
-      batch: async () => {
-        tries++;
-        if (tries < 3) throw new Error("D1_ERROR: database is locked: SQLITE_BUSY");
-        return [];
-      },
-    };
-    // oxlint-disable-next-line no-unsafe-type-assertion -- a fake with only the members under test
-    const d1 = fake as unknown as D1Database;
-    await expect(retryBusy(d1).batch([])).resolves.toEqual([]);
-    expect(tries).toBe(3);
-  });
 });

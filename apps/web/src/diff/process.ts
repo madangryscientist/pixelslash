@@ -117,10 +117,16 @@ function storeUncompared(
   );
 }
 
-/** Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot. */
+/**
+ * Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot.
+ * It runs after the batch that stopped the row naming it, so a delete that fails leaves a stray blob,
+ * not a wrong result: it is reported, and the batch's other shots still drop theirs.
+ */
 async function dropOwnOverlay(deps: ProcessDeps, shot: SnapshotRow): Promise<void> {
-  if (shot.diffKey && shot.diffKey === diffKeyOf(await snapshotStem(shot)))
-    await deps.blobs.delete(shot.diffKey);
+  if (!shot.diffKey || shot.diffKey !== diffKeyOf(await snapshotStem(shot))) return;
+  await deps.blobs
+    .delete(shot.diffKey)
+    .catch((e: unknown) => reportError(e, { area: "diff", step: "overlay" }));
 }
 
 /** Store a comparison: the shot it was against, and the open change it carries, if any (ob 1712). */

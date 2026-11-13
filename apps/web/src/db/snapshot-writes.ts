@@ -16,17 +16,16 @@ type Fields = Partial<typeof snapshots.$inferInsert>;
  * A row is written when its batch is: the run flushes when `full` and before it ends or reads the
  * rows back, whatever ends it. A run that dies with writes queued has not stored those shots, and the
  * next run measures them again, as it would a shot that died mid-diff. Work that must follow a row's
- * write (deleting an overlay the row no longer names) runs after its batch, never before it.
+ * write (deleting an overlay the row no longer names) runs after its batch, never before it, and
+ * reports its own failure rather than throwing, so one failure does not skip the rest.
  */
 export class SnapshotWrites {
   private queued: BatchItem<"sqlite">[] = [];
   private after: (() => Promise<void>)[] = [];
   private readonly db: Db;
-  private readonly size: number;
 
-  constructor(db: Db, size = WRITES_PER_BATCH) {
+  constructor(db: Db) {
     this.db = db;
-    this.size = size;
   }
 
   /** Queue a row's update; `then` runs once the batch holding it is written. */
@@ -36,7 +35,7 @@ export class SnapshotWrites {
   }
 
   get full(): boolean {
-    return this.queued.length >= this.size;
+    return this.queued.length >= WRITES_PER_BATCH;
   }
 
   /** Write what is queued as one batch, then run what waited on it. */
