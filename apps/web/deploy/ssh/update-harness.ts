@@ -9,6 +9,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -119,6 +120,21 @@ export function pack(
   const tar = spawnSync("tar", ["-czf", tarball, "-C", dir, "."]);
   expect(tar.status).toBe(0);
   return tarball;
+}
+
+/**
+ * A release already serving, as a deploy leaves it (its files unpacked under `releases`, `current`
+ * pointing at it), without running update.sh. For a test about the deploy AFTER it: a deploy spawns
+ * a long chain of small processes, whose wall time a loaded host stretches past the test's 5 s.
+ */
+export function serve(s: Setup, sha: string) {
+  const rel = join(s.releases, sha);
+  mkdirSync(rel, { recursive: true });
+  expect(spawnSync("tar", ["-xzf", pack(sha), "-C", rel]).status).toBe(0);
+  // what unpack_release adds: the release's link to the state shared by every release
+  mkdirSync(join(rel, "apps/web/.wrangler"), { recursive: true });
+  symlinkSync(join(s.legacyWeb, ".wrangler/state"), join(rel, "apps/web/.wrangler/state"));
+  symlinkSync(rel, join(s.releases, "current"));
 }
 
 export function deploy(s: Setup, tarball: string, env: Record<string, string> = {}) {

@@ -6,14 +6,24 @@ import { resolve } from "node:path";
 import { freshConnectionPerRequest, miniflareUndici } from "./fresh-connection.ts";
 
 const HOLD_MS = 200;
-const CLOSE_AFTER_MS = 40;
 
+// workerd closes the connection a moment after it answers. A clock cannot stand in for that: a
+// loaded host lags past any delay between the first answer and the second send, and the second
+// request then finds the socket already gone and opens a fresh one. What the CT's close does to the
+// client is fail a request that was dispatched on the kept socket, so the server does exactly that:
+// the first request on a socket is answered, a second one on the same socket is cut off unanswered.
+const requestsOn = new WeakMap();
 const workerd = createServer((req, res) => {
   req.resume();
+  const count = (requestsOn.get(req.socket) ?? 0) + 1;
+  requestsOn.set(req.socket, count);
+  if (count > 1) {
+    req.socket.destroy();
+    return;
+  }
   setTimeout(() => {
     res.writeHead(200, { "content-type": "application/json" });
     res.end('{"status":"done"}');
-    setTimeout(() => req.socket.destroy(), CLOSE_AFTER_MS);
   }, HOLD_MS);
 });
 await new Promise((done) => workerd.listen(0, "127.0.0.1", done));
