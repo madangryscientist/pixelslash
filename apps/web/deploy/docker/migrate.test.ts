@@ -10,7 +10,7 @@ const FILES = readdirSync(DRIZZLE)
   .toSorted();
 
 let mf: Miniflare;
-beforeAll(() => {
+beforeAll(async () => {
   mf = new Miniflare(
     convertV4MiniflareOptions({
       cf: false,
@@ -24,6 +24,8 @@ beforeAll(() => {
       ],
     }),
   );
+  // workerd's cold start is spent here, not charged to the test's own 5 s.
+  await mf.ready;
 });
 afterAll(() => mf?.dispose());
 
