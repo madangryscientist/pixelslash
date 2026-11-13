@@ -76,61 +76,6 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
   await expect(page.locator('rect[data-ai-label="noise"]').first()).toBeAttached();
 });
 
-test("a build with 10 changed shots gets no summary, says why, and offers no Regenerate", async ({
-  page,
-}) => {
-  const { token, projectId } = await provision(page, "Big Co", "bigbuild");
-  const form = page.getByTestId("model-settings");
-  await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
-  await form.getByTestId("model-name").fill("deepseek-flash");
-  await form.getByTestId("model-key").fill("sk-e2e-model");
-  await form.getByTestId("model-save").click();
-  await expect(form.getByTestId("model-key-set")).toBeVisible();
-
-  const names = Array.from({ length: 10 }, (_, i) => `page-${i}`);
-  await uploadBuild(
-    token,
-    { branch: "main", commitSha: SHA_MAIN },
-    names.map((name) => ({ name, png: WHITE })),
-  );
-  await page.waitForTimeout(1100);
-  const buildId = await uploadBuild(
-    token,
-    { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
-    names.map((name) => ({ name, png: CHANGED })),
-  );
-  await open(page, `/projects/${projectId}/builds/${buildId}`);
-  await explained(page);
-  const summary = page.getByTestId("build-summary");
-  await expect(summary.getByTestId("summary-too-many")).toHaveText(
-    "No AI summary: 10 changed shots (summaries are made for builds with fewer than 10).",
-  );
-  await expect(summary.getByTestId("summary-skip")).toHaveCount(0);
-  await expect(summary.getByTestId("summary-sentence")).toHaveCount(0);
-  await expect(summary.getByTestId("summary-regenerate")).toHaveCount(0);
-});
-
-test("with no model a changed shot is reviewed as plain pixels", async ({ page }) => {
-  const { token, projectId } = await provision(page, "Plain Co", "plain");
-  await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  await page.waitForTimeout(1100);
-  const buildId = await uploadBuild(
-    token,
-    { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
-    [{ name: "hero", png: CHANGED }],
-  );
-  await open(page, `/projects/${projectId}/builds/${buildId}`);
-  await expect(page.getByTestId("build-status")).toHaveText("changes");
-  await expect(page.getByTestId("group-ai-filtered")).toHaveCount(0);
-  // No model: the summary says so and offers nothing to regenerate; it never invents one.
-  await expect(page.getByTestId("summary-skip")).toHaveText("skip: no judge.");
-  await expect(page.getByTestId("summary-sentence")).toHaveCount(0);
-  await expect(page.getByTestId("summary-regenerate")).toHaveCount(0);
-  await page.getByTestId("snapshot-row").getByRole("link").click();
-  await showPanel(page);
-  await expect(page.getByTestId("ai-skip")).toHaveText("skip: no judge. Review the pixels.");
-});
-
 /**
  * The org's model (ob 1789): set once in the org's settings, a project reports that it uses it, its
  * builds are explained by it, and a project's own model overrides it until it is removed.

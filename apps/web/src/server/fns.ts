@@ -29,6 +29,7 @@ import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/t
 import { projectStale } from "#/db/stale";
 import { twinsOfBuild } from "#/db/twins";
 import { nextToReviewId } from "#/lib/build-tabs";
+import { walkAround } from "#/lib/review-walk";
 import { buildExpiry } from "#/lib/retention";
 import { holdsChange, reviewGroupOf } from "#/lib/snapshot-groups";
 import { twinEntryOf } from "#/lib/twins";
@@ -242,10 +243,10 @@ export const getSnapshotPage = createServerFn()
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const view = await or404(buildView(db, project.id, data.buildId));
-    const index = view.snapshots.findIndex((shot) => shot.id === data.snapshotId);
-    if (index === -1) throw notFound();
-    const snapshot = view.snapshots[index];
-    if (!snapshot) throw notFound();
+    const walk = walkAround(view.snapshots, data.snapshotId);
+    if (!walk) throw notFound();
+    const { shot: snapshot, position, total, previousId, nextId } = walk;
+    const index = position - 1;
     const twins = await twinsOfBuild(db, view.build.id);
     const images = await imageUrls(project.orgId, {
       main: snapshot.baselineKey,
@@ -287,10 +288,10 @@ export const getSnapshotPage = createServerFn()
         await projectFlake(db, project.id, snapshot.flakeId),
       ),
       /** The j/k order is the build's order, so a walk visits every shot once. */
-      position: index + 1,
-      total: view.snapshots.length,
-      previousId: index > 0 ? (view.snapshots[index - 1]?.id ?? null) : null,
-      nextId: view.snapshots[index + 1]?.id ?? null,
+      position,
+      total,
+      previousId,
+      nextId,
       /** Where a decision on this shot moves the reviewer: the next shot still awaiting one. */
       nextToReviewId: nextToReviewId(view.snapshots, snapshot.id),
       /** Every name in the build, so the label reads the same as on the build page. */

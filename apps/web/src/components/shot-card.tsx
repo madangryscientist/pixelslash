@@ -3,7 +3,7 @@ import { Caption, Card, Cluster, ClusterGrow, Pill, Stack, Text } from "@hackcov
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { a11yLine } from "#/components/a11y";
-import type { Composition } from "#/components/composition";
+import { type Composition, findingsLine } from "#/components/composition";
 import type { SnapshotView } from "#/db/review";
 import { labelSummary } from "#/components/ai-notes";
 import { FlakyBadge } from "#/components/flake";
@@ -148,12 +148,6 @@ export function measured(shot: SnapshotView, baseline: boolean): string {
     return boxes > 0 ? `${changed} · size changed ${sizes}` : `size changed ${sizes}`;
   }
   return changed;
-}
-
-/** A composition-only shot's findings in a line: the gaps, and the special cases when there are any. */
-export function findingsLine({ library, gaps, special }: Composition): string {
-  const gap = `${gaps.length} ${gaps.length === 1 ? "gap" : "gaps"} not from ${library}`;
-  return special.length > 0 ? `${gap} · ${special.length} special` : gap;
 }
 
 function GapsLine({ composition }: { composition: Composition | null | undefined }) {

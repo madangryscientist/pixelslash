@@ -1,7 +1,14 @@
 import type { diffPngs } from "@hackcove/pixelslash-engine/diff";
 import { eq } from "drizzle-orm";
 import { setup } from "#/api/test-support";
-import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#/db/builds";
+import {
+  type Build,
+  type SnapshotInput,
+  createBuild,
+  finaliseBuild,
+  getBuild,
+  putSnapshot,
+} from "#/db/builds";
 import type { Db } from "#/db/db";
 import type { SentFlake } from "#/db/flakes";
 import { type FlakyPolicy, snapshots } from "#/db/schema";
@@ -23,7 +30,9 @@ export const sha = (n: number) => n.toString(16).padStart(40, "0");
 export type Shot = {
   name?: string;
   png: Uint8Array<ArrayBuffer>;
-  fingerprint?: { image: string; browser: string; fonts: string };
+  /** What rendered it, when not Linux Chromium: a native shot's platform and its device label. */
+  renderer?: { platform: string; browser: string };
+  fingerprint?: SnapshotInput["fingerprint"];
   diff?: object;
   ignore?: Array<{ x: number; y: number; width: number; height: number }>;
   flaky?: FlakyPolicy | null;
@@ -80,8 +89,7 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
     await putSnapshot({ db: ctx.db, blobs: ctx.scoped }, build, {
       input: {
         name: s.name ?? "pricing",
-        platform: "linux",
-        browser: "chromium",
+        ...(s.renderer ?? { platform: "linux", browser: "chromium" }),
         viewport: "1280x720",
         theme: "light",
         tags: [],

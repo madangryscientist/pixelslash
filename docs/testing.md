@@ -76,7 +76,7 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | --- | --- | --- | --- |
 | `packages/cli/smoke` | 1 | smoke | new |
 | `apps/web/smoke` | 1 | smoke | new |
-| `apps/web/e2e` | 26 (was 25) | e2e | one happy path per feature, in a real browser (the operator health page's 404 for everyone else and the page for a listed login, `admin.spec.ts`; its empty state is a unit test, since the e2e database always has the stub's seed). `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
+| `apps/web/e2e` | 26 (was 34 before the cut below), 51 tests (was 68) | e2e | one happy path per feature, in a real browser (the operator health page's 404 for everyone else and the page for a listed login, `admin.spec.ts`; its empty state is a unit test, since the e2e database always has the stub's seed). `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
 | `apps/site/e2e` | 4 | e2e | nav, footer and dead links on the prerendered pages, desktop and phone (named `smoke.spec.ts`; it is an e2e); one header on every page and the theme toggle (`header.spec.ts`); the home page in both themes (`home.spec.ts`); the pricing page fills the column and its one action leads to the self-host guide (`pricing.spec.ts`) |
 | `packages/cli/test` | 30 | integration | the `pixelslash` commands run in-process or as a child, against a fake server and real temp dirs. The `*-support.ts` files are helpers |
 | `packages/engine/test` | 50 | integration + unit | store, upload, capture (real Chromium), report and DS judge are integration; `diff*`, `regions`, `fingerprint`, `sentry-scrub`, `route-names`, `change-note`, `config*` are unit |
@@ -102,11 +102,41 @@ Each cut names where the behaviour is still proved.
 | `apps/web/src/diff/process-recovery.test.ts` "a build the Worker ceiling stopped is resumed on retry, and the retry gives the verdict" | the resume path and the verdict-on-retry path are each tested alone | `process-resume.test.ts` (resume) and "a diff that errored is re-diffed to a real verdict" in the same file |
 | `apps/web/src/api/handler.test.ts`, the `GET /api/v1/nope` 404 line | the same refusal is asserted for the other unknown path and method in the same test | the remaining assertions of "unknown paths and methods are refused" |
 | `apps/web/e2e/deep-history.spec.ts` (the whole file, one test) | a browserless upload test dressed as an e2e; nothing it asserts is in the UI | `process-deep-history.test.ts` (a main build 150 commits back is the baseline, a newer one is not used, the nearest wins, past 200 ancestors the shot is new) and `packages/engine/test/upload.test.ts` (the CLI sends up to 200 first-parent ancestors) |
-| `apps/web/e2e/timings.spec.ts` "with several builds the Timings tab counts them and keeps the slowest as max" | the arithmetic is the stats module's, not the tab's | `timings-stats.test.ts` ("lists every project with p50/p95 of its builds"); the tab itself is still rendered by the first test in the file |
+| `apps/web/e2e/timings.spec.ts` "with several builds the Timings tab counts them and keeps the slowest as max" | the arithmetic is the stats module's, not the tab's | `timings-stats.test.ts` ("lists every project with p50/p95 of its builds"); the tab itself was rendered by the first test in that file, which is cut too (see "E2E specs cut" below) |
 | `apps/web/e2e/metrics.spec.ts` "a build older than the timings says so, and invents no zero" | it clears columns in D1 to test one rendering rule | `src/lib/run-card.test.ts` ("has no wall time, no compare time and no re-capture line", "never shows a time it did not record as 0") for the build card; `src/lib/run-metrics.test.ts` ("is absent for a shot never timed") and `src/lib/branch-metrics.test.ts` (an untimed shot is left out, not counted as 0) for the shot and branch pages |
 
 Nothing proved before is unproved now: each row above names a surviving test that fails if the behaviour
 breaks.
+
+### E2E specs cut
+
+Eight web specs and three tests in two others were each a data and logic check run through a browser.
+Every assertion moved to the lowest layer that can prove it, or is looks only (theme, phone width). The
+page wiring that a browser used to prove is now a render test: `renderToStaticMarkup` for components
+with no router, and `src/test/render-routed.tsx` (a memory-history router) for components with a link.
+The count goes from 34 spec files and 68 tests to 26 and 51 (`bunx playwright test --list` in `apps/web`).
+
+| Removed | Still proved by |
+| --- | --- |
+| `composition.spec.ts` (2 tests) | `components/composition.test.tsx` (the overlay, the findings line, the focus), `components/shot-card.test.tsx` (the card carries the line), `api/composition.test.ts` ("the build view hands stored findings to the screens") |
+| `carried-from-main.spec.ts` | `diff/process-open-vs-main.test.ts` and `process-open-vs-main-page.test.ts` (what is carried and how it is filed), `lib/summary-counts.test.ts` (the counts line), `lib/review-walk.test.ts` (the j/k walk) |
+| `metrics.spec.ts` | `components/run-metrics.test.tsx` (build card, shot and branch pages), plus the unit tests already named in the table above |
+| `timings.spec.ts` (4 tests) | `components/build-timings.test.tsx`, `components/org-timings.test.tsx`, `lib/timings.test.ts`, `db/timings-stats.test.ts`; theme and phone width are looks only, and the click that opens the Timings tab, its `?tab=timings` URL and the loader are walked by `orgs.spec.ts`, which gained a step for it |
+| `brief.spec.ts` | `components/build-brief.test.tsx`, `components/brief-summary.test.tsx` |
+| `native.spec.ts` | `diff/process-native.test.ts`, `components/snapshot-side-panel.test.tsx`, `api/native.test.ts`, `packages/cli/test/import-native.test.ts` |
+| `parity.spec.ts` (3 tests) | `components/parity-view.test.tsx`, `components/twins.test.tsx`, `api/parity.test.ts`, `api/twins.test.ts` |
+| `stale.spec.ts` | `components/stale.test.tsx`, `components/twins.test.tsx`, `db/stale.test.ts`, `db/stale-review.test.ts`, `api/stale.test.ts`, `diff/process-stale.test.ts`; accepting a stale shot is walked by `review.spec.ts` |
+| `ai-review.spec.ts` "a build with 10 changed shots gets no summary, says why, and offers no Regenerate" and "with no model a changed shot is reviewed as plain pixels" | `components/build-summary.test.tsx`, `components/ai-notes.test.tsx`, `diff/process.test.ts` |
+| `twins.spec.ts` "a build shows its twin and links to it" | `components/twins.test.tsx`, `db/twins.test.ts`, `api/twins.test.ts` |
+
+Kept, with the reason: the other two tests in `ai-review.spec.ts` (an opted-in project's model auto-passes a
+noise-only shot; a project without its own model uses the org's) and the project settings test in
+`twins.spec.ts` need the settings forms, their server functions and the stub model pipeline together, which
+no render test reaches.
+
+The two merges planned beside this cut: `admin-health-now.test.ts` is folded into `admin-health.test.ts`
+(its fixtures moved to `admin-health-kit.ts` so the file stays under the 300-line lint cap).
+`ai/summary-parse.test.ts` stays its own file: `summary.test.ts` is at the cap, and merging would break it.
 
 ### Gaps filled
 

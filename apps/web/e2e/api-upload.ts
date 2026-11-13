@@ -44,12 +44,6 @@ export type Shot = {
   name: string;
   png: Buffer;
   flaky?: "review" | "skip";
-  /** The shot's composition findings, sent as the CLI sends them (ob 1850). */
-  composition?: object;
-  /** Fields of the CLI's meta that replace the web defaults (a native shot's platform and device, a theme). */
-  meta?: Record<string, unknown>;
-  /** A layout metrics file (PS-296), sent as the CLI sends `--metrics`. */
-  metrics?: string;
 };
 
 /** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
@@ -64,8 +58,6 @@ function shotForm(shot: Shot): FormData {
     tags: ["web"],
     fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
   };
-  Object.assign(meta, shot.meta);
-  if (shot.composition) meta["composition"] = shot.composition;
   if (shot.flaky) {
     meta["flaky"] = shot.flaky;
     meta["flake"] = {
@@ -80,19 +72,11 @@ function shotForm(shot: Shot): FormData {
   }
   form.set("meta", JSON.stringify(meta));
   form.set("file", pngBlob(shot.png), "shot.png");
-  if (shot.metrics !== undefined)
-    form.set("metrics", new Blob([shot.metrics], { type: "application/json" }), "metrics.json");
   return form;
 }
 
 /** Open a build, put each shot, finalise: the server diffs in the finalise request. */
-export async function uploadBuild(
-  token: string,
-  build: object,
-  shots: Shot[],
-  /** More of the finalise body, such as the CLI's `timings`. */
-  finalise: object = {},
-) {
+export async function uploadBuild(token: string, build: object, shots: Shot[]) {
   const headers = { authorization: `Bearer ${token}` };
   const opened = await fetch(`${SERVER}/api/v1/builds`, {
     method: "POST",
@@ -112,7 +96,7 @@ export async function uploadBuild(
   const done = await fetch(`${SERVER}/api/v1/builds/${id}/finalize`, {
     method: "POST",
     headers: { ...headers, "content-type": "application/json" },
-    body: JSON.stringify({ snapshots: shots.length, ...finalise }),
+    body: JSON.stringify({ snapshots: shots.length }),
   });
   expect(done.status).toBe(200);
   return id;

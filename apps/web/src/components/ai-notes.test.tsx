@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
-import { AiExplanation, type JudgedShot } from "./ai-notes";
+import { AiExplanation, aiFiltered, type JudgedShot } from "./ai-notes";
 
 /** Only the fields the section reads; the rest of a snapshot row is not its business. */
 const changed = (over: Partial<JudgedShot>): JudgedShot => ({
@@ -36,4 +36,14 @@ test("a shot still waiting on the queue is explaining, whatever an earlier run s
   const out = text(changed({ aiPending: true, aiError: "old failure" }));
   expect(out).toContain("explaining…");
   expect(out).not.toContain("judge failed");
+});
+
+test("only a shot the model auto-passed and no person decided is AI-filtered; with no model none is", () => {
+  const auto = { model: "m", at: 0, regions: [], autoPassed: true };
+  expect(aiFiltered(changed({ aiReview: auto, reviewState: "accepted" }))).toBe(true);
+  expect(aiFiltered(changed({ aiReview: auto, reviewState: "accepted", reviewedBy: "ada" }))).toBe(
+    false,
+  );
+  expect(aiFiltered(changed({ aiReview: auto, reviewState: "pending" }))).toBe(false);
+  expect(aiFiltered(changed({}))).toBe(false);
 });

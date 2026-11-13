@@ -34,8 +34,6 @@ const s256 = (verifier: string) => createHash("sha256").update(verifier).digest(
 
 const STUB_MODEL_ANSWER = "LABEL noise\nWHY Text edges moved by a sub-pixel.";
 const STUB_SUMMARY_ANSWER = "The hero's text edges moved by a sub-pixel. [C1]";
-/** For a build with a brief (PS-232): the same sentence, then the closing one about the brief. */
-const STUB_BRIEF_ANSWER = `${STUB_SUMMARY_ANSWER}\nBrief: the hero changed as the brief says; nothing it describes is missing. [C1]`;
 
 type Handler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<void> | void;
 
@@ -98,13 +96,11 @@ const ROUTES: Record<string, Handler> = {
     else res.writeHead(401).end();
   },
   // An OpenAI-compatible vision endpoint for a project's own model (ob 1473): every region is noise.
-  // The build's text-only summary call (ob 1668) gets a sentence about its first changed item, and
-  // one about its brief when it has one (PS-232).
+  // The build's text-only summary call (ob 1668) gets a sentence about its first changed item.
   "/v1/chat/completions": async (req, res) => {
     const text = JSON.stringify(await readJson(req));
     let content = STUB_SUMMARY_ANSWER;
     if (text.includes("image_url")) content = STUB_MODEL_ANSWER;
-    else if (text.includes("Brief, as the uploader wrote it")) content = STUB_BRIEF_ANSWER;
     if (req.headers.authorization === "Bearer sk-e2e-model")
       json(res, { choices: [{ message: { role: "assistant", content } }] });
     else res.writeHead(401).end();
