@@ -195,12 +195,16 @@ for (const scheme of ["light", "dark"] as const) {
       await page.goto(to, { waitUntil: "networkidle" });
       // `fonts.ready` resolves when nothing is pending, which is also true before layout has asked
       // for the face (status `unloaded`; the preload fetches the file, not the FontFace). So wait
-      // for the page itself to have loaded Inter, then read it below. Nothing here loads the face.
-      await page.waitForFunction(() =>
-        [...document.fonts].some(
-          (face) => face.status === "loaded" && face.family.replaceAll('"', "") === "Inter",
-        ),
-      );
+      // for the page itself to have loaded Inter, and read the loaded families in that same call:
+      // the font state is read once, here, so nothing between a wait and a second read can change
+      // the answer. Nothing here loads the face.
+      const loadedFamilies = await page.waitForFunction(() => {
+        const loaded = [...document.fonts]
+          .filter((face) => face.status === "loaded")
+          .map((face) => face.family.replaceAll('"', ""));
+        return loaded.includes("Inter") ? loaded : null;
+      });
+      const loaded = await loadedFamilies.jsonValue();
       await page.evaluate(() => document.fonts.ready);
 
       expect(foreign, "a request left the site's own origin").toEqual([]);
@@ -211,11 +215,7 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.locator("html")).toHaveClass(
         scheme === "dark" ? /\bdark\b/ : /^(?!.*\bdark\b)/,
       );
-
-      const loaded = await page.evaluate(() =>
-        [...document.fonts].filter((face) => face.status === "loaded").map((face) => face.family),
-      );
-      expect(loaded.map((family) => family.replaceAll('"', ""))).toContain("Inter");
+      expect(loaded).toContain("Inter");
 
       // What the browser drew with: Inter, the served file, for the page's heading and its body.
       const cdp = await page.context().newCDPSession(page);
