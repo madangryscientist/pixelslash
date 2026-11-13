@@ -109,7 +109,7 @@ export function Pane({
   ignored,
   composition,
 }: {
-  label: string;
+  label: ReactNode;
   caption: string | null;
   url: string | null;
   alt: string;

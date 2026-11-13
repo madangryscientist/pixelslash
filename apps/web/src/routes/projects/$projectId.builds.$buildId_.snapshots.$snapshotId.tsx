@@ -11,16 +11,19 @@ import { EdgeWarning, IgnoreBoxes, useIgnoreDraft } from "#/components/ignore-bo
 import { RerunShot } from "#/components/rerun";
 import type { PanelToggle } from "#/components/snapshot-controls";
 import { ShortcutHelp, StickyRail, ViewerBar } from "#/components/snapshot-panels";
+import { linkToBuild } from "#/components/snapshot-base-link";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer, useViewState, type ViewState } from "#/components/snapshot-viewer";
 import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
 import { Page } from "#/components/ui";
+import { formatNumber, formatPercent } from "#/lib/format";
 import { ignoreAreas } from "#/lib/ignore-areas";
 import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
 import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { useReviewKeys } from "#/lib/use-review-keys";
 import { usePanelFold } from "#/lib/use-panel-fold";
+import { basesOf } from "#/lib/viewer-bases";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snapshots/$snapshotId")(
@@ -211,7 +214,12 @@ function ViewerStage({
   view: ViewState;
   panel: PanelToggle | null;
 }) {
-  const { snapshot, images } = data;
+  const { snapshot, images, project, build } = data;
+  const bases = basesOf(
+    { branch: build.branch, baselineBuild: data.baselineBuild, snapshot, images },
+    { number: formatNumber, percent: formatPercent },
+    linkToBuild(project.id),
+  );
   return (
     <Stack gap="sm">
       <DecisionError error={error} />
@@ -219,6 +227,8 @@ function ViewerStage({
       <CompositionFocus>
         <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
           <SnapshotViewer
+            snapshotId={snapshot.id}
+            bases={bases}
             name={snapshot.name}
             mainUrl={images.main}
             branchUrl={images.branch}

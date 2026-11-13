@@ -1,12 +1,21 @@
 import { type ReactNode, useState } from "react";
 import { type Crop, changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { Composition } from "#/components/composition";
+import { BaseSwitch } from "#/components/snapshot-base";
 import { type Mode, type PanelToggle, ViewerControls } from "#/components/snapshot-controls";
 import type { Scale } from "#/components/snapshot-frame";
 import { type Marking, Pane } from "#/components/snapshot-pane";
 import { OverlayControls, SnapshotOverlay, useOverlay } from "#/components/snapshot-overlay";
 import { SliderControls, SnapshotSlider, useSlider } from "#/components/snapshot-slider";
 import type { DiffResult, IgnoreRect } from "#/db/schema";
+import {
+  type Base,
+  type BaseId,
+  type BaseNames,
+  type Bases,
+  MAIN_NAMES,
+  chosenBase,
+} from "#/lib/viewer-bases";
 
 /** One side's measured size, and its caption; all null when nothing measured it. */
 function sideSize(result: DiffResult | null, side: "main" | "branch") {
@@ -25,11 +34,14 @@ type Shots = {
   removed: boolean;
   /** The branch's composition findings (ob 1850); drawn on the branch pane only. */
   composition?: Composition | null | undefined;
+  /** How the left side is named; "Main (baseline)" unless the shot was compared with an earlier build. */
+  names?: BaseNames;
 };
 
-/** Main and Branch next to each other, each at its own measured size. */
+/** Main (or the earlier build) and Branch next to each other, each at its own measured size. */
 function SideBySide({
   name,
+  names = MAIN_NAMES,
   mainUrl,
   branchUrl,
   result,
@@ -49,10 +61,10 @@ function SideBySide({
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Pane
-        label="Main (baseline)"
+        label={names.pane}
         {...sideSize(result, "main")}
         url={mainUrl}
-        alt={`${name} on main`}
+        alt={`${name} ${names.alt}`}
         empty="No baseline to compare with."
         boxes={regions}
         scale={scale}
@@ -106,12 +118,68 @@ export type ViewState = {
   onMode: (mode: Mode) => void;
   scale: Scale;
   onScale: (scale: Scale) => void;
+  /** The comparison chosen, and for which shot: a choice made on another shot does not carry over. */
+  base: { snapshotId: string; id: BaseId } | null;
+  onBase: (base: { snapshotId: string; id: BaseId }) => void;
 };
 
 export function useViewState(): ViewState {
   const [mode, onMode] = useState<Mode>("side");
   const [scale, onScale] = useState<Scale>("fit");
-  return { mode, onMode, scale, onScale };
+  const [base, onBase] = useState<ViewState["base"]>(null);
+  return { mode, onMode, scale, onScale, base, onBase };
+}
+
+/** The pair on screen: the shot's own, unless the reviewer (or a carried shot) opens on main. */
+function pairOf(
+  given: Shots,
+  bases: Bases | null,
+  picked: ViewState["base"],
+  snapshotId: string,
+): { base: Base | null; shots: Shots & { names: BaseNames }; boxesByDefault: boolean } {
+  const base = bases
+    ? chosenBase(bases, picked?.snapshotId === snapshotId ? picked.id : null)
+    : null;
+  if (!base)
+    return { base, shots: { ...given, names: given.names ?? MAIN_NAMES }, boxesByDefault: false };
+  const { names, mainUrl, diffUrl, result, boxesByDefault } = base;
+  return { base, shots: { ...given, names, mainUrl, diffUrl, result }, boxesByDefault };
+}
+
+/**
+ * Whether the boxes are drawn: the reviewer's ask, else the pair's default. The ask belongs to the
+ * shot it was made on, as the base does: an off on one carried shot must not close the boxes the next
+ * one opens with.
+ */
+function useHighlight(snapshotId: string, byDefault: boolean) {
+  const [asked, setAsked] = useState<{ snapshotId: string; on: boolean } | null>(null);
+  const on = asked?.snapshotId === snapshotId ? asked.on : byDefault;
+  return [on, (next: boolean) => setAsked({ snapshotId, on: next })] as const;
+}
+
+/** The toolbar part that belongs to the slider or the overlay; nothing for side by side. */
+function modeControlsOf(
+  mode: Mode,
+  slider: ReturnType<typeof useSlider>,
+  overlay: ReturnType<typeof useOverlay>,
+  shots: Shots & { names: BaseNames },
+): ReactNode {
+  if (mode === "slider")
+    return (
+      <SliderControls slider={slider} branchUrl={shots.branchUrl} baseName={shots.names.short} />
+    );
+  if (mode === "overlay") return <OverlayControls overlay={overlay} diffUrl={shots.diffUrl} />;
+  return null;
+}
+
+/** What the left pane is compared with, above the toolbar; nothing when only main is on offer. */
+function compareSwitch(
+  bases: Bases | null,
+  base: Base | null,
+  onSelect: (id: BaseId) => void,
+): ReactNode {
+  if (!bases || !base) return null;
+  return <BaseSwitch bases={bases} selected={base.id} summary={base.summary} onSelect={onSelect} />;
 }
 
 /**
@@ -125,13 +193,24 @@ export function SnapshotViewer({
   ignored = [],
   view,
   panel,
-  ...shots
-}: Shots & Partial<Marking> & { view: ViewState; panel: PanelToggle | null }) {
+  snapshotId,
+  bases,
+  ...given
+}: Shots &
+  Partial<Marking> & {
+    view: ViewState;
+    panel: PanelToggle | null;
+    snapshotId: string;
+    /** What the shot can be compared with; null reads as main's baseline, the only pair. */
+    bases: Bases | null;
+  }) {
+  const { base, shots, boxesByDefault } = pairOf(given, bases, view.base, snapshotId);
   // An area is drawn on Main or Branch as they stand; overlay and slider move the images around.
   const mode = onDraw ? "side" : view.mode;
   const { scale } = view;
-  // Off on load: the shot is read as it is first, and the boxes are asked for.
-  const [highlight, setHighlight] = useState(false);
+  // Off on load: the shot is read as it is first, and the boxes are asked for. Opening on main to
+  // decide a carried change is the exception: the change is what is being decided.
+  const [highlight, setHighlight] = useHighlight(snapshotId, boxesByDefault);
   const [showFindings, setShowFindings] = useState(true);
   const slider = useSlider();
   const overlay = useOverlay();
@@ -139,13 +218,9 @@ export function SnapshotViewer({
   const crop = cropOf(result);
   const draw = overlapDraw(onDraw, result);
   const shown = { highlight, scale, crop };
-  let modeControls: ReactNode = null;
-  if (mode === "slider")
-    modeControls = <SliderControls slider={slider} branchUrl={shots.branchUrl} />;
-  if (mode === "overlay")
-    modeControls = <OverlayControls overlay={overlay} diffUrl={shots.diffUrl} />;
   return (
     <section aria-label="Snapshot viewer">
+      {compareSwitch(bases, base, (id) => view.onBase({ snapshotId, id }))}
       <ViewerControls
         mode={mode}
         onMode={view.onMode}
@@ -158,7 +233,7 @@ export function SnapshotViewer({
         composition={shots.composition}
         showFindings={showFindings}
         onShowFindings={setShowFindings}
-        modeControls={modeControls}
+        modeControls={modeControlsOf(mode, slider, overlay, shots)}
         panel={panel}
       />
       {mode === "side" && (

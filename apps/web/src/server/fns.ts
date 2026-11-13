@@ -1,6 +1,7 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
+import { baselineBuildOf } from "#/db/baseline-build";
 import { snapshotDiffOptions } from "#/db/builds";
 import { listFlags, snapshotFlags } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
@@ -250,12 +251,19 @@ export const getSnapshotPage = createServerFn()
       main: snapshot.baselineKey,
       branch: isMarker(snapshot) ? null : snapshot.imageKey,
       diff: snapshot.diffKey,
+      mainBaseline: snapshot.mainBaselineKey,
     });
     return {
       org,
       project,
       build: view.build,
       snapshot,
+      /** The build behind the left pane's image, so the viewer names it and does not say "Main". */
+      baselineBuild: await baselineBuildOf(db, {
+        projectId: project.id,
+        snapshotId: snapshot.id,
+        defaultBranch: project.defaultBranch,
+      }),
       /** This shot's twins on the other platforms (PS-295); null when no other platform is in play. */
       twins: twinEntryOf(twins, snapshot.id),
       images,

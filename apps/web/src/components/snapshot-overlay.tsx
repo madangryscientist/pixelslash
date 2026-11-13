@@ -124,6 +124,9 @@ function Controls({
         onChange={(e) => onShowDiff(e.target.checked)}
       />
       <Legend items={items} />
+      {!diffUrl && regions.length > 0 && (
+        <Caption>No diff image for this comparison; the boxes are the measured regions.</Caption>
+      )}
     </Cluster>
   );
 }
