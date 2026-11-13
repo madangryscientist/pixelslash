@@ -142,8 +142,10 @@ async function provision(
     page.getByRole("button", { name: "Issue token" }),
   );
   const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
-  await page.goto(`/orgs?org=${orgId}`);
+  await open(page, `/orgs?org=${orgId}`);
   await page.getByRole("link", { name: "shop", exact: true }).click();
+  // `click()` resolves once the click is dispatched, not when the client navigation commits.
+  await expect(page).toHaveURL(/\/projects\/[^/]+/);
   const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1];
   if (!projectId) throw new Error(`no project id in ${page.url()}`);
   return { token, projectId };

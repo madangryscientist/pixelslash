@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Locator, type Page, expect, test } from "@playwright/test";
+import { open } from "./api-upload";
 import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 
@@ -214,7 +215,7 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
   expect(after?.n).toBe(1);
 
   // A revoked token is refused.
-  await page.goto("/orgs");
+  await open(page, "/orgs");
   await page
     .getByRole("navigation", { name: "Organizations" })
     .getByRole("link", { name: /^Upload Co \d+$/ })
