@@ -1,11 +1,14 @@
 /** The real `Host` of the reserve helper, and its entry point: `bun build --compile` makes the root binary (ob 1947). */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { HelperError, runHelper, SCOPE, type Host, type Out } from "./reserve.ts";
+import { HelperError } from "./error.ts";
+import { runHelper } from "./reserve.ts";
+import { SCOPE, type Host, type Out } from "./machine.ts";
 
 /** The only programs the helper runs, by absolute path: root must not resolve a name from the caller's PATH. */
 const PROGRAMS: Record<string, string> = {
   systemctl: "/usr/bin/systemctl",
   busctl: "/usr/bin/busctl",
+  "systemd-run": "/usr/bin/systemd-run",
 };
 
 async function exec(cmd: string[]): Promise<Out> {
@@ -66,6 +69,9 @@ export const realHost: Host = {
   procUid,
   self: process.pid,
   callerUid: sudoUid(),
+  now: () => Date.now(),
+  // the compiled binary itself, never a name from PATH
+  selfPath: process.execPath,
   insideScope: () => (readOrNull("/proc/self/cgroup") ?? "").includes(SCOPE),
 };
 
