@@ -53,4 +53,12 @@ test("an empty org says what a project is, and a pending invite can be withdrawn
   await pending.getByRole("button", { name: /Withdraw/ }).click();
   await expect(page.getByTestId("invite-row")).toHaveCount(0);
   await expect(page.getByTestId("org-people")).toContainText("0 invites pending");
+
+  // The Timings tab: the link, the ?tab=timings URL and the loader that reads the builds. With no
+  // build yet it says so (the rows and the numbers are render and query tests).
+  await page.getByRole("link", { name: "Timings", exact: true }).click();
+  await expect(page).toHaveURL(/tab=timings/);
+  await expect(page.getByTestId("timings-empty")).toContainText(
+    "No finished builds in the last 30 days",
+  );
 });

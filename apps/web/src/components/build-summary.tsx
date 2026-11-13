@@ -4,47 +4,11 @@ import { Button, Caption, Cluster, Divider, Overline, Pill, Stack, Text } from "
 import { useHydrated } from "#/components/ui";
 import type { AiSummarySentence } from "#/db/diff-json";
 import type { BuildView, SnapshotView } from "#/db/review";
-import { tabCounts } from "#/lib/build-tabs";
-import { reviewGroupOf } from "#/lib/snapshot-groups";
 import { formatDateTime } from "#/lib/format";
 import { noSummaryReason, tooManyChanges } from "#/lib/summary-limit";
+import { isDescribable, summaryCounts } from "#/lib/summary-counts";
 import { type ShotLabel, shotChips, shotLabeller } from "#/lib/shot-label";
 import { regenerateBuildSummary } from "#/server/model";
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/**
- * What the page states from the measurements, beside the model's sentences: the model is never
- * asked about these, so a shot that was not measured is never read as unchanged.
- */
-function measuredCounts(snapshots: SnapshotView[]): string[] {
-  const counts = tabCounts(snapshots);
-  const carried = carriedFromMain(snapshots);
-  const noise = snapshots
-    .flatMap((shot) => shot.aiReview?.regions ?? [])
-    .filter((note) => note.label === "noise").length;
-  const parts = [`${counts.unchanged} unchanged`];
-  if (carried.changed + carried.new > 0)
-    parts.unshift(
-      `${carried.changed} changed and ${carried.new} new carried from main: no change since the previous build, but they still differ from main`,
-    );
-  if (counts.unmeasured > 0)
-    parts.push(
-      `${plural(counts.unmeasured, "shot")} not measured: not compared, so not known to be unchanged`,
-    );
-  if (noise > 0) parts.push(`${plural(noise, "region")} labelled likely noise`);
-  return parts;
-}
-
-/** Shots filed under changed or new only because they differ from main (PS-285), not because this build changed them. */
-function carriedFromMain(snapshots: SnapshotView[]): { changed: number; new: number } {
-  const held = { changed: 0, new: 0 };
-  for (const shot of snapshots) {
-    const group = reviewGroupOf(shot);
-    if (shot.carriedFrom !== null && (group === "changed" || group === "new")) held[group]++;
-  }
-  return held;
-}
 
 const story = (name: string) => name.split("@")[0] ?? name;
 
@@ -276,11 +240,6 @@ function SummaryBody({
   );
 }
 
-/** With a brief, nothing changed is still not a match: there was nothing to read against it. */
-const nothingChanged = (brief: string | null) =>
-  brief ? "Nothing changed, so there is nothing to read against the brief. " : "Nothing changed. ";
-
-const DESCRIBED = new Set(["changed", "new", "removed"]);
 const VERDICTS = new Set(["changes", "passed", "failed"]);
 
 /**
@@ -305,9 +264,8 @@ export function BuildSummary({
   // A build still measuring, or one that stopped, has no verdict to summarise: what it held
   // before is not shown, and the run that finishes it writes the summary again.
   if (!VERDICTS.has(build.status)) return null;
-  const describable = snapshots.some((shot) => DESCRIBED.has(shot.diffStatus ?? ""));
+  const describable = isDescribable(snapshots);
   const changed = snapshots.filter((shot) => shot.diffStatus === "changed").length;
-  const carried = carriedFromMain(snapshots);
   return (
     <Stack as="section" gap="xs" data-testid="build-summary">
       <Divider />
@@ -322,8 +280,7 @@ export function BuildSummary({
         pending={pending}
       />
       <Text as="p" tone="muted" data-testid="summary-counts">
-        {describable || carried.changed + carried.new > 0 ? "" : nothingChanged(build.brief)}
-        {measuredCounts(snapshots).join(" · ")}.
+        {summaryCounts(snapshots, build.brief)}
       </Text>
       <Footer
         projectId={projectId}

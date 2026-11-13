@@ -18,7 +18,7 @@ import { firstToReview } from "#/lib/build-tabs";
 import { formatDateTime } from "#/lib/format";
 import { holdsChange, skippedFlaky } from "#/lib/snapshot-groups";
 
-function toReviewText(baseline: boolean, toReview: number): string {
+export function toReviewText(baseline: boolean, toReview: number): string {
   if (baseline) return "baseline set";
   return toReview === 0 ? "nothing to review" : `${toReview} to review`;
 }

@@ -52,6 +52,12 @@ export function CompositionFocus({ children }: { children: ReactNode }) {
 const isFocused = (focus: Finding | null, kind: Finding["kind"], index: number) =>
   focus?.kind === kind && focus.index === index;
 
+/** A composition-only shot's findings in a line: the gaps, and the special cases when there are any. */
+export function findingsLine({ library, gaps, special }: Composition): string {
+  const gap = `${gaps.length} ${gaps.length === 1 ? "gap" : "gaps"} not from ${library}`;
+  return special.length > 0 ? `${gap} · ${special.length} special` : gap;
+}
+
 /** Hex colour `hex` at `alpha` (0-255) as an 8-digit hex. */
 const tint = (hex: string, alpha: number) => `${hex}${alpha.toString(16).padStart(2, "0")}`;
 
