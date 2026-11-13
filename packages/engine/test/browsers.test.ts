@@ -4,11 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { launchBrowser } from "../src/capture.ts";
 import { captureInto } from "../src/capture-into.ts";
+import { CRASH_GRACE_MS } from "../src/crash-retry.ts";
 import { IMAGE_BROWSERS, parseConfig, type BrowserName } from "../src/config.ts";
 import { compareSnapshots } from "../src/compare-snapshots.ts";
 import { readManifest } from "../src/manifest.ts";
 import { renderPixelReport } from "../src/report.ts";
-import { captureSnapshots, recapture, type CaptureSession } from "../src/snapshot.ts";
+import {
+  captureSnapshots,
+  openCaptureSession,
+  recapture,
+  type CaptureSession,
+} from "../src/snapshot.ts";
 import { cleanupDev, png, tmpDir } from "./dev-fixtures.ts";
 
 const dirs: string[] = [];
@@ -53,6 +59,8 @@ const launchable = new Set<BrowserName>();
 for (const b of IMAGE_BROWSERS) if (await launches(b)) launchable.add(b);
 
 const pinned = { env: { PIXELSLASH_IMAGE_VERSION: "test" }, listFonts: async () => [] };
+/** The settle timeout the never-settling page is given. */
+const SETTLE_MS = 1_500;
 const base = { baseUrl: `http://127.0.0.1:${server.port}` };
 
 describe("a variant's browser", { timeout: 60_000 }, () => {
@@ -203,13 +211,27 @@ describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
         ...base,
         routes: ["/hangs"],
         variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
-        stabilise: { timeoutMs: 1_500 },
+        stabilise: { timeoutMs: SETTLE_MS },
       });
-      const began = Date.now();
-      await expect(captureSnapshots(config, await out(), pinned)).rejects.toThrow(
-        /capture settle exceeded|Timeout/,
-      );
-      expect(Date.now() - began).toBeLessThan(15_000);
+      // The clock starts once the browser is up: launching and closing a browser is the host's
+      // cost, and says nothing about whether the settle timeout ends the capture. What is timed
+      // is two attempts (a shot that times out is retried alone once the run has drained, so a
+      // hang is paid twice), each the timeout plus the crash grace, and 8 s of margin for a busy
+      // host. A capture that ignored the timeout would wait out Playwright's own 30 s, so the
+      // bound still fails it.
+      const session = await openCaptureSession(config, pinned);
+      const dir = await out();
+      let took: number;
+      try {
+        const began = Date.now();
+        await expect(captureInto(session, dir, undefined, { warn() {} })).rejects.toThrow(
+          /capture settle exceeded|Timeout/,
+        );
+        took = Date.now() - began;
+      } finally {
+        await session.close();
+      }
+      expect(took).toBeLessThan(2 * (SETTLE_MS + CRASH_GRACE_MS) + 8_000);
     },
     60_000,
   );
