@@ -67,6 +67,7 @@ export {
 } from "./composition.ts";
 export { gapsList, type GapGroup, type GapsList } from "./composition-report.ts";
 export { parseDiffOption } from "./diff-options.ts";
+export { parseConcurrency } from "./config-concurrency.ts";
 export type { Fingerprint } from "./fingerprint.ts";
 export { fontSetHash, imageId } from "./fingerprint.ts";
 export { identity, pngPath, readManifest } from "./manifest.ts";

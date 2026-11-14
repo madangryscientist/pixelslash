@@ -28,6 +28,8 @@ export const FLAG_NOTES: Readonly<Record<string, string>> = {
   "--pr": "The pull request number the build is recorded under.",
   "--flake-retries":
     "How many more times a shot that differs from its baseline is captured (default 2); 0 turns it off.",
+  "--concurrency":
+    "How many shots run at once, 1 to 32, over the config's concurrency; it also bounds the re-captures of changed shots.",
   "--brief": "A file holding your own words on what the build means to change.",
   "--brief-text": "Your own words on what the build means to change, given inline.",
   "--wait":

@@ -28,16 +28,16 @@ import {
   changeNoter,
 } from "@hackcove/pixelslash-engine";
 import { RemoteError } from "./api.ts";
-import { readFlagPairs } from "./args.ts";
+import { concurrencyFlag, flakeRetries, prNumber, readFlagPairs } from "./args.ts";
 import { ESCALATE, enterStage, uploadLine, uploadProgress } from "./failure.ts";
 import { connect, namesProject, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]\n`--brief FILE` or `--brief-text TEXT` sends your own words on what the build means to change (at most " +
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--concurrency N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]\n`--brief FILE` or `--brief-text TEXT` sends your own words on what the build means to change (at most " +
   BRIEF_LIMIT +
-  " characters); the build's AI summary says whether the changes match it, and it decides nothing.\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes.\nA failed upload ends on `UPLOAD FAILED: <reason>` and prints no build link, except that a build the server `errored` names its page in the reason. " +
+  " characters); the build's AI summary says whether the changes match it, and it decides nothing.\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes, up to --concurrency (else `concurrency` in the config) at a time.\nA failed upload ends on `UPLOAD FAILED: <reason>` and prints no build link, except that a build the server `errored` names its page in the reason. " +
   ESCALATE;
 
 /** The flags `upload` and `capture --upload` share. */
@@ -59,6 +59,7 @@ export type UploadFlags = Partial<Record<(typeof UPLOAD_FLAGS)[number], string>>
   judge?: boolean | undefined;
   /** `upload DIR --brief`'s text (PS-232); `capture --upload` sends none. */
   brief?: string | undefined;
+  concurrency?: number | undefined;
 };
 
 /** `--judge`'s noter, or none: with no local judge the run says `skip: no judge` and invents nothing. */
@@ -70,21 +71,6 @@ function judgeDeps(flags: UploadFlags, io: Io, deps: UploadDeps & DevJudgeDeps):
     return deps;
   }
   return { ...deps, describe };
-}
-
-function prNumber(raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n <= 0) throw new UsageError("--pr must be a positive integer");
-  return n;
-}
-
-export function flakeRetries(raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const n = Number(raw);
-  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(n))
-    throw new UsageError("--flake-retries must be a non-negative integer");
-  return n;
 }
 
 type Target = { server: string; token: string; baseBranch: string; projectId?: string };
@@ -148,7 +134,7 @@ async function configRecapture(
   let opening: Promise<CaptureSession> | undefined;
   return {
     retries: config.flake.retries,
-    concurrency: config.concurrency ?? defaultConcurrency(),
+    concurrency: flags.concurrency ?? config.concurrency ?? defaultConcurrency(),
     recapture: async (e) => {
       sameMachine(e, { image: imageId(env), fonts: await (local ??= fontSetHash()) });
       const session = await (opening ??= openCaptureSession(config, { warn }));
@@ -357,12 +343,19 @@ export async function runUpload(
     interval,
     brief: briefFile,
     "brief-text": briefText,
+    concurrency,
     ...flags
   } = readFlagPairs(
     rest.filter((a) => a !== "--wait" && a !== "--judge"),
-    [...UPLOAD_FLAGS, "timeout", "interval", "brief", "brief-text"],
+    [...UPLOAD_FLAGS, "timeout", "interval", "brief", "brief-text", "concurrency"],
   );
   const wait = waitOptions(rest.includes("--wait"), { timeout, interval });
   const brief = await readBrief(briefFile, briefText, deps.cwd ?? process.cwd());
-  return uploadDir(dir, { ...flags, wait, judge: rest.includes("--judge"), brief }, io, deps);
+  const judge = rest.includes("--judge");
+  return uploadDir(
+    dir,
+    { ...flags, wait, judge, brief, concurrency: concurrencyFlag(concurrency) },
+    io,
+    deps,
+  );
 }

@@ -20,7 +20,7 @@ import {
   type DevJudgeDeps,
 } from "@hackcove/pixelslash-engine";
 import type { Io } from "./run.ts";
-import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
+import { concurrencyFlag, readFlagPairs, takeJson, takeOnly, withConcurrency } from "./args.ts";
 import { UPLOAD_FLAGS, type UploadFlags, uploadDir } from "./upload.ts";
 import { type Watch, watched } from "./watch.ts";
 
@@ -30,13 +30,14 @@ type SnapshotResult = Awaited<ReturnType<typeof captureInto>>;
 type TimedSnapshotResult = SnapshotResult & { timings: Timings };
 
 export const CAPTURE_USAGE =
-  "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--json] | [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
+  "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--concurrency N] [--json] | [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
 
 type CaptureFlags = {
   out: string;
   upload: boolean;
   uploadFlags: UploadFlags;
   only: string[] | undefined;
+  concurrency: number | undefined;
   json: boolean;
 };
 
@@ -47,9 +48,13 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
   const { only, rest } = takeOnly(pairs);
   const upload = rest.includes("--upload");
   const judge = rest.includes("--judge");
-  const { out = "pixelslash-snapshots", ...uploadFlags } = readFlagPairs(
+  const {
+    out = "pixelslash-snapshots",
+    concurrency,
+    ...uploadFlags
+  } = readFlagPairs(
     rest.filter((a) => !SWITCHES.has(a)),
-    [...UPLOAD_FLAGS, "out"],
+    [...UPLOAD_FLAGS, "out", "concurrency"],
   );
   const { config: _config, ...uploadOnly } = uploadFlags;
   if (!upload && (judge || Object.keys(uploadOnly).length > 0))
@@ -58,7 +63,14 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
     );
   // A partial build would tell the server the other routes were removed.
   if (upload && (only || json)) throw new UsageError("--only and --json do not go with --upload");
-  return { out: resolve(cwd, out), upload, uploadFlags: { ...uploadFlags, judge }, only, json };
+  return {
+    out: resolve(cwd, out),
+    upload,
+    uploadFlags: { ...uploadFlags, judge },
+    only,
+    concurrency: concurrencyFlag(concurrency),
+    json,
+  };
 }
 
 /** `--json` and `capture_local`: every shot taken, with its PNG's absolute path. */
@@ -87,13 +99,22 @@ export function captureJson(
 
 /** The routes `only` names (all when absent) into `out`, nothing uploaded; `capture_local`'s run. */
 export async function captureLocal(
-  flags: { config?: string | undefined; out: string; only: string[] | undefined },
+  flags: {
+    config?: string | undefined;
+    out: string;
+    only: string[] | undefined;
+    /** `--concurrency`: over the config's own. */
+    concurrency?: number | undefined;
+  },
   deps: SnapshotDeps & { cwd?: string },
   watch: Watch = {},
 ): Promise<TimedSnapshotResult> {
   const started = performance.now();
   const loadStart = loadNow();
-  const config = await loadConfig(findConfig(flags.config, deps.cwd ?? process.cwd()));
+  const config = withConcurrency(
+    await loadConfig(findConfig(flags.config, deps.cwd ?? process.cwd())),
+    flags.concurrency,
+  );
   const session = await openCaptureSession(config, deps);
   try {
     const shooting = onlyRoutes(session, flags.only);
@@ -152,7 +173,7 @@ export async function runCapture(
   if (!flags.upload) {
     const config = flags.uploadFlags.config;
     const result = await captureLocal(
-      { config, out: flags.out, only: flags.only },
+      { config, out: flags.out, only: flags.only, concurrency: flags.concurrency },
       {
         ...deps,
         cwd,
@@ -166,7 +187,10 @@ export async function runCapture(
   }
   const started = performance.now();
   const loadStart = loadNow();
-  const config = await loadConfig(findConfig(flags.uploadFlags.config, cwd));
+  const config = withConcurrency(
+    await loadConfig(findConfig(flags.uploadFlags.config, cwd)),
+    flags.concurrency,
+  );
   const session = await openCaptureSession(config, {
     ...deps,
     warn,
