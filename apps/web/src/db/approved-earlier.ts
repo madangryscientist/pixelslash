@@ -18,6 +18,13 @@ export type ApprovedEarlier = {
   reviewedAt: Date | null;
   /** The project's default branch: what the accepted change was measured against. */
   defaultBranch: string;
+  /**
+   * The default branch's image for this key is not the one the approval was measured against:
+   * this shot's main baseline and the approving shot's both exist and their image hashes differ
+   * (a re-capture of the same pixels does not count). False when either is unknown, since the
+   * page never claims a change it did not measure.
+   */
+  mainChangedSince: boolean;
 };
 
 type Build = Pick<typeof builds.$inferSelect, "id" | "projectId" | "branch">;
@@ -46,6 +53,7 @@ function readLinks(db: Db, build: Build, ids: string[]) {
         reviewedAt: snapshots.reviewedAt,
         reviewedBy: users.login,
         baselineSnapshotId: snapshots.baselineSnapshotId,
+        mainBaselineKey: snapshots.mainBaselineKey,
         commitSha: builds.commitSha,
       })
       .from(snapshots)
@@ -76,16 +84,51 @@ async function defaultBranchOf(db: Db, projectId: string): Promise<string | unde
   return project?.defaultBranch;
 }
 
-/** The unchanged shots of this build, waiting on the shot each was compared against. */
-async function firstHop(db: Db, buildId: string): Promise<Waiting> {
+/** The build that wrote an image, from its key `builds/<buildId>/…`; null for any other shape. */
+const ownerOf = (imageKey: string) => /^builds\/([^/]+)\//.exec(imageKey)?.[1] ?? null;
+
+/**
+ * The image hash behind each stored image key. A key is per upload, so main re-captured with the
+ * same pixels has a new key: only a differing hash means main changed. The read goes by the
+ * writing build (indexed), so it never scans the table. A key with no known owner or hash (a row
+ * older than the hash column) is left out, and its shot reads as not changed.
+ */
+async function pixelsOf(db: Db, keys: string[]): Promise<Map<string, string>> {
+  const wanted = new Set(keys);
+  const owners = [...new Set(keys.flatMap((key) => ownerOf(key) ?? []))];
+  // Each statement binds the owning builds and nothing else.
+  const rows = await inChunks(owners, 0, (part) =>
+    db
+      .select({ imageKey: snapshots.imageKey, imageSha256: snapshots.imageSha256 })
+      .from(snapshots)
+      .where(inArray(snapshots.buildId, part)),
+  );
+  const out = new Map<string, string>();
+  for (const row of rows)
+    if (row.imageSha256 && wanted.has(row.imageKey)) out.set(row.imageKey, row.imageSha256);
+  return out;
+}
+
+/**
+ * The unchanged shots of this build, waiting on the shot each was compared against, and the
+ * default branch image each was measured against (null when it was not).
+ */
+async function firstHop(db: Db, buildId: string) {
   const rows = await db
-    .select({ id: snapshots.id, baselineSnapshotId: snapshots.baselineSnapshotId })
+    .select({
+      id: snapshots.id,
+      baselineSnapshotId: snapshots.baselineSnapshotId,
+      mainBaselineKey: snapshots.mainBaselineKey,
+    })
     .from(snapshots)
     .where(and(eq(snapshots.buildId, buildId), eq(snapshots.diffStatus, "unchanged")));
   const waiting: Waiting = new Map();
-  for (const row of rows)
+  const mainKeys = new Map<string, string | null>();
+  for (const row of rows) {
+    mainKeys.set(row.id, row.mainBaselineKey);
     if (row.baselineSnapshotId) wait(waiting, row.baselineSnapshotId, [row.id]);
-  return waiting;
+  }
+  return { waiting, mainKeys };
 }
 
 /** What ends a walk back through a branch's baselines, and what lets it go on. */
@@ -128,16 +171,42 @@ export async function approvedEarlier(db: Db, build: Build): Promise<Map<string,
   const found = new Map<string, ApprovedEarlier>();
   const defaultBranch = await defaultBranchOf(db, build.projectId);
   if (defaultBranch === undefined || build.branch === defaultBranch) return found;
+  const { waiting, mainKeys } = await firstHop(db, build.id);
+  const settled: Array<{ id: string; link: Link }> = [];
   const settle = (link: Link, ids: string[]) => {
-    const { id: snapshotId, buildId, commitSha, reviewedBy, reviewedAt } = link;
-    const approval = { snapshotId, buildId, commitSha, reviewedBy, reviewedAt, defaultBranch };
-    for (const id of ids) found.set(id, approval);
+    for (const id of ids) settled.push({ id, link });
   };
   const rule: ChainRule = {
     settles: approves,
     passes: (link) => link.diffStatus === "unchanged",
     settle,
   };
-  await walkChain(db, build, await firstHop(db, build.id), rule);
+  await walkChain(db, build, waiting, rule);
+  // Shots whose main image key differs from the approving shot's: their pixels are compared.
+  const mainKeysOf = ({ id, link }: (typeof settled)[number]) => ({
+    current: mainKeys.get(id) ?? null,
+    approved: link.mainBaselineKey,
+  });
+  const keys = settled.flatMap((entry) => {
+    const { current, approved } = mainKeysOf(entry);
+    return current && approved && current !== approved ? [current, approved] : [];
+  });
+  const pixels = keys.length > 0 ? await pixelsOf(db, keys) : new Map<string, string>();
+  for (const entry of settled) {
+    const { id: snapshotId, buildId, commitSha, reviewedBy, reviewedAt } = entry.link;
+    const { current, approved } = mainKeysOf(entry);
+    const was = pixels.get(approved ?? "");
+    const is = pixels.get(current ?? "");
+    const mainChangedSince = was !== undefined && is !== undefined && was !== is;
+    found.set(entry.id, {
+      snapshotId,
+      buildId,
+      commitSha,
+      reviewedBy,
+      reviewedAt,
+      defaultBranch,
+      mainChangedSince,
+    });
+  }
   return found;
 }

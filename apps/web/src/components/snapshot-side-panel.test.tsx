@@ -3,6 +3,7 @@ import { buildView } from "#/db/review";
 import { context, FINGERPRINT, sha, upload, type Shot } from "#/diff/test-builds";
 import { shot } from "#/diff/test-shots";
 import { renderRouted, textOf } from "#/test/render-routed";
+import { snapshotView } from "#/test/snapshot-view";
 import { SidePanel } from "./snapshot-side-panel";
 
 /** The "Captured in" panel of a shot's review page, for a web shot and for a native one. */
@@ -50,5 +51,45 @@ describe("Captured in", () => {
     expect(text).toContain("Browser chromium");
     expect(text).not.toContain("Device");
     expect(text).not.toContain("Scale");
+  });
+});
+
+const approvedText = async (mainChangedSince: boolean) => {
+  const html = await renderRouted(
+    <SidePanel
+      projectId="p1"
+      buildId="b1"
+      snapshot={snapshotView({
+        diffStatus: "unchanged",
+        reviewState: "accepted",
+        approvedEarlier: {
+          snapshotId: "s0",
+          buildId: "b0",
+          commitSha: "61f0c17000000000000000000000000000000000",
+          reviewedBy: "ada",
+          reviewedAt: new Date(0),
+          defaultBranch: "main",
+          mainChangedSince,
+        },
+      })}
+      options={{}}
+      reviewable
+      status="passed"
+    />,
+  );
+  return textOf(/data-testid="approved-earlier"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "");
+};
+
+describe("Approved earlier", () => {
+  test("says main has changed since that approval when it has", async () => {
+    expect(await approvedText(true)).toContain(
+      "main has changed since that approval, so it was given against an older main",
+    );
+  });
+
+  test("says nothing about main moving when it has not", async () => {
+    const text = await approvedText(false);
+    expect(text).toContain("this shot still differs from main");
+    expect(text).not.toContain("has changed since that approval");
   });
 });

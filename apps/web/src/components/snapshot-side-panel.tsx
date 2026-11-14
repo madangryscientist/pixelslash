@@ -222,6 +222,13 @@ function ApprovedEarlier({ projectId, snapshot }: { projectId: string; snapshot:
         {approved.reviewedBy && <> by {approved.reviewedBy}</>}
         {approved.reviewedAt && <>, {formatDateTime(approved.reviewedAt)}</>}. No change since, but
         this shot still differs from {approved.defaultBranch}.
+        {approved.mainChangedSince && (
+          <>
+            {" "}
+            {approved.defaultBranch} has changed since that approval, so it was given against an
+            older {approved.defaultBranch}.
+          </>
+        )}
       </Text>
       <TextLink
         data-testid="approved-earlier-link"
