@@ -142,7 +142,7 @@ export async function explaining<T>(
 }
 
 /** What diffing a build may stand in for; see `upload`. */
-export type DiffOptions = {
+type RunOptions = {
   now?: () => number;
   db?: Db;
   blobs?: BlobStore;
@@ -175,7 +175,7 @@ export async function diffFinalised(
     modelFetch,
     modelKeySecret = TEST_MODEL_KEY_SECRET,
     queue,
-  }: DiffOptions = {},
+  }: RunOptions = {},
 ): Promise<Build> {
   const explain = queue ?? memoryQueue();
   const secret = modelKeySecret ?? undefined;
@@ -200,7 +200,7 @@ export async function diffFinalised(
 export async function upload(
   ctx: Uploads,
   spec: BuildSpec,
-  options: DiffOptions = {},
+  options: RunOptions = {},
 ): Promise<Build> {
   return diffFinalised(ctx, await finalised(ctx, spec), options);
 }
