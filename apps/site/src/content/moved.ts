@@ -23,10 +23,3 @@ export const REDIRECTS: ReadonlyMap<string, string> = new Map(
         ],
   ),
 );
-
-/** Where a moved page went, by its old path. */
-export function movedTo(from: (typeof MOVED)[number]["from"]): string {
-  const target = REDIRECTS.get(from);
-  if (target === undefined) throw new Error(`${from} is not a moved page`);
-  return target;
-}

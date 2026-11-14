@@ -1,7 +1,7 @@
 /**
- * Every page of the site, in nav order. The build prerenders each one; the nav, the head of each
- * page, the sitemap and the smoke test read the same list. The marketing pages moved to
- * slashslash.build (`moved.ts`); the nav still links them, around these.
+ * Every page of the site. The build prerenders each one; the head of each page, the sitemap and the
+ * smoke test read the same list. The marketing pages moved to slashslash.build (`moved.ts`); the nav
+ * (`nav.ts`) links them around these, so it picks each of these by index: reorder both together.
  */
 export const PAGES = [
   {

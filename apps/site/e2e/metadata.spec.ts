@@ -112,22 +112,19 @@ test("a page with a trailing slash redirects to the canonical one", async ({ pag
  */
 test("each moved page answers a 301 to its slashslash.build address", async ({ page }) => {
   // `/` has no trailing-slash form of its own, so the other three give two paths each.
-  expect([...REDIRECTS.keys()]).toEqual([
-    "/",
-    "/how-it-works",
-    "/how-it-works/",
-    "/compare",
-    "/compare/",
-    "/pricing",
-    "/pricing/",
-  ]);
-  for (const [path, target] of REDIRECTS) {
+  const moved: [string, string][] = [
+    ["/", "https://slashslash.build/pixelslash"],
+    ["/how-it-works", "https://slashslash.build/pixelslash/how-it-works"],
+    ["/how-it-works/", "https://slashslash.build/pixelslash/how-it-works"],
+    ["/compare", "https://slashslash.build/pixelslash/compare"],
+    ["/compare/", "https://slashslash.build/pixelslash/compare"],
+    ["/pricing", "https://slashslash.build/pixelslash/pricing"],
+    ["/pricing/", "https://slashslash.build/pixelslash/pricing"],
+  ];
+  expect([...REDIRECTS]).toEqual(moved);
+  for (const [path, location] of moved) {
     const response = await page.request.get(path, { maxRedirects: 0 });
     expect(response.status(), path).toBe(301);
-    expect(response.headers()["location"], path).toBe(target);
+    expect(response.headers()["location"], path).toBe(location);
   }
-  expect(REDIRECTS.get("/")).toBe("https://slashslash.build/pixelslash");
-  expect(REDIRECTS.get("/how-it-works/")).toBe("https://slashslash.build/pixelslash/how-it-works");
-  expect(REDIRECTS.get("/compare")).toBe("https://slashslash.build/pixelslash/compare");
-  expect(REDIRECTS.get("/pricing/")).toBe("https://slashslash.build/pixelslash/pricing");
 });

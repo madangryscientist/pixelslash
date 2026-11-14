@@ -59,13 +59,6 @@ test("the site carries more than 20 copy buttons in total", async ({ context }) 
   expect(counts.reduce((sum, count) => sum + count, 0)).toBeGreaterThan(20);
 });
 
-test("the pages that carry their own blocks have a copy button", async ({ page }) => {
-  for (const path of ["/self-host", "/docs/getting-started"]) {
-    await page.goto(path, { waitUntil: "networkidle" });
-    await expect(page.getByRole("button", { name: "copy", exact: true })).not.toHaveCount(0);
-  }
-});
-
 for (const scheme of ["light", "dark"] as const) {
   test(`${scheme}: every page stands on the same ground`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });

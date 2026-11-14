@@ -159,8 +159,10 @@ for (const system of ["light", "dark"] as const) {
 
     await expect.poll(async () => (await paint(page)).ground).not.toBe(before.ground);
     const after = await paint(page);
-    expect(after.html).toBe(after.ground);
-    expect(after.body).toBe(after.ground);
+    // The canvas under the shell switches with it. In dark the kit's own shell background is the
+    // one painted on the shell root, so the two are not compared with each other.
+    expect(after.html).not.toBe(before.html);
+    expect(after.body).toBe(after.html);
     expect(after.text).not.toBe(before.text);
     expect(after.header).not.toBe(before.header);
 
