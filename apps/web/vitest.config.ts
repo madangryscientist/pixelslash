@@ -8,5 +8,7 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}", "deploy/**/*.test.ts"],
     globalSetup: ["../../scripts/test-tmp-scope.ts"],
+    // Nx runs up to three test projects at once, so each takes a third of the cores.
+    maxWorkers: "33%",
   },
 });
