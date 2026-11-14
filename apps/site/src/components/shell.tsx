@@ -13,6 +13,7 @@ import { useKeyboardScrollers } from "#/components/keyboard-scrollers";
 import { TRADEMARK } from "#/content/trademark";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
 import { PAGES } from "#/content/pages";
+import { STAGE_LINE } from "#/content/stage";
 import { Wordmark } from "#/components/logo";
 
 /** The class each scheme puts on <html>: Latte's scope for light, Mocha's for dark. */
@@ -44,14 +45,15 @@ function Controls(): ReactNode {
   );
 }
 
-/** The footer every page shares: the wordmark, the licence and contact lines, then the trademark line. */
-function Footer(): ReactNode {
+/** The footer every page shares: the wordmark, the stage, the licence and contact lines, then the trademark line. */
+export function Footer(): ReactNode {
   return (
     <div data-testid="footer" className="home-footer flex flex-col gap-4 py-6">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <a href="/" className="flex items-center" aria-label="PixelSlash home">
           <Wordmark />
         </a>
+        <Caption data-testid="stage-footer">{STAGE_LINE}</Caption>
         <span>Elastic License 2.0</span>
         <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
         <SourceLink />

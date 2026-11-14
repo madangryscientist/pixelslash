@@ -643,8 +643,12 @@ body:has([data-art]) {
     animation-delay: 0.3s;
   }
 
+  .home-rise:nth-child(5) {
+    animation-delay: 0.4s;
+  }
+
   .home-demo-wrap {
-    animation: home-rise 1.1s 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: home-rise 1.1s 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
   /* Hidden only once the page's script has marked what is already on screen (home.tsx). */
