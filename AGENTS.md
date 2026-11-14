@@ -38,7 +38,7 @@ declared dependencies and the root's, not another package's. Declare what a
 package imports in that package's `package.json`; do not lean on a sibling's.
 The capture image copies only the package manifests, never the bunfig, so it
 still installs hoisted; its PNG hashes matched main's when the linker landed.
-It also sets `[install] globalStore = true`: most packages in `node_modules`
+`bunfig.toml` also sets `[install] globalStore = true`: most packages in `node_modules`
 are symlinks into one shared store under the Bun cache, not per-worktree
 copies. `globalStore = false` is the project-wide fallback.
 
