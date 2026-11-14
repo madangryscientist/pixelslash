@@ -35,10 +35,11 @@ tasks:
   smoke:
     command: "bun run vitest run -c vitest.smoke.config.ts"
     inputs:
-      # Vitest refuses a `.only` when CI is set. PIXELSLASH_SMOKE_TOKEN is left out on purpose: it is a
-      # credential, and moon writes an env input's value into its hash manifests (and so the remote cache).
-      # The smoke seeds whatever token it is given, so a pass does not hang on its value.
+      # Vitest refuses a `.only` when CI is set.
       - "$CI"
+      # The token the smoke seeds and sends; its prefix picks which check authorizes it. It only opens the
+      # run's own throwaway local D1, so hashing it exposes nothing.
+      - "$PIXELSLASH_SMOKE_TOKEN"
   test-e2e:
     command: "bun run playwright test"
     inputs:
