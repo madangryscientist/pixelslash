@@ -44,8 +44,11 @@ tasks:
       - "/docs/metrics.md"
       - "/docs/concepts/**/*"
       - "/docs/help/**/*"
+    # .wrangler/deploy/config.json is written by @cloudflare/vite-plugin and read by `vite preview`
+    # and `wrangler`, so a cache hit must restore it with dist.
     outputs:
       - "dist"
+      - ".wrangler/deploy"
   test-e2e:
     command: "bun run playwright test"
     deps:
