@@ -75,13 +75,25 @@ jobs:
           git status --porcelain --ignored | grep -v node_modules | head -50 > "$RUNNER_TEMP/hd/status-before.txt" || true
           ls -la .nx/workspace-data .nx/cache | head -60 > "$RUNNER_TEMP/hd/nx-dirs.txt" || true
       - run: bun run typecheck
-        env: { NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs", NX_HASH_DUMP: "${{ runner.temp }}/hd/typecheck.json" }
+        env:
+          {
+            NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs",
+            NX_HASH_DUMP: "${{ runner.temp }}/hd/typecheck.json",
+          }
       - run: bun run lint
-        env: { NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs", NX_HASH_DUMP: "${{ runner.temp }}/hd/lint.json" }
+        env:
+          {
+            NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs",
+            NX_HASH_DUMP: "${{ runner.temp }}/hd/lint.json",
+          }
       - run: bun run format:check
       # Includes bench:check (the regression guard); never bench:perf.
       - run: bun run test
-        env: { NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs", NX_HASH_DUMP: "${{ runner.temp }}/hd/test.json" }
+        env:
+          {
+            NODE_OPTIONS: "--require ${{ github.workspace }}/.github/nx-hash-dump.cjs",
+            NX_HASH_DUMP: "${{ runner.temp }}/hd/test.json",
+          }
       - name: DEBUG post-run state
         if: always()
         run: |
