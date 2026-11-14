@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devStore, latestIteration, liveSession } from "@hackcove/pixelslash-engine";
 import { afterAll, describe, expect, test } from "vitest";
+import { parseDevArgs } from "../src/dev.ts";
+import { attachTo } from "../src/dev-attach.ts";
 import type { KeyInput } from "../src/dev-loop.ts";
 import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng } from "./support.ts";
@@ -46,14 +48,31 @@ function server() {
   return { fetch, seen };
 }
 
-/** Keys a test presses. */
+/**
+ * Keys a test presses. Like stdin, keys arrive in order after the call that pressed or listened
+ * returns, and a key pressed while nothing listens is held for the next listener. A dev prints
+ * its banner before it listens, so a q pressed on the banner of a starved dev used to be dropped
+ * here, never by stdin.
+ */
 function keyboard(): KeyInput & { press: (k: string) => void } {
   const fns = new Set<(chunk: string) => void>();
+  const held: string[] = [];
+  const flush = () => {
+    while (fns.size > 0) {
+      const k = held.shift();
+      if (k === undefined) return;
+      for (const fn of fns) fn(k);
+    }
+  };
   return {
-    on: (_e, fn) => fns.add(fn),
+    on: (_e, fn) => {
+      fns.add(fn);
+      queueMicrotask(flush);
+    },
     off: (_e, fn) => fns.delete(fn),
     press: (k) => {
-      for (const fn of fns) fn(k);
+      held.push(k);
+      queueMicrotask(flush);
     },
   };
 }
@@ -185,6 +204,34 @@ describe("pixelslash dev", () => {
     expect(await first).toBe(0);
     expect(await liveSession(store)).toBeUndefined();
   }, 90_000);
+
+  test("an attached dev takes a q pressed as soon as it says it is attached", async () => {
+    // The session's state is held open: a starved owner answering slowly. The q lands before the
+    // follower listens for keys; the keyboard used to drop it, and the follower polled on forever.
+    const held = Promise.withResolvers<void>();
+    const asked = Promise.withResolvers<void>();
+    const session = Bun.serve({
+      port: 0,
+      fetch: async () => {
+        asked.resolve();
+        await held.promise;
+        return Response.json({ latest: null });
+      },
+    });
+    try {
+      const [keys, cap] = [keyboard(), capture()];
+      const owner = { pid: 1, url: `http://127.0.0.1:${session.port}`, target: "index" };
+      const following = attachTo(owner, parseDevArgs([]), cap.io, { keys });
+      await asked.promise;
+      expect(cap.stdout).toContain("attached to the session on index");
+      keys.press("q");
+      held.resolve();
+      expect(await following).toBe(0);
+    } finally {
+      held.resolve();
+      await session.stop(true);
+    }
+  });
 
   test("SIGTERM ends it like q, and the next dev starts its own session (ob 1761)", async () => {
     const { cwd } = await project();
