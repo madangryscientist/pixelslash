@@ -35,7 +35,9 @@ tasks:
   smoke:
     command: "bun run vitest run -c vitest.smoke.config.ts"
     inputs:
-      # Vitest refuses a `.only` when CI is set.
+      # Vitest refuses a `.only` when CI is set. PIXELSLASH_SMOKE_TOKEN is left out on purpose: it is a
+      # credential, and moon writes an env input's value into its hash manifests (and so the remote cache).
+      # The smoke seeds whatever token it is given, so a pass does not hang on its value.
       - "$CI"
   test-e2e:
     command: "bun run playwright test"
@@ -45,7 +47,9 @@ tasks:
       # Which server and diff path the run uses (playwright.config.ts).
       - "$PIXELSLASH_E2E_DEV"
       - "$PIXELSLASH_E2E_NO_SIDECAR"
-      # rss-burst.spec.ts runs only when the count is set, and these shape it.
+      # rss-burst.spec.ts runs only when the count is set. It is a measurement (clock and RSS), run with
+      # `bunx playwright test rss-burst` from apps/web, not through moon; these only keep a burst run through
+      # moon from replaying the gate's pass. Add `--force` to measure through moon.
       - "$PIXELSLASH_RSS_BURST"
       - "$PIXELSLASH_RSS_HEIGHT"
       - "$PIXELSLASH_RSS_MODEL"
