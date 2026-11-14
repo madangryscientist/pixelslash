@@ -28,7 +28,6 @@ import { DIFF_LOCATIONS } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
 import { projectStale } from "#/db/stale";
 import { twinsOfBuild } from "#/db/twins";
-import { nextToReviewId } from "#/lib/build-tabs";
 import { warn } from "#/lib/log";
 import { walkAround } from "#/lib/review-walk";
 import { buildExpiry } from "#/lib/retention";
@@ -293,8 +292,6 @@ export const getSnapshotPage = createServerFn()
       total,
       previousId,
       nextId,
-      /** Where a decision on this shot moves the reviewer: the next shot still awaiting one. */
-      nextToReviewId: nextToReviewId(view.snapshots, snapshot.id),
       /** Every name in the build, so the label reads the same as on the build page. */
       names: view.snapshots.map((shot) => shot.name),
       /**
