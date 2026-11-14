@@ -1,7 +1,8 @@
 name: CI
 
 # The gate from AGENTS.md, on a GitHub-hosted runner. The only secrets read are the moon remote cache's
-# tokens: the read token on every run, and the write token on a push to main only (see `gate`). The
+# tokens: the read token on every run that gets secrets, and the write token on a push to main only
+# (see `gate`). The
 # trigger is `pull_request` (never `pull_request_target`), so a pull request from a fork runs with a
 # read-only GitHub token and no secrets, and so with no remote cache. Actions are pinned to a commit; the
 # tag is in the comment.
