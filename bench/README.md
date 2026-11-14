@@ -501,8 +501,9 @@ It needs no VM and no browser.
 It is in the gate: `bench:test` depends on `bench:check`, so `bun run test` (and `moon run :test`)
 runs it and fails on a regression. The check is cacheable. Its inputs are `bench/src`, the committed
 corpora, `bench/results/*.json`, `bench/package.json`, `bun.lock` and the engine's diff sources
-(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`); an edit to any of them re-runs it,
-and an edit anywhere else (`apps/web`, the CLI) replays it from cache.
+(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`), plus what every TypeScript task
+inherits (all of `packages/**` and the root files in `.moon/tasks/all.yml`); an edit to any of them
+re-runs it, and an edit anywhere else (`apps/web`, the docs) replays it from cache.
 
 When a score moves on purpose (a threshold you meant to change, a new case): run `bun run bench:check`,
 read the before and after numbers, then run `bun run bench` to write a new `bench/results/<date>.json`

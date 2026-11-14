@@ -2,14 +2,9 @@ $schema: "../../.moon/cache/schemas/project.json"
 
 tags: ["dotnet"]
 
-# PixelSlash.Diff and PixelSlash.Diff.Tests, built and tested here as one. `dotnet test` restores and
-# builds on its own, and its incremental build is its own cache, so `build` is never cached by moon.
-# The tests decode every PNG under fixtures/ds and both bench corpora, so those are inputs.
+# PixelSlash.Diff and PixelSlash.Diff.Tests, tested here as one: `dotnet test` restores and builds on
+# its own. The tests decode every PNG under fixtures/ds and both bench corpora, so those are inputs.
 tasks:
-  build:
-    command: "dotnet build PixelSlash.Diff.Tests/PixelSlash.Diff.Tests.csproj"
-    options:
-      cache: false
   test:
     command: "dotnet test PixelSlash.Diff.Tests/PixelSlash.Diff.Tests.csproj"
     inputs:

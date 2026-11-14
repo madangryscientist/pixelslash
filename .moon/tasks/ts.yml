@@ -12,9 +12,10 @@ implicitInputs:
   - "/packages/**/*"
   # Vitest's and Playwright's globalSetup, which every test run loads.
   - "/scripts/test-tmp-scope.ts"
-  # node_modules is gitignored, but a workspace package's node_modules holds symlinks that the glob
-  # still walks. dist, wasm, .wrangler and the Playwright output are what a build or a test run
-  # leaves behind.
+  # moon's input globs do not read .gitignore, so what a build or a test run leaves behind is listed
+  # here: node_modules (a workspace package's holds symlinks the glob still walks), dist, the licence
+  # files and tarballs the package builds copy in, the CLI's wasm copy, .wrangler and the Playwright
+  # output.
   - "!/**/node_modules/**"
   - "!/**/dist/**"
   - "!/**/.wrangler/**"
@@ -22,5 +23,10 @@ implicitInputs:
   - "!/**/test-results/**"
   - "!/**/playwright-report/**"
   - "!/packages/cli/wasm/**"
+  - "!/packages/*/LICENSE"
+  - "!/packages/*/NOTICE"
+  - "!/packages/*/*.tgz"
+  - "!/bench/imported/**"
+  - "!/bench/perf-results/**"
   # routeTree.gen.ts is left in: `tsr generate` rewrites it to the same bytes, so the hash holds, and
   # the tests import it through src/router.tsx.
