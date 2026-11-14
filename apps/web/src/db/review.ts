@@ -1,18 +1,20 @@
 import type { A11yDiff } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { and, eq, ne } from "drizzle-orm";
+import { nextToReviewId } from "#/lib/build-tabs";
 import { SNAPSHOT_GROUPS, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { cacheHit } from "./cache-hit";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
-import { type Verdict, refreshBuildStatus } from "./verdict";
+import { type Verdict, VERDICT_STATUSES, refreshBuildStatus, verdictOf } from "./verdict";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
 import {
   type AiReview,
+  type BuildStatus,
   type DiffLocation,
   type DiffOptions,
   type DiffResult,
@@ -41,8 +43,8 @@ async function refreshDecided(db: Db, buildId: string): Promise<Verdict> {
   throw new NotReviewableError(row?.status ?? "missing");
 }
 
-/** A decision's outcome: the decided build's verdict, and every build whose status it refreshed. */
-export type Decided = { verdict: Verdict; buildIds: string[] };
+/** A decision's outcome: the decided build, its verdict, and every build whose status it refreshed. */
+export type Decided = { buildId: string; verdict: Verdict; buildIds: string[] };
 
 /** A build still uploading, processing or errored has no verdict to review. */
 export class NotReviewableError extends Error {
@@ -299,7 +301,27 @@ export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> 
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
   const verdict = await refreshDecided(db, shot.buildId);
-  return { verdict, buildIds: [shot.buildId, ...moved] };
+  return { buildId: shot.buildId, verdict, buildIds: [shot.buildId, ...moved] };
+}
+
+/**
+ * What the reviewer needs once a decision on `snapshotId` is written: the build's status as it is
+ * now (another reviewer's reject may have failed it since) and the next shot still awaiting a
+ * decision, both read after the write, so the client moves on without a second round trip.
+ */
+export async function afterDecision(
+  db: Db,
+  input: { projectId: string; buildId: string; snapshotId: string },
+): Promise<{ buildStatus: BuildStatus; nextToReviewId: string | null }> {
+  const { build, snapshots: shots } = await buildView(db, input.projectId, input.buildId);
+  // A build at a verdict takes it from the same shots the next one is picked from, so the two
+  // cannot disagree: another reviewer's reject shows once its shot is written, before its build
+  // status is refreshed. A build that left its verdict (a re-run) keeps that status.
+  const atVerdict = VERDICT_STATUSES.some((status) => status === build.status);
+  return {
+    buildStatus: atVerdict ? verdictOf(shots) : build.status,
+    nextToReviewId: nextToReviewId(shots, input.snapshotId),
+  };
 }
 
 /**
@@ -336,5 +358,5 @@ export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> 
   const group = groupsOfBuild(db, buildId);
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
-  return { verdict: await refreshDecided(db, buildId), buildIds: [buildId, ...moved] };
+  return { buildId, verdict: await refreshDecided(db, buildId), buildIds: [buildId, ...moved] };
 }

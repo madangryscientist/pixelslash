@@ -21,14 +21,14 @@ import {
   withdrawInvite,
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
-import { NotReviewableError, buildView, decideAll, decideShot } from "#/db/review";
+import { NotReviewableError, afterDecision, buildView, decideAll, decideShot } from "#/db/review";
 import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
 import { projectStale } from "#/db/stale";
 import { twinsOfBuild } from "#/db/twins";
-import { nextToReviewId } from "#/lib/build-tabs";
+import { warn } from "#/lib/log";
 import { walkAround } from "#/lib/review-walk";
 import { buildExpiry } from "#/lib/retention";
 import { holdsChange, reviewGroupOf } from "#/lib/snapshot-groups";
@@ -292,8 +292,6 @@ export const getSnapshotPage = createServerFn()
       total,
       previousId,
       nextId,
-      /** Where a decision on this shot moves the reviewer: the next shot still awaiting one. */
-      nextToReviewId: nextToReviewId(view.snapshots, snapshot.id),
       /** Every name in the build, so the label reads the same as on the build page. */
       names: view.snapshots.map((shot) => shot.name),
       /**
@@ -313,18 +311,30 @@ export const reviewShot = createServerFn({ method: "POST" })
   .validator((d: unknown) => {
     const state = typeof d === "object" && d !== null ? Reflect.get(d, "state") : null;
     if (state !== "accepted" && state !== "rejected") throw new Error("state is required");
-    return {
-      projectId: field(d, "projectId"),
-      snapshotId: field(d, "snapshotId"),
-      state,
-    };
+    const next = typeof d === "object" && d !== null && Reflect.get(d, "next") === true;
+    return { projectId: field(d, "projectId"), snapshotId: field(d, "snapshotId"), state, next };
   })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const decided = await orConflict(decideShot(db, { ...data, userId: user.id }));
+    const { next, ...decision } = data;
+    const decided = await orConflict(decideShot(db, { ...decision, userId: user.id }));
     await syncChecks(db, decided.buildIds);
-    return { status: decided.verdict };
+    // Nowhere to go next: the build page. That is also the answer when the read below fails, since the
+    // decision is already written and only the next shot is lost.
+    const toBuild = { buildStatus: decided.verdict, nextToReviewId: null };
+    if (!next) return { status: decided.verdict, ...toBuild };
+    // `next` asks where the reviewer goes, read after the write, so moving on takes no second round
+    // trip and another reviewer's reject in between shows in `buildStatus`.
+    const after = await afterDecision(db, {
+      projectId: data.projectId,
+      buildId: decided.buildId,
+      snapshotId: data.snapshotId,
+    }).catch((e: unknown) => {
+      warn(`reviewShot: next shot not read: ${e instanceof Error ? e.message : String(e)}`);
+      return toBuild;
+    });
+    return { status: decided.verdict, ...after };
   });
 
 export const acceptBuild = createServerFn({ method: "POST" })
