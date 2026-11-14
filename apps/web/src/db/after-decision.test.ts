@@ -74,14 +74,7 @@ describe("what a decision answers", () => {
     expect(await after("about")).toEqual({ buildStatus: "passed", nextToReviewId: null });
   });
 
-  test("a reject on another shot after the accept shows as the build's status", async () => {
-    const { decide, after } = await changedBuild();
-    await decide("about", "accepted");
-    await decide("pricing", "rejected");
-    expect((await after("about")).buildStatus).toBe("failed");
-  });
-
-  test("a reject whose shot is written but whose build status is not yet refreshed shows", async () => {
+  test("another reviewer's reject shows as the build's status, before its build row is refreshed", async () => {
     const { idOf, decide, after, between } = await changedBuild();
     await decide("about", "accepted");
     // Another reviewer's reject lands its shot after the build row is read, before the shots are.

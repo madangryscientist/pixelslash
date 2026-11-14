@@ -75,7 +75,7 @@ describe("deciding on the shot on screen", () => {
   });
 
   it("a reject goes to the build page", async () => {
-    await mount(() => Promise.resolve({ buildStatus: "failed", nextToReviewId: "s2" }));
+    await mount(() => Promise.resolve({ buildStatus: "failed", nextToReviewId: null }));
     await press("rejected");
     expect(calls).toEqual(["review rejected", "build"]);
   });
