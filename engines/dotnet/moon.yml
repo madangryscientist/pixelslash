@@ -1,0 +1,14 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["dotnet"]
+
+# PixelSlash.Diff and PixelSlash.Diff.Tests, tested here as one: `dotnet test` restores and builds on
+# its own. The tests decode every PNG under fixtures/ds and both bench corpora, so those are inputs.
+tasks:
+  test:
+    command: "dotnet test PixelSlash.Diff.Tests/PixelSlash.Diff.Tests.csproj"
+    inputs:
+      - "**/*"
+      - "/fixtures/**/*"
+      - "/bench/corpus/**/*"
+      - "/bench/corpus-holdout/**/*"

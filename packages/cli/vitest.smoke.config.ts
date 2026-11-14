@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
-// The smoke layer: the built bundle as a child process (`nx smoke cli`). Kept out of vitest.config.ts so
-// `nx test cli` never needs a build.
+// The smoke layer: the built bundle as a child process (`moon run cli:smoke`). Kept out of vitest.config.ts so
+// `moon run cli:test` never needs a build.
 export default defineConfig({
   test: {
     environment: "node",

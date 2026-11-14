@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.test.ts"],
     globalSetup: ["../../scripts/test-tmp-scope.ts"],
-    // Nx runs up to three test projects at once, so each takes a third of the cores.
+    // moon runs up to three test projects at once (`--concurrency 3`), so each takes a third of the cores.
     maxWorkers: "33%",
     setupFiles: ["../../scripts/test-idle-machine.ts"],
   },

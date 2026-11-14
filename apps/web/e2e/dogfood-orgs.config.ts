@@ -9,7 +9,7 @@
  * `setup` (dogfood-orgs.setup.ts) signs in through the stand-in and seeds fixed rows. The ports
  * are fixed because the empty state prints the server URL. It shares `.wrangler/e2e` and `dist/`
  * with the e2e suite (vite.config pins the persist path), so do not run it while
- * `nx test:e2e web` runs.
+ * `moon run web:test-e2e` runs.
  *
  * Deterministic: fixed ids and dates in the seed, the capture's own stabilise, and every relative
  * time ("3h ago") is an ignore area, since the server renders it from its own clock.

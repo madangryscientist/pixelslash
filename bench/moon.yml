@@ -1,0 +1,66 @@
+$schema: "../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+dependsOn:
+  - "engine"
+
+tasks:
+  typecheck:
+    command: "tsc -p bench/tsconfig.json"
+    options:
+      runFromWorkspaceRoot: true
+  lint:
+    script: "oxlint --type-aware --deny-warnings bench && bun scripts/check-slop.ts bench"
+    options:
+      runFromWorkspaceRoot: true
+  test:
+    command: "bun --bun vitest run"
+    deps:
+      - "~:check"
+    inputs:
+      - "**/*"
+      - "/fixtures/**/*"
+      - "$PIXELSLASH_TEST_BROWSERS"
+  # The regression guard: its own inputs, so an apps/web change replays it from cache.
+  check:
+    command: "bun bench/src/check.ts"
+    inputs:
+      - "src/**/*.ts"
+      - "corpus/**/*"
+      - "corpus-holdout/**/*"
+      - "results/*.json"
+      - "package.json"
+      - "/bun.lock"
+      - "/packages/engine/src/index.ts"
+      - "/packages/engine/src/diff.ts"
+      - "/packages/engine/src/diff-options.ts"
+      - "/packages/engine/src/regions.ts"
+      - "/packages/engine/src/shift.ts"
+    options:
+      runFromWorkspaceRoot: true
+  corpus:
+    command: "bun bench/src/generate.ts"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  bench:
+    command: "bun bench/src/run.ts"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  perf:
+    command: "bun bench/src/perf/run.ts"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  perf-check:
+    command: "bun bench/src/perf/run.ts --check"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  decoders:
+    command: "bun bench/src/perf/decoders.ts"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
