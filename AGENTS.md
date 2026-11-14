@@ -289,6 +289,17 @@ is always busy with something else, so an unasked run gives noisy numbers. When 
 run base against head, interleaved, in one invocation, on one machine. The accuracy guard
 (`bench:check`) is a different thing and stays in the gate.
 
+Every speed measurement runs inside the dedicated reservation, never on the shared machine and never by
+waiting for the load to drop. `bench:perf` takes it as a flag, `--env dedicated`, which needs `--impl`:
+the default `--env none`, and a ref comparison, are shared runs. Any other timed command (`bench:native`,
+a ref comparison, a capture at several worker counts, an upload timing) runs from one script that starts
+with `sudo -n /usr/local/sbin/pixelslash-bench-reserve on --pid $$` (CPUs `4,5,10,11` and `4G` by
+default) and traps `sudo -n /usr/local/sbin/pixelslash-bench-reserve off` on exit. A new `bench/PERF.md`
+entry says `dedicated`. If the helper is not installed, or refuses the run, no measurement is taken and
+none is recorded: never fall back to a shared run. The reservation squeezes everything else on the
+machine and lapses after 30 minutes unless `renew` is run, so it is for timing runs only, never a repro
+or a test loop. `bench/README.md` ("A quiet machine") has the details.
+
 ## Rivals are benchmarks
 
 Do not copy, adapt or vendor code from an open-source competitor, even when its licence allows it.
