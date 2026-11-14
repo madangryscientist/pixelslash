@@ -20,6 +20,9 @@ tasks:
       - "**/*"
       - "/fixtures/**/*"
       - "/docs/cli.md"
+  # build, smoke and test-e2e all write `dist` and `.wrangler/deploy`. The smoke and the e2e cannot depend
+  # on `build`, because each bakes its own run's stub ports and sidecar URL into the build
+  # (vite.config.ts, pointAtStub). So the three share the `web-dist` mutex, and moon runs one at a time.
   build:
     command: "bun run vite build"
     # .wrangler/deploy/config.json is written by @cloudflare/vite-plugin and read by `vite preview`
@@ -27,6 +30,8 @@ tasks:
     outputs:
       - "dist"
       - ".wrangler/deploy"
+    options:
+      mutex: "web-dist"
   # The smoke and the e2e build the app themselves (the e2e's web server runs `bun run build`, the smoke's
   # harness too) and serve it on loopback only: a local D1, the GitHub and Sentry stand-ins and the diff
   # sidecar, nothing off the machine. So a run's result is the repo's files (the inherited inputs; a
@@ -40,8 +45,12 @@ tasks:
       # The token the smoke seeds and sends; its prefix picks which check authorizes it. It only opens the
       # run's own throwaway local D1, so hashing it exposes nothing.
       - "$PIXELSLASH_SMOKE_TOKEN"
+    options:
+      mutex: "web-dist"
   test-e2e:
     command: "bun run playwright test"
+    options:
+      mutex: "web-dist"
     inputs:
       # `forbidOnly` in playwright.config.ts.
       - "$CI"
