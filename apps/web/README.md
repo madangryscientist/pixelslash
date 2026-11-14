@@ -254,7 +254,7 @@ it as it does in a build; to serve the production build instead, `CLOUDFLARE_ENV
 then `HOST=127.0.0.1 bun deploy/ssh/serve.ts` (the LAN self-host's server, below; `PORT` moves it off :3000).
 `bunx vite preview --host 127.0.0.1 --port 3000 --strictPort` still serves the same build.
 
-`bunx nx test:e2e web` (and `bun run test:e2e:dev`) does not use :3000 or :4174: `e2e/ports.ts` picks two
+`bunx moon run web:test-e2e` (and `bun run test:e2e:dev`) does not use :3000 or :4174: `e2e/ports.ts` picks two
 free ports per run, so two runs from two worktrees can go at once. Set `PIXELSLASH_E2E_PORT` and
 `PIXELSLASH_E2E_STUB_PORT` to pin them. Each run builds and keeps its D1 under its own worktree's
 `.wrangler/e2e`, and turns the Workers debugger port off (it probes from 9229 and two runs at once

@@ -1,8 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// The smoke layer (`nx smoke web`): the production build on a local D1, driven over HTTP. Kept out of
-// vitest.config.ts so `nx test web` never builds.
+// The smoke layer (`moon run web:smoke`): the production build on a local D1, driven over HTTP. Kept out of
+// vitest.config.ts so `moon run web:test` never builds.
 export default defineConfig({
   resolve: { alias: { "#": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {

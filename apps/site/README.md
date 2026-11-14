@@ -74,16 +74,16 @@ so it needs the same change.
 
 ```bash
 bun run dev              # vite dev on :3100
-bunx nx build site       # prerenders every page into dist/client
-bunx nx test site        # the docs and compare pages against their source files
-bunx nx test:e2e site    # Playwright on the build, desktop and phone (CI runs `-- --project desktop`): nav, footer, dead links,
+bunx moon run site:build     # prerenders every page into dist/client
+bunx moon run site:test      # the docs and compare pages against their source files
+bunx moon run site:test-e2e  # Playwright on the build, desktop and phone (CI runs `-- --project desktop`): nav, footer, dead links,
                          # WCAG AA contrast in both themes (e2e/support/contrast.ts): every text node on a solid ground,
                          # and the inner pages' heading and lead over the aurora, read from pixels. Text on a
                          # picture or gradient fill (the demo, the closing band) is not measured,
                          # every `copy` button, the home's spacing
 ```
 
-`SITE_SHOTS_DIR=<dir> bunx nx test:e2e site` also writes a full-page screenshot of every page.
+`SITE_SHOTS_DIR=<dir> bunx moon run site:test-e2e` also writes a full-page screenshot of every page.
 
 ## Deploy
 
