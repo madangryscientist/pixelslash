@@ -24,4 +24,17 @@ vcs:
 pipeline:
   installDependencies: false
 
+# The shared remote cache, over HTTP. Its public door answers only a request that carries a bearer
+# token, reads included. `auth.token` names the env var that holds it (unset or empty sends none). In
+# CI a pull request reads with the read token and only a push to main holds the write token, so a branch
+# cannot poison the cache (.github/workflows/ci.yml). Outside CI moon only downloads (`localReadOnly`); a
+# local run with no token gets a 401 and runs on its local cache alone.
+remote:
+  api: "http"
+  host: "https://moon-cache.madangryscientist.com"
+  auth:
+    token: "MOON_REMOTE_TOKEN"
+  cache:
+    localReadOnly: true
+
 telemetry: false
