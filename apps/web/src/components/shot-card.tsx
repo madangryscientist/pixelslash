@@ -118,7 +118,8 @@ function approvedEarlierLine(shot: SnapshotView): string | null {
   const approved = shot.approvedEarlier;
   if (!approved) return null;
   const by = approved.reviewedBy ? ` by ${approved.reviewedBy}` : "";
-  return `no change since build ${approved.commitSha.slice(0, 7)} · change from ${approved.defaultBranch} approved${by}`;
+  const moved = approved.mainChangedSince ? ` · ${approved.defaultBranch} has changed since` : "";
+  return `no change since build ${approved.commitSha.slice(0, 7)} · change from ${approved.defaultBranch} approved${by}${moved}`;
 }
 
 /** An unchanged native shot of a twin key the web side changed (PS-297): nothing differs here, yet it was not looked at since. */

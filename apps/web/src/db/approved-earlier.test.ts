@@ -11,6 +11,8 @@ import { acceptAllSnapshots, buildView, reviewSnapshot } from "./review";
 const white = shot();
 const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
 
+const blue = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: [0, 0, 255] }] });
+
 const onBranch = (commit: number, png: typeof white) => ({
   branch: "feat",
   commit: sha(commit),
@@ -55,6 +57,7 @@ describe("approved earlier on this branch", () => {
       commitSha: sha(2),
       reviewedBy: "ada",
       defaultBranch: "main",
+      mainChangedSince: false,
     });
     expect(view?.approvedEarlier?.reviewedAt).toBeInstanceOf(Date);
   });
@@ -69,6 +72,57 @@ describe("approved earlier on this branch", () => {
     });
     const third = await upload(ctx, onBranch(4, red));
     expect((await viewOf(ctx, third.id))?.approvedEarlier?.buildId).toBe(first.id);
+  });
+
+  test("an approval given before main moved says main has changed since", async () => {
+    const ctx = await context();
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+    const first = await upload(ctx, onBranch(2, red));
+    const firstShot = await onlyShot(ctx, first);
+    if (!firstShot) throw new Error("no shot");
+    await accept(ctx, firstShot.id);
+    // Main moves on to a different image, and the branch is rebased onto it.
+    await upload(ctx, { branch: "main", commit: sha(4), shots: [{ png: blue }] });
+    const second = await upload(ctx, {
+      branch: "feat",
+      commit: sha(5),
+      mergeBase: sha(4),
+      shots: [{ png: red }],
+    });
+    const view = await viewOf(ctx, second.id);
+    expect(view).toMatchObject({ diffStatus: "unchanged", carriedFrom: null });
+    expect(view?.approvedEarlier).toMatchObject({ buildId: first.id, mainChangedSince: true });
+  });
+
+  test("main re-captured with the same pixels does not say main has changed", async () => {
+    const { ctx, first } = await acceptedOnBuildOne();
+    await upload(ctx, { branch: "main", commit: sha(4), shots: [{ png: white }] });
+    const second = await upload(ctx, {
+      branch: "feat",
+      commit: sha(5),
+      mergeBase: sha(4),
+      shots: [{ png: red }],
+    });
+    const view = await viewOf(ctx, second.id);
+    expect(view?.approvedEarlier).toMatchObject({ buildId: first.id, mainChangedSince: false });
+  });
+
+  test("an approval is not marked when the shot has no main image to compare", async () => {
+    const ctx = await context();
+    // The branch's first shot has no main shot at its merge-base, so its main key is null.
+    await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white, name: "other" }] });
+    const first = await upload(ctx, onBranch(2, red));
+    const firstShot = await onlyShot(ctx, first);
+    if (!firstShot) throw new Error("no shot");
+    await accept(ctx, firstShot.id);
+    await upload(ctx, { branch: "main", commit: sha(4), shots: [{ png: blue }] });
+    const second = await upload(ctx, {
+      branch: "feat",
+      commit: sha(5),
+      mergeBase: sha(4),
+      shots: [{ png: red }],
+    });
+    expect((await viewOf(ctx, second.id))?.approvedEarlier?.mainChangedSince).toBe(false);
   });
 
   test("a shot whose baseline is the default branch's gets no label", async () => {
