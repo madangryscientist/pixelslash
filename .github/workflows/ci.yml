@@ -1,8 +1,10 @@
 name: CI
 
-# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read, and the trigger is
-# `pull_request` (never `pull_request_target`), so a pull request from a fork runs with a read-only
-# token. Actions are pinned to a commit; the tag is in the comment.
+# The gate from AGENTS.md, on a GitHub-hosted runner. The only secrets read are the moon remote cache's
+# tokens: the read token on every run that gets secrets, and the write token on a push to main only
+# (see `gate`). The trigger is `pull_request` (never `pull_request_target`), so a pull request from a
+# fork runs with a read-only GitHub token and no secrets, and so with no remote cache. Actions are pinned
+# to a commit; the tag is in the comment.
 
 on:
   pull_request:
@@ -28,18 +30,22 @@ jobs:
     name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # moon's own local cache (.moon/cache) is kept between runs with actions/cache; there is no remote
-    # cache. moon still checks every entry by its hash. GitHub scopes a cache to the ref that saved it:
-    # a pull request reads and writes only its own, plus the base branch's, and `main` cannot read a
-    # PR's, so a branch can never poison main's cache. The key carries the ref and the sha, so every run
-    # saves a fresh entry; restore-keys fall back to the last entry of the same ref, then to main's.
-    # A tag (a release, which calls this workflow) never restores or saves the cache, so a release
-    # gate always runs uncached.
+    # The moon remote cache (.moon/workspace.yml `remote:`): moon sends MOON_REMOTE_TOKEN as a bearer
+    # token, and the cache answers no request without one. Only a push to main writes: the job then
+    # enters the `moon-cache-write` environment, which GitHub lets only `main` use, and that environment
+    # alone holds MOON_CACHE_WRITE_TOKEN. Every other run reads with MOON_CACHE_READ_TOKEN, and its
+    # uploads are refused (moon logs a WARN and carries on), so a pull request cannot poison the cache.
+    # The ref is checked as well as the event because a tag push is also a `push`: a release calls this
+    # workflow, and the environment would refuse a tag. A release passes no secrets, so its gate runs
+    # with no token and uncached, as does a fork's pull request. Never make the write token a plain
+    # repository secret, which a same-repo pull request could read.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
       # moon diffs the head against the base branch before any task runs, even for a plain `moon run`,
       # and the checkout has no local `main`, so it names the remote ref. That needs the full history
       # (fetch-depth: 0 below).
       MOON_BASE: origin/main
+      MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,15 +59,6 @@ jobs:
         with:
           global-json-file: global.json
       - run: bun install --frozen-lockfile
-      - name: Restore the moon cache
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .moon/cache
-          key: moon-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
-          restore-keys: |
-            moon-${{ runner.os }}-${{ github.ref }}-
-            moon-${{ runner.os }}-refs/heads/main-
       # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
       - name: Install the Playwright browser
         working-directory: packages/engine
@@ -163,10 +160,12 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # This job builds and runs e2e, so it keeps no moon cache. It does not use engines/dotnet, and
-    # moon's graph needs no SDK, so none is installed. MOON_BASE and the full history: see `gate`.
+    # It reads the moon remote cache with the read token and never writes it (see `gate`). It does not
+    # use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # history: see `gate`.
     env:
       MOON_BASE: origin/main
+      MOON_REMOTE_TOKEN: ${{ secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -221,10 +220,12 @@ jobs:
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # This job builds and runs e2e, so it keeps no moon cache. It does not use engines/dotnet, and
-    # moon's graph needs no SDK, so none is installed. MOON_BASE and the full history: see `gate`.
+    # It reads the moon remote cache with the read token and never writes it (see `gate`). It does not
+    # use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # history: see `gate`.
     env:
       MOON_BASE: origin/main
+      MOON_REMOTE_TOKEN: ${{ secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

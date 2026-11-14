@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
-    # A release builds from scratch and never restores a moon cache (the gate it calls skips the cache on a tag too):
+    # A release builds from scratch and never restores a moon cache (the gate it calls gets no cache token on a tag either):
     # what is published is what this job built.
     permissions:
       contents: read

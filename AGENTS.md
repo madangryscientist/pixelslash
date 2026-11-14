@@ -87,11 +87,22 @@ hashes the root files in `.moon/tasks/all.yml`, so a change to the engine re-run
 imports it. Cache correctness over granularity. moon runs without a toolchain (no
 `.moon/toolchains.yml`, `pipeline.installDependencies: false`), so it never downloads Bun or runs
 `bun install`. moon diffs the head against `main` before any task runs, so every CI job that runs
-moon fetches the full history and sets `MOON_BASE=origin/main`. There is no remote cache: the gate
-job keeps `.moon/cache` between runs with `actions/cache`, keyed on ref and sha, falling back to the
-same ref and then to `main`.
-GitHub scopes a PR's cache to that PR, so a branch cannot poison `main`'s, and a tag (a release)
-neither restores nor saves it. Lint rules are all errors; fix the code, do not disable a rule.
+moon fetches the full history and sets `MOON_BASE=origin/main`.
+
+**The remote cache.** moon shares task outputs through an HTTP remote cache (`remote:` in
+`.moon/workspace.yml`). It answers no request without a bearer token, reads included; moon sends the
+value of `MOON_REMOTE_TOKEN`. In CI the `gate`, `web` and `site` jobs read it with the repo secret
+`MOON_CACHE_READ_TOKEN`. Only a push to `main` writes: the `gate` job then enters the `moon-cache-write`
+environment, which only `main` may deploy to and which alone holds `MOON_CACHE_WRITE_TOKEN`, so a branch
+cannot poison the cache. A pull request's uploads are refused (a WARN per task, not a failure). A fork's
+pull request and a release (a tag; `release.yml` passes no secrets) run with no token and uncached. The
+write token is never a plain repository secret, since a same-repo pull request can read those. A task
+output over 100 MB does not upload (the host's request cap); the largest today is about 4 MB compressed.
+Outside CI moon only downloads (`cache.localReadOnly`). A local run with no token costs one line,
+`Failed to connect to storage backend, disabling it ... (401 Unauthorized)`, and no time (a cold
+`bun run test` took 57 s with no token and 80 s with one, on a busy desktop): moon then runs on
+`.moon/cache` alone. A contributor who has a read token may set `MOON_REMOTE_TOKEN` to it.
+Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
 Real-browser tests run Chromium only; set `PIXELSLASH_TEST_BROWSERS=firefox,webkit` (or `all`) to add the others, and a browser named there that does not launch fails the run.

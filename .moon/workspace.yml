@@ -24,4 +24,14 @@ vcs:
 pipeline:
   installDependencies: false
 
+# The shared remote cache, over HTTP. Every request needs a bearer token, read from the env var
+# `auth.token` names; who reads and who writes is in AGENTS.md ("The remote cache").
+remote:
+  api: "http"
+  host: "https://moon-cache.madangryscientist.com"
+  auth:
+    token: "MOON_REMOTE_TOKEN"
+  cache:
+    localReadOnly: true
+
 telemetry: false

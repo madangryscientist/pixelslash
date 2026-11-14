@@ -22,8 +22,11 @@ tasks:
       - "/docs/cli.md"
   build:
     command: "bun run vite build"
+    # .wrangler/deploy/config.json is written by @cloudflare/vite-plugin and read by `vite preview`
+    # and `wrangler`, so a cache hit must restore it with dist.
     outputs:
       - "dist"
+      - ".wrangler/deploy"
   smoke:
     command: "bun run vitest run -c vitest.smoke.config.ts"
     options:
