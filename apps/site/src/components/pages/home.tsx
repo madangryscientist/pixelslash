@@ -1,8 +1,18 @@
-import { Button, Card, CardGrid, CodeBlock, Container, Pill, TextLink } from "@hackcove/ui-react";
+import {
+  Button,
+  Caption,
+  Card,
+  CardGrid,
+  CodeBlock,
+  Container,
+  Pill,
+  TextLink,
+} from "@hackcove/ui-react";
 import { useEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
 import { Demo } from "#/components/pages/home-parts";
 import { REPO_PUBLIC, REPO_URL } from "#/content/links";
+import { STAGE_LINE } from "#/content/stage";
 
 /*
  * The homepage is marketing, not an admin screen: its controls and cards are @hackcove/ui-react
@@ -84,6 +94,9 @@ function Hero(): ReactNode {
         <p className="home-rise mx-auto mt-6 max-w-2xl text-lg text-(--home-sub) md:text-xl">
           PixelSlash pixel-diffs Main against Branch and writes a report of what changed. It runs on
           your machine, for free.
+        </p>
+        <p className="home-rise mt-4 text-balance">
+          <Caption data-testid="stage">{STAGE_LINE}</Caption>
         </p>
         <div className="home-rise mt-9 flex flex-wrap justify-center gap-3">
           <Button href="/self-host" size="lg">
