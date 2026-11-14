@@ -4,8 +4,6 @@ import { type Token, lexer } from "marked";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { DocPage, DocsIndexPage } from "#/components/pages/docs";
-import { HomePage } from "#/components/pages/home";
-import { HowItWorksPage } from "#/components/pages/how-it-works";
 import { splitCli } from "./cli-pages.ts";
 import { CLI_SPLIT } from "./cli-split.ts";
 import { OLD_ANCHOR_SCRIPT } from "./old-anchors.ts";
@@ -234,22 +232,7 @@ describe("heading text", () => {
 });
 
 describe("links into the docs", () => {
-  test("every /docs/<page>#anchor on home and how it works lands on the page that holds it", () => {
-    const html = renderToStaticMarkup(<HomePage />) + renderToStaticMarkup(<HowItWorksPage />);
-    const links = [...html.matchAll(/href="\/docs\/([^"#]+)(?:#([^"]+))?"/g)];
-    expect(links.length).toBeGreaterThan(0);
-    const slugs = DOC_PAGES.map((p) => p.slug);
-    const unknown = links.filter(([, slug]) => !slugs.includes(slug ?? ""));
-    expect(unknown.map((link) => link[0])).toEqual([]);
-    const misplaced = links.filter(
-      ([, slug, anchor]) => anchor !== undefined && CLI_SPLIT.anchorPage.get(anchor) !== slug,
-    );
-    expect(misplaced.map((link) => link[0])).toEqual([]);
-  });
-
   test("an old /docs#anchor is sent to the page that holds it, for every heading of cli.md", () => {
-    const html = renderToStaticMarkup(<HomePage />) + renderToStaticMarkup(<HowItWorksPage />);
-    expect(html).not.toMatch(/href="\/docs#/);
     for (const [anchor, slug] of CLI_SPLIT.anchorPage) {
       expect(OLD_ANCHOR_SCRIPT).toContain(`"${anchor}":"${slug}"`);
     }

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { LISTED_PAGES } from "../src/content/docs-map.ts";
+import { MOVED, REDIRECTS } from "../src/content/moved.ts";
 import { PAGES } from "../src/content/pages.ts";
 
 /*
@@ -88,6 +89,10 @@ test("the sitemap lists exactly the site's pages, and robots.txt names it", asyn
   );
   expect(locs).toHaveLength(PATHS.length);
   expect(new Set(locs)).toEqual(new Set(PATHS.map((path) => `${ORIGIN}${path}`)));
+  expect(PAGES.map((one) => one.to)).toEqual(["/docs", "/self-host", "/security"]);
+  for (const moved of MOVED) {
+    expect(locs, `${moved.from} moved to slashslash.build`).not.toContain(`${ORIGIN}${moved.from}`);
+  }
 
   const robots = await (await page.request.get("/robots.txt")).text();
   expect(robots).toContain(`Sitemap: ${ORIGIN}/sitemap.xml`);
@@ -95,8 +100,34 @@ test("the sitemap lists exactly the site's pages, and robots.txt names it", asyn
 });
 
 test("a page with a trailing slash redirects to the canonical one", async ({ page }) => {
-  const response = await page.request.get("/pricing/", { maxRedirects: 0 });
+  const response = await page.request.get("/security/", { maxRedirects: 0 });
   expect(response.status()).toBeGreaterThanOrEqual(300);
   expect(response.status()).toBeLessThan(400);
-  expect(response.headers()["location"]).toBe("/pricing");
+  expect(response.headers()["location"]).toBe("/security");
+});
+
+/*
+ * The marketing pages moved to slashslash.build: each old path, with and without its trailing
+ * slash, answers a 301 to its new address, from the site's own Worker entry (src/server.ts).
+ */
+test("each moved page answers a 301 to its slashslash.build address", async ({ page }) => {
+  // `/` has no trailing-slash form of its own, so the other three give two paths each.
+  expect([...REDIRECTS.keys()]).toEqual([
+    "/",
+    "/how-it-works",
+    "/how-it-works/",
+    "/compare",
+    "/compare/",
+    "/pricing",
+    "/pricing/",
+  ]);
+  for (const [path, target] of REDIRECTS) {
+    const response = await page.request.get(path, { maxRedirects: 0 });
+    expect(response.status(), path).toBe(301);
+    expect(response.headers()["location"], path).toBe(target);
+  }
+  expect(REDIRECTS.get("/")).toBe("https://slashslash.build/pixelslash");
+  expect(REDIRECTS.get("/how-it-works/")).toBe("https://slashslash.build/pixelslash/how-it-works");
+  expect(REDIRECTS.get("/compare")).toBe("https://slashslash.build/pixelslash/compare");
+  expect(REDIRECTS.get("/pricing/")).toBe("https://slashslash.build/pixelslash/pricing");
 });

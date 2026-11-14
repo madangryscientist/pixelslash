@@ -3,8 +3,6 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { DocPage, DocsIndexPage } from "#/components/pages/docs";
-import { HomePage } from "#/components/pages/home";
-import { HowItWorksPage } from "#/components/pages/how-it-works";
 import { SecurityPage } from "#/components/pages/security";
 import { SelfHostPage } from "#/components/pages/self-host";
 import { TICKET_ID } from "./doc-text.ts";
@@ -32,14 +30,12 @@ function codeRows(markdown: string, heading: string): string[] {
 const read = (file: string): string => readFileSync(join(ROOT, file), "utf8");
 
 describe("no private ticket id in a rendered page", () => {
-  test("not in any docs page, the docs index, self-host, security or the home page", () => {
+  test("not in any docs page, the docs index, self-host or security", () => {
     const pages: [string, string][] = [
       ...[...html].map(([slug, markup]): [string, string] => [`/docs/${slug}`, markup]),
       ["/docs", renderToStaticMarkup(<DocsIndexPage />)],
       ["/self-host", renderToStaticMarkup(<SelfHostPage />)],
       ["/security", renderToStaticMarkup(<SecurityPage />)],
-      ["/how-it-works", renderToStaticMarkup(<HowItWorksPage />)],
-      ["/", renderToStaticMarkup(<HomePage />)],
     ];
     const leaking = pages
       .filter(([, markup]) => TICKET_ID.test(text(markup)))

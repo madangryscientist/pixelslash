@@ -1,22 +1,9 @@
 /**
  * Every page of the site, in nav order. The build prerenders each one; the nav, the head of each
- * page, the sitemap and the smoke test read the same list.
+ * page, the sitemap and the smoke test read the same list. The marketing pages moved to
+ * slashslash.build (`moved.ts`); the nav still links them, around these.
  */
 export const PAGES = [
-  {
-    to: "/",
-    label: "Home",
-    title: "PixelSlash: visual review for the web",
-    description:
-      "PixelSlash diffs two versions of a page and shows what changed. Source available under the Elastic License 2.0, self-hostable.",
-  },
-  {
-    to: "/how-it-works",
-    label: "How it works",
-    title: "How it works · PixelSlash",
-    description:
-      "One PixelSlash run, step by step: capture Main and Branch, diff the pixels perceptually, and read the report it writes.",
-  },
   {
     to: "/docs",
     label: "Docs",
@@ -30,20 +17,6 @@ export const PAGES = [
     title: "Self-host · PixelSlash",
     description:
       "Run the PixelSlash review app yourself: in Docker, on your own Cloudflare account or on your own box.",
-  },
-  {
-    to: "/compare",
-    label: "Compare",
-    title: "How we compare · PixelSlash",
-    description:
-      "PixelSlash against five other visual testing tools, capability by capability, with the rows where it is behind left in.",
-  },
-  {
-    to: "/pricing",
-    label: "Pricing",
-    title: "Pricing · PixelSlash",
-    description:
-      "PixelSlash is free and you can run all of it yourself. There is no paid plan to buy; the whole product is in the source-available repository.",
   },
   {
     to: "/security",

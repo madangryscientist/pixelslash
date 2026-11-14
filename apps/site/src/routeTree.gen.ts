@@ -9,10 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as CompareRouteImport } from './routes/compare'
-import { Route as HowItWorksRouteImport } from './routes/how-it-works'
-import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as SearchIndexDotjsonRouteImport } from './routes/search-index[.]json'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SelfHostRouteImport } from './routes/self-host'
@@ -20,26 +16,6 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSlugRouteImport } from './routes/docs.$slug'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CompareRoute = CompareRouteImport.update({
-  id: '/compare',
-  path: '/compare',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HowItWorksRoute = HowItWorksRouteImport.update({
-  id: '/how-it-works',
-  path: '/how-it-works',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SearchIndexDotjsonRoute = SearchIndexDotjsonRouteImport.update({
   id: '/search-index.json',
   path: '/search-index.json',
@@ -72,10 +48,6 @@ const DocsSlugRoute = DocsSlugRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/compare': typeof CompareRoute
-  '/how-it-works': typeof HowItWorksRoute
-  '/pricing': typeof PricingRoute
   '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
@@ -84,10 +56,6 @@ export interface FileRoutesByFullPath {
   '/docs/': typeof DocsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/compare': typeof CompareRoute
-  '/how-it-works': typeof HowItWorksRoute
-  '/pricing': typeof PricingRoute
   '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
@@ -97,10 +65,6 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/compare': typeof CompareRoute
-  '/how-it-works': typeof HowItWorksRoute
-  '/pricing': typeof PricingRoute
   '/search-index.json': typeof SearchIndexDotjsonRoute
   '/security': typeof SecurityRoute
   '/self-host': typeof SelfHostRoute
@@ -111,10 +75,6 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/compare'
-    | '/how-it-works'
-    | '/pricing'
     | '/search-index.json'
     | '/security'
     | '/self-host'
@@ -123,10 +83,6 @@ export interface FileRouteTypes {
     | '/docs/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
-    | '/compare'
-    | '/how-it-works'
-    | '/pricing'
     | '/search-index.json'
     | '/security'
     | '/self-host'
@@ -135,10 +91,6 @@ export interface FileRouteTypes {
     | '/docs'
   id:
     | '__root__'
-    | '/'
-    | '/compare'
-    | '/how-it-works'
-    | '/pricing'
     | '/search-index.json'
     | '/security'
     | '/self-host'
@@ -148,10 +100,6 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  CompareRoute: typeof CompareRoute
-  HowItWorksRoute: typeof HowItWorksRoute
-  PricingRoute: typeof PricingRoute
   SearchIndexDotjsonRoute: typeof SearchIndexDotjsonRoute
   SecurityRoute: typeof SecurityRoute
   SelfHostRoute: typeof SelfHostRoute
@@ -162,34 +110,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/compare': {
-      id: '/compare'
-      path: '/compare'
-      fullPath: '/compare'
-      preLoaderRoute: typeof CompareRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/how-it-works': {
-      id: '/how-it-works'
-      path: '/how-it-works'
-      fullPath: '/how-it-works'
-      preLoaderRoute: typeof HowItWorksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/search-index.json': {
       id: '/search-index.json'
       path: '/search-index.json'
@@ -236,10 +156,6 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  CompareRoute: CompareRoute,
-  HowItWorksRoute: HowItWorksRoute,
-  PricingRoute: PricingRoute,
   SearchIndexDotjsonRoute: SearchIndexDotjsonRoute,
   SecurityRoute: SecurityRoute,
   SelfHostRoute: SelfHostRoute,
