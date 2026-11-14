@@ -90,8 +90,11 @@ describe("deciding on the shot on screen", () => {
   it("a second key while the first is in flight is ignored", async () => {
     const pending = new Promise<DecisionReply>((resolve) => (settle = resolve));
     await mount(() => pending);
-    await press("accepted");
-    await press("accepted");
+    // Both keys land in one task, before React re-renders with `busy` set.
+    await act(async () => {
+      hook.decide("accepted");
+      hook.decide("accepted");
+    });
     expect(calls).toEqual(["review accepted"]);
     expect(hook.busy).toBe(true);
     await act(async () => settle({ buildStatus: "changes", nextToReviewId: "s2" }));

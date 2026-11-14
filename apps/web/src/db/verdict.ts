@@ -35,7 +35,7 @@ async function verdictOfBuild(db: Db, buildId: string): Promise<Verdict> {
   return verdictOf(rows);
 }
 
-const VERDICT_STATUSES: Verdict[] = ["changes", "passed", "failed"];
+export const VERDICT_STATUSES: Verdict[] = ["changes", "passed", "failed"];
 
 /**
  * Recompute the verdict of a build that already has one (a review decision, an explain settling, a flake).

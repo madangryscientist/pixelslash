@@ -8,7 +8,7 @@ import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { cacheHit } from "./cache-hit";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
-import { type Verdict, refreshBuildStatus, verdictOf } from "./verdict";
+import { type Verdict, VERDICT_STATUSES, refreshBuildStatus, verdictOf } from "./verdict";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
@@ -317,8 +317,7 @@ export async function afterDecision(
   // A build at a verdict takes it from the same shots the next one is picked from, so the two
   // cannot disagree: another reviewer's reject shows once its shot is written, before its build
   // status is refreshed. A build that left its verdict (a re-run) keeps that status.
-  const atVerdict =
-    build.status === "changes" || build.status === "passed" || build.status === "failed";
+  const atVerdict = VERDICT_STATUSES.some((status) => status === build.status);
   return {
     buildStatus: atVerdict ? verdictOf(shots) : build.status,
     nextToReviewId: nextToReviewId(shots, input.snapshotId),
