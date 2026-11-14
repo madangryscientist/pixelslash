@@ -1,0 +1,19 @@
+# Inherited by every project. Root files every task's result depends on, so a change to one is
+# never a cache hit.
+$schema: "../cache/schemas/tasks.json"
+
+implicitInputs:
+  - "/package.json"
+  - "/bun.lock"
+  - "/bunfig.toml"
+  - "/tsconfig.base.json"
+  - "/.oxlintrc.json"
+  - "/scripts/check-slop.ts"
+  - "/global.json"
+  - "/.tool-versions"
+  - "/engines/dotnet/Directory.Build.*"
+
+# Run every task in CI whether or not the change touched it, so a push to main (nothing affected
+# against origin/main) still gates and saves the cache.
+taskOptions:
+  runInCI: "always"

@@ -16,7 +16,7 @@ bun run bench:perf                 # speed, before vs after on this machine (see
 bun run bench:perf:check           # the same comparison; exits 1 when a step is over 25% slower
 bun run bench:perf -- --impl "<cmd>" --impl "<cmd>"   # time implementations against each other
 bun run bench:native               # diff.wasm's steps in wasm and natively (needs cargo; PS-212)
-bunx nx run bench:corpus           # re-render the main corpus (needs chromium-headless-shell)
+bunx moon run bench:corpus         # re-render the main corpus (needs chromium-headless-shell)
 bun bench/src/generate.ts --set holdout   # re-render the held-out corpus
 ```
 
@@ -124,7 +124,7 @@ directory, and the next run removes it.
 median is more than 25% above the base median *in that run*. It never reads an earlier run. With no
 `--base` and neither `origin/main` nor `main` available it prints the head timings alone, says no
 comparison was made, and exits 0. An unknown `--base` ref is a usage error (exit 2). Both root scripts
-run `bun bench/src/perf/run.ts` directly, so those exit codes reach the caller (through `nx run` every
+run `bun bench/src/perf/run.ts` directly, so those exit codes reach the caller (through `moon run` every
 failure would read as 1). The head side times the working tree; the head SHA in the report and the
 results file carries `+dirty` when the tree has uncommitted changes.
 
@@ -414,11 +414,11 @@ contract: the same YIQ threshold, anti-alias test, 24 px region grouping, speck,
 rules, and the same overlap-only rule for shots of different sizes. PNGs are decoded with
 SkiaSharp (MIT, Skia BSD-3), base and head at once, since PS-168; `--decoder stb --decode
 sequential` is the StbImageSharp (Unlicense or MIT) path it had before. See "Decoders and encoders". `engines/dotnet/PixelSlash.Diff.Tests` holds its xunit tests on
-tiny rasters. Both are Nx projects through `@nx/dotnet`, named after their `.csproj`, so
+tiny rasters. Both are the one moon project `dotnet` (`engines/dotnet/moon.yml`), so
 `bun run test` builds and runs them. It needs the .NET SDK that `global.json` pins (see AGENTS.md).
 
 ```bash
-bunx nx build PixelSlash.Diff --configuration release   # or: dotnet build engines/dotnet/PixelSlash.Diff -c Release
+dotnet build engines/dotnet/PixelSlash.Diff -c Release
 bun run bench -- --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
 bun run bench:perf -- --impl "bun bench/src/impl/ts-diff.ts" \
   --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
@@ -492,17 +492,18 @@ kernel's rusage for a child carries the parent's high-water mark through fork an
 
 ## The regression guard
 
-`bun run bench:check` (an Nx target, `bench:check`) runs PixelSlash on both corpora, reads the
+`bun run bench:check` (a moon task, `bench:check`) runs PixelSlash on both corpora, reads the
 committed `bench/results/<date>.json` at git HEAD, and exits 1 when, on either corpus, real changes
 caught fall, or noise or identical pairs flagged rise. Fractions are compared exactly (a corpus that
 grew compares by rate). It prints every number before and after, and the cases whose verdict moved.
 It needs no VM and no browser.
 
-It is in the gate: `bench:test` depends on `bench:check`, so `bun run test` (and `nx run-many -t test`)
+It is in the gate: `bench:test` depends on `bench:check`, so `bun run test` (and `moon run :test`)
 runs it and fails on a regression. The check is cacheable. Its inputs are `bench/src`, the committed
 corpora, `bench/results/*.json`, `bench/package.json`, `bun.lock` and the engine's diff sources
-(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`); an edit to any of them re-runs it,
-and an edit anywhere else (`apps/web`, the CLI) replays it from cache.
+(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`), plus what every TypeScript task
+inherits (all of `packages/**` and the root files in `.moon/tasks/all.yml`); an edit to any of them
+re-runs it, and an edit anywhere else (`apps/web`, the docs) replays it from cache.
 
 When a score moves on purpose (a threshold you meant to change, a new case): run `bun run bench:check`,
 read the before and after numbers, then run `bun run bench` to write a new `bench/results/<date>.json`

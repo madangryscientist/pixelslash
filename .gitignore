@@ -1,6 +1,6 @@
 node_modules/
 .pixelslash/
-.nx/
+.moon/cache/
 bench/imported/
 bench/perf-results/
 engines/dotnet/**/bin/

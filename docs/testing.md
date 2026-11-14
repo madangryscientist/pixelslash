@@ -6,10 +6,10 @@ cannot see.
 
 | Layer | Question | Runs against | Where | Command |
 | --- | --- | --- | --- | --- |
-| **Smoke** | Does the thing we ship start and do its one job? | the built artifact: the bundled CLI, a production build of the web app | `packages/cli/smoke`, `apps/web/smoke` | `bunx nx smoke cli`, `bunx nx smoke web` |
-| **E2E** | Does a user's happy path work through the real UI or CLI? | a real browser on a local build, local D1, GitHub stubbed | `apps/web/e2e`, `apps/site/e2e` | `bunx nx test:e2e web`, `bunx nx test:e2e site` |
-| **Integration** | Do the parts agree with each other and with the store? | real SQLite (D1's engine), real files, real HTTP on loopback, a real child process | `*/test`, `apps/web/src/{db,api,diff,github,storage,server}` | `bunx nx test <project>` |
-| **Unit** | Is this function right on the cases that are easy to get wrong? | one module, no I/O | the rest of `*/test` and `apps/web/src/{lib,auth,ai}` | `bunx nx test <project>` |
+| **Smoke** | Does the thing we ship start and do its one job? | the built artifact: the bundled CLI, a production build of the web app | `packages/cli/smoke`, `apps/web/smoke` | `bunx moon run cli:smoke`, `bunx moon run web:smoke` |
+| **E2E** | Does a user's happy path work through the real UI or CLI? | a real browser on a local build, local D1, GitHub stubbed | `apps/web/e2e`, `apps/site/e2e` | `bunx moon run web:test-e2e`, `bunx moon run site:test-e2e` |
+| **Integration** | Do the parts agree with each other and with the store? | real SQLite (D1's engine), real files, real HTTP on loopback, a real child process | `*/test`, `apps/web/src/{db,api,diff,github,storage,server}` | `bunx moon run <project>:test` |
+| **Unit** | Is this function right on the cases that are easy to get wrong? | one module, no I/O | the rest of `*/test` and `apps/web/src/{lib,auth,ai}` | `bunx moon run <project>:test` |
 
 Integration and unit share a runner (Vitest under Bun) and the `test` target, so the split between them
 is by what a test touches, not by a folder. A unit test is added only for a gap: logic with branches the
@@ -21,13 +21,13 @@ A smoke test runs the **released shape**, not the source: the CLI smoke imports 
 the web smoke talks to the built server over HTTP (its one `src/` import is the `usageCounts` query, to
 read the numbers a dashboard would show). A failure means the artifact is broken, not that one function is.
 
-- **`cli`** (`packages/cli/smoke/cli.smoke.test.ts`, 4 tests, about 2 s). `nx smoke cli` builds
+- **`cli`** (`packages/cli/smoke/cli.smoke.test.ts`, 4 tests, about 2 s). `moon run cli:smoke` builds
   `packages/cli/dist/index.js` and runs it as a child process, as the npm package runs: a PNG pair with
   100 changed pixels (stdout, manifest, overlay, report), an identical pair, a pair of static pages
   captured in a real browser from a loopback server, and a page that is down (exit 1, no report). The
   child's environment has every `PIXELSLASH_*` variable removed, so no token, server or error sink can
   reach it from the shell.
-- **`web`** (`apps/web/smoke/web.smoke.test.ts`, 4 tests, about 17 s). `nx smoke web` builds the app,
+- **`web`** (`apps/web/smoke/web.smoke.test.ts`, 4 tests, about 17 s). `moon run web:smoke` builds the app,
   applies the migrations to a **fresh local D1** in `apps/web/.wrangler/smoke`, serves it with
   `vite preview`, and drives the `/api/v1` upload of a main build and a branch build over HTTP: the
   sign-in page serves, a bad token is refused, a token reads `/me`, the pair uploads and the branch build
@@ -176,10 +176,10 @@ gain 8 smoke tests.
 ## Running them
 
 ```bash
-bunx nx smoke cli          # builds the CLI first
-bunx nx smoke web          # builds the web app and starts it on a fresh local D1
-bunx nx test:e2e web       # the happy paths in a real browser
-bunx nx test <project>     # integration + unit
+bunx moon run cli:smoke        # builds the CLI first
+bunx moon run web:smoke        # builds the web app and starts it on a fresh local D1
+bunx moon run web:test-e2e     # the happy paths in a real browser
+bunx moon run <project>:test   # integration + unit
 ```
 
 In CI the web e2e runs every spec once on the production build (with the diff in the sidecar). A second run
@@ -187,7 +187,7 @@ on `vite dev` is cut to `e2e/upload.spec.ts` and `e2e/review.spec.ts`: it exists
 workerd, as on Cloudflare, stays under an e2e run, and those two specs are the ones that make the server diff
 and read its result. The site's e2e runs the `desktop` project only (not the phone one), and only when the site
 itself changed (`apps/site/` or what decides how it installs) or on `main`; a docs-only edit is checked by
-`nx build site` (a dead internal link or a missing `cli.md` anchor fails the prerender) and the site's unit
+`moon run site:build` (a dead internal link or a missing `cli.md` anchor fails the prerender) and the site's unit
 tests, and a spec that quotes a docs sentence waits for the next site change or the push to `main`.
 
 The smoke state is `apps/web/.wrangler/smoke` (gitignored), recreated on every run; its scratch is under

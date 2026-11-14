@@ -1,0 +1,26 @@
+$schema: "../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+tasks:
+  typecheck:
+    command: "tsc -p scripts/tsconfig.json"
+    options:
+      runFromWorkspaceRoot: true
+  lint:
+    script: "oxlint --type-aware --deny-warnings scripts && bun scripts/check-slop.ts scripts"
+    deps:
+      - "~:check-dashes"
+    options:
+      runFromWorkspaceRoot: true
+  check-dashes:
+    command: "bun scripts/check-dashes.ts"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+  test:
+    command: "bun --bun vitest run"
+    inputs:
+      - "**/*"
+      - "/fixtures/**/*"
+      - "$PIXELSLASH_TEST_BROWSERS"

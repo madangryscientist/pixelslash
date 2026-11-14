@@ -28,23 +28,22 @@ jobs:
     name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Nx never talks to Nx Cloud from CI: NX_NO_CLOUD is on, so no run starts a pipeline execution
-    # (those are billed in credits). Nx's own local cache is kept between runs with actions/cache
-    # instead, which is free. Nx 24 indexes the cache in a database, so the cache directory alone is
-    # rejected on a fresh runner (0 hits); `.nx/cache` and `.nx/workspace-data` are saved together, and
-    # NX_CACHE_DIRECTORY keeps the cache in the checkout (Nx 24 defaults to ~/.nx). Nx still checks
-    # every entry by its hash. GitHub scopes a cache to the ref that saved it: a pull
-    # request reads and writes only its own, plus the base branch's, and `main` cannot read a PR's, so
-    # a branch can never poison main's cache. The key carries the ref and the sha, so every run saves a
-    # fresh entry; restore-keys fall back to the last entry of the same ref, then to main's.
+    # moon's own local cache (.moon/cache) is kept between runs with actions/cache; there is no remote
+    # cache. moon still checks every entry by its hash. GitHub scopes a cache to the ref that saved it:
+    # a pull request reads and writes only its own, plus the base branch's, and `main` cannot read a
+    # PR's, so a branch can never poison main's cache. The key carries the ref and the sha, so every run
+    # saves a fresh entry; restore-keys fall back to the last entry of the same ref, then to main's.
     # A tag (a release, which calls this workflow) never restores or saves the cache, so a release
     # gate always runs uncached.
     env:
-      NX_NO_CLOUD: "true"
-      NX_CACHE_DIRECTORY: .nx/cache
+      # moon diffs the head against the base branch before any task runs, even for a plain `moon run`,
+      # and the checkout has no local `main`, so it names the remote ref. That needs the full history
+      # (fetch-depth: 0 below).
+      MOON_BASE: origin/main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -54,17 +53,15 @@ jobs:
         with:
           global-json-file: global.json
       - run: bun install --frozen-lockfile
-      - name: Restore the Nx cache
+      - name: Restore the moon cache
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            .nx/cache
-            .nx/workspace-data
-          key: nx-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
+          path: .moon/cache
+          key: moon-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
-            nx-${{ runner.os }}-${{ github.ref }}-
-            nx-${{ runner.os }}-refs/heads/main-
+            moon-${{ runner.os }}-${{ github.ref }}-
+            moon-${{ runner.os }}-refs/heads/main-
       # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
       - name: Install the Playwright browser
         working-directory: packages/engine
@@ -141,10 +138,10 @@ jobs:
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
           fi
-          # The site's build inputs (apps/site/project.json: the docs it renders), its Playwright globalSetup,
+          # The site's build inputs (apps/site/moon.yml: the docs it renders), its Playwright globalSetup,
           # and what decides how it installs.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|nx\.json$|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
             echo "site=true" >> "$GITHUB_OUTPUT"
           else
             echo "site=false" >> "$GITHUB_OUTPUT"
@@ -154,7 +151,7 @@ jobs:
           # docs-only edit skips the browser run. A spec that quotes a docs sentence is only run on a site
           # change or on main. Keep this list inside the one above.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|nx\.json$|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
             echo "site_e2e=true" >> "$GITHUB_OUTPUT"
           else
             echo "site_e2e=false" >> "$GITHUB_OUTPUT"
@@ -166,11 +163,10 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache. It does not use
-    # engines/dotnet, so it installs no SDK and tells the @nx/dotnet plugin to stand down (AGENTS.md).
+    # This job builds and runs e2e, so it keeps no moon cache. It does not use engines/dotnet, and
+    # moon's graph needs no SDK, so none is installed. MOON_BASE and the full history: see `gate`.
     env:
-      NX_NO_CLOUD: "true"
-      NX_DOTNET_DISABLE: "true"
+      MOON_BASE: origin/main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -184,10 +180,10 @@ jobs:
       - name: Install the Playwright browser
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
-      - run: bunx nx build web
+      - run: bunx moon run web:build
       - name: e2e (production build)
         id: e2e
-        run: bunx nx test:e2e web
+        run: bunx moon run web:test-e2e
       # Only the specs that make the server diff: the upload, and the review of its result. The dev run is
       # there so the pngjs diff inside workerd stays under an e2e run (apps/web/playwright.config.ts); the
       # production run above already covers every spec.
@@ -225,14 +221,14 @@ jobs:
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache. It does not use
-    # engines/dotnet, so it installs no SDK and tells the @nx/dotnet plugin to stand down (AGENTS.md).
+    # This job builds and runs e2e, so it keeps no moon cache. It does not use engines/dotnet, and
+    # moon's graph needs no SDK, so none is installed. MOON_BASE and the full history: see `gate`.
     env:
-      NX_NO_CLOUD: "true"
-      NX_DOTNET_DISABLE: "true"
+      MOON_BASE: origin/main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -244,8 +240,8 @@ jobs:
         run: bunx playwright install --with-deps chromium-headless-shell
       # Prerenders every page with crawlLinks and failOnError, so a dead internal link or a missing
       # cli.md anchor fails here.
-      - run: bunx nx build site
+      - run: bunx moon run site:build
       # Desktop project only: the phone (Pixel 7) project is not run in CI.
       - name: e2e (desktop)
         if: needs.changes.outputs.site_e2e == 'true'
-        run: bunx nx test:e2e site -- --project desktop
+        run: bunx moon run site:test-e2e -- --project desktop

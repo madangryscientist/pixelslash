@@ -10,13 +10,13 @@
   "type": "module",
   "scripts": {
     "pixelslash": "bun packages/cli/src/index.ts",
-    "typecheck": "bun scripts/nx.ts run-many -t typecheck",
-    "lint": "bun scripts/nx.ts run-many -t lint",
+    "typecheck": "bun scripts/moon.ts run --concurrency 3 :typecheck",
+    "lint": "bun scripts/moon.ts run --concurrency 3 :lint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test": "bun scripts/nx.ts run-many -t test",
-    "bench": "bun scripts/nx.ts run bench:bench --output-style=stream",
-    "bench:check": "bun scripts/nx.ts run bench:check --output-style=stream",
+    "test": "bun scripts/moon.ts run --concurrency 3 :test",
+    "bench": "bun scripts/moon.ts run bench:bench --output-style stream --",
+    "bench:check": "bun scripts/moon.ts run bench:check --output-style stream --",
     "bench:perf": "bun bench/src/perf/run.ts",
     "bench:native": "bun bench/src/perf/native.ts",
     "bench:perf:check": "bun bench/src/perf/run.ts --check",
@@ -29,15 +29,17 @@
     "wasm:check": "bun scripts/build-wasm.ts --check"
   },
   "devDependencies": {
-    "@nx/dotnet": "24.0.1",
+    "@moonrepo/cli": "2.6.5",
     "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
-    "nx": "24.0.1",
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
     "pngjs": "^7.0.0",
     "typescript": "7.0.2",
     "vitest": "5.0.5"
-  }
+  },
+  "trustedDependencies": [
+    "@moonrepo/cli"
+  ]
 }

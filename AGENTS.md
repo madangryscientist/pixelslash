@@ -21,7 +21,9 @@ Code comments and docs that carry one are explaining why a line exists; leave th
 
 ## The gate
 
-The repo is a small Nx workspace on Bun workspaces:
+The repo is a small moon workspace (moon 2.6.5, `@moonrepo/cli` pinned in `package.json`) on Bun
+workspaces. `.moon/workspace.yml` lists the projects, each has a `moon.yml`, and `.moon/tasks/*.yml`
+holds what they inherit:
 
 | Project | Path | What it is |
 | --- | --- | --- |
@@ -31,7 +33,7 @@ The repo is a small Nx workspace on Bun workspaces:
 | `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, every page prerendered from the repo's own docs and `data.json`; no D1, R2 or sign-in. The planner deploys it after a merge (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
-| `PixelSlash.Diff`, `PixelSlash.Diff.Tests` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract, and its xunit tests. Inferred by `@nx/dotnet` (named after the `.csproj`); `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
+| `dotnet` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract (`PixelSlash.Diff`), and its xunit tests (`PixelSlash.Diff.Tests`): two `.csproj` files, one moon project, tagged `dotnet`. `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
 
 `bunfig.toml` sets `[install] linker = "isolated"`: a package sees its own
 declared dependencies and the root's, not another package's. Declare what a
@@ -45,17 +47,16 @@ copies. `globalStore = false` is the project-wide fallback.
 A change is green when all of these pass **from the worktree**:
 
 ```bash
-bun install                       # FIRST: a fresh worktree has no node_modules, and nx stops with
-                                  # "Could not find Nx modules" until it is installed
-bun run typecheck                 # nx run-many -t typecheck  (tsc, strict)
-bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop;
+bun install                       # FIRST: a fresh worktree has no node_modules, and so no moon
+bun run typecheck                 # moon run --concurrency 3 :typecheck  (tsc, strict)
+bun run lint                      # moon run --concurrency 3 :lint  (oxlint --type-aware --deny-warnings + check-slop;
                                   # check-dashes fails on an em or en dash in any tracked text file)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
-bun run test                      # nx run-many -t test  (Vitest under the Bun runtime, and xunit for engines/dotnet)
+bun run test                      # moon run --concurrency 3 :test  (Vitest under the Bun runtime, and xunit for engines/dotnet)
 ```
 
 **The .NET SDK is optional** (`engines/dotnet`, ob 1910; opt-in for contributors, PS-251). The root
-scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `scripts/nx.ts`, which runs
+scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `scripts/moon.ts`, which runs
 `dotnet --version` first. Two paths:
 
 - **With a working `dotnet`** (this desktop): nothing changes. `bun run test` builds and tests
@@ -64,23 +65,31 @@ scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `script
   itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
   "dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
   network once.
-- **Without one** (a container, an outside contributor): the wrapper sets `NX_DOTNET_DISABLE=true`
-  and prints `dotnet SDK not found: skipping engines/dotnet`; the TS projects run as before and the
-  two dotnet projects are not in the graph. A `dotnet` that cannot run (no SDK matching
-  `global.json`) counts as missing. Setting `NX_DOTNET_DISABLE` yourself skips the check and the line.
+- **Without one** (a container, an outside contributor): the wrapper prints
+  `dotnet SDK not found: skipping engines/dotnet` and adds `--query "tag!=dotnet"` to `moon run`, so
+  the TS projects run as before and the `dotnet` project does not. A `dotnet` that cannot run (no SDK
+  matching `global.json`) counts as missing. This path does not fail in CI either: the SDK is
+  optional. Setting `PIXELSLASH_DOTNET_DISABLE` (any value) yourself skips the check and the line,
+  and leaves the project out.
 
-The reason for the wrapper: the `@nx/dotnet` plugin in `nx.json` reads the .NET projects when Nx
-builds its graph, so without an SDK **every** `nx` command fails ("Failed to register MSBuild"), not
-only the dotnet ones. A bare `bunx nx ...` skips the wrapper, so on a machine without an SDK set
-`NX_DOTNET_DISABLE=true` yourself. The SDK is for the gate and the bench only: it is not in the
-capture image or on the self-host. A change to `engines/dotnet` needs the SDK to be checked.
+The reason for the wrapper: moon's graph needs no SDK, so every moon command works without one, but
+`moon run :test` runs every project's `test`, and `dotnet:test` fails where there is no `dotnet`. A
+bare `bunx moon run :test` skips the wrapper, so on a machine without an SDK add
+`--query "tag!=dotnet"` yourself, or run one project. The wrapper also puts the root's
+`node_modules/.bin` on PATH, which moon does not. The SDK is for the gate and the bench only: it is
+not in the capture image or on the self-host. A change to `engines/dotnet` needs the SDK to be checked.
 
-One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches locally in
-`.nx/`; add `--skip-nx-cache` to force a rerun. CI never uses Nx Cloud (`NX_NO_CLOUD=true` in
-every workflow job that runs nx; there is no `nxCloudId`): the gate job keeps `.nx/cache` and `.nx/workspace-data` between
-runs with `actions/cache` (Nx 24 indexes the cache in that database, so the cache directory alone is
-rejected on a fresh runner; `NX_CACHE_DIRECTORY=.nx/cache` pins it, as Nx 24 defaults to `~/.nx`), keyed on
-ref and sha, falling back to the same ref and then to `main`.
+One project: `bunx moon run engine:test`, `bunx moon run cli:lint`. A task id cannot hold a colon, so
+the Playwright suites are `test-e2e` (`bunx moon run web:test-e2e`). moon caches locally in
+`.moon/cache` (gitignored); add `--force` to force a rerun. moon has no `^default`: every task in a
+TypeScript project (tag `ts`, `.moon/tasks/ts.yml`) hashes all of `packages/**`, and every task
+hashes the root files in `.moon/tasks/all.yml`, so a change to the engine re-runs everything that
+imports it. Cache correctness over granularity. moon runs without a toolchain (no
+`.moon/toolchains.yml`, `pipeline.installDependencies: false`), so it never downloads Bun or runs
+`bun install`. moon diffs the head against `main` before any task runs, so every CI job that runs
+moon fetches the full history and sets `MOON_BASE=origin/main`. There is no remote cache: the gate
+job keeps `.moon/cache` between runs with `actions/cache`, keyed on ref and sha, falling back to the
+same ref and then to `main`.
 GitHub scopes a PR's cache to that PR, so a branch cannot poison `main`'s, and a tag (a release)
 neither restores nor saves it. Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
@@ -90,8 +99,8 @@ Real-browser tests run Chromium only; set `PIXELSLASH_TEST_BROWSERS=firefox,webk
 The bench regression guard is part of `test`: `bench:test` depends on `bench:check`
 (`bun bench/src/check.ts`, no VM, no browser), which fails when a score is worse than the
 committed `bench/results/*.json`. The check is cacheable; its inputs are `bench/src`, the
-committed corpora, `bench/results/*.json` and the engine's diff sources, so an `apps/web`
-change replays it from cache. When a score moves on purpose, commit a new
+committed corpora, `bench/results/*.json`, the engine's diff sources and the inherited ones
+(`packages/**` and the root files), so an `apps/web` change replays it from cache. When a score moves on purpose, commit a new
 `bench/results/<date>.json` in the same change: that file becomes the baseline (see
 `bench/README.md`, "The regression guard").
 
@@ -105,24 +114,20 @@ the next run of its generator overwrites. Sources (`data.json`, `build.py`, `ben
 ignored too, so prose is never reflowed by a formatter.
 
 **/tmp is a quota'd tmpfs; do not fill it.** A full /tmp fails unrelated tests with
-`Disk quota exceeded` / `SQLITE_IOERR`. Two rules keep it empty:
+`Disk quota exceeded` / `SQLITE_IOERR`. One rule keeps it empty:
 
 - Every project's test run goes through `scripts/test-tmp-scope.ts` (a Vitest and
   Playwright `globalSetup`): `TMPDIR` is a fresh dir for the run and is removed after it,
   so anything a test or the code under it leaves in the temp dir goes with the run. A test
   that makes its own temp dir still removes it in `afterAll`/`finally`; a new project's
   `vitest.config.ts` must list the same `globalSetup`. Check a new test with
-  `ls -A /tmp | sort` before and after `bun run test --skip-nx-cache`.
-- `nx.json` sets `"useDaemonProcess": false`. With the daemon on, every non-CI `nx` run
-  made the daemon install `nx@latest` into `/tmp/tmp-<pid>-*/` (~97 MB) to check for
-  outdated AI-agent config, and a stopped daemon did not remove it. Do not turn the daemon
-  back on, and do not run `nx daemon` here.
+  `ls -A /tmp | sort` before and after `bun run test -- --force`.
 
 A change to `apps/web` also runs the standard's web gate (from the worktree root):
 
 ```bash
-bunx nx build web
-bunx nx test:e2e web              # Playwright: a local build on a fresh local D1, GitHub stubbed
+bunx moon run web:build
+bunx moon run web:test-e2e        # Playwright: a local build on a fresh local D1, GitHub stubbed
 (cd apps/web && bun run test:e2e:dev -- e2e/upload.spec.ts e2e/review.spec.ts)   # the two specs that make the server diff, against `vite dev` (after the build run: same ports)
 (cd apps/web && bunx wrangler deploy --dry-run --outdir /tmp/ps-web-dry)
 (cd apps/web && CLOUDFLARE_ENV=production bun run build && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry-production")   # env.production, app.pixelslash.dev (PS-277)
@@ -134,8 +139,8 @@ new unit test is for a gap, not a second copy. The two smoke targets run the *bu
 not part of `test` (they build, they are never cached, and `web` needs a local build and a port):
 
 ```bash
-bunx nx smoke cli                 # builds packages/cli/dist, then runs it as a child process
-bunx nx smoke web                 # builds the web app, a fresh local D1 in .wrangler/smoke, drives /api/v1
+bunx moon run cli:smoke           # builds packages/cli/dist, then runs it as a child process
+bunx moon run web:smoke           # builds the web app, a fresh local D1 in .wrangler/smoke, drives /api/v1
 ```
 
 A smoke run is **local only** and leaves no number behind: the web smoke's org is `is_smoke`, a test
@@ -147,22 +152,22 @@ A change to `apps/site`, or to a file it renders (`docs/cli.md`, `apps/web/SELF-
 `SECURITY.md`, `docs/capabilities/data.json`, the README's trademark line), runs:
 
 ```bash
-bunx nx build site
-bunx nx test:e2e site             # Playwright on the build, desktop and phone: nav, footer, no dead links (CI: `-- --project desktop`)
+bunx moon run site:build
+bunx moon run site:test-e2e       # Playwright on the build, desktop and phone: nav, footer, no dead links (CI: `-- --project desktop`)
 (cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-site-dry")
 ```
 
-CI runs `Site gate (build, e2e)` in two tiers. The build (`bunx nx build site`) runs on a pull request that
+CI runs `Site gate (build, e2e)` in two tiers. The build (`bunx moon run site:build`) runs on a pull request that
 touches `apps/site/`, `docs/`, a root file the site renders or installs from (`README.md`, `SECURITY.md`,
-`apps/web/SELF-HOST.md`, `apps/web/github-app/manifest.json`, `package.json`, `nx.json`,
+`apps/web/SELF-HOST.md`, `apps/web/github-app/manifest.json`, `package.json`, `.moon/`,
 `tsconfig.base.json`, `bun.lock`, `bunfig.toml`, `scripts/test-tmp-scope.ts`) or `ci.yml`, and on every push to
 `main`. The build prerenders with `crawlLinks` and `failOnError`, and `resolve-links.ts` throws on a missing
 `cli.md` anchor, so a docs-only edit is checked by the build and the site's unit tests, not a browser. The e2e
-(`bunx nx test:e2e site -- --project desktop`, the phone project is not run in CI) runs only on the short list:
-`apps/site/`, `scripts/test-tmp-scope.ts`, `package.json`, `nx.json`, `tsconfig.base.json`, `bun.lock`,
+(`bunx moon run site:test-e2e -- --project desktop`, the phone project is not run in CI) runs only on the short list:
+`apps/site/`, `scripts/test-tmp-scope.ts`, `package.json`, `.moon/`, `tsconfig.base.json`, `bun.lock`,
 `bunfig.toml` and `ci.yml`, and on every push to `main`. A tag (a release) runs neither. The check is not
 required, so a skipped job blocks nothing; the hand run above is no longer the only run, but the wrangler dry
-run stays yours. The `web` and `site` jobs install no .NET SDK and set `NX_DOTNET_DISABLE`; only `gate` has it.
+run stays yours. The `web` and `site` jobs install no .NET SDK and run only web and site tasks; only `gate` has it.
 
 `apps/web` keeps its schema in `src/db/schema.ts`; `bun run db:generate` (in
 `apps/web`) writes the next additive migration to `apps/web/drizzle/`. All

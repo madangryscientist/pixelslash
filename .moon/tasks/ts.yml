@@ -1,0 +1,32 @@
+# Inherited by the projects tagged `ts`: every TypeScript project. moon has no `^default`: without
+# the javascript toolchain it does not hash the files of a project this one depends on. The apps,
+# the bench and the CLI import the engine, and the Playwright helper imports the CLI, so each of their
+# tasks hashes every package, and a change to the engine re-runs them all. Cache correctness over
+# granularity.
+$schema: "../cache/schemas/tasks.json"
+
+inheritedBy:
+  tags: ["ts"]
+
+implicitInputs:
+  - "/packages/**/*"
+  # Vitest's and Playwright's globalSetup, which every test run loads.
+  - "/scripts/test-tmp-scope.ts"
+  # moon's input globs do not read .gitignore, so what a build or a test run leaves behind is listed
+  # here: node_modules (a workspace package's holds symlinks the glob still walks), dist, the licence
+  # files and tarballs the package builds copy in, the CLI's wasm copy, .wrangler and the Playwright
+  # output.
+  - "!/**/node_modules/**"
+  - "!/**/dist/**"
+  - "!/**/.wrangler/**"
+  - "!/**/.tanstack/**"
+  - "!/**/test-results/**"
+  - "!/**/playwright-report/**"
+  - "!/packages/cli/wasm/**"
+  - "!/packages/*/LICENSE"
+  - "!/packages/*/NOTICE"
+  - "!/packages/*/*.tgz"
+  - "!/bench/imported/**"
+  - "!/bench/perf-results/**"
+  # routeTree.gen.ts is left in: `tsr generate` rewrites it to the same bytes, so the hash holds, and
+  # the tests import it through src/router.tsx.

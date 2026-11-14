@@ -1,0 +1,41 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+dependsOn:
+  - "cli"
+  - "engine"
+
+tasks:
+  typecheck:
+    command: "tsc -p packages/playwright/tsconfig.json"
+    options:
+      runFromWorkspaceRoot: true
+  lint:
+    script: "oxlint --type-aware --deny-warnings packages/playwright && bun scripts/check-slop.ts packages/playwright"
+    options:
+      runFromWorkspaceRoot: true
+  test:
+    command: "bun run playwright test"
+    deps:
+      - "~:build"
+    inputs:
+      - "**/*"
+      - "/fixtures/**/*"
+      - "$PIXELSLASH_TEST_BROWSERS"
+  build:
+    command: "bun scripts/build-playwright.ts"
+    inputs:
+      - "src/**/*"
+      - "types/**/*"
+      - "package.json"
+      - "/scripts/build-playwright.ts"
+      - "/packages/engine/src/**/*"
+      - "/LICENSE"
+      - "/NOTICE"
+    outputs:
+      - "dist"
+      - "LICENSE"
+      - "NOTICE"
+    options:
+      runFromWorkspaceRoot: true

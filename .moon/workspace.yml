@@ -1,0 +1,27 @@
+# moon workspace. A project id is its directory's old Nx name, so `bunx moon run engine:test` runs the
+# engine's tests. The two .NET projects (the .csproj files under engines/dotnet) are one moon project,
+# `dotnet`. Projects are listed, not globbed.
+#
+# No toolchain is declared (no .moon/toolchains.yml): every task runs on the `system` toolchain, so
+# moon runs our bun commands as they are and never downloads Bun or runs `bun install`.
+# The cache lives in .moon/cache (gitignored); moon has no setting to move it.
+$schema: "./cache/schemas/workspace.json"
+
+projects:
+  site: "apps/site"
+  web: "apps/web"
+  bench: "bench"
+  cli: "packages/cli"
+  engine: "packages/engine"
+  playwright: "packages/playwright"
+  scripts: "scripts"
+  dotnet: "engines/dotnet"
+
+vcs:
+  client: "git"
+  defaultBranch: "main"
+
+pipeline:
+  installDependencies: false
+
+telemetry: false
