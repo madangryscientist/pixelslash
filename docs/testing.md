@@ -33,7 +33,9 @@ read the numbers a dashboard would show). A failure means the artifact is broken
   sign-in page serves, a bad token is refused, a token reads `/me`, the pair uploads and the branch build
   reads back `changes` with a `changed` snapshot, and another org's build is a 404.
 
-Neither smoke is cacheable (`cache: false`): a smoke that replays from cache proves nothing.
+Both smokes, and both e2e suites, are cached like any other test: a pass replays only while every input is
+the same (the whole repo minus build and test output, `bun.lock` for the Playwright build, and the env vars
+each `moon.yml` lists), and a failure is never cached. A change the run could see re-runs it.
 
 ### The isolation rule, and the test that proves it
 

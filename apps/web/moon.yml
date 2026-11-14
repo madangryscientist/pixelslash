@@ -27,11 +27,27 @@ tasks:
     outputs:
       - "dist"
       - ".wrangler/deploy"
+  # The smoke and the e2e build the app themselves (the e2e's web server runs `bun run build`, the smoke's
+  # harness too) and serve it on loopback only: a local D1, the GitHub and Sentry stand-ins and the diff
+  # sidecar, nothing off the machine. So a run's result is the repo's files (the inherited inputs; a
+  # failure's test-results and .wrangler are excluded there), the Playwright build pinned in bun.lock
+  # (all.yml), and the env vars below. A failed run is never cached.
   smoke:
     command: "bun run vitest run -c vitest.smoke.config.ts"
-    options:
-      cache: false
+    inputs:
+      # Vitest refuses a `.only` when CI is set.
+      - "$CI"
   test-e2e:
     command: "bun run playwright test"
-    options:
-      cache: false
+    inputs:
+      # `forbidOnly` in playwright.config.ts.
+      - "$CI"
+      # Which server and diff path the run uses (playwright.config.ts).
+      - "$PIXELSLASH_E2E_DEV"
+      - "$PIXELSLASH_E2E_NO_SIDECAR"
+      # rss-burst.spec.ts runs only when the count is set, and these shape it.
+      - "$PIXELSLASH_RSS_BURST"
+      - "$PIXELSLASH_RSS_HEIGHT"
+      - "$PIXELSLASH_RSS_MODEL"
+      # Where the specs write their screens: a new dir must get them.
+      - "$PS_SHOT_DIR"

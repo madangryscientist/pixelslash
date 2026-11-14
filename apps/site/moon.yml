@@ -49,9 +49,16 @@ tasks:
     outputs:
       - "dist"
       - ".wrangler/deploy"
+  # Against the build, served by `vite preview` on loopback. The specs only assert https:// URLs as
+  # strings (metadata.spec.ts, smoke.spec.ts) and search.spec.ts fails if any request leaves the origin,
+  # so nothing is fetched off the machine and a pass can be cached. A failed run is never cached.
   test-e2e:
     command: "bun run playwright test"
+    # The rest of the repo comes from .moon/tasks/ts.yml.
+    inputs:
+      # `forbidOnly` in playwright.config.ts.
+      - "$CI"
+      # Where smoke.spec.ts writes a screenshot of every page: a new dir must get them.
+      - "$SITE_SHOTS_DIR"
     deps:
       - "~:build"
-    options:
-      cache: false

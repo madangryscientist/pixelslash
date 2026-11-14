@@ -160,12 +160,14 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # It reads the moon remote cache with the read token and never writes it (see `gate`). It does not
-    # use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # The moon remote cache as in `gate`: a push to main writes (the `moon-cache-write` environment and
+    # its token), so main's build and e2e results reach the cache; every other run only reads. It does
+    # not use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
     # history: see `gate`.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
       MOON_BASE: origin/main
-      MOON_REMOTE_TOKEN: ${{ secrets.MOON_CACHE_READ_TOKEN }}
+      MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -220,12 +222,14 @@ jobs:
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # It reads the moon remote cache with the read token and never writes it (see `gate`). It does not
-    # use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # The moon remote cache as in `gate`: a push to main writes (the `moon-cache-write` environment and
+    # its token), so main's build and e2e results reach the cache; every other run only reads. It does
+    # not use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
     # history: see `gate`.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
       MOON_BASE: origin/main
-      MOON_REMOTE_TOKEN: ${{ secrets.MOON_CACHE_READ_TOKEN }}
+      MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
