@@ -5,10 +5,9 @@ import { devStore, latestIteration, liveSession } from "@hackcove/pixelslash-eng
 import { afterAll, describe, expect, test } from "vitest";
 import { parseDevArgs } from "../src/dev.ts";
 import { attachTo } from "../src/dev-attach.ts";
-import type { KeyInput } from "../src/dev-loop.ts";
 import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng } from "./support.ts";
-import { FIGMA, featureProject, project, until } from "./dev-support.ts";
+import { FIGMA, featureProject, keyboard, project, stepLog, until } from "./dev-support.ts";
 import { gitRepo } from "./upload-support.ts";
 
 afterAll(cleanup);
@@ -46,35 +45,6 @@ function server() {
     return Response.json({ error: "not here" }, { status: 404 });
   };
   return { fetch, seen };
-}
-
-/**
- * Keys a test presses. Like stdin, keys arrive in order after the call that pressed or listened
- * returns, and a key pressed while nothing listens is held for the next listener. A dev prints
- * its banner before it listens, so a q pressed on the banner of a starved dev used to be dropped
- * here, never by stdin.
- */
-function keyboard(): KeyInput & { press: (k: string) => void } {
-  const fns = new Set<(chunk: string) => void>();
-  const held: string[] = [];
-  const flush = () => {
-    while (fns.size > 0) {
-      const k = held.shift();
-      if (k === undefined) return;
-      for (const fn of fns) fn(k);
-    }
-  };
-  return {
-    on: (_e, fn) => {
-      fns.add(fn);
-      queueMicrotask(flush);
-    },
-    off: (_e, fn) => fns.delete(fn),
-    press: (k) => {
-      held.push(k);
-      queueMicrotask(flush);
-    },
-  };
 }
 
 const base = { listFonts: async () => [], which: () => null };
@@ -159,25 +129,37 @@ describe("pixelslash dev", () => {
   test("re-runs on a save, and a second dev attaches to the live session", async () => {
     const { cwd, file } = await project();
     const [keys, cap] = [keyboard(), capture()];
+    const { step, mark, show } = stepLog();
+    show("first dev", cap);
     const store = devStore(cwd);
     const first = run(["dev", "index"], cap.io, { ...base, cwd, env: pinned, keys });
     try {
-      const owner = await until(async () =>
-        (await liveSession(store))?.url ? await liveSession(store) : undefined,
+      const owner = await step(
+        "session live",
+        until(async () => ((await liveSession(store))?.url ? await liveSession(store) : undefined)),
       );
-      await until(async () => (cap.stdout.includes("#1 vs") ? true : undefined));
-      await writeFile(file, `<body style="margin:0;background:#fff"><h1>saved</h1></body>`);
-      await until(async () => (cap.stdout.includes("#2 vs #1") ? true : undefined));
+      await step(
+        "run 1 printed",
+        until(async () => (cap.stdout.includes("#1 vs") ? true : undefined)),
+      );
+      await step(
+        "save written",
+        writeFile(file, `<body style="margin:0;background:#fff"><h1>saved</h1></body>`),
+      );
+      await step(
+        "run 2 printed",
+        until(async () => (cap.stdout.includes("#2 vs #1") ? true : undefined)),
+      );
       expect(cap.stdout).toMatch(
         /#2 vs #1: \d+ regions changed · \d+ px · ours \d+\.\d s · settle \d+\.\d s · http:\/\/127\.0\.0\.1:\d+/,
       );
 
       const once = capture();
-      const second = await run(["dev", "--once", "--json"], once.io, {
-        ...base,
-        cwd,
-        keys: keyboard(),
-      });
+      show("dev --once", once);
+      const second = await step(
+        "--once returned",
+        run(["dev", "--once", "--json"], once.io, { ...base, cwd, keys: keyboard() }),
+      );
       expect(second).toBe(0);
       expect(JSON.parse(once.stdout)).toMatchObject({
         page: owner?.url,
@@ -185,23 +167,32 @@ describe("pixelslash dev", () => {
       });
 
       const elsewhere = capture();
-      expect(await run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd })).toBe(
-        2,
-      );
+      show("dev other", elsewhere);
+      expect(
+        await step(
+          "other returned",
+          run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd }),
+        ),
+      ).toBe(2);
       expect(elsewhere.stderr).toMatch(/session is on index, not other/);
 
       const otherKeys = keyboard();
       const attached = capture();
+      show("follower", attached);
       const following = run(["dev"], attached.io, { ...base, cwd, keys: otherKeys });
-      await until(async () =>
-        attached.stdout.includes("attached to the session on index") ? true : undefined,
+      await step(
+        "follower attached",
+        until(async () =>
+          attached.stdout.includes("attached to the session on index") ? true : undefined,
+        ),
       );
       otherKeys.press("q");
-      expect(await following).toBe(0);
+      expect(await step("follower ended", following)).toBe(0);
     } finally {
+      mark("q sent");
       keys.press("q");
     }
-    expect(await first).toBe(0);
+    expect(await step("first ended", first)).toBe(0);
     expect(await liveSession(store)).toBeUndefined();
   }, 90_000);
 
