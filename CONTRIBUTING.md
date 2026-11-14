@@ -28,8 +28,8 @@ bun run test            # Vitest under Bun, and xunit for engines/dotnet
 
 - **Each script runs through moon** (`moon run :typecheck`, `:lint`, `:test`), one project at a time
   with `bunx moon run <project>:<task>`, such as `bunx moon run engine:test`. `docs/cli.md` points here for them.
-- **CI keeps moon's local cache with `actions/cache`** (`.moon/cache`, scoped to the PR). There is no
-  remote cache.
+- **CI shares moon's cache through a remote cache.** A push to `main` writes it; a pull request only
+  reads it, so a task whose inputs did not change replays from `main`'s run, e2e suites included.
 - **Lint rules are errors.** Fix the code; do not disable a rule.
 - **Tests** live in `packages/*/test/`. A test that makes a temp dir removes it, and a new
   project's `vitest.config.ts` lists the `globalSetup` in `scripts/test-tmp-scope.ts` so a run

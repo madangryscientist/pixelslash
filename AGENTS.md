@@ -147,7 +147,8 @@ bunx moon run web:test-e2e        # Playwright: a local build on a fresh local D
 **Tests have four layers** (smoke, e2e, integration, unit; `docs/testing.md` is the policy, the
 inventory and the before/after). A behaviour is proved at the lowest layer that can prove it, and a
 new unit test is for a gap, not a second copy. The two smoke targets run the *built* artifact and are
-not part of `test` (they build, they are never cached, and `web` needs a local build and a port):
+not part of `test` (they build, and `web` needs a local build and a port). Like the e2e suites they are
+cached: a pass replays while the repo, `bun.lock` and the env vars their `moon.yml` lists are unchanged:
 
 ```bash
 bunx moon run cli:smoke           # builds packages/cli/dist, then runs it as a child process
