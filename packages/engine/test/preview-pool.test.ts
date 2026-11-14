@@ -131,11 +131,24 @@ describe("a story may be shot on a reused preview page, only when the capture as
   test("a re-capture is always on a fresh page, even in a session that reused pages", async () => {
     const session = await openCaptureSession(config, pinned);
     try {
-      const { manifest } = await captureInto(session, await out(), 1, { reuse: true });
+      const reusedDir = await out();
+      const { manifest } = await captureInto(session, reusedDir, 1, { reuse: true });
+      const freshDir = await out();
+      const fresh = await captureInto(session, freshDir, 1);
       loads = 0;
       const shots = await Promise.all(manifest.snapshots.map((e) => recapture(session, e)));
       expect(loads).toBe(IDS.length);
       for (const shot of shots) expect(shot?.reused).toBeUndefined();
+
+      // A fresh page shoots the same bytes as the reused page and as a plain capture, so the flake
+      // check (a re-capture against the first shot) never reports a reused shot as different.
+      const reused = await pngs(reusedDir, manifest.snapshots);
+      const plain = await pngs(freshDir, fresh.manifest.snapshots);
+      for (const [i, { name }] of manifest.snapshots.entries()) {
+        const shot = shots[i]!;
+        expect(shot.png.equals(reused.get(name)!), `${name} matches the reused page`).toBe(true);
+        expect(shot.png.equals(plain.get(name)!), `${name} matches a fresh capture`).toBe(true);
+      }
     } finally {
       await session.close();
     }
