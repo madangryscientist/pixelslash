@@ -11,23 +11,39 @@ function cover(lo: number, len: number, px: number): number {
   return Math.max(0, Math.min(lo + len, px + 1) - Math.max(lo, px));
 }
 
-/** The grey at (x, y): `rects` painted over white, each taking the share of the pixel it covers. */
-function shade(rects: SoftRect[], x: number, y: number): number {
-  let v = 255;
-  for (const [rx, ry, rw, rh, grey] of rects) {
-    const c = cover(rx, rw, x) * cover(ry, rh, y);
-    if (c > 0) v = v * (1 - c) + grey * c;
+/** Paint one rectangle into `grey` (row-major, `width` wide), visiting only the pixels it can touch. */
+function paint(grey: Float64Array, width: number, height: number, rect: SoftRect): void {
+  const [rx, ry, rw, rh, g] = rect;
+  const x0 = Math.max(0, Math.floor(rx));
+  const x1 = Math.min(width, Math.ceil(rx + rw));
+  const y1 = Math.min(height, Math.ceil(ry + rh));
+  for (let y = Math.max(0, Math.floor(ry)); y < y1; y++) {
+    const cy = cover(ry, rh, y);
+    for (let x = x0; x < x1; x++) {
+      const c = cover(rx, rw, x) * cy;
+      const i = y * width + x;
+      if (c > 0) grey[i] = (grey[i] ?? 255) * (1 - c) + g * c;
+    }
   }
-  return Math.round(v);
 }
 
+/**
+ * `rects` painted over white, in order, each pixel taking the share of itself a rectangle covers.
+ * Each rectangle visits only the pixels it can touch. Scanning every rectangle at every pixel cost
+ * about 50 ms a page on an idle desktop, and the size-mismatch test paints twelve, which under the
+ * full parallel test run was nearly all of its time and pushed it past the 5 s limit on CI.
+ */
 export function softPage(width: number, height: number, rects: SoftRect[]): PNG {
+  const grey = new Float64Array(width * height).fill(255);
+  for (const rect of rects) paint(grey, width, height, rect);
   const img = new PNG({ width, height });
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const v = shade(rects, x, y);
-      img.data.set([v, v, v, 255], (y * width + x) << 2);
-    }
+  for (let i = 0; i < grey.length; i++) {
+    const v = Math.round(grey[i] ?? 255);
+    const at = i << 2;
+    img.data[at] = v;
+    img.data[at + 1] = v;
+    img.data[at + 2] = v;
+    img.data[at + 3] = 255;
   }
   return img;
 }
