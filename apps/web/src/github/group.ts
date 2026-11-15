@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
 import type { Db } from "#/db/db";
 import { builds, projects } from "#/db/schema";
@@ -111,7 +111,9 @@ export async function groupOf(
         eq(builds.commitSha, commitSha),
       ),
     )
-    .orderBy(desc(builds.createdAt), desc(builds.id));
+    // `created_at` has a second's resolution, so the insert order (`rowid`) breaks a tie; the
+    // random id cannot, and a rerun in the same second as the build it replaces must win.
+    .orderBy(desc(builds.createdAt), desc(sql`${builds}.rowid`));
   // Newest first, so the first build met per project is the one that counts.
   const newest = new Map<string, SyncedBuild>();
   for (const b of onCommit) if (!newest.has(b.projectId)) newest.set(b.projectId, b);
