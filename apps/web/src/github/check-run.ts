@@ -18,7 +18,7 @@ import { syncPrComment } from "./pr-comment";
  * A server without the App but with a token (PS-235) posts the same states as a commit status,
  * context "PixelSlash". The App wins when both are configured; with neither, nothing is called.
  *
- * When several projects are linked to one repo, each build's check (and status) is named
+ * When several of an org's projects are linked to one repo, each build's check (and status) is named
  * "PixelSlash / <project name>", so a reviewer can tell them apart; one project keeps the plain name.
  */
 
@@ -151,6 +151,7 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
       prNumber: builds.prNumber,
       repo: projects.githubRepo,
       projectName: projects.name,
+      orgId: projects.orgId,
       comment: projects.githubComment,
     })
     .from(builds)
@@ -158,12 +159,18 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
     .where(eq(builds.id, buildId));
   // A repo stored before it was checked is skipped, not sent to GitHub.
   if (!row?.repo || !isRepoName(row.repo)) return null;
-  // GitHub's owner and repo names ignore case, so `Acme/Web` and `acme/web` are one repo.
+  // GitHub's owner and repo names ignore case, so `Acme/Web` and `acme/web` are one repo. Only the
+  // org's own projects count: another org linking the same repo must not rename this one's check.
   const [linked] = await db
     .select({ n: count() })
     .from(projects)
-    .where(eq(sql`lower(${projects.githubRepo})`, row.repo.toLowerCase()));
-  const { projectName, ...rest } = row;
+    .where(
+      and(
+        eq(projects.orgId, row.orgId),
+        eq(sql`lower(${projects.githubRepo})`, row.repo.toLowerCase()),
+      ),
+    );
+  const { projectName, orgId: _orgId, ...rest } = row;
   return { ...rest, repo: row.repo, checkName: checkNameOf(projectName, linked?.n ?? 0) };
 }
 

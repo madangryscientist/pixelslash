@@ -184,4 +184,15 @@ describe("the PixelSlash check run", () => {
     expect(names).toEqual(["PixelSlash", "PixelSlash"]);
     expect(web.body.status).toBe("passed");
   });
+
+  test("another org's project on the same repo leaves the plain name", async () => {
+    const w = await world({ repo: "acme/web" });
+    await setGithubRepo(w.db, w.other.user.id, w.other.project.id, "acme/web");
+    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
+
+    expect(bodies(w.github.checkRunCalls()).map((b) => b.name)).toEqual([
+      "PixelSlash",
+      "PixelSlash",
+    ]);
+  });
 });
