@@ -255,7 +255,7 @@ export function IgnoreAreas({
   areas: IgnoreArea[];
 }) {
   return (
-    <div aria-label="Ignored areas" className="pointer-events-none absolute inset-0">
+    <>
       {areas.map(({ rect, source }, i) => (
         <OutlineRegion
           // Areas are listed in a fixed order for one page load: the index is a stable key.
@@ -269,6 +269,6 @@ export function IgnoreAreas({
           title={`ignored (${source}): ${rect.width}×${rect.height} at ${rect.x},${rect.y}`}
         />
       ))}
-    </div>
+    </>
   );
 }

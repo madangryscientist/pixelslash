@@ -3,6 +3,7 @@ import {
   ButtonGroup,
   Caption,
   Card,
+  CardGrid,
   Cluster,
   CopyLine,
   Input,
@@ -107,31 +108,36 @@ export function FlakeRuns({ evidence }: { evidence: FlakeView["evidence"][number
         {evidence.differed.length} of {evidence.runs} runs differed (run
         {evidence.differed.length === 1 ? "" : "s"} {evidence.differed.join(", ")})
       </Text>
-      <ul className="grid grid-cols-3 gap-2">
+      <CardGrid as="ul" columns={3}>
         {evidence.images.map((image) => {
           const differed = evidence.differed.includes(image.run);
           return (
-            <li key={image.run} data-testid="flake-run" data-differed={differed}>
-              <Card as="div" size="sm" attention={differed}>
-                <Stack gap="xs">
-                  <a href={image.url} target="_blank" rel="noreferrer" className="block">
-                    <img
-                      src={image.url}
-                      alt={`Run ${image.run}`}
-                      loading="lazy"
-                      className="aspect-[3/2] w-full rounded object-cover object-top"
-                    />
-                  </a>
-                  <Caption>
-                    run {image.run}
-                    {differed ? " · differed" : ""}
-                  </Caption>
-                </Stack>
-              </Card>
-            </li>
+            <Card
+              key={image.run}
+              as="div"
+              size="sm"
+              attention={differed}
+              data-testid="flake-run"
+              data-differed={differed}
+            >
+              <Stack gap="xs">
+                <a href={image.url} target="_blank" rel="noreferrer" className="block">
+                  <img
+                    src={image.url}
+                    alt={`Run ${image.run}`}
+                    loading="lazy"
+                    className="aspect-[3/2] w-full rounded object-cover object-top"
+                  />
+                </a>
+                <Caption>
+                  run {image.run}
+                  {differed ? " · differed" : ""}
+                </Caption>
+              </Stack>
+            </Card>
           );
         })}
-      </ul>
+      </CardGrid>
     </Stack>
   );
 }

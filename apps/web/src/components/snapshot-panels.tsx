@@ -8,7 +8,9 @@ import {
   Kbd,
   KeyValue,
   KeyValueList,
+  MetaList,
   Pill,
+  Stack,
   SubsectionHeading,
   Text,
 } from "@hackcove/ui-react";
@@ -55,32 +57,16 @@ function variantPills(snapshot: SnapshotView, label: ShotLabel): string[] {
 }
 
 /** The variant chips, the build's status, and this shot's decision: none of them truncate, so the title gives way. */
-function ShotMeta({
-  build,
-  snapshot,
-  label,
-}: {
-  build: BuildView["build"];
-  snapshot: SnapshotView;
-  label: ShotLabel;
-}) {
-  return (
-    <>
-      {variantPills(snapshot, label).map((chip) => (
-        <Pill key={chip} tone="slate" data-testid="shot-chip">
-          {chip}
-        </Pill>
-      ))}
-      <StatusBadge status={build.status} />
-      <ReviewChip state={snapshot.reviewState} by={snapshot.reviewedBy} />
-      {/* The date is the first thing a narrow row gives up: below xl the title keeps the room. */}
-      {snapshot.reviewedAt && (
-        <div className="hidden xl:block">
-          <Text tone="muted">{formatDateTime(snapshot.reviewedAt)}</Text>
-        </div>
-      )}
-    </>
-  );
+function shotMeta(build: BuildView["build"], snapshot: SnapshotView, label: ShotLabel) {
+  return [
+    ...variantPills(snapshot, label).map((chip) => (
+      <Pill key={chip} tone="slate" data-testid="shot-chip">
+        {chip}
+      </Pill>
+    )),
+    <StatusBadge key="status" status={build.status} />,
+    <ReviewChip key="review-chip" state={snapshot.reviewState} by={snapshot.reviewedBy} />,
+  ];
 }
 
 /** The key that does the same as a button; a phone has no keys, so it gives the room back. */
@@ -256,30 +242,36 @@ export function ViewerBar({
   const ref = usePublishBarHeight();
   return (
     <div ref={ref} data-testid="viewer-bar">
-      <div className="flex flex-col gap-1 sm:gap-2">
+      <Stack gap="xs">
         <div className="hidden sm:block">{breadcrumbs}</div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Cluster wrap gap="sm" align="center">
           {/* The title keeps at least 17rem, so beside it only what fits; the rest wraps under it. */}
           <ClusterGrow minWidth="md">
             <ShotTitle snapshot={snapshot} label={label} />
           </ClusterGrow>
-          <div
-            data-testid="shot-meta"
-            className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 [&_*]:whitespace-nowrap"
-          >
-            <ShotMeta build={build} snapshot={snapshot} label={label} />
-            <Text data-testid="review-position" tone="muted" numeric>
-              {reviewText(review)}
-            </Text>
-            <Text data-testid="position" tone="muted" numeric>
-              {`shot ${position} of ${total}`}
-            </Text>
-          </div>
-        </div>
+          <MetaList nowrap separator="none" data-testid="shot-meta">
+            {[
+              ...shotMeta(build, snapshot, label),
+              <Text key="review" data-testid="review-position" tone="muted" numeric>
+                {reviewText(review)}
+              </Text>,
+              <Text key="position" data-testid="position" tone="muted" numeric>
+                {`shot ${position} of ${total}`}
+              </Text>,
+              // The date is the first thing a narrow row gives up: below xl the title keeps the room.
+              // It goes last, so the empty item it leaves below xl adds no gap between the others.
+              snapshot.reviewedAt ? (
+                <div key="date" className="hidden xl:block">
+                  <Text tone="muted">{formatDateTime(snapshot.reviewedAt)}</Text>
+                </div>
+              ) : null,
+            ]}
+          </MetaList>
+        </Cluster>
         <Cluster justify="end">
           <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
         </Cluster>
-      </div>
+      </Stack>
     </div>
   );
 }
