@@ -93,4 +93,18 @@ describe("the PixelSlash commit status (token, no App)", () => {
       expect(w.github.calls).toEqual([]);
     }
   });
+
+  test("with two projects on one repo, each status's context names its project", async () => {
+    const w = await world({ app: false, token: true });
+    const docs = await w.linkProject("docs", "ACME/web");
+    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
+    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN, token: docs });
+
+    expect(statusBodies(w.github.statusCalls()).map((b) => b.context)).toEqual([
+      "PixelSlash / web",
+      "PixelSlash / web",
+      "PixelSlash / docs",
+      "PixelSlash / docs",
+    ]);
+  });
 });

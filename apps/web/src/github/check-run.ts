@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "#/db/db";
 import { type OpenShot, openShotsOf } from "#/db/open-shots";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
@@ -17,9 +17,17 @@ import { syncPrComment } from "./pr-comment";
  *
  * A server without the App but with a token (PS-235) posts the same states as a commit status,
  * context "PixelSlash". The App wins when both are configured; with neither, nothing is called.
+ *
+ * When several projects are linked to one repo, each build's check (and status) is named
+ * "PixelSlash / <project name>", so a reviewer can tell them apart; one project keeps the plain name.
  */
 
 const CHECK_RUN_NAME = "PixelSlash";
+
+/** The check's name: plain for a repo's only project, with the project's name when it shares one. */
+function checkNameOf(projectName: string, projectsOnRepo: number): string {
+  return projectsOnRepo > 1 ? `${CHECK_RUN_NAME} / ${projectName}` : CHECK_RUN_NAME;
+}
 
 export type CheckRunDeps = {
   db: Db;
@@ -85,14 +93,14 @@ function summaryOf(
  * (PS-284).
  */
 function checkRunOf(
-  build: SyncedBuild,
+  build: SyncedBuild & { checkName: string },
   counts: BuildCounts,
   open: OpenShot[],
   detailsUrl: string | undefined,
 ): CheckRunBody {
   const done = build.status !== "uploading" && build.status !== "processing";
   return {
-    name: CHECK_RUN_NAME,
+    name: build.checkName,
     external_id: build.id,
     ...(detailsUrl && { details_url: detailsUrl }),
     status: done ? "completed" : "in_progress",
@@ -125,6 +133,8 @@ type BuildRow = SyncedBuild & {
   commitSha: string;
   checkRunId: number | null;
   repo: RepoName;
+  /** "PixelSlash", or "PixelSlash / <project>" when the repo has several projects. */
+  checkName: string;
   prNumber: number | null;
   comment: boolean;
 };
@@ -140,6 +150,7 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
       checkRunId: builds.checkRunId,
       prNumber: builds.prNumber,
       repo: projects.githubRepo,
+      projectName: projects.name,
       comment: projects.githubComment,
     })
     .from(builds)
@@ -147,7 +158,13 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
     .where(eq(builds.id, buildId));
   // A repo stored before it was checked is skipped, not sent to GitHub.
   if (!row?.repo || !isRepoName(row.repo)) return null;
-  return { ...row, repo: row.repo };
+  // GitHub's owner and repo names ignore case, so `Acme/Web` and `acme/web` are one repo.
+  const [linked] = await db
+    .select({ n: count() })
+    .from(projects)
+    .where(eq(sql`lower(${projects.githubRepo})`, row.repo.toLowerCase()));
+  const { projectName, ...rest } = row;
+  return { ...rest, repo: row.repo, checkName: checkNameOf(projectName, linked?.n ?? 0) };
 }
 
 async function bodyOf(deps: CheckRunDeps, row: BuildRow): Promise<CheckRunBody> {

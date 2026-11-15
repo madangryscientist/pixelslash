@@ -152,4 +152,36 @@ describe("the PixelSlash check run", () => {
       "completed:success All changes accepted",
     ]);
   });
+
+  test("two projects on one repo each name their check after the project; the repo ignores case", async () => {
+    const w = await world({ repo: "acme/web" });
+    const docs = await w.linkProject("docs", "Acme/Web");
+    const web = await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
+    const other = await w.finalise({ commit: sha(1), branch: "main", png: PLAIN, token: docs });
+
+    const runs = w.github.checkRunCalls();
+    const names = (id: string) =>
+      bodies(runs)
+        .filter((b) => b.external_id === id)
+        .map((b) => b.name);
+    expect(names(web.id)).toEqual(["PixelSlash / web", "PixelSlash / web"]);
+    expect(names(other.id)).toEqual(["PixelSlash / docs", "PixelSlash / docs"]);
+    // Each is still its own run on the shared commit, with its own repo spelling in the path.
+    expect(runs.map((c) => `${c.method} ${c.path}`)).toEqual([
+      "POST /repos/acme/web/check-runs",
+      "PATCH /repos/acme/web/check-runs/100",
+      "POST /repos/Acme/Web/check-runs",
+      "PATCH /repos/Acme/Web/check-runs/101",
+    ]);
+  });
+
+  test("a project on another repo leaves the plain name", async () => {
+    const w = await world({ repo: "acme/web" });
+    await w.linkProject("docs", "acme/docs");
+    const web = await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
+
+    const names = bodies(w.github.checkRunCalls()).map((b) => b.name);
+    expect(names).toEqual(["PixelSlash", "PixelSlash"]);
+    expect(web.body.status).toBe("passed");
+  });
 });
