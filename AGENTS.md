@@ -386,9 +386,10 @@ dependencies.
    capture image may start the app from a command named in its config.*
 6. **Figma dogfood is out of scope** (decision #62). Do not reopen 770, 771,
    772, 773, 781, 782 or 783.
-7. **`/api/v1` is a stable contract** (decided 2026-10-22). Changes are
-   additive only: a new endpoint, or a new field on a reply. Nothing is
-   renamed, retyped or removed, and an error `code` keeps its meaning. A
-   breaking change is `/api/v2`. Every endpoint is in `ENDPOINTS`
-   (`apps/web/src/api/handler.ts`) and in the "API" table of `docs/cli.md`; a test
-   fails when the two differ.
+7. **`/api/v1` follows the project's stage** (decided 2026-10-22, amended
+   2026-11-14). PixelSlash is in alpha, so `/api/v1` may change in any way,
+   a rename or a removal included, with no shim, deprecation period or new
+   version prefix: the path stays `/api/v1` until a real V2 release. A change
+   that breaks a client is marked with `!` on its commit subject. Every
+   endpoint is in `ENDPOINTS` (`apps/web/src/api/handler.ts`) and in the "API"
+   table of `docs/cli.md`; a test fails when the two differ.

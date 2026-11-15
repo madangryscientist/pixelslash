@@ -21,8 +21,8 @@ import { BadRequest, Forbidden } from "./validate";
 /**
  * The read API (ob 1729): what the CLI and the MCP server read builds and shots with. Every
  * handler reaches rows through `db/actor.ts` and shapes them from the `db/*` read models; none
- * queries by itself. Keys are snake_case and every reply carries `api_version`. `/api/v1` is a
- * stable contract: a field may be added, never renamed, retyped or removed (AGENTS.md).
+ * queries by itself. Keys are snake_case and every reply carries `api_version`. `/api/v1` follows the
+ * project's stage (AGENTS.md, invariant 7): in alpha a field may be renamed, retyped or removed.
  */
 export const API_VERSION = 1;
 
