@@ -99,6 +99,33 @@ describe("review over the API", () => {
     expect(shotBody.snapshot).toMatchObject({ reviewed_by: "ada", review_state: "accepted" });
   });
 
+  test.each(["review", "accept-all"])(
+    "%s reaches the build that carries the change, and syncs both",
+    async (how) => {
+      const { ctx, feature, about, ada } = await changed();
+      // The branch again with the change still open: its `about` carries the first build's.
+      const carrier = await upload(ctx, {
+        branch: "feature",
+        commit: sha(3),
+        mergeBase: sha(1),
+        shots: [
+          { name: "home", png: shot() },
+          { name: "about", png: shot({ blocks: [block] }) },
+        ],
+      });
+      expect(carrier.status).toBe("changes");
+      vi.mocked(syncCheckRuns).mockClear();
+      const res =
+        how === "review"
+          ? await review(ctx, about.id, ada, { state: "accepted" })
+          : await acceptAll(ctx, feature.id, ada);
+      expect(res).toMatchObject({ status: 200, body: { status: "passed" } });
+      expect(res.body.build_ids).toEqual([feature.id, carrier.id]);
+      expect(await buildStatus(ctx, carrier.id)).toBe("passed");
+      expect(syncedIds()).toEqual([[feature.id, carrier.id]]);
+    },
+  );
+
   test("rejecting the changed shot fails the build", async () => {
     const { ctx, feature, about, ada } = await changed();
     const res = await review(ctx, about.id, ada, { state: "rejected" });
