@@ -7,7 +7,8 @@ import { cliMeta } from "./cli-meta.ts";
 import { DOC_PAGES } from "./src/content/docs-map.ts";
 import { PAGES } from "./src/content/pages.ts";
 
-// Every page is prerendered to static HTML at build time; the Worker only serves the files.
+// Every page is prerendered to static HTML at build time; the Worker serves the files, and answers
+// the four moved marketing paths with a 301 (src/server.ts).
 export default defineConfig({
   resolve: { tsconfigPaths: true },
   // The pages read the repo's own docs (`docs/cli.md`, `SECURITY.md`, ...) at build time.
@@ -23,7 +24,14 @@ export default defineConfig({
         "/search-index.json",
         "/sitemap.xml",
       ].map((path) => ({ path })),
-      prerender: { enabled: true, crawlLinks: true, failOnError: true },
+      // The list above is every page. Discovery would add `/` (the root route's path), which now
+      // answers a 301 to slashslash.build (src/server.ts), and fail the build on it.
+      prerender: {
+        enabled: true,
+        crawlLinks: true,
+        failOnError: true,
+        autoStaticPathsDiscovery: false,
+      },
     }),
     viteReact(),
   ],

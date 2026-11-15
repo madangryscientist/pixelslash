@@ -26,8 +26,8 @@ test("a code block too wide for its box takes keyboard focus, and one that fits 
   page,
 }) => {
   test.setTimeout(300_000);
-  // The home's install block wraps now (PS-371), so the home may carry no scroller; the check runs
-  // over every page and asserts that at least one scroller exists across the site.
+  // A page may carry no scroller; the check runs over every page and asserts that at least one
+  // scroller exists across the site.
   let scrollers = 0;
   for (const path of PATHS) {
     await page.goto(path, { waitUntil: "networkidle" });

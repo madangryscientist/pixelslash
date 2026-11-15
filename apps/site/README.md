@@ -1,7 +1,29 @@
 # apps/site: pixelslash.dev
 
-The project site. TanStack Start on a Cloudflare Worker, every page prerendered to static HTML at
-build time: no D1, no R2, no sign-in, no cookies, no forms.
+The project's docs site. TanStack Start on a Cloudflare Worker, every page prerendered to static
+HTML at build time: no D1, no R2, no sign-in, no cookies, no forms. pixelslash.dev serves the docs,
+self-host and security pages.
+
+## The marketing pages moved
+
+The home, how it works, compare and pricing pages are on slashslash.build now. pixelslash.dev answers
+each old path, with and without a trailing slash, with a `301` to its new address:
+
+| Path | Location |
+| --- | --- |
+| `/` | `https://slashslash.build/pixelslash` |
+| `/how-it-works` | `https://slashslash.build/pixelslash/how-it-works` |
+| `/compare` | `https://slashslash.build/pixelslash/compare` |
+| `/pricing` | `https://slashslash.build/pixelslash/pricing` |
+
+The list is `src/content/moved.ts`. The Worker's own entry, `src/server.ts`, answers it before
+TanStack Start does; no asset matches those paths, so every such request reaches the Worker. The nav
+(`src/content/nav.ts`) still shows the four, linking to slashslash.build, and the wordmark links the
+PixelSlash home there. `e2e/metadata.spec.ts` reads every moved path with no redirect followed and
+checks the `301` and the `Location`. slashslash.build fetches a few files from this repo at a pinned
+commit (the hero shots and `src/content/hero.json`, `public/report.png`, `public/favicon.svg`,
+`public/fonts/`, `docs/capabilities/data.json`, `apps/web/github-app/manifest.json`); keep them where
+they are.
 
 The pages are drawn from the repo's own files, read when the site is built, so the site says what
 the code says at that commit:
@@ -11,11 +33,7 @@ the code says at that commit:
 | `/docs`, `/docs/<page>` | `docs/cli.md` cut into grouped pages by `src/content/docs-map.ts`, `docs/getting-started.md`, and the pages under `docs/tutorials/` and `docs/ci/` |
 | `/self-host` | `apps/web/SELF-HOST.md` |
 | `/security` | `SECURITY.md` |
-| `/compare` | `docs/capabilities/data.json` (the behind rows included) |
-| `/how-it-works` | `public/report.png`, a real report of `fixtures/pages/live.html` against `local.html` |
 | footer | the README's trademark line, written out in `src/content/trademark.ts` and held to the README by a test |
-
-The pricing page's commitment sentence is `src/content/pricing.ts`.
 
 ## The CLI reference, its index and search
 
@@ -75,12 +93,12 @@ so it needs the same change.
 ```bash
 bun run dev              # vite dev on :3100
 bunx moon run site:build     # prerenders every page into dist/client
-bunx moon run site:test      # the docs and compare pages against their source files
+bunx moon run site:test      # the docs pages against their source files
 bunx moon run site:test-e2e  # Playwright on the build, desktop and phone (CI runs `-- --project desktop`): nav, footer, dead links,
                          # WCAG AA contrast in both themes (e2e/support/contrast.ts): every text node on a solid ground,
                          # and the inner pages' heading and lead over the aurora, read from pixels. Text on a
-                         # picture or gradient fill (the demo, the closing band) is not measured,
-                         # every `copy` button, the home's spacing
+                         # picture or gradient fill is not measured, every `copy` button,
+                         # and the 301 of every moved page
 ```
 
 `SITE_SHOTS_DIR=<dir> bunx moon run site:test-e2e` also writes a full-page screenshot of every page.

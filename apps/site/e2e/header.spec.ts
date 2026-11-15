@@ -1,4 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
+import { MOVED } from "../src/content/moved.ts";
+import { NAV } from "../src/content/nav.ts";
 import { PAGES } from "../src/content/pages.ts";
 import { SCHEME_CLASS, box, hydrated, other, schemeClasses, toggleOf } from "./support/header.ts";
 import { menuButton, menuOpen, siteNav } from "./support/site-nav.ts";
@@ -9,15 +11,7 @@ import { menuButton, menuOpen, siteNav } from "./support/site-nav.ts";
  * of Get started, and with the page unscrolled.
  */
 
-const VISITED = [
-  "/",
-  "/docs/",
-  "/docs/install/",
-  "/pricing/",
-  "/compare/",
-  "/self-host/",
-  "/how-it-works/",
-];
+const VISITED = ["/docs/", "/docs/install/", "/security/", "/self-host/"];
 
 declare global {
   interface Window {
@@ -32,13 +26,13 @@ const backgroundOf = (page: Page, selector: string) =>
     .first()
     .evaluate((element) => getComputedStyle(element).backgroundColor);
 
-/** What home is really drawn with: its canvas, its body, its header and its text. */
-async function homePaint(page: Page) {
+/** What a page is really drawn with: its canvas, its body, its ground, its header and its text. */
+async function paint(page: Page) {
   return {
     html: await backgroundOf(page, "html"),
     body: await backgroundOf(page, "body"),
-    home: await backgroundOf(page, ".home"),
-    text: await page.locator(".home").evaluate((element) => getComputedStyle(element).color),
+    ground: await backgroundOf(page, "[data-art]"),
+    text: await page.locator("main").evaluate((element) => getComputedStyle(element).color),
     header: await backgroundOf(page, "header"),
   };
 }
@@ -69,16 +63,23 @@ test("the header, logo, toggle, Get started and nav do not move between pages", 
       navTop: nav.y,
     };
   }
-  for (const to of VISITED) expect(seen[to], `${to} against /`).toEqual(seen["/"]);
+  for (const to of VISITED) expect(seen[to], `${to} against /docs/`).toEqual(seen["/docs/"]);
 });
 
-test("the nav marks the page it is on, Home included", async ({ page }) => {
-  await page.goto("/");
+test("the nav marks the page it is on, and the moved pages link to slashslash.build", async ({
+  page,
+}) => {
+  await page.goto("/security");
   const nav = await siteNav(page);
-  await expect(nav.getByRole("link", { name: "Home", exact: true })).toHaveAttribute(
+  await expect(nav.getByRole("link", { name: "Security", exact: true })).toHaveAttribute(
     "aria-current",
     "page",
   );
+  for (const moved of MOVED) {
+    const link = nav.getByRole("link", { name: moved.label, exact: true });
+    await expect(link).toHaveAttribute("href", moved.target);
+    await expect(link).not.toHaveAttribute("aria-current", "page");
+  }
 });
 
 for (const system of ["light", "dark"] as const) {
@@ -90,7 +91,7 @@ for (const system of ["light", "dark"] as const) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.emulateMedia({ colorScheme: system });
-    await page.goto("/pricing", { waitUntil: "networkidle" });
+    await page.goto("/security", { waitUntil: "networkidle" });
     await hydrated(page);
     expect(await schemeClasses(page)).toEqual([SCHEME_CLASS[system]]);
 
@@ -105,7 +106,7 @@ for (const system of ["light", "dark"] as const) {
 
     // Before any bundle: the head script restores the choice on another page by itself.
     await withoutBundles(page);
-    await page.goto("/compare", { waitUntil: "domcontentloaded" });
+    await page.goto("/self-host", { waitUntil: "domcontentloaded" });
     expect(await schemeClasses(page)).toEqual([SCHEME_CLASS[chosen]]);
   });
 
@@ -114,13 +115,15 @@ for (const system of ["light", "dark"] as const) {
   }) => {
     await page.emulateMedia({ colorScheme: system });
     await withoutBundles(page);
-    for (const to of ["/", "/pricing"]) {
+    for (const to of ["/docs", "/security"]) {
       await page.goto(to, { waitUntil: "domcontentloaded" });
       expect(await schemeClasses(page), to).toEqual([SCHEME_CLASS[system]]);
     }
   });
 
-  test(`on a ${system} system, / never shows the other scheme while it loads`, async ({ page }) => {
+  test(`on a ${system} system, /docs never shows the other scheme while it loads`, async ({
+    page,
+  }) => {
     await page.emulateMedia({ colorScheme: system });
     // Every value <html>'s scheme has had since <body> began: from there on the page can paint.
     await page.addInitScript(() => {
@@ -140,36 +143,38 @@ for (const system of ["light", "dark"] as const) {
         attributeFilter: ["class"],
       });
     });
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/docs", { waitUntil: "networkidle" });
     await hydrated(page);
     expect(await page.evaluate(() => window.seenSchemes)).toEqual([[SCHEME_CLASS[system]]]);
   });
 
-  test(`on a ${system} system, the toggle switches all of / and the choice wins on load`, async ({
+  test(`on a ${system} system, the toggle switches all of /docs and the choice wins on load`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: system });
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/docs", { waitUntil: "networkidle" });
     await hydrated(page);
-    const before = await homePaint(page);
+    const before = await paint(page);
     await toggleOf(page).click();
 
-    await expect.poll(async () => (await homePaint(page)).home).not.toBe(before.home);
-    const after = await homePaint(page);
-    expect(after.html).toBe(after.home);
-    expect(after.body).toBe(after.home);
+    await expect.poll(async () => (await paint(page)).ground).not.toBe(before.ground);
+    const after = await paint(page);
+    // The canvas under the shell switches with it. In dark the kit's own shell background is the
+    // one painted on the shell root, so the two are not compared with each other.
+    expect(after.html).not.toBe(before.html);
+    expect(after.body).toBe(after.html);
     expect(after.text).not.toBe(before.text);
     expect(after.header).not.toBe(before.header);
 
     // Against the system's preference, so only the stored choice can have set it.
     await page.reload({ waitUntil: "networkidle" });
-    expect(await homePaint(page)).toEqual(after);
+    expect(await paint(page)).toEqual(after);
   });
 }
 
 test("the toggle is named, and works from the keyboard", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
-  await page.goto("/pricing", { waitUntil: "networkidle" });
+  await page.goto("/security", { waitUntil: "networkidle" });
   await hydrated(page);
   const toggle = page.getByRole("button", { name: "Switch to dark theme" });
   await expect(toggle).toBeVisible();
@@ -186,21 +191,23 @@ test("the toggle is named, and works from the keyboard", async ({ page }) => {
 });
 
 /*
- * The header stays on top of the home's body, where the demo, its read-out and the cards all stack. As
+ * The header stays on top of a long page's body: its headings, code blocks and tables. As
  * in smoke.spec.ts, what is asserted is what is painted: the header's band is shot as it is, then with
  * everything in the page body hidden, and the two must match. Each part is scrolled to straddle the
  * band. Reduced motion, so nothing moves between the two shots.
  */
 for (const scheme of ["light", "dark"] as const) {
-  test(`/ scrolled: nothing in the page paints over the header in ${scheme}`, async ({ page }) => {
+  test(`/docs/cli scrolled: nothing in the page paints over the header in ${scheme}`, async ({
+    page,
+  }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/docs/cli", { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
 
     const clip = await page.locator("header").first().boundingBox();
     if (!clip) throw new Error("the header has no box");
 
-    for (const part of [".home-rise a", ".home-demo", ".home-readout", ".home-cards a"]) {
+    for (const part of ["main h2", "main pre", "main table"]) {
       await page
         .locator(part)
         .first()
@@ -227,7 +234,7 @@ for (const scheme of ["light", "dark"] as const) {
  * longest doc page (by scrollHeight at 1440). Run on the phone project only, so each case runs once.
  */
 const PHONE_PAGES = [...PAGES.map((one) => one.to), "/docs/cli"];
-const LABELS = PAGES.map((one) => one.label);
+const LABELS = NAV.map((one) => one.label);
 
 test.describe("at 390", () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -268,9 +275,9 @@ test.describe("at 390", () => {
         expect(await menuOpen(page)).toBe(false);
         await expect(nav).toHaveCount(0);
 
-        // Following a link shuts it.
+        // Following a link shuts it. A local one, so the run stays on this machine.
         await menuButton(page).click();
-        const target = to === "/pricing" ? "Security" : "Pricing";
+        const target = to === "/security" ? "Docs" : "Security";
         const href = PAGES.find((one) => one.label === target)?.to ?? "";
         await nav.getByRole("link", { name: target, exact: true }).click();
         await page.waitForURL((url) => url.pathname.replace(/\/$/, "") === href);
@@ -285,7 +292,7 @@ test.describe("at 390 without JavaScript", () => {
   test.skip(({ isMobile }) => !isMobile, "the phone project only");
 
   test("Menu opens and shows the nav links", async ({ page }) => {
-    await page.goto("/pricing");
+    await page.goto("/security");
     const nav = await siteNav(page);
     for (const label of LABELS) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();

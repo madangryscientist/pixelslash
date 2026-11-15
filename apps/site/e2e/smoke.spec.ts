@@ -1,14 +1,17 @@
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { DOC_PAGES, GROUPS, LISTED_PAGES, neighbours } from "../src/content/docs-map.ts";
+import { SLASHSLASH } from "../src/content/moved.ts";
+import { NAV } from "../src/content/nav.ts";
 import { PAGES } from "../src/content/pages.ts";
 import { groupRows } from "./support/docs-rows.ts";
 import { siteNav } from "./support/site-nav.ts";
 
 /*
  * Every page, on a desktop and a phone: the nav and the footer are there, every internal link and
- * anchor lands on something, nothing links to the hosted app while it is closed, and nothing scrolls sideways. That the docs and compare pages agree with their source
- * files is checked in the unit tests (src/content/docs.test.tsx, matrix.test.tsx).
+ * anchor lands on something, nothing links to the hosted app while it is closed, and nothing scrolls
+ * sideways. That the docs pages agree with their source files is checked in the unit tests
+ * (src/content/docs.test.tsx).
  */
 
 const CLOSED = ["app.pixelslash.dev"];
@@ -37,11 +40,17 @@ async function checkPage(
     expect(response?.status()).toBe(200);
 
     const nav = await siteNav(page);
-    for (const item of PAGES)
-      await expect(nav.getByRole("link", { name: item.label, exact: true })).toHaveCount(1);
+    for (const item of NAV)
+      await expect(nav.getByRole("link", { name: item.label, exact: true })).toHaveAttribute(
+        "href",
+        item.href,
+      );
 
     const footer = page.getByTestId("footer");
-    await expect(footer.getByRole("link", { name: "PixelSlash home" })).toBeVisible();
+    await expect(footer.getByRole("link", { name: "PixelSlash home" })).toHaveAttribute(
+      "href",
+      SLASHSLASH,
+    );
     await expect(footer.getByTestId("trademark")).toContainText("PixelSlash is a name of");
     await expect(footer.getByRole("link", { name: "hello@hack-cove.com" })).toHaveAttribute(
       "href",
@@ -76,7 +85,7 @@ async function checkPage(
 
     const dir = process.env["SITE_SHOTS_DIR"];
     if (dir) {
-      const name = to === "/" ? "home" : to.slice(1).replaceAll("/", "-");
+      const name = to.slice(1).replaceAll("/", "-");
       // Still, and with every scroll reveal shown: a full-page shot does not scroll the page.
       await page.emulateMedia({ reducedMotion: "reduce" });
       // The phone Menu was opened to read the nav; the shot is of the page, so close it.
@@ -281,7 +290,7 @@ const contrast = (a: string, b: string) => {
 for (const scheme of ["light", "dark"] as const) {
   test(`the ${scheme} scope is set alone and the wordmark reads on it`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/pricing", { waitUntil: "networkidle" });
+    await page.goto("/security", { waitUntil: "networkidle" });
 
     const html = page.locator("html");
     await expect(html).toHaveClass(scheme === "dark" ? /\bdark\b/ : /\blatte\b/);

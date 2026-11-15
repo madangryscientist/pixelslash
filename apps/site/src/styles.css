@@ -58,9 +58,10 @@
 }
 
 /* From md (768) to lg (1024) the nav sits beside the brand and the controls, and the row is too
-   narrow for every tab. Home drops out there (the wordmark links home); from lg every tab shows. */
+   narrow for every tab. Home (on slashslash.build) drops out there (the wordmark links it too);
+   from lg every tab shows. */
 @media (min-width: 48rem) and (width < 64rem) {
-  header nav[aria-label="Site"] a[href="/"] {
+  header nav[aria-label="Site"] a[href="https://slashslash.build/pixelslash"] {
     display: none;
   }
 }
@@ -80,9 +81,8 @@
 /* Light-theme headings have their own, darker ink (PS-364). Latte's theme file maps the kit's
    text-slate-900 (headings, Display, SectionHeading) to body grey with an unlayered rule at 0,2,0,
    so the rules below are written at :root.latte (0,2,x) to win; a selector without the root is
-   0,1,2 and loses. Muted headings keep their slate (text-slate-400 and 500 are not matched), and
-   .home-gradient-text keeps its transparent fill, because the rules colour the heading and the
-   kit's ink span only, never the gradient span. Dark sets nothing. */
+   0,1,2 and loses. Muted headings keep their slate (text-slate-400 and 500 are not matched). Dark
+   sets nothing. */
 .latte {
   --ps-heading: #232634; /* Catppuccin Frappe crust: 13.3:1 on the page ground, the body is 7.1:1 */
 }

@@ -30,7 +30,7 @@ holds what they inherit:
 | `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@hackcove/pixelslash-engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
-| `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, every page prerendered from the repo's own docs and `data.json`; no D1, R2 or sign-in. The planner deploys it after a merge (`apps/site/README.md`) |
+| `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, serving the docs, self-host and security pages, each prerendered from the repo's own docs; no D1, R2 or sign-in. The four marketing pages (`/`, `/how-it-works`, `/compare`, `/pricing`) 301 to slashslash.build/pixelslash from the site's Worker entry. The planner deploys it after a merge (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
 | `dotnet` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract (`PixelSlash.Diff`), and its xunit tests (`PixelSlash.Diff.Tests`): two `.csproj` files, one moon project, tagged `dotnet`. `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
@@ -161,7 +161,7 @@ Run both after a change to the CLI's bundle (`scripts/build-cli.ts`, its depende
 build, the upload API or the synthetic-org filter (`src/db/synthetic.ts`).
 
 A change to `apps/site`, or to a file it renders (`docs/cli.md`, `apps/web/SELF-HOST.md`,
-`SECURITY.md`, `docs/capabilities/data.json`, the README's trademark line), runs:
+`SECURITY.md`, the README's trademark line), runs:
 
 ```bash
 bunx moon run site:build

@@ -34,23 +34,6 @@ for (const viewport of WIDTHS) {
     test.use({ viewport, colorScheme: "light" });
     test.skip(({ isMobile }) => isMobile, "the desktop project only");
 
-    test("/pricing: the facts run from the header's left to its right, the commitment ends at its right", async ({
-      page,
-    }) => {
-      const { left, right } = await open(page, "/pricing");
-      const facts = await box(page.getByTestId("pricing-facts"));
-      expect(Math.abs(facts.x - left), "pricing-facts left").toBeLessThanOrEqual(TOLERANCE);
-      expect(Math.abs(facts.x + facts.w - right), "pricing-facts right").toBeLessThanOrEqual(
-        TOLERANCE,
-      );
-      // The commitment sits beside the headline now, so only its right edge is on the column.
-      const commitment = await box(page.getByTestId("commitment"));
-      expect(commitment.x, "commitment left is inside the column").toBeGreaterThan(left);
-      expect(Math.abs(commitment.x + commitment.w - right), "commitment right").toBeLessThanOrEqual(
-        TOLERANCE,
-      );
-    });
-
     test("/docs: the search box and the index cards run from the header's left to its right (no rail)", async ({
       page,
     }) => {
@@ -63,21 +46,6 @@ for (const viewport of WIDTHS) {
       expect(Math.abs(found.x + found.w - right), "docs-index right").toBeLessThanOrEqual(
         TOLERANCE,
       );
-    });
-
-    test("/: the features, the install and the local band run from the header's left to its right", async ({
-      page,
-    }) => {
-      const { left, right } = await open(page, "/");
-      const columns = page.getByTestId("home-column");
-      await expect(columns).toHaveCount(3);
-      for (let index = 0; index < 3; index += 1) {
-        const found = await box(columns.nth(index));
-        expect(Math.abs(found.x - left), `column ${index} left`).toBeLessThanOrEqual(TOLERANCE);
-        expect(Math.abs(found.x + found.w - right), `column ${index} right`).toBeLessThanOrEqual(
-          TOLERANCE,
-        );
-      }
     });
   });
 }
