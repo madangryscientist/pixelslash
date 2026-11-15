@@ -26,7 +26,7 @@ const NAMED_SHOTS = 5;
 
 type PrCommentDeps = { db: Db; publicUrl: string | undefined };
 
-/** What the comment needs of the synced build; the check run's row has all of it. */
+/** What the comment needs of the synced build; the commit status's row has all of it. */
 export type PrCommentBuild = SyncedBuild & {
   commitSha: string;
   repo: RepoName;

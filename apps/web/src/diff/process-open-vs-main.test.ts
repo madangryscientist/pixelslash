@@ -10,7 +10,7 @@ import { tabCounts } from "#/lib/build-tabs";
 import { awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
 import { builds, snapshots } from "#/db/schema";
 import { fakeGithub } from "#/github/test-github";
-import { type CheckRunBody, syncCheckRuns } from "#/github/check-run";
+import { type StatusBody, syncCheckRuns } from "#/github/check-run";
 import { rediffShots } from "./rerun";
 import {
   type BuildSpec,
@@ -129,21 +129,21 @@ async function decide(ctx: Ctx, snapshotId: string, state: "accepted" | "rejecte
   });
 }
 
-/** The check run the build gets on GitHub, as it is sent. */
-async function checkRunOf(ctx: Ctx, buildId: string): Promise<CheckRunBody> {
+/** The commit status the build gets on GitHub, as it is sent. */
+async function statusOf(ctx: Ctx, buildId: string): Promise<StatusBody> {
   await setGithubRepo(ctx.db, ctx.userId, ctx.projectId, "acme/web");
   const github = fakeGithub();
   await syncCheckRuns(
     { db: ctx.db, app: github.app({ timeoutMs: 50 }), token: null, publicUrl: "https://ps.test/" },
     [buildId],
   );
-  const body = github.checkRunCalls().at(-1);
-  if (!body) throw new Error("no check run was sent");
+  const body = github.statusCalls().at(-1);
+  if (!body) throw new Error("no commit status was sent");
   return JSON.parse(body.raw);
 }
 
 describe("open changes against main (PS-284)", () => {
-  test("a build after the chain ends at changes, and the check run names the changed and new shots", async () => {
+  test("a build after the chain ends at changes, and its status waits on the changed and new shots", async () => {
     const { ctx, passedOnIt } = await theChain();
     expect((await getBuild(ctx.db, ctx.projectId, passedOnIt.id)).status).toBe("passed");
 
@@ -162,15 +162,8 @@ describe("open changes against main (PS-284)", () => {
     expect(shots["home"]?.carriedFrom).toBeNull();
     expect(next.status).toBe("changes");
 
-    const run = await checkRunOf(ctx, next.id);
-    expect([run.status, run.conclusion]).toEqual(["in_progress", undefined]);
-    expect(run.output.title).toBe("2 changes to review");
-    expect(run.output.summary).toContain("Waiting for review: 1 changed shot and 1 new shot.");
-    expect(run.output.summary).toContain("- Changed: about (1280x720, light)");
-    expect(run.output.summary).toContain("- New: pricing (1280x720, light)");
-    expect(run.output.summary).not.toContain("home");
-    // Carried from main, they count under their against-main status, not as Unchanged (PS-285).
-    expect(run.output.summary).toContain("| 1 | 2 | 0 | 0 | 1 | 0 | 1 |");
+    const status = await statusOf(ctx, next.id);
+    expect(status).toMatchObject({ state: "pending", description: "2 changes to review" });
   });
 
   test("the build page files the carried shots under Changed and New, and the API keeps them unchanged (PS-285)", async () => {
@@ -196,7 +189,7 @@ describe("open changes against main (PS-284)", () => {
     });
   });
 
-  test("accepting the open shots turns the build and the check run to passed", async () => {
+  test("accepting the open shots turns the build and its status to passed", async () => {
     const { ctx } = await theChain();
     const next = await upload(ctx, onFeat(5));
     expect(next.status).toBe("changes");
@@ -205,9 +198,10 @@ describe("open changes against main (PS-284)", () => {
     expect(await decide(ctx, shots["pricing"]?.id ?? "", "accepted")).toBe("passed");
 
     expect((await getBuild(ctx.db, ctx.projectId, next.id)).status).toBe("passed");
-    const run = await checkRunOf(ctx, next.id);
-    expect(run.conclusion).toBe("success");
-    expect(run.output.summary).not.toContain("Waiting for review");
+    expect(await statusOf(ctx, next.id)).toMatchObject({
+      state: "success",
+      description: "All changes accepted",
+    });
 
     // The decision holds for the build after it: the shots are accepted, not open again.
     const after = await upload(ctx, onFeat(6));

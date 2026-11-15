@@ -1,24 +1,25 @@
-import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import type { Db } from "#/db/db";
-import { type OpenShot, openShotsOf } from "#/db/open-shots";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
 import { builds, projects } from "#/db/schema";
 import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";
-import { GithubError, type GithubApp, type RepoName, field, isRepoName } from "./app";
-import { type SyncedBuild, countsTable, detailsUrlOf, plural, titleOf } from "./build-text";
+import { GithubError, type GithubApp, type RepoName, isRepoName } from "./app";
+import { type SyncedBuild, detailsUrlOf, titleOf } from "./build-text";
 import { syncPrComment } from "./pr-comment";
 
 /*
- * The "PixelSlash" check run on a build's commit (PS-23): one per build, created the first time
- * the build is synced and updated in place after that. It carries counts and a link to the build
- * page, never an image (invariant 4). GitHub is told, never asked: a failed call is logged and
- * reported, and the build's verdict and the request that synced it are untouched.
+ * The "PixelSlash" commit status on a build's commit (PS-23, PS-235): a new status each time the
+ * build is synced, newest wins. Its Details link opens the build page in one click, which a check
+ * run's cannot (GitHub sends that to its own check page). It carries the title and a link, never
+ * an image (invariant 4). GitHub is told, never asked: a failed call is logged and reported, and
+ * the build's verdict and the request that synced it are untouched.
  *
- * A server without the App but with a token (PS-235) posts the same states as a commit status,
- * context "PixelSlash". The App wins when both are configured; with neither, nothing is called.
+ * The App posts it with its installation token when configured, else the server's token; with
+ * neither, nothing is called. A build synced before the App moved to statuses may still hold a
+ * check run: the App completes it once as `neutral` and forgets its id.
  *
- * When several of an org's projects are linked to one repo, each build's check (and status) is named
+ * When several of an org's projects are linked to one repo, each build's status is named
  * "PixelSlash / <project name>", so a reviewer can tell them apart; one project keeps the plain name.
  */
 
@@ -39,75 +40,35 @@ export type CheckRunDeps = {
   publicUrl: string | undefined;
 };
 
+/** What the build's state is on GitHub, before it is put as a commit status. */
 export type CheckRunBody = {
   name: string;
-  head_sha?: string;
-  external_id: string;
   details_url?: string;
   status: "in_progress" | "completed";
   conclusion?: "success" | "failure";
-  output: { title: string; summary: string };
+  output: { title: string };
 };
 
-/** How many shots the summary names; the build page has the rest. */
-const NAMED_SHOTS = 10;
-
-/** The shots awaiting review, counted and named: a carried change is `unchanged` in the table. */
-function openLines(open: OpenShot[]): string[] {
-  if (open.length === 0) return [];
-  const changed = open.filter((shot) => shot.kind === "changed").length;
-  const added = open.length - changed;
-  const named = open
-    .slice(0, NAMED_SHOTS)
-    .map(
-      (shot) =>
-        `- ${shot.kind === "new" ? "New" : "Changed"}: ${shot.name} (${shot.viewport}, ${shot.theme})`,
-    );
-  const more = open.length - named.length;
-  return [
-    "",
-    `Waiting for review: ${plural(changed, "changed shot")} and ${plural(added, "new shot")}.`,
-    ...named,
-    ...(more > 0 ? [`- and ${more} more`] : []),
-  ];
-}
-
-function summaryOf(
-  build: SyncedBuild,
-  counts: BuildCounts,
-  open: OpenShot[],
-  detailsUrl: string | undefined,
-) {
-  const lines =
-    build.status === "uploading" || build.status === "processing"
-      ? ["The build is being diffed."]
-      : [...countsTable(counts), ...openLines(open), "", "Removed shots do not fail the check."];
-  if (detailsUrl) lines.push("", `[Review the build](${detailsUrl})`);
-  return lines.join("\n");
-}
-
 /**
- * What the check run says for a build: `in_progress` while it is diffed and while a change awaits
+ * What the status says for a build: `in_progress` while it is diffed and while a change awaits
  * review (the title says how many), so a waiting change reads as pending, not as failed CI;
  * `failure` when a shot is rejected or the build errored (the title names the error); `success`
  * when every change is accepted or nothing changed. New shots wait for review like changes do
- * (PS-284). GitHub marks a run left `in_progress` for 14 days as stale.
+ * (PS-284). The counts and the waiting shots are in the PR comment and on the build page.
  */
 function checkRunOf(
   build: SyncedBuild & { checkName: string },
   counts: BuildCounts,
-  open: OpenShot[],
   detailsUrl: string | undefined,
 ): CheckRunBody {
   const done =
     build.status !== "uploading" && build.status !== "processing" && build.status !== "changes";
   return {
     name: build.checkName,
-    external_id: build.id,
     ...(detailsUrl && { details_url: detailsUrl }),
     status: done ? "completed" : "in_progress",
     ...(done && { conclusion: build.status === "passed" ? "success" : "failure" }),
-    output: { title: titleOf(build, counts), summary: summaryOf(build, counts, open, detailsUrl) },
+    output: { title: titleOf(build, counts) },
   };
 }
 
@@ -121,7 +82,7 @@ export type StatusBody = {
   target_url?: string;
 };
 
-/** The check run's state as a commit status: `in_progress` is `pending`, the conclusions are kept. */
+/** The state as a commit status: `in_progress` is `pending`, the conclusions are kept. */
 function statusOf(run: CheckRunBody): StatusBody {
   return {
     state: run.status === "in_progress" ? "pending" : (run.conclusion ?? "failure"),
@@ -178,8 +139,7 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
 
 async function bodyOf(deps: CheckRunDeps, row: BuildRow): Promise<CheckRunBody> {
   const counts = (await countBuilds(deps.db, [row.id])).get(row.id) ?? emptyCounts();
-  const open = row.status === "changes" ? await openShotsOf(deps.db, row.id) : [];
-  return checkRunOf(row, counts, open, detailsUrlOf(deps.publicUrl, row));
+  return checkRunOf(row, counts, detailsUrlOf(deps.publicUrl, row));
 }
 
 /** A commit status is a new entry on the commit, newest wins: there is no id to keep. */
@@ -188,38 +148,37 @@ async function syncStatus(deps: CheckRunDeps, client: GithubApp, row: BuildRow):
   await client.request(row.repo, "POST", `/repos/${row.repo}/statuses/${row.commitSha}`, status);
 }
 
-async function syncCheckRun(deps: CheckRunDeps, app: GithubApp, row: BuildRow): Promise<void> {
-  const { repo } = row;
-  const body = await bodyOf(deps, row);
-  const update = (id: number) =>
-    app.request(repo, "PATCH", `/repos/${repo}/check-runs/${id}`, body);
-  if (row.checkRunId !== null) {
-    await update(row.checkRunId);
-    return;
-  }
-  const created = await app.request(repo, "POST", `/repos/${repo}/check-runs`, {
-    ...body,
-    head_sha: row.commitSha,
-  });
-  const id = Number(field(created, "id"));
-  const stored = await deps.db
+/** What the check run a build was given before the status says as it is put to rest. */
+const RETIRED_RUN = {
+  status: "completed",
+  conclusion: "neutral",
+  output: {
+    title: "Moved to the PixelSlash commit status",
+    summary: "This build now reports as a commit status, whose Details link opens the build.",
+  },
+};
+
+/**
+ * A build synced while the App posted check runs holds one, maybe still `in_progress`: complete it
+ * once, so it does not spin. The id is cleared first, by the one sync that finds it set, so two
+ * syncs do not both send it and a failed call is not retried on every sync after.
+ */
+async function retireCheckRun(deps: CheckRunDeps, app: GithubApp, row: BuildRow): Promise<void> {
+  const id = row.checkRunId;
+  if (id === null) return;
+  const claimed = await deps.db
     .update(builds)
-    .set({ checkRunId: id })
-    .where(and(eq(builds.id, row.id), isNull(builds.checkRunId)))
+    .set({ checkRunId: null })
+    .where(and(eq(builds.id, row.id), eq(builds.checkRunId, id)))
     .returning({ id: builds.id });
-  if (stored.length > 0) return;
-  // Another sync created one first: that one is the build's, so it gets this state too.
-  const [winner] = await deps.db
-    .select({ checkRunId: builds.checkRunId })
-    .from(builds)
-    .where(eq(builds.id, row.id));
-  if (winner?.checkRunId) await update(winner.checkRunId);
+  if (claimed.length === 0) return;
+  await app.request(row.repo, "PATCH", `/repos/${row.repo}/check-runs/${id}`, RETIRED_RUN);
 }
 
 /**
- * Bring each build's check run (or, with only the token, its commit status) and its PR's comment
- * up to the current state. Does nothing when neither is configured or the build's project has no
- * repo, and never throws: the two are separate calls, so one failing leaves the other.
+ * Bring each build's commit status and its PR's comment up to the current state. Does nothing when
+ * neither the App nor the token is configured or the build's project has no repo, and never
+ * throws: the calls are separate, so one failing leaves the others.
  */
 export async function syncCheckRuns(deps: CheckRunDeps, buildIds: Iterable<string>): Promise<void> {
   const { app, token } = deps;
@@ -231,18 +190,26 @@ export async function syncCheckRuns(deps: CheckRunDeps, buildIds: Iterable<strin
       return null;
     });
     if (!row) continue;
-    await attempt(`github check run for build ${buildId}`, () =>
-      app ? syncCheckRun(deps, app, row) : syncStatus(deps, client, row),
+    if (app)
+      await attempt(`github check run for build ${buildId}`, () => retireCheckRun(deps, app, row));
+    // A 403 here is an App set up before it posted statuses: the owner grants commit statuses
+    // write. Logged, not reported, like the comment's below.
+    await attempt(
+      `github commit status for build ${buildId}`,
+      () => syncStatus(deps, client, row),
+      forbidden,
     );
     // A 403 here is a server whose App or token was set up before the comment: the owner has to
     // grant pull requests write. That is logged, not reported, or every PR build would be an event.
     await attempt(
       `github PR comment for build ${buildId}`,
       () => syncPrComment(deps, client, row),
-      (error) => error instanceof GithubError && error.status === 403,
+      forbidden,
     );
   }
 }
+
+const forbidden = (error: unknown) => error instanceof GithubError && error.status === 403;
 
 async function attempt(
   what: string,

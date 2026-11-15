@@ -50,7 +50,7 @@ export type ApiDeps = {
   modelKeySecret?: ProcessDeps["modelKeySecret"];
   /** Where a project made through the API diffs (ob 1787). */
   defaultDiffLocation: () => DiffLocation;
-  /** The GitHub App and public URL a finalised build's check run is synced with (PS-23); unset syncs none. */
+  /** The GitHub App and public URL a finalised build's commit status is synced with (PS-23); unset syncs none. */
   checkRuns?: Omit<CheckRunDeps, "db">;
   /** Counts requests per token, or per client IP when the token is refused (PS-250); unset counts none. */
   rateLimit?: RateLimiter | undefined;
@@ -129,7 +129,7 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // The model's explanations are not in it: they are queued once the verdict is written (ob 1875).
   const blobs = orgBlobs(ctx.store, orgId);
   const { db, diff, diffSidecar, explainQueue, modelKeySecret } = ctx;
-  // The check run says `in_progress` while the diff runs, then the verdict (PS-23); neither call
+  // The commit status says `pending` while the diff runs, then the verdict (PS-23); neither call
   // can fail the finalise.
   const sync = () =>
     ctx.timer.time("sync", async () => {

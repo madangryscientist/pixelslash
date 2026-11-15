@@ -3,7 +3,7 @@ import type { Db } from "./db";
 import { getProject } from "./orgs";
 import { projects } from "./schema";
 
-/** Whether the project's PR builds post the PR comment (PS-82); the check run is sent either way. */
+/** Whether the project's PR builds post the PR comment (PS-82); the commit status is sent either way. */
 export async function setGithubComment(
   db: Db,
   userId: string,

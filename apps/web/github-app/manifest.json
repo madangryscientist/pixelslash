@@ -1,13 +1,14 @@
 {
   "name": "PixelSlash Review",
   "url": "https://github.com/madangryscientist/pixelslash",
-  "description": "Posts a PixelSlash check run on each build's commit, and one comment on its pull request: the counts and a link to the build page.",
+  "description": "Posts a PixelSlash commit status on each build's commit, whose Details opens the build page, and one comment on its pull request with the counts.",
   "public": false,
   "redirect_url": "http://localhost:8787/",
   "default_permissions": {
     "checks": "write",
     "metadata": "read",
-    "pull_requests": "write"
+    "pull_requests": "write",
+    "statuses": "write"
   },
   "default_events": []
 }

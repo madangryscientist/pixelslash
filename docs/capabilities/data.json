@@ -511,7 +511,7 @@
       "label": "PR status blocked on review",
       "ps": {
         "v": "y",
-        "note": "a PixelSlash check run on each build's commit in the project's connected repo: pending (in progress) while changes await review, failure once one is rejected or the build errored, success once all are accepted or nothing changed, updated in place on each decision (needs the GitHub App registered, apps/web/github-app). A self-host without the App posts the same states as a `PixelSlash` commit status with a fine-grained token. A CI job can also block by exit code with `pixelslash status --wait`",
+        "note": "a PixelSlash commit status on each build's commit in the project's connected repo, whose Details link opens the build page: pending while changes await review, failure once one is rejected or the build errored, success once all are accepted or nothing changed, a new status on each decision (posted by the GitHub App, apps/web/github-app, or on a self-host without it by a fine-grained token). A CI job can also block by exit code with `pixelslash status --wait`",
         "commit": "cad8b76"
       },
       "t": {
@@ -529,7 +529,7 @@
       "label": "GitHub App integration",
       "ps": {
         "v": "p",
-        "note": "sign-in, and an outbound-only App that posts the check run and keeps one PR comment per pull request, edited in place on each build, with the model's summary, the counts and the most changed shots as links (a project can turn it off); no webhooks",
+        "note": "sign-in, and an outbound-only App that posts the commit status and keeps one PR comment per pull request, edited in place on each build, with the model's summary, the counts and the most changed shots as links (a project can turn it off); no webhooks",
         "commit": "cad8b76"
       },
       "t": {
@@ -540,7 +540,7 @@
         "lost": "y"
       },
       "plan": "",
-      "gap": "webhooks; the App is outbound only, so it posts the check run and the PR comment but reacts to nothing on GitHub"
+      "gap": "webhooks; the App is outbound only, so it posts the commit status and the PR comment but reacts to nothing on GitHub"
     },
     {
       "g": "flow",

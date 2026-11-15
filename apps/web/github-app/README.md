@@ -4,21 +4,33 @@ The App is named **PixelSlash Review** (slug `pixelslash-review`, id `5528217` i
 "PixelSlash" is reserved on GitHub, so the manifest's `name` field carries "PixelSlash Review" too; a
 manifest that says "PixelSlash" will not register.
 
-The App posts one check run, named **PixelSlash**, on each build's commit in the repo a project is
-connected to (project settings → GitHub repo):
+The App posts a commit status, named **PixelSlash**, on each build's commit in the repo a project is
+connected to (project settings → GitHub repo). Its **Details** link opens the build page in one
+click (a check run's opens GitHub's own check page, which is why it is not one):
 
-| Build | Check run |
+| Build | Commit status |
 | --- | --- |
-| uploading, processing | `in_progress` |
-| changes to review | `in_progress`, titled with what waits ("3 changes to review") |
+| uploading, processing | `pending` |
+| changes to review | `pending`, titled with what waits ("3 changes to review") |
 | a rejected shot | `failure` |
 | every change accepted, or nothing changed | `success` |
 | errored | `failure`, titled with the error |
 
-The summary is the counts and `details_url` is the build page on `PIXELSLASH_PUBLIC_URL`. It is
-updated in place on finalize, on every accept or reject, on accept-all, on rerun, on marking a shot
-flaky and when the model passes a build. A build that ends `changes` (a changed or new shot waits for review) keeps it in progress, so a check that branch protection requires blocks the merge until the review is done; removed shots never do, and the summary names the shots that wait (PS-284). No image goes to
-GitHub, only the link.
+The description is that one-line title and `target_url` is the build page on
+`PIXELSLASH_PUBLIC_URL`; the counts and the waiting shots are in the PR comment and on the build
+page. A new status is posted on finalize, on every accept or reject, on accept-all, on rerun, on
+marking a shot flaky and when the model passes a build, and GitHub shows the newest. A build that
+ends `changes` (a changed or new shot waits for review) keeps it pending, so a status that branch
+protection requires blocks the merge until the review is done; removed shots never do (PS-284). No
+image goes to GitHub, only the link.
+
+**An App registered when it posted check runs** needs one more permission: the owner grants
+**Commit statuses: Read and write** in the App's settings (Permissions & events), and each
+installation's owner accepts the upgrade request GitHub sends. Until then the status calls fail
+with a 403, which is logged and not reported. A branch protection rule that requires `PixelSlash`
+keeps working by name; if it was tied to the App's check run, pick `PixelSlash` from the list
+again. A build that still has a check run from before gets it completed once, as `neutral` and
+titled "Moved to the PixelSlash commit status", on its next sync; `checks: write` stays for that.
 
 ### The pull request comment (PS-82)
 
@@ -29,17 +41,18 @@ skipped" when the project has no model, or the model's call failed), the counts 
 five most changed shots as links to their page, and the link to the build page. Only the newest
 build of a PR edits its comment. A comment someone deleted is made again on the next sync. The
 comment is text and links: no image is sent. A project turns it off in settings → GitHub repo →
-"Comment on pull requests"; the check run stays. The comment is posted to the project's connected repo
-and nowhere else, and a failed comment call is logged like a failed check run: it never changes a
-build's verdict and it never stops the check run being sent.
+"Comment on pull requests"; the commit status stays. The comment is posted to the project's connected repo
+and nowhere else, and a failed comment call is logged like a failed status: it never changes a
+build's verdict and it never stops the status being sent.
 
 The comment needs `pull_requests: write`. An installation made before PS-82 granted only `read`:
 **the owner of the App changes the permission in the App's settings, and the installation's owner
-accepts the upgrade request GitHub sends**, or the comment calls fail with a 403 (logged; the check
-run is unaffected).
+accepts the upgrade request GitHub sends**, or the comment calls fail with a 403 (logged; the commit
+status is unaffected).
 
-The App is outbound only: it has **no webhook**, and its permissions are `checks: write`,
-`metadata: read` and `pull_requests: write` (`manifest.json`). It is not public. With no App
+The App is outbound only: it has **no webhook**, and its permissions are `statuses: write`,
+`pull_requests: write`, `metadata: read` and `checks: write`, the last only to complete a check run
+left from before (`manifest.json`). It is not public. With no App
 configured, or a project with no repo, the server calls GitHub not at all. A failed GitHub call is
 logged and reported to Sentry; it never changes a build's verdict and never fails a review.
 
@@ -91,7 +104,7 @@ to listen there, GitHub only puts a one-time `code` in that URL.
 | --- | --- | --- |
 | `GITHUB_APP_ID` | `wrangler.jsonc` vars / `.dev.vars` / the CT's `.dev.vars.e2e` | The App id. |
 | `GITHUB_APP_PRIVATE_KEY` | `wrangler secret put` / `.dev.vars` / the CT's `.dev.vars.e2e` | The App's private key: the PEM as GitHub gave it, the PEM with `\n` for its newlines, or its base64 on one line. |
-| `PIXELSLASH_PUBLIC_URL` | `wrangler.jsonc` vars / `.dev.vars` / the CT's `.dev.vars.e2e` | The server's URL as a reviewer opens it; the check run links the build page on it. Unset, the check run has no link. |
+| `PIXELSLASH_PUBLIC_URL` | `wrangler.jsonc` vars / `.dev.vars` / the CT's `.dev.vars.e2e` | The server's URL as a reviewer opens it; the commit status links the build page on it. Unset, the status has no link. |
 
 Both App vars must be set, or nothing calls GitHub. Installation tokens are minted per repo and
 cached until five minutes before GitHub expires them.
