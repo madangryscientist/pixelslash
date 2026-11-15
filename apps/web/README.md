@@ -214,7 +214,8 @@ each installation accepts the request GitHub sends; until then the status calls 
 logged and not reported. A branch protection rule that requires `PixelSlash` keeps working by name;
 if the rule was tied to the check run's app, pick `PixelSlash` from the list again. A build that
 still has a check run from before gets it completed once as `neutral` ("Moved to the PixelSlash
-commit status") on its next sync, so no old run is left spinning.
+commit status") on its next sync; a failed completion is logged and not tried again, and a build
+that is never synced again keeps its old run until GitHub marks it stale.
 
 ### The pull request comment (PS-82)
 

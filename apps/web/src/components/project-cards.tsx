@@ -101,9 +101,10 @@ export function GithubRepo({
             Each build posts a PixelSlash commit status on its commit: pending while changes wait
             for review, passing once they are accepted, failing when one is rejected. Its Details
             link opens the build. A branch protection rule that requires PixelSlash keeps working by
-            name. The status carries a title and a link, never a screenshot. A pull request's builds
-            also keep one comment, edited in place, with the model's summary, the counts and the
-            most changed shots as links.
+            name; pick it again if the rule was tied to the old check run. The status carries a
+            title and a link, never a screenshot. A pull request's builds also keep one comment,
+            edited in place, with the model's summary, the counts and the most changed shots as
+            links.
           </Text>
           {!configured && (
             <Text as="p">

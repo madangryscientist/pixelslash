@@ -45,7 +45,7 @@ secret: every secret is read from the environment, never from the tree.
   URLs** are signed with `IMAGE_SIGNING_SECRET` and short-lived.
 - **The model endpoint is attacker-controlled input.** A project owner names the base URL the
   server calls, so the server refuses private and local targets (below).
-- **The GitHub App** only writes commit statuses and one comment per pull request: its manifest subscribes to no webhooks, and each
+- **The GitHub App** only writes commit statuses, one comment per pull request, and the completion of a check run it posted before it moved to statuses: its manifest subscribes to no webhooks, and each
   deployment registers its own App.
 - **Errors, never shots, go to Sentry**, and only when a DSN is set. Every report passes
   `scrubEvent` (`packages/engine/src/sentry-scrub.ts`), which drops request bodies, cookies, query

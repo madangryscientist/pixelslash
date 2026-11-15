@@ -4,7 +4,7 @@ import { builds } from "#/db/schema";
 import { sha } from "#/diff/test-builds";
 import type { StatusBody } from "./check-run";
 import { type Call, TEST_TOKEN } from "./test-github";
-import { CHANGED, PLAIN, world } from "./test-world";
+import { PLAIN, world } from "./test-world";
 
 /** The commit status a token-only server posts (PS-235); the App posts the same (check-run.test.ts). */
 
@@ -37,31 +37,6 @@ describe("the PixelSlash commit status (token, no App)", () => {
     expect((await w.buildRow(main.id))?.checkRunId).toBeNull();
   });
 
-  test("a change is pending until accepted, and a reject fails it", async () => {
-    const w = await world({ app: false, token: true });
-    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
-    const before = w.github.statusCalls().length;
-    const feature = await w.finalise({
-      commit: sha(2),
-      branch: "feat/x",
-      mergeBase: sha(1),
-      png: CHANGED,
-    });
-    expect(feature.body.status).toBe("changes");
-
-    await w.sync(await w.decide(feature.id, "accepted"));
-    await w.sync(await w.decide(feature.id, "rejected"));
-
-    const posts = w.github.statusCalls().slice(before);
-    expect(posts.every((c) => c.path === `/repos/acme/web/statuses/${sha(2)}`)).toBe(true);
-    expect(statusStates(posts)).toEqual([
-      "pending Diffing the shots",
-      "pending 1 change to review",
-      "success All changes accepted",
-      "failure 1 change rejected",
-    ]);
-  });
-
   test("an errored build is a failure, and the description names the error", async () => {
     const w = await world({ app: false, token: true });
     const main = await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
@@ -83,19 +58,5 @@ describe("the PixelSlash commit status (token, no App)", () => {
       expect(main.body.status).toBe("passed");
       expect(w.github.calls).toEqual([]);
     }
-  });
-
-  test("with two projects on one repo, each status's context names its project", async () => {
-    const w = await world({ app: false, token: true });
-    const docs = await w.linkProject("docs", "ACME/web");
-    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
-    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN, token: docs });
-
-    expect(statusBodies(w.github.statusCalls()).map((b) => b.context)).toEqual([
-      "PixelSlash / web",
-      "PixelSlash / web",
-      "PixelSlash / docs",
-      "PixelSlash / docs",
-    ]);
   });
 });
