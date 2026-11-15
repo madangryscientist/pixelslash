@@ -79,8 +79,14 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
   const { latest } = project;
   const shots = latest ? latest.total - latest.counts.removed : 0;
   return (
-    <TableRow data-testid="project-row" stripe={stripeToneOf(latest)}>
-      <TableCell secondary={latest ? plural(shots, "shot") : "no builds yet"}>
+    <TableRow
+      data-testid={project.parentName === null ? "project-row" : "subproject-row"}
+      stripe={stripeToneOf(latest)}
+    >
+      <TableCell
+        indent={project.parentName === null ? undefined : 1}
+        secondary={latest ? plural(shots, "shot") : "no builds yet"}
+      >
         <TextLink
           stretch
           render={(props) => (
@@ -120,6 +126,10 @@ function ProjectRow({ project, now }: { project: ProjectOverview; now: Date }) {
     </TableRow>
   );
 }
+
+/** A project's name, and a subproject's as `Project / Subproject`. */
+const labelOf = (project: ProjectOverview) =>
+  project.parentName === null ? project.name : `${project.parentName} / ${project.name}`;
 
 /** One link per build that is waiting on someone, and the next one to open. */
 export function WaitingStrip({ org }: { org: OrgOverview }) {
@@ -162,7 +172,7 @@ export function WaitingStrip({ org }: { org: OrgOverview }) {
                 />
               )}
             >
-              {project.name} · {project.latest.branch}
+              {labelOf(project)} · {project.latest.branch}
             </TextLink>
             <Text tone="muted">{project.latest.counts.toReview} to review</Text>
           </Cluster>
