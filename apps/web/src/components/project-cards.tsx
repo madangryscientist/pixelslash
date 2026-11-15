@@ -141,8 +141,14 @@ export function GithubRepo({
   );
 }
 
-/** The project settings' upload-command card. */
-export function UploadCommand({ serverUrl }: { serverUrl: string }) {
+/** The project settings' upload-command card; a subproject's names it, with its parent's token. */
+export function UploadCommand({
+  serverUrl,
+  subproject,
+}: {
+  serverUrl: string;
+  subproject?: string | undefined;
+}) {
   const hydrated = useHydrated();
   return (
     <Card>
@@ -154,7 +160,7 @@ export function UploadCommand({ serverUrl }: { serverUrl: string }) {
           </Text>
         </Stack>
         <CopyLine
-          text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}
+          text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}${subproject ? ` --subproject ${subproject}` : ""}`}
           disabled={!hydrated}
           data-testid="upload-command"
         />

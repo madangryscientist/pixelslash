@@ -22,7 +22,7 @@ import {
   ModeTabs,
 } from "#/components/branch-review";
 import { TabBody } from "#/components/build-shots";
-import { orgCrumb, projectCrumb } from "#/components/crumbs";
+import { orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { Page, StatusBadge } from "#/components/ui";
 import {
   type MainSummary,
@@ -105,7 +105,9 @@ function BranchPage() {
   return (
     <Page>
       <ListLayout
-        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), build.branch]} />}
+        breadcrumbs={
+          <Breadcrumbs crumbs={[orgCrumb(org), ...projectCrumbs(project), build.branch]} />
+        }
         title={`${project.name} · ${build.branch}`}
       >
         <BranchMeta project={project} build={build} buildCount={buildCount} />

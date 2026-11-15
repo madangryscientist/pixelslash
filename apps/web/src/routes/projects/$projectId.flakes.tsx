@@ -16,7 +16,7 @@ import {
 } from "@hackcove/ui-react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
-import { orgCrumb, projectCrumb } from "#/components/crumbs";
+import { orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { useFlagWrite } from "#/components/detection-flag";
 import { FlakeHistory, FlakeRuns, FlakyPolicyControl, flakeAnchor } from "#/components/flake";
 import { Page, useHydrated } from "#/components/ui";
@@ -159,7 +159,7 @@ function FlakesPage() {
   return (
     <Page>
       <ListLayout
-        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), "Flakes"]} />}
+        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), ...projectCrumbs(project), "Flakes"]} />}
         title={`${project.name} · flakes`}
         subtitle={
           flakes.length === 0
