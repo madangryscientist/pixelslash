@@ -24,6 +24,7 @@ on:
       - "apps/site/scripts/site-images.ts"
       - "fixtures/pages/**"
       - "bun.lock"
+      - ".tool-versions"
       - ".github/workflows/site-images.yml"
   workflow_dispatch:
 
