@@ -1,0 +1,97 @@
+name: Site images
+
+# Regenerates the four files slashslash.build fetches from this repo (apps/site/public/hero/*.png,
+# apps/site/public/report.png, apps/site/src/content/hero.json and report.json) when what draws them
+# changes on main, and lands them through a pull request that merges itself once CI is green.
+#
+# The push and every `gh` call use the SITE_IMAGES_TOKEN secret, a fine-grained token for this repo
+# with Contents and Pull requests write. Not GITHUB_TOKEN: a pull request opened or pushed with
+# GITHUB_TOKEN starts no workflow, so the required Gate would never report and the pull request could
+# never merge. With the token the Gate runs on the bot's pull request like any other, and
+# `gh pr merge --auto` merges it when that passes. The bot's commit touches only files under
+# apps/site/public and apps/site/src/content, none of which is in `paths`, so its merge starts no run.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/engine/src/**"
+      - "packages/cli/src/**"
+      - "apps/site/hero/**"
+      - "apps/site/scripts/cli-run.ts"
+      - "apps/site/scripts/hero.ts"
+      - "apps/site/scripts/report.ts"
+      - "apps/site/scripts/site-images.ts"
+      - "fixtures/pages/**"
+      - "bun.lock"
+      - ".github/workflows/site-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-images
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: "1.4.2"
+  BRANCH: bot/site-images
+
+jobs:
+  regenerate:
+    name: Regenerate the site images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Install the Playwright browser
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium-headless-shell
+      - name: Regenerate
+        run: bun apps/site/scripts/site-images.ts --body "$RUNNER_TEMP/body.md"
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ secrets.SITE_IMAGES_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          files=(
+            apps/site/public/hero/main.png
+            apps/site/public/hero/branch.png
+            apps/site/public/report.png
+            apps/site/src/content/hero.json
+            apps/site/src/content/report.json
+          )
+          git add -- "${files[@]}"
+          if git diff --cached --quiet; then
+            echo "No change: no branch and no pull request."
+            exit 0
+          fi
+          # The script writes only those files; anything else dirty is a bug, and it does not ship.
+          if git status --porcelain --untracked-files=all | grep -qv '^[AM]  '; then
+            git status --short
+            echo "::error::files outside the site images changed"
+            exit 1
+          fi
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::the SITE_IMAGES_TOKEN secret is not set"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "chore(site): regenerate the site images"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+          open=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh pr edit "$open" --repo "$REPO" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --repo "$REPO" --base main --head "$BRANCH" \
+              --title "chore(site): regenerate the site images" --body-file "$RUNNER_TEMP/body.md"
+          fi
+          gh pr merge "$BRANCH" --repo "$REPO" --auto --squash --delete-branch
