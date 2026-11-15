@@ -163,7 +163,7 @@ describe("open changes against main (PS-284)", () => {
     expect(next.status).toBe("changes");
 
     const run = await checkRunOf(ctx, next.id);
-    expect(run.conclusion).toBe("failure");
+    expect([run.status, run.conclusion]).toEqual(["in_progress", undefined]);
     expect(run.output.title).toBe("2 changes to review");
     expect(run.output.summary).toContain("Waiting for review: 1 changed shot and 1 new shot.");
     expect(run.output.summary).toContain("- Changed: about (1280x720, light)");

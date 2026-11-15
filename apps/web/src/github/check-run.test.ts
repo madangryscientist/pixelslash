@@ -40,7 +40,7 @@ describe("the PixelSlash check run", () => {
     expect((await w.buildRow(main.id))?.checkRunId).toBe(100);
   });
 
-  test("a change fails it until it is accepted, and a reject fails it again; one run, updated in place", async () => {
+  test("a change keeps it in_progress until it is accepted, and a reject fails it; one run, updated in place", async () => {
     const w = await world();
     await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
     const before = w.github.checkRunCalls().length;
@@ -64,13 +64,31 @@ describe("the PixelSlash check run", () => {
     ]);
     expect(states(runs)).toEqual([
       "in_progress Diffing the shots",
-      "completed:failure 1 change to review",
+      "in_progress 1 change to review",
       "completed:success All changes accepted",
       "completed:failure 1 change rejected",
     ]);
     expect(bodies(runs)[0]?.head_sha).toBe(sha(2));
     expect(bodies(runs)[1]?.output.summary).toContain("| 1 | 1 | 0 | 0 | 0 | 0 | 0 |");
     expect((await w.buildRow(feature.id))?.checkRunId).toBe(101);
+  });
+
+  test("rejecting a waiting change moves it from in_progress to failure", async () => {
+    const w = await world();
+    await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
+    const before = w.github.checkRunCalls().length;
+    const feature = await w.finalise({
+      commit: sha(2),
+      branch: "feat/x",
+      mergeBase: sha(1),
+      png: CHANGED,
+    });
+    await w.sync(await w.decide(feature.id, "rejected"));
+    expect(states(w.github.checkRunCalls().slice(before))).toEqual([
+      "in_progress Diffing the shots",
+      "in_progress 1 change to review",
+      "completed:failure 1 change rejected",
+    ]);
   });
 
   test("accept-all moves it to success", async () => {
