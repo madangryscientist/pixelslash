@@ -1,6 +1,6 @@
 import { Breadcrumbs, ListLayout, Text } from "@hackcove/ui-react";
 import { createFileRoute } from "@tanstack/react-router";
-import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { buildCrumb, orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { ParityBody } from "#/components/parity-view";
 import { Page } from "#/components/ui";
 import { getParityPage } from "#/server/parity-page";
@@ -29,7 +29,7 @@ function ParityPage() {
           <Breadcrumbs
             crumbs={[
               orgCrumb(org),
-              projectCrumb(project),
+              ...projectCrumbs(project),
               buildCrumb(project.id, build),
               `${parity.name} ${parity.theme}`,
             ]}

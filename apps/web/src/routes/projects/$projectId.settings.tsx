@@ -21,12 +21,13 @@ import {
   TableRow,
   Text,
 } from "@hackcove/ui-react";
-import { orgCrumb, projectCrumb } from "#/components/crumbs";
+import { orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { IgnoreBoxSettings } from "#/components/ignore-box-settings";
 import { ModelSettings } from "#/components/model-settings";
 import { OverrideSettings } from "#/components/override-trail";
 import { TwinSettings } from "#/components/twin-settings";
 import { DefaultBranch, GithubRepo, UploadCommand } from "#/components/project-cards";
+import { AddSubproject, InheritedSettings } from "#/components/subprojects";
 import { InlineForm, Page, useHydrated } from "#/components/ui";
 import { formatDateTime } from "#/lib/format";
 import type { DiffLocation } from "#/db/schema";
@@ -48,49 +49,18 @@ export const Route = createFileRoute("/projects/$projectId/settings")({
 function ProjectSettings() {
   const { project, org, tokens, overrides, model, checks, twinOptions, serverUrl } =
     Route.useLoaderData();
-  const router = useRouter();
   const hydrated = useHydrated();
-  const [issued, setIssued] = useState<string | null>(null);
-  const issue = async (name: string) => {
-    const { token } = await issueToken({ data: { projectId: project.id, name } });
-    setIssued(token);
-    await router.invalidate();
-  };
   return (
     <Page>
       <ListLayout
-        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), "Settings"]} />}
+        breadcrumbs={
+          <Breadcrumbs crumbs={[orgCrumb(org), ...projectCrumbs(project), "Settings"]} />
+        }
         title={`${project.name} · settings`}
       >
-        <Card>
-          <Stack>
-            <Stack gap="xs">
-              <SectionHeading>CI tokens</SectionHeading>
-              <Text as="p">
-                CI uploads builds with a token. It is shown once, when issued; store it as a CI
-                secret.
-              </Text>
-            </Stack>
-            {issued && (
-              <Callout
-                tone="warn"
-                role="status"
-                title="Copy this token now. It will not be shown again."
-              >
-                <CopyLine text={issued} data-testid="issued-token" />
-              </Callout>
-            )}
-            <InlineForm
-              label="Token name, e.g. github-actions"
-              button="Issue token"
-              busyLabel="Issuing…"
-              emptyReason="Name the token first: where it will be used."
-              onSubmit={issue}
-            />
-            <TokenTable tokens={tokens} hydrated={hydrated} />
-          </Stack>
-        </Card>
-        <DefaultBranch projectId={project.id} branch={project.defaultBranch} />
+        {project.parent && <InheritedSettings parent={project.parent} />}
+        {!project.parent && <TokensCard projectId={project.id} tokens={tokens} />}
+        {!project.parent && <DefaultBranch projectId={project.id} branch={project.defaultBranch} />}
         <DiffLocationForm projectId={project.id} saved={project.diffLocation} hydrated={hydrated} />
         <TwinSettings
           projectId={project.id}
@@ -98,12 +68,14 @@ function ProjectSettings() {
           options={twinOptions}
           hydrated={hydrated}
         />
-        <GithubRepo
-          projectId={project.id}
-          repo={project.githubRepo}
-          comment={project.githubComment}
-          configured={checks}
-        />
+        {!project.parent && (
+          <GithubRepo
+            projectId={project.id}
+            repo={project.githubRepo}
+            comment={project.githubComment}
+            configured={checks}
+          />
+        )}
         <OverrideSettings projectId={project.id} overrides={overrides} hydrated={hydrated} />
         <IgnoreBoxSettings
           projectId={project.id}
@@ -111,16 +83,63 @@ function ProjectSettings() {
           trail={overrides.boxTrail}
           hydrated={hydrated}
         />
-        <ModelSettings
-          scope={{ kind: "project", projectId: project.id }}
-          saved={model.source === "project" ? model.model : null}
-          source={model}
-          orgSettingsHref={`/orgs?org=${org.id}&tab=model`}
-          hydrated={hydrated}
+        {!project.parent && (
+          <ModelSettings
+            scope={{ kind: "project", projectId: project.id }}
+            saved={model.source === "project" ? model.model : null}
+            source={model}
+            orgSettingsHref={`/orgs?org=${org.id}&tab=model`}
+            hydrated={hydrated}
+          />
+        )}
+        {!project.parent && <AddSubproject projectId={project.id} />}
+        <UploadCommand
+          serverUrl={serverUrl}
+          subproject={project.parent ? project.name : undefined}
         />
-        <UploadCommand serverUrl={serverUrl} />
       </ListLayout>
     </Page>
+  );
+}
+
+/** The project's CI tokens: issue one (shown once) and the list. A subproject has none of its own. */
+function TokensCard({ projectId, tokens }: { projectId: string; tokens: Token[] }) {
+  const router = useRouter();
+  const hydrated = useHydrated();
+  const [issued, setIssued] = useState<string | null>(null);
+  const issue = async (name: string) => {
+    const { token } = await issueToken({ data: { projectId, name } });
+    setIssued(token);
+    await router.invalidate();
+  };
+  return (
+    <Card>
+      <Stack>
+        <Stack gap="xs">
+          <SectionHeading>CI tokens</SectionHeading>
+          <Text as="p">
+            CI uploads builds with a token. It is shown once, when issued; store it as a CI secret.
+          </Text>
+        </Stack>
+        {issued && (
+          <Callout
+            tone="warn"
+            role="status"
+            title="Copy this token now. It will not be shown again."
+          >
+            <CopyLine text={issued} data-testid="issued-token" />
+          </Callout>
+        )}
+        <InlineForm
+          label="Token name, e.g. github-actions"
+          button="Issue token"
+          busyLabel="Issuing…"
+          emptyReason="Name the token first: where it will be used."
+          onSubmit={issue}
+        />
+        <TokenTable tokens={tokens} hydrated={hydrated} />
+      </Stack>
+    </Card>
   );
 }
 

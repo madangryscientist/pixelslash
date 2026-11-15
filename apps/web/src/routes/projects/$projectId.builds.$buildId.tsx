@@ -6,7 +6,7 @@ import { BuildHeader } from "#/components/build-header";
 import { BuildTimings } from "#/components/build-timings";
 import { BuildSummary } from "#/components/build-summary";
 import { BuildTabs, TabBody } from "#/components/build-shots";
-import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { buildCrumbLabel, orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { BuildOverrideChanges } from "#/components/override-trail";
 import { RerunErrored } from "#/components/rerun";
 import { UnlinkedShots } from "#/components/twins";
@@ -135,7 +135,9 @@ function BuildPage() {
     <Page>
       <ListLayout
         breadcrumbs={
-          <Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), buildCrumbLabel(build)]} />
+          <Breadcrumbs
+            crumbs={[orgCrumb(org), ...projectCrumbs(project), buildCrumbLabel(build)]}
+          />
         }
         title={`${project.name} · ${build.branch}`}
       >

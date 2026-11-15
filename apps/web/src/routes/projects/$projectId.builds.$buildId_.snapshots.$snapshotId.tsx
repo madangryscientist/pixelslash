@@ -14,7 +14,7 @@ import { ShortcutHelp, StickyRail, ViewerBar } from "#/components/snapshot-panel
 import { linkToBuild } from "#/components/snapshot-base-link";
 import { SidePanel } from "#/components/snapshot-side-panel";
 import { SnapshotViewer, useViewState, type ViewState } from "#/components/snapshot-viewer";
-import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { buildCrumb, orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { Page } from "#/components/ui";
 import { formatNumber, formatPercent } from "#/lib/format";
 import { ignoreAreas } from "#/lib/ignore-areas";
@@ -154,7 +154,12 @@ function ShotCrumbs({ data }: { data: ReturnType<typeof Route.useLoaderData> }) 
   const { org, project, build, snapshot } = data;
   return (
     <Breadcrumbs
-      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumb(project.id, build), snapshot.name]}
+      crumbs={[
+        orgCrumb(org),
+        ...projectCrumbs(project),
+        buildCrumb(project.id, build),
+        snapshot.name,
+      ]}
     />
   );
 }
