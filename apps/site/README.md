@@ -25,6 +25,23 @@ commit (the hero shots and `src/content/hero.json`, `public/report.png`, `public
 `public/fonts/`, `docs/capabilities/data.json`, `apps/web/github-app/manifest.json`); keep them where
 they are.
 
+## The images slashslash.build fetches
+
+Four of those files are drawn by scripts, never by hand, each with the real CLI:
+
+- `bun scripts/hero.ts` shoots `hero/page.html` as Main and as Branch into `public/hero/main.png`
+  and `public/hero/branch.png`, and writes what the run measured to `src/content/hero.json`.
+- `bun scripts/report.ts` runs `fixtures/pages/live.html` against `fixtures/pages/local.html`, opens
+  the `report.html` it wrote at 1200x960 (2x) with the Timings table hidden, and saves the view as
+  `public/report.png`, with what the run measured in `src/content/report.json`.
+
+Neither JSON file carries a timestamp, so a rerun that measured the same writes the same bytes.
+`bun scripts/site-images.ts` runs both into a temp dir and replaces a committed PNG only when our
+own diff counts a changed pixel, and a JSON file only when its text differs. The `site-images`
+workflow (`.github/workflows/site-images.yml`) runs it on `main` whenever the engine, the CLI, the
+hero page, the fixtures or these scripts change, and lands any change through a pull request that
+merges itself once CI is green, so both images stay fresh without anyone redrawing them.
+
 The pages are drawn from the repo's own files, read when the site is built, so the site says what
 the code says at that commit:
 

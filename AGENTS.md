@@ -150,6 +150,15 @@ dark, over the synthetic seed in `apps/web/e2e/dogfood-seed.ts`, so no real data
 app.pixelslash.dev with the `PIXELSLASH_TOKEN` secret. The PixelSlash check on a PR is posted from that build,
 against main's. It is not required, and with no secret (a fork) it skips and passes.
 
+**The site images bot** (`.github/workflows/site-images.yml`) runs `bun apps/site/scripts/site-images.ts` on
+`main` when the engine, the CLI, the hero page, `fixtures/pages` or those scripts change. When an image really
+changed it force-pushes `bot/site-images` and opens (or updates) a pull request titled `chore(site): regenerate
+the site images`, which may change only `apps/site/public/hero/*.png`, `apps/site/public/report.png`,
+`apps/site/src/content/hero.json` and `apps/site/src/content/report.json`. It acts with the `SITE_IMAGES_TOKEN`
+secret, so the Gate runs on that pull request like any other, and it merges itself on green
+(`gh pr merge --auto`). With no change it ends green, opens nothing and closes a bot pull request an
+earlier run left open, whose images `main` no longer needs.
+
 **Tests have four layers** (smoke, e2e, integration, unit; `docs/testing.md` is the policy, the
 inventory and the before/after). A behaviour is proved at the lowest layer that can prove it, and a
 new unit test is for a gap, not a second copy. The two smoke targets run the *built* artifact and are
