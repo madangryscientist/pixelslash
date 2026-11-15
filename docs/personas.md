@@ -8,7 +8,7 @@ persona needs something that is not built yet, it is marked as a gap at the end.
 ## 1. Priya, frontend lead on a product team
 
 Priya leads six engineers on one React app. The app has a Storybook that is half kept up, and she
-has either used Chromatic or priced it and balked. Her goal is that every pull request shows what
+is on Chromatic today. Her goal is that every pull request shows what
 changed visually, and that nothing merges until someone has looked.
 
 She uses the CLI in GitHub Actions to upload each build to the hosted app. A PixelSlash commit
@@ -16,8 +16,7 @@ status stays pending on the pull request until the changes are approved, and a c
 request links to the build. On the build page she accepts or rejects each change.
 
 She wins when the path from the pull request to the change is one click, when the tool raises few
-false alarms because anti-aliasing and font hinting are absorbed, and when the bill is lower than
-the one she had. She loses when every pull request shows a red X, when reviewing takes two clicks,
+false alarms because anti-aliasing and font hinting are absorbed. She loses when every pull request shows a red X, when reviewing takes two clicks,
 or when baselines drift and nobody knows why.
 
 ## 2. Marcus, platform engineer in a monorepo
@@ -72,7 +71,7 @@ when the answer about where data goes is vague, or when a feature works only on 
 
 Sam builds client sites, often without Storybook. Sometimes there are Playwright tests, and
 sometimes there is only a URL. The question Sam wants answered is "did my CSS change break the other
-pages?", and wants the answer in a minute and at no cost.
+pages?", and wants the answer in a minute.
 
 Sam uses the CLI's pair mode: `--live` against `--local`, or two PNG files. The report, `report.html`,
 opens locally in a browser. The Playwright helper takes the shots for an existing test suite. A
