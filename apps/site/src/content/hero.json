@@ -1,14 +1,14 @@
 {
   "width": 1280,
   "height": 720,
-  "changedPixels": 13418,
+  "changedPixels": 13717,
   "regions": [
     {
       "x": 617,
       "y": 368,
       "w": 266,
       "h": 44,
-      "changedPixels": 11259,
+      "changedPixels": 11227,
       "kind": "change"
     },
     {
@@ -22,19 +22,18 @@
     {
       "x": 584,
       "y": 483,
-      "w": 108,
+      "w": 119,
       "h": 11,
-      "changedPixels": 360,
+      "changedPixels": 650,
       "kind": "change"
     },
     {
-      "x": 656,
-      "y": 178,
-      "w": 18,
-      "h": 23,
-      "changedPixels": 125,
+      "x": 667,
+      "y": 176,
+      "w": 21,
+      "h": 25,
+      "changedPixels": 166,
       "kind": "change"
     }
-  ],
-  "createdAt": "2026-10-28T21:00:11.169Z"
+  ]
 }
