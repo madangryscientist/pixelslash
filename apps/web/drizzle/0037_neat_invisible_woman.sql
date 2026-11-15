@@ -1,0 +1,1 @@
+DROP INDEX `snapshots_build_idx`;

@@ -413,7 +413,6 @@ export const snapshots = sqliteTable(
   },
   (t) => [
     unique().on(t.buildId, t.name, t.platform, t.browser, t.viewport, t.theme),
-    index("snapshots_build_idx").on(t.buildId),
     index("snapshots_carried_idx").on(t.carriedFrom),
     index("snapshots_image_sha_idx").on(t.imageSha256),
   ],

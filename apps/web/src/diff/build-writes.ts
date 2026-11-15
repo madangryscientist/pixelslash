@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { Build } from "#/db/builds";
 import type { runFields } from "#/db/server-timings";
@@ -58,11 +58,17 @@ export async function acceptDefaultBranchBuild(
   if (build.branch !== project.defaultBranch) return;
   // A flaky shot is never auto-accepted (ob 1724): under `review` it waits, under `skip` it is left.
   // Nor is a native shot of a stale twin key (PS-297): only a person's accept makes it fresh.
+  // A shot already accepted (a re-run of the build) is left as it is: no row written to change nothing.
   await db
     .update(snapshots)
     .set({ reviewState: "accepted", reviewedAt: new Date() })
     .where(
-      and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId), isNull(snapshots.staleOf)),
+      and(
+        eq(snapshots.buildId, build.id),
+        isNull(snapshots.flakeId),
+        isNull(snapshots.staleOf),
+        ne(snapshots.reviewState, "accepted"),
+      ),
     );
 }
 

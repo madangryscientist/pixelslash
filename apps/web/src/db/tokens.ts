@@ -1,4 +1,5 @@
-import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { type SQL, and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import { randomToken, sha256Hex } from "#/lib/crypto";
 import { type Db, NotFoundError } from "./db";
 import { refuseOnSubproject } from "./effective";
@@ -7,6 +8,17 @@ import { ciTokens, members, projects, userTokens } from "./schema";
 import { orgTokens } from "./schema-org-tokens";
 
 const PREFIX = "psci_";
+
+/**
+ * How stale a token's `last_used_at` may get. Every authenticated request reads its token, and D1
+ * bills each row written, so the use is recorded at most once in this window: the settings pages'
+ * "last used" is true to within 5 minutes, not to the request.
+ */
+export const LAST_USED_WINDOW_MS = 5 * 60 * 1000;
+
+/** The token's `last_used_at` is due a write: never recorded, or older than the window. */
+const lastUseDue = (column: SQLiteColumn, now: Date): SQL | undefined =>
+  or(isNull(column), lt(column, new Date(now.getTime() - LAST_USED_WINDOW_MS)));
 
 /** The plaintext is returned here and nowhere else; the table keeps its hash. */
 export async function issueCiToken(db: Db, userId: string, projectId: string, name: string) {
@@ -63,7 +75,10 @@ export async function verifyCiToken(db: Db, token: string, now = new Date()) {
     .innerJoin(projects, eq(projects.id, ciTokens.projectId))
     .where(and(eq(ciTokens.tokenHash, await sha256Hex(token)), isNull(ciTokens.revokedAt)));
   if (!row) return null;
-  await db.update(ciTokens).set({ lastUsedAt: now }).where(eq(ciTokens.id, row.tokenId));
+  await db
+    .update(ciTokens)
+    .set({ lastUsedAt: now })
+    .where(and(eq(ciTokens.id, row.tokenId), lastUseDue(ciTokens.lastUsedAt, now)));
   return { projectId: row.projectId, orgId: row.orgId };
 }
 
@@ -127,7 +142,10 @@ export async function verifyOrgToken(db: Db, token: string, now = new Date()) {
     .from(orgTokens)
     .where(and(eq(orgTokens.tokenHash, await sha256Hex(token)), isNull(orgTokens.revokedAt)));
   if (!row) return null;
-  await db.update(orgTokens).set({ lastUsedAt: now }).where(eq(orgTokens.id, row.tokenId));
+  await db
+    .update(orgTokens)
+    .set({ lastUsedAt: now })
+    .where(and(eq(orgTokens.id, row.tokenId), lastUseDue(orgTokens.lastUsedAt, now)));
   return { orgId: row.orgId };
 }
 
@@ -189,6 +207,9 @@ export async function verifyUserToken(db: Db, token: string, now = new Date()) {
       ),
     );
   if (!row) return null;
-  await db.update(userTokens).set({ lastUsedAt: now }).where(eq(userTokens.id, row.tokenId));
+  await db
+    .update(userTokens)
+    .set({ lastUsedAt: now })
+    .where(and(eq(userTokens.id, row.tokenId), lastUseDue(userTokens.lastUsedAt, now)));
   return { userId: row.userId };
 }

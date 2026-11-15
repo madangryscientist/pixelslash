@@ -139,6 +139,31 @@ migration the database reports against the ones the code carries, and row counts
 everyone else, signed out or not, and when the variable is unset; nothing links to it. The LAN stub build lists nobody (every visitor there signs in as `e2e-octocat`), so set `PIXELSLASH_ADMIN_LOGINS` in its `.dev.vars` to open the page. A figure that
 cannot be read (R2's total, failed summary calls) says "unavailable" and why instead of a 0.
 
+## Rows written per build
+
+Cloudflare bills D1 by rows written, and each index entry a statement writes counts as a row. `src/db/rows-written.test.ts`
+(part of `web:test`) counts D1's own `meta.rows_written` on a local D1 for a fixed fixture: one project, the server diff,
+100 shots uploaded and finalised in three builds. (a) is a first main build (every shot new, auto-accepted); (b) a second
+main build with 50 shots unchanged, 40 changed and 10 new (so 10 removed markers); (c) a branch build off (a) with the same
+mix, which is also measured against main. The test prints the numbers and fails when a build writes more than the last
+measured count.
+
+| Build | Before | Each write sets only what moves | And no `build_id` index | Saved |
+| --- | ---: | ---: | ---: | ---: |
+| (a) first main build | 1,008 | 808 | 708 | 30% |
+| (b) second main build | 1,078 | 878 | 768 | 29% |
+| (c) branch build | 1,068 | 868 | 758 | 29% |
+
+- **Each write sets only what moves.** A diff run's write to a shot sets only the fields whose value differs from the row
+  (`SnapshotWrites`), so a column left as it was, and the index on it, is not written, and a shot whose result is what it
+  was sends no statement. The resolved options, which used to be a statement of their own, go in the shot's result
+  statement. This took a shot's follow-up writes from 3 rows to 1.
+- **No `build_id` index.** It was the left prefix of the shots' unique index, which serves every lookup by build, so a
+  shot's insert writes 5 rows, not 6 (migration 0037).
+- **A re-run of a build** writes no shot that was already accepted or whose result stands.
+- **Tokens** (not in these numbers, which go through no request): a token's `last_used_at` is written at most once in 5
+  minutes, not on every request, so "last used" on the settings pages is true to within 5 minutes.
+
 ## Retention (PS-239)
 
 Off unless you set it. `PIXELSLASH_RETENTION_DAYS=30` (a whole number above 0; anything else is off)

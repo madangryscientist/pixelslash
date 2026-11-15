@@ -79,7 +79,7 @@ export async function diffAgainstMain(
   shot: SnapshotRow,
   main: BaselineSnapshot | undefined,
 ): Promise<void> {
-  writes.update(shot.id, await against(compare, shot, main));
+  writes.update(shot, await against(compare, shot, main));
 }
 
 /**

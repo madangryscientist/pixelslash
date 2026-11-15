@@ -4,7 +4,7 @@ import { context, rows, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
 import type { Db } from "./db";
 import { snapshots } from "./schema";
-import { SnapshotWrites, WRITES_PER_BATCH } from "./snapshot-writes";
+import { SnapshotWrites, WRITES_PER_BATCH, changedFields } from "./snapshot-writes";
 
 /** `db`, with the size of every batch it is sent recorded; `fail` makes each batch throw. */
 function counted(db: Db, fail = false) {
@@ -51,11 +51,11 @@ describe("a diff run's row writes", () => {
     );
 
     expect(build.status).toBe("changes");
-    // Each shot's resolved options, its result, and its result against main: three writes a shot,
-    // in full batches and one tail.
+    // Each shot's result, its resolved options in the same statement, and its result against
+    // main: two writes a shot, in full batches and one tail.
     expect(batches.every((size) => size <= WRITES_PER_BATCH)).toBe(true);
-    expect(batches.reduce((a, b) => a + b, 0)).toBe(3 * n);
-    expect(batches.length).toBeLessThanOrEqual(Math.ceil((3 * n) / WRITES_PER_BATCH) + 1);
+    expect(batches.reduce((a, b) => a + b, 0)).toBe(2 * n);
+    expect(batches.length).toBeLessThanOrEqual(Math.ceil((2 * n) / WRITES_PER_BATCH) + 1);
     const stored = await rows(ctx, build);
     expect(stored.filter((r) => r.diffStatus === "changed")).toHaveLength(Math.floor(n / 2));
     expect(stored.filter((r) => r.diffStatus === "unchanged")).toHaveLength(Math.ceil(n / 2));
@@ -76,15 +76,61 @@ describe("a diff run's row writes", () => {
 
     const seen: (string | null | undefined)[] = [];
     const writes = new SnapshotWrites(ctx.db);
-    writes.update(row.id, { diffError: "written" }, async () => void seen.push(await errorOf()));
+    writes.update(row, { diffError: "written" }, async () => void seen.push(await errorOf()));
     expect(seen).toEqual([]);
     await writes.flush();
     expect(seen).toEqual(["written"]);
 
     const failing = new SnapshotWrites(counted(ctx.db, true).db);
-    failing.update(row.id, { diffError: "never" }, async () => void seen.push("ran"));
+    failing.update(row, { diffError: "never" }, async () => void seen.push("ran"));
     await expect(failing.flush()).rejects.toThrow(/the batch failed/);
     expect(seen).toEqual(["written"]);
     expect(await errorOf()).toBe("written");
+  });
+
+  test("a write that leaves a row as it was sends nothing, and one sets only what moves", async () => {
+    const ctx = await context();
+    const build = await upload(ctx, {
+      branch: "main",
+      commit: sha(1),
+      shots: [{ name: "a", png: white }],
+    });
+    const [row] = await rows(ctx, build);
+    if (!row) throw new Error("no row");
+    const { db, batches } = counted(ctx.db);
+    const writes = new SnapshotWrites(db);
+
+    // The own diff's fields as they are stored: nothing moves, so no statement.
+    writes.update(row, {
+      diffStatus: row.diffStatus,
+      diffResult: row.diffResult === null ? null : structuredClone(row.diffResult),
+      baselineKey: row.baselineKey,
+      carriedFrom: null,
+      diffError: null,
+      createdAt: new Date(row.createdAt.getTime()),
+    });
+    await writes.settle();
+    expect(batches).toEqual([]);
+
+    // A field held for the result and the result's own go in one statement, of the moved fields.
+    expect(changedFields(row, { diffError: "moved", carriedFrom: null, diffMs: 7 })).toEqual({
+      diffError: "moved",
+      diffMs: 7,
+    });
+    const folded = new SnapshotWrites(db);
+    folded.hold(row, { aiError: "held", carriedFrom: null });
+    folded.update(row, { diffError: "moved", carriedFrom: null });
+    await folded.flush();
+    expect(batches).toEqual([1]);
+
+    // A hold that no result follows is written when the run settles, not at a flush.
+    const alone = new SnapshotWrites(db);
+    alone.hold(row, { diffError: "held" });
+    await alone.flush();
+    expect(batches).toEqual([1]);
+    await alone.settle();
+    expect(batches).toEqual([1, 1]);
+    const [stored] = await ctx.db.select().from(snapshots).where(eq(snapshots.id, row.id));
+    expect([stored?.diffError, stored?.aiError]).toEqual(["held", "held"]);
   });
 });

@@ -5,13 +5,17 @@ import { createOrg, createProject } from "./orgs";
 import { ciTokens, userTokens } from "./schema";
 import { testDb } from "./test-db";
 import {
+  LAST_USED_WINDOW_MS,
   issueCiToken,
+  issueOrgToken,
   issueUserToken,
   listCiTokens,
+  listOrgTokens,
   listUserTokens,
   revokeCiToken,
   revokeUserToken,
   verifyCiToken,
+  verifyOrgToken,
   verifyUserToken,
 } from "./tokens";
 import { signInGithubUser } from "./users";
@@ -129,5 +133,54 @@ describe("personal tokens", () => {
     expect(await listUserTokens(db, eve.id)).toEqual([]);
     await expect(revokeUserToken(db, eve.id, id)).rejects.toThrow(NotFoundError);
     expect(await verifyUserToken(db, token)).not.toBeNull();
+  });
+});
+
+describe("last used, written at most once in the window", () => {
+  const t0 = new Date("2026-11-15T10:00:00Z");
+  const at = (ms: number) => new Date(t0.getTime() + ms);
+
+  /**
+   * Use the token at `t0`, a minute later, at the window's end and just past it, and read "last
+   * used" after each: written at the first and the last, two writes and not four.
+   */
+  async function uses(use: (now: Date) => Promise<unknown>, lastUsed: () => Promise<unknown>) {
+    const seen: unknown[] = [];
+    for (const now of [t0, at(60_000), at(LAST_USED_WINDOW_MS), at(LAST_USED_WINDOW_MS + 1)]) {
+      await use(now);
+      seen.push(await lastUsed());
+    }
+    return seen;
+  }
+  const twice = [t0, t0, t0, at(LAST_USED_WINDOW_MS + 1)];
+
+  test("a CI token", async () => {
+    const { db, user, project } = await setup();
+    const { token } = await issueCiToken(db, user.id, project.id, "ci");
+    const seen = await uses(
+      (now) => verifyCiToken(db, token, now),
+      async () => (await listCiTokens(db, user.id, project.id))[0]?.lastUsedAt,
+    );
+    expect(seen).toEqual(twice);
+  });
+
+  test("an org token", async () => {
+    const { db, user, org } = await setup();
+    const { token } = await issueOrgToken(db, user.id, org.id, "monorepo");
+    const seen = await uses(
+      (now) => verifyOrgToken(db, token, now),
+      async () => (await listOrgTokens(db, user.id))[0]?.lastUsedAt,
+    );
+    expect(seen).toEqual(twice);
+  });
+
+  test("a personal token", async () => {
+    const { db, user } = await setup();
+    const { token } = await issueUserToken(db, user.id, "laptop", null);
+    const seen = await uses(
+      (now) => verifyUserToken(db, token, now),
+      async () => (await listUserTokens(db, user.id))[0]?.lastUsedAt,
+    );
+    expect(seen).toEqual(twice);
   });
 });
