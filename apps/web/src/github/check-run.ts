@@ -87,10 +87,11 @@ function summaryOf(
 }
 
 /**
- * What the check run says for a build: `in_progress` while it is diffed; `failure` while a change
- * awaits review, a shot is rejected, or the build errored (the title names the error); `success`
+ * What the check run says for a build: `in_progress` while it is diffed and while a change awaits
+ * review (the title says how many), so a waiting change reads as pending, not as failed CI;
+ * `failure` when a shot is rejected or the build errored (the title names the error); `success`
  * when every change is accepted or nothing changed. New shots wait for review like changes do
- * (PS-284).
+ * (PS-284). GitHub marks a run left `in_progress` for 14 days as stale.
  */
 function checkRunOf(
   build: SyncedBuild & { checkName: string },
@@ -98,7 +99,8 @@ function checkRunOf(
   open: OpenShot[],
   detailsUrl: string | undefined,
 ): CheckRunBody {
-  const done = build.status !== "uploading" && build.status !== "processing";
+  const done =
+    build.status !== "uploading" && build.status !== "processing" && build.status !== "changes";
   return {
     name: build.checkName,
     external_id: build.id,

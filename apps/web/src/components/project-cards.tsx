@@ -98,10 +98,11 @@ export function GithubRepo({
         <Stack gap="xs">
           <SectionHeading>GitHub repo</SectionHeading>
           <Text as="p">
-            Each build posts a PixelSlash check run on its commit: failing while changes wait for
-            review or one is rejected, passing once they are accepted. The check carries counts and
-            a link, never a screenshot. A pull request's builds also keep one comment, edited in
-            place, with the model's summary, the counts and the most changed shots as links.
+            Each build posts a PixelSlash check run on its commit: pending while changes wait for
+            review, passing once they are accepted, failing when one is rejected. The check carries
+            counts and a link, never a screenshot. A pull request's builds also keep one comment,
+            edited in place, with the model's summary, the counts and the most changed shots as
+            links.
           </Text>
           {!configured && (
             <Text as="p">

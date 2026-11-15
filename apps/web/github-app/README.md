@@ -10,13 +10,14 @@ connected to (project settings → GitHub repo):
 | Build | Check run |
 | --- | --- |
 | uploading, processing | `in_progress` |
-| changes to review, or a rejected shot | `failure` |
+| changes to review | `in_progress`, titled with what waits ("3 changes to review") |
+| a rejected shot | `failure` |
 | every change accepted, or nothing changed | `success` |
 | errored | `failure`, titled with the error |
 
 The summary is the counts and `details_url` is the build page on `PIXELSLASH_PUBLIC_URL`. It is
 updated in place on finalize, on every accept or reject, on accept-all, on rerun, on marking a shot
-flaky and when the model passes a build. A build that ends `changes` (a changed or new shot waits for review) fails it; removed shots never do, and the summary names the shots that wait (PS-284). No image goes to
+flaky and when the model passes a build. A build that ends `changes` (a changed or new shot waits for review) keeps it in progress, so a check that branch protection requires blocks the merge until the review is done; removed shots never do, and the summary names the shots that wait (PS-284). No image goes to
 GitHub, only the link.
 
 ### The pull request comment (PS-82)

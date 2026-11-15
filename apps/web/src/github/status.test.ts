@@ -37,7 +37,7 @@ describe("the PixelSlash commit status (token, no App)", () => {
     expect((await w.buildRow(main.id))?.checkRunId).toBeNull();
   });
 
-  test("a change is a failure until accepted, and a reject fails it again", async () => {
+  test("a change is pending until accepted, and a reject fails it", async () => {
     const w = await world({ app: false, token: true });
     await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
     const before = w.github.statusCalls().length;
@@ -56,7 +56,7 @@ describe("the PixelSlash commit status (token, no App)", () => {
     expect(posts.every((c) => c.path === `/repos/acme/web/statuses/${sha(2)}`)).toBe(true);
     expect(statusStates(posts)).toEqual([
       "pending Diffing the shots",
-      "failure 1 change to review",
+      "pending 1 change to review",
       "success All changes accepted",
       "failure 1 change rejected",
     ]);

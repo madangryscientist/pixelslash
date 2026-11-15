@@ -184,9 +184,13 @@ every project; a self-host fires no cron, so there a project is swept only when 
 ## GitHub check runs (PS-23)
 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a
-**PixelSlash** check run on each build's commit: failing while changes await review or one is
-rejected, passing once every change is accepted or nothing changed, updated in place as the build
-is reviewed. When several projects of one org are connected to the same repo (compared ignoring case),
+**PixelSlash** check run on each build's commit: in progress while the build is diffed and while
+changes await review (titled with what waits, "3 changes to review"), passing once every change is
+accepted or nothing changed, failing when a shot is rejected or the build errored, updated in place
+as the build is reviewed. A waiting change is pending, not failed, so it never reads as red CI; a
+branch protection rule that requires the PixelSlash check therefore blocks the merge until the
+changes are reviewed. GitHub marks a check run left in progress for 14 days as stale, which here
+means a build nobody reviewed in two weeks. When several projects of one org are connected to the same repo (compared ignoring case),
 each project's check is named `PixelSlash / <project name>` instead, so they can be told apart on
 the commit; the commit status below follows the same rule. Connecting a second project renames the
 first one's check from its next sync, so a branch protection rule that requires `PixelSlash` must
@@ -211,8 +215,8 @@ comment call is logged and never changes a build's verdict. The App needs `pull_
 
 A self-host that has not registered the App can post the same verdict as a **commit status**,
 context `PixelSlash`, with a fine-grained personal access token. The states are the check run's:
-`pending` while the build is diffed, `failure` while a change awaits review, a shot is rejected or
-the build errored, `success` once every change is accepted or nothing changed. A status has no
+`pending` while the build is diffed and while a change awaits review, `failure` once a shot is
+rejected or the build errored, `success` once every change is accepted or nothing changed. A status has no
 body, so it carries only the one-line title and the link to the build page; each state change is a
 new status on the commit and GitHub shows the latest.
 
