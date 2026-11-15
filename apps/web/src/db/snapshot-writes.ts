@@ -56,7 +56,12 @@ export class SnapshotWrites {
     this.db = db;
   }
 
-  /** Queue the fields of `row` that change; `then` runs once the batch holding it is written. */
+  /**
+   * Queue the fields of `row` that change; `then` runs once the batch holding it is written. `row`
+   * is the row as it stands once what is already queued or held for it is written (a run passes
+   * the row `withOverrides` returned, a re-diff the row as it cleared it): a field compared with
+   * anything older could be dropped as unchanged when it is not.
+   */
   update(row: Row, fields: Fields, then?: () => Promise<void>): void {
     const changed = changedFields(row, fields);
     const held = this.held.get(row.id);
