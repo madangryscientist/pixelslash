@@ -244,7 +244,7 @@ export function ViewerBar({
     <div ref={ref} data-testid="viewer-bar">
       <Stack gap="xs">
         <div className="hidden sm:block">{breadcrumbs}</div>
-        <Cluster wrap gap="sm" align="center">
+        <Cluster wrap gap="xs" align="center">
           {/* The title keeps at least 17rem, so beside it only what fits; the rest wraps under it. */}
           <ClusterGrow minWidth="md">
             <ShotTitle snapshot={snapshot} label={label} />
