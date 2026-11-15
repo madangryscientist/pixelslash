@@ -132,6 +132,6 @@ describe("a code block can be copied, and every page can be edited", () => {
   });
 
   test("code blocks carry the copy button", () => {
-    expect(html.get("install")).toMatch(/<button[^>]*>copy<\/button>/);
+    expect(html.get("install")).toMatch(/<button[^>]*aria-label="copy"[^>]*data-copy-text=/);
   });
 });
