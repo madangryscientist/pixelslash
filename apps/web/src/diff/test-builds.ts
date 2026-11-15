@@ -1,5 +1,5 @@
 import type { diffPngs } from "@hackcove/pixelslash-engine/diff";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { setup } from "#/api/test-support";
 import {
   type Build,
@@ -206,7 +206,12 @@ export async function upload(
 }
 
 export async function rows(ctx: Uploads, build: Build) {
-  return ctx.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
+  // In the order they were sent, which the tests read by position.
+  return ctx.db
+    .select()
+    .from(snapshots)
+    .where(eq(snapshots.buildId, build.id))
+    .orderBy(sql`rowid`);
 }
 
 /** The one shot a single-shot build holds. */

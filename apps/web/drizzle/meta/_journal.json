@@ -260,6 +260,13 @@
       "when": 1794739061382,
       "tag": "0036_tidy_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1794744502458,
+      "tag": "0037_neat_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

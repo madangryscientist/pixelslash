@@ -99,7 +99,7 @@ function storeUncompared(
   // A shot measured again against another baseline may have had an overlay; one that now has no
   // overlay to write drops it.
   deps.writes.update(
-    shot.id,
+    shot,
     baseline
       ? {
           ...UNCOMPARED,
@@ -156,7 +156,7 @@ async function storeDiff(
     // An explanation was of the result this one replaces (ob 1473).
     aiReview: null,
   } as const;
-  deps.writes.update(shot.id, fields, then);
+  deps.writes.update(shot, fields, then);
 }
 
 async function measureAgainst(
@@ -277,7 +277,7 @@ async function diffOrRecord(
     const reason = e instanceof Error ? e.message : String(e);
     const refused = e instanceof DiffRefusedError;
     if (!refused) reportError(e, { area: "diff", step: "shot" });
-    deps.writes.update(shot.id, {
+    deps.writes.update(shot, {
       diffStatus: null,
       diffResult: null,
       rebaselineNeeded: false,
@@ -303,7 +303,7 @@ async function measureFromCi(deps: RunDeps, rows: SnapshotRow[], baselines: Base
       await diffOne(deps, ciComparer(deps.blobs), shot, baseline);
     } catch (e) {
       if (!(e instanceof CiResultError)) throw e;
-      deps.writes.update(shot.id, { diffStatus: null, diffError: e.message });
+      deps.writes.update(shot, { diffStatus: null, diffError: e.message });
       refused.push(`${shotLabel(shot)}: ${e.message}`);
     }
     if (deps.writes.full) await deps.writes.flush();
