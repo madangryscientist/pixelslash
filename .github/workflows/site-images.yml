@@ -6,8 +6,8 @@ name: Site images
 #
 # The push and every `gh` call use the SITE_IMAGES_TOKEN secret, a fine-grained token for this repo
 # with Contents and Pull requests write. Not GITHUB_TOKEN: a pull request opened or pushed with
-# GITHUB_TOKEN starts no workflow, so the required Gate would never report and the pull request could
-# never merge. With the token the Gate runs on the bot's pull request like any other, and
+# GITHUB_TOKEN starts no workflow, so the required `gate` check would never report and the pull request could
+# never merge. With the token `gate` runs on the bot's pull request like any other, and
 # `gh pr merge --auto` merges it when that passes. The bot's commit touches only files under
 # apps/site/public and apps/site/src/content, none of which is in `paths`, so its merge starts no run.
 
@@ -24,6 +24,7 @@ on:
       - "apps/site/scripts/site-images.ts"
       - "fixtures/pages/**"
       - "bun.lock"
+      - ".tool-versions"
       - ".github/workflows/site-images.yml"
   workflow_dispatch:
 
@@ -35,12 +36,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUN_VERSION: "1.4.2"
   BRANCH: bot/site-images
 
 jobs:
   regenerate:
-    name: Regenerate the site images
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -49,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         working-directory: apps/web

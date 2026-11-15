@@ -64,7 +64,8 @@ scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `script
   activates it in this directory, with no `mise trust` needed) and in `global.json` (what `dotnet`
   itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
   "dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
-  network once.
+  network once. `.tool-versions` also pins Bun (`bun 1.4.2`), which CI's `setup-bun` steps read too, so
+  `mise install` installs that as well.
 - **Without one** (a container, an outside contributor): the wrapper prints
   `dotnet SDK not found: skipping engines/dotnet` and adds `--query "tag!=dotnet"` to `moon run`, so
   the TS projects run as before and the `dotnet` project does not. A `dotnet` that cannot run (no SDK
@@ -155,7 +156,7 @@ against main's. It is not required, and with no secret (a fork) it skips and pas
 changed it force-pushes `bot/site-images` and opens (or updates) a pull request titled `chore(site): regenerate
 the site images`, which may change only `apps/site/public/hero/*.png`, `apps/site/public/report.png`,
 `apps/site/src/content/hero.json` and `apps/site/src/content/report.json`. It acts with the `SITE_IMAGES_TOKEN`
-secret, so the Gate runs on that pull request like any other, and it merges itself on green
+secret, so `gate` runs on that pull request like any other, and it merges itself on green
 (`gh pr merge --auto`). With no change it ends green, opens nothing and closes a bot pull request an
 earlier run left open, whose images `main` no longer needs.
 
@@ -184,15 +185,15 @@ bunx moon run site:test-e2e       # Playwright on the build, desktop and phone: 
 (cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-site-dry")
 ```
 
-CI runs `Site gate (build, e2e)` in two tiers. The build (`bunx moon run site:build`) runs on a pull request that
+CI runs `site` in two tiers. The build (`bunx moon run site:build`) runs on a pull request that
 touches `apps/site/`, `docs/`, a root file the site renders or installs from (`README.md`, `SECURITY.md`,
 `apps/web/SELF-HOST.md`, `apps/web/github-app/manifest.json`, `package.json`, `.moon/`,
-`tsconfig.base.json`, `bun.lock`, `bunfig.toml`, `scripts/test-tmp-scope.ts`) or `ci.yml`, and on every push to
+`tsconfig.base.json`, `bun.lock`, `bunfig.toml`, `.tool-versions`, `scripts/test-tmp-scope.ts`) or `ci.yml`, and on every push to
 `main`. The build prerenders with `crawlLinks` and `failOnError`, and `resolve-links.ts` throws on a missing
 `cli.md` anchor, so a docs-only edit is checked by the build and the site's unit tests, not a browser. The e2e
 (`bunx moon run site:test-e2e -- --project desktop`, the phone project is not run in CI) runs only on the short list:
 `apps/site/`, `scripts/test-tmp-scope.ts`, `package.json`, `.moon/`, `tsconfig.base.json`, `bun.lock`,
-`bunfig.toml` and `ci.yml`, and on every push to `main`. A tag (a release) runs neither. The check is not
+`bunfig.toml`, `.tool-versions` and `ci.yml`, and on every push to `main`. A tag (a release) runs neither. The check is not
 required, so a skipped job blocks nothing; the hand run above is no longer the only run, but the wrangler dry
 run stays yours. The `web` and `site` jobs install no .NET SDK and run only web and site tasks; only `gate` has it.
 
