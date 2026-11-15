@@ -156,7 +156,8 @@ changed it force-pushes `bot/site-images` and opens (or updates) a pull request 
 the site images`, which may change only `apps/site/public/hero/*.png`, `apps/site/public/report.png`,
 `apps/site/src/content/hero.json` and `apps/site/src/content/report.json`. It acts with the `SITE_IMAGES_TOKEN`
 secret, so the Gate runs on that pull request like any other, and it merges itself on green
-(`gh pr merge --auto`). With no change it ends green and opens nothing.
+(`gh pr merge --auto`). With no change it ends green, opens nothing and closes a bot pull request an
+earlier run left open, whose images `main` no longer needs.
 
 **Tests have four layers** (smoke, e2e, integration, unit; `docs/testing.md` is the policy, the
 inventory and the before/after). A behaviour is proved at the lowest layer that can prove it, and a

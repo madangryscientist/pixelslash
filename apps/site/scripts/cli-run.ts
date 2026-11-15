@@ -19,7 +19,7 @@ export function outDir(argv: string[] = process.argv.slice(2)): string {
 }
 
 type Region = { x: number; y: number; w: number; h: number; changedPixels: number; kind?: string };
-export type Manifest = { changedPixels: number; regions: Region[] };
+type Manifest = { changedPixels: number; regions: Region[] };
 
 /** Runs `pixelslash <args>` from the repo root and returns the `manifest.json` it wrote to `out`. */
 export async function pixelslash(args: string[], out: string): Promise<Manifest> {

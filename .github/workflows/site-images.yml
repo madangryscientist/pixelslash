@@ -61,6 +61,10 @@ jobs:
           GH_TOKEN: ${{ secrets.SITE_IMAGES_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::the SITE_IMAGES_TOKEN secret is not set"
+            exit 1
+          fi
           files=(
             apps/site/public/hero/main.png
             apps/site/public/hero/branch.png
@@ -69,7 +73,12 @@ jobs:
             apps/site/src/content/report.json
           )
           git add -- "${files[@]}"
+          open=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number')
           if git diff --cached --quiet; then
+            # main already matches: a bot pull request from an earlier run would now land stale images.
+            if [ -n "$open" ]; then
+              gh pr close "$open" --repo "$REPO" --delete-branch --comment "main already matches these images."
+            fi
             echo "No change: no branch and no pull request."
             exit 0
           fi
@@ -79,15 +88,10 @@ jobs:
             echo "::error::files outside the site images changed"
             exit 1
           fi
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error::the SITE_IMAGES_TOKEN secret is not set"
-            exit 1
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -q -m "chore(site): regenerate the site images"
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
-          open=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number')
           if [ -n "$open" ]; then
             gh pr edit "$open" --repo "$REPO" --body-file "$RUNNER_TEMP/body.md"
           else
