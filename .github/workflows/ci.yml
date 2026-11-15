@@ -250,3 +250,53 @@ jobs:
       - name: e2e (desktop)
         if: needs.changes.outputs.site_e2e == 'true'
         run: bunx moon run site:test-e2e -- --project desktop
+
+  # The review app reviews itself: `bun run dogfood:upload` (apps/web) captures its project, build and
+  # snapshot pages, light and dark, from a local build over the fixed synthetic seed, and uploads them to
+  # app.pixelslash.dev. The PixelSlash check on a pull request is posted by that server's GitHub App from
+  # this build; main's builds are the baseline every pull request is compared with. Not a required check,
+  # and with no PIXELSLASH_TOKEN (a fork's pull request gets no secrets) it skips and passes. A release (a
+  # tag, through workflow_call) and a manual run do not upload. Its own runner, so the fixed ports and
+  # `.wrangler/e2e` it shares with the e2e never meet the `web` job's.
+  visual:
+    needs: changes
+    if: >-
+      needs.changes.outputs.web == 'true' &&
+      (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The upload sends HEAD's commit, so a pull request checks out its head, not the merge commit:
+          # the check is posted on the commit the build names. The full history is for the merge-base.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Install the Playwright browser
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium-headless-shell
+      - name: Capture and upload the dogfood shots
+        working-directory: apps/web
+        env:
+          PIXELSLASH_CI_TOKEN: ${{ secrets.PIXELSLASH_TOKEN }}
+          PIXELSLASH_SERVER: https://app.pixelslash.dev
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PIXELSLASH_CI_TOKEN" ]; then
+            echo "visual: no PIXELSLASH_TOKEN, skipping the upload"
+            exit 0
+          fi
+          export PIXELSLASH_TOKEN_FILE="$RUNNER_TEMP/pixelslash-token"
+          (umask 077 && printf '%s' "$PIXELSLASH_CI_TOKEN" > "$PIXELSLASH_TOKEN_FILE")
+          unset PIXELSLASH_CI_TOKEN
+          if [ "$EVENT" = "pull_request" ]; then
+            bun run dogfood:upload -- --branch "$GITHUB_HEAD_REF" --pr "$PR" --base "$GITHUB_BASE_REF"
+          else
+            bun run dogfood:upload -- --branch main
+          fi
