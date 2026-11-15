@@ -19,8 +19,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  # Only a pull request run is cancelled by a newer push: a push to main writes the moon cache and
-  # always runs to the end.
+  # Only a pull request run is cancelled by a newer push. A push to main writes the moon cache, so once
+  # it starts it runs to the end (a main run still waiting is replaced by a newer push).
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Bun's version comes from .tool-versions (every setup-bun step reads it, and mise reads it locally).
