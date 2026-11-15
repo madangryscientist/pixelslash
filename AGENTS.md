@@ -144,6 +144,12 @@ bunx moon run web:test-e2e        # Playwright: a local build on a fresh local D
 (cd apps/web && CLOUDFLARE_ENV=production bun run build && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry-production")   # env.production, app.pixelslash.dev (PS-277)
 ```
 
+**The `visual` job** (`ci.yml`) runs on every pull request that changes the web app and on every push to
+`main`: it builds the review app, captures the six dogfood shots (project, build and snapshot pages, light and
+dark, over the synthetic seed in `apps/web/e2e/dogfood-seed.ts`, so no real data) and uploads them to
+app.pixelslash.dev with the `PIXELSLASH_TOKEN` secret. The PixelSlash check on a PR is posted from that build,
+against main's. It is not required, and with no secret (a fork) it skips and passes.
+
 **Tests have four layers** (smoke, e2e, integration, unit; `docs/testing.md` is the policy, the
 inventory and the before/after). A behaviour is proved at the lowest layer that can prove it, and a
 new unit test is for a gap, not a second copy. The two smoke targets run the *built* artifact and are
