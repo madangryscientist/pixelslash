@@ -161,6 +161,7 @@ To run it from your clone instead, replace the `npx` line with
 ### 10. Optional: GitHub check runs
 
 A second, separate GitHub **App** (not the OAuth app) posts a `PixelSlash` check run on each build's commit and keeps one comment on its pull request.
+When several projects of one org are connected to one repo, each project's check (and commit status) is named `PixelSlash / <project name>` instead, so a branch protection rule that requires `PixelSlash` must then name those.
 It is outbound only. Skip it if you do not want it.
 
 ```bash

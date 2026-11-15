@@ -186,8 +186,12 @@ every project; a self-host fires no cron, so there a project is swept only when 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a
 **PixelSlash** check run on each build's commit: failing while changes await review or one is
 rejected, passing once every change is accepted or nothing changed, updated in place as the build
-is reviewed. A build of a pull request also keeps one comment on the PR, edited in place on each
-build (below). It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
+is reviewed. When several projects of one org are connected to the same repo (compared ignoring case),
+each project's check is named `PixelSlash / <project name>` instead, so they can be told apart on
+the commit; the commit status below follows the same rule. Connecting a second project renames the
+first one's check from its next sync, so a branch protection rule that requires `PixelSlash` must
+name the new checks, and a commit status already posted under the old name stays on its commit. A build of a pull request also keeps one
+comment on the PR, edited in place on each build (below). It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
 `PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. `GITHUB_APP_API_BASE`
 (PS-281) is the App's own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
 `https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub. Registering the
