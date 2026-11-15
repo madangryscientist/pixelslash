@@ -5,9 +5,9 @@ import { type Page, expect, test } from "@playwright/test";
  * Using the box asks for that file and for nothing else, and no request leaves the origin.
  */
 
-/** On a phone the rail is folded under a "Docs" summary: open it, as a reader would. */
+/** On a phone the rail is folded under a "Docs" summary ("Docs: <page>" once hydrated): open it, as a reader would. */
 async function openRail(page: Page): Promise<void> {
-  const fold = page.locator("summary", { hasText: /^Docs$/ });
+  const fold = page.locator("summary", { hasText: /^Docs(: .+)?$/ });
   if (await fold.isVisible()) await fold.click();
 }
 

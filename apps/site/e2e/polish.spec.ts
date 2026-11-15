@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { DOC_PAGES } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
 import { textBelowAA, worstOverArt } from "./support/contrast.ts";
+import { hydrated } from "./support/header.ts";
 
 /*
  * The polish (PS-312): text that passes AA in both themes, copy buttons that copy, and one ground
@@ -29,6 +30,8 @@ for (const path of PATHS) {
   test(`${path}: every copy button copies its block`, async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto(path, { waitUntil: "networkidle" });
+    // The site has no inline copy script: before hydration a click copies nothing.
+    await hydrated(page);
     // By position: each button is named "copy", and the status region after it announces "copied".
     const all = page.locator("figure:has(pre) button");
     const count = await all.count();
