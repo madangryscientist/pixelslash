@@ -90,9 +90,14 @@ export class SnapshotCountError extends Error {
   }
 }
 
-export async function createBuild(db: Db, projectId: string, input: NewBuild): Promise<string> {
+export async function createBuild(
+  db: Db,
+  projectId: string,
+  input: NewBuild,
+  status: "uploading" | "passed" = "uploading",
+): Promise<string> {
   const id = crypto.randomUUID();
-  await db.insert(builds).values({ id, projectId, ...input });
+  await db.insert(builds).values({ id, projectId, ...input, status });
   return id;
 }
 

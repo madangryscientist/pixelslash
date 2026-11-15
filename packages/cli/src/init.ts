@@ -122,7 +122,9 @@ async function projectsOn(
     return [];
   }
   try {
-    return await listProjects(apiClient(server, token, fetch));
+    // `upload.project` names a top-level project; a subproject goes in `upload.subproject`.
+    const projects = await listProjects(apiClient(server, token, fetch));
+    return projects.filter((p) => p.parentId === null);
   } catch (e) {
     if (!(e instanceof RemoteError)) throw e;
     io.stderr.write(`could not read the projects on ${server} (${e.message})\n`);

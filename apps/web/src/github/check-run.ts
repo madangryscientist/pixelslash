@@ -1,4 +1,4 @@
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "#/db/db";
 import { type BuildCounts, countBuilds, emptyCounts } from "#/db/build-counts";
 import { builds, projects } from "#/db/schema";
@@ -6,6 +6,7 @@ import { warn } from "#/lib/log";
 import { reportError } from "#/server/sentry";
 import { GithubError, type GithubApp, type RepoName, isRepoName } from "./app";
 import { type SyncedBuild, detailsUrlOf, titleOf } from "./build-text";
+import { groupStatus, hasSubprojects } from "./group";
 import { syncPrComment } from "./pr-comment";
 
 /*
@@ -100,10 +101,12 @@ type BuildRow = SyncedBuild & {
   checkName: string;
   prNumber: number | null;
   comment: boolean;
+  /** The build's top-level project: its own, or a subproject's parent, whose repo and name it reports under. */
+  topProjectId: string;
 };
 
 async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
-  const [row] = await db
+  const [build] = await db
     .select({
       id: builds.id,
       projectId: builds.projectId,
@@ -112,29 +115,46 @@ async function loadBuild(db: Db, buildId: string): Promise<BuildRow | null> {
       commitSha: builds.commitSha,
       checkRunId: builds.checkRunId,
       prNumber: builds.prNumber,
-      repo: projects.githubRepo,
-      projectName: projects.name,
-      orgId: projects.orgId,
-      comment: projects.githubComment,
+      parentProjectId: projects.parentProjectId,
     })
     .from(builds)
     .innerJoin(projects, eq(projects.id, builds.projectId))
     .where(eq(builds.id, buildId));
+  if (!build) return null;
+  // A subproject's build reports under its parent: the parent's repo, name and status.
+  const { parentProjectId, ...rest } = build;
+  const topProjectId = parentProjectId ?? build.projectId;
+  const [top] = await db
+    .select({
+      repo: projects.githubRepo,
+      name: projects.name,
+      orgId: projects.orgId,
+      comment: projects.githubComment,
+    })
+    .from(projects)
+    .where(eq(projects.id, topProjectId));
   // A repo stored before it was checked is skipped, not sent to GitHub.
-  if (!row?.repo || !isRepoName(row.repo)) return null;
+  if (!top?.repo || !isRepoName(top.repo)) return null;
   // GitHub's owner and repo names ignore case, so `Acme/Web` and `acme/web` are one repo. Only the
-  // org's own projects count: another org linking the same repo must not rename this one's check.
+  // org's own top-level projects count: another org linking the same repo must not rename this one's.
   const [linked] = await db
     .select({ n: count() })
     .from(projects)
     .where(
       and(
-        eq(projects.orgId, row.orgId),
-        eq(sql`lower(${projects.githubRepo})`, row.repo.toLowerCase()),
+        eq(projects.orgId, top.orgId),
+        isNull(projects.parentProjectId),
+        eq(sql`lower(${projects.githubRepo})`, top.repo.toLowerCase()),
       ),
     );
-  const { projectName, orgId: _orgId, ...rest } = row;
-  return { ...rest, repo: row.repo, checkName: checkNameOf(projectName, linked?.n ?? 0) };
+  return {
+    ...rest,
+    repo: top.repo,
+    checkName: checkNameOf(top.name, linked?.n ?? 0),
+    // One PR comment edited by every subproject's build would show whichever synced last.
+    comment: top.comment && parentProjectId === null,
+    topProjectId,
+  };
 }
 
 async function bodyOf(deps: CheckRunDeps, row: BuildRow): Promise<CheckRunBody> {
@@ -144,7 +164,10 @@ async function bodyOf(deps: CheckRunDeps, row: BuildRow): Promise<CheckRunBody> 
 
 /** A commit status is a new entry on the commit, newest wins: there is no id to keep. */
 async function syncStatus(deps: CheckRunDeps, client: GithubApp, row: BuildRow): Promise<void> {
-  const status = statusOf(await bodyOf(deps, row));
+  // With subprojects, one status for the project and all of them, from each one's newest build.
+  const status = (await hasSubprojects(deps.db, row.topProjectId))
+    ? await groupStatus(deps, row)
+    : statusOf(await bodyOf(deps, row));
   await client.request(row.repo, "POST", `/repos/${row.repo}/statuses/${row.commitSha}`, status);
 }
 

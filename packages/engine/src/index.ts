@@ -113,6 +113,7 @@ export {
   type UploadProgress,
   type UploadResult,
 } from "./upload.ts";
+export { uploadSkipped, type SkippedOptions } from "./upload-skipped.ts";
 export type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 export type { FlakeRecord } from "./flake.ts";
 export {

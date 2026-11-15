@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { randomToken, sha256Hex } from "#/lib/crypto";
 import { type Db, NotFoundError } from "./db";
+import { refuseOnSubproject } from "./effective";
 import { getProject, requireMember } from "./orgs";
 import { ciTokens, members, projects, userTokens } from "./schema";
 import { orgTokens } from "./schema-org-tokens";
@@ -9,7 +10,8 @@ const PREFIX = "psci_";
 
 /** The plaintext is returned here and nowhere else; the table keeps its hash. */
 export async function issueCiToken(db: Db, userId: string, projectId: string, name: string) {
-  await getProject(db, userId, projectId);
+  // The parent's token uploads to its subprojects too, so a subproject has none of its own.
+  refuseOnSubproject(await getProject(db, userId, projectId), "CI tokens");
   const token = randomToken(PREFIX);
   const id = crypto.randomUUID();
   await db.insert(ciTokens).values({

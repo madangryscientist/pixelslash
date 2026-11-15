@@ -9,8 +9,10 @@ import {
   openKey,
   sealKey,
 } from "./model-key";
+import { refuseOnSubproject, topProjectId } from "./effective";
 import { getProject, requireMember } from "./orgs";
-import { members, orgModels, projectModels, projects } from "./schema";
+import { members, projects } from "./schema";
+import { orgModels, projectModels } from "./schema-models";
 
 /**
  * A project's own vision model (ob 1473), or its org's (ob 1789). The key is write-only:
@@ -54,13 +56,15 @@ export async function projectModelFor(
   projectId: string,
   secret: string | undefined,
 ): Promise<ProjectModel | null> {
-  const own = await storedModel(db, projectId);
-  if (own) return openModel(own, `project ${projectId}`, secret);
+  // A subproject's model is its parent's: the parent's own row, then the org's.
+  const owner = await modelOwnerOf(db, projectId);
+  const own = await storedModel(db, owner);
+  if (own) return openModel(own, `project ${owner}`, secret);
   const [org] = await db
     .select({ orgId: orgModels.orgId, ...MODEL_COLUMNS })
     .from(projects)
     .innerJoin(orgModels, eq(orgModels.orgId, projects.orgId))
-    .where(eq(projects.id, projectId));
+    .where(eq(projects.id, owner));
   return org ? openModel(org, `org ${org.orgId}`, secret) : null;
 }
 
@@ -83,6 +87,15 @@ async function openModel(
   }
 }
 
+/** The project whose `project_models` row a project uses: its parent for a subproject, else itself. */
+async function modelOwnerOf(db: Db, projectId: string): Promise<string> {
+  const [row] = await db
+    .select({ parentProjectId: projects.parentProjectId })
+    .from(projects)
+    .where(eq(projects.id, projectId));
+  return row?.parentProjectId ?? projectId;
+}
+
 /** The project's own row as stored: the key is sealed, or plain text from before ob 1786. */
 async function storedModel(db: Db, projectId: string) {
   const [row] = await db.select().from(projectModels).where(eq(projectModels.projectId, projectId));
@@ -95,7 +108,7 @@ export async function projectModelView(
   userId: string,
   projectId: string,
 ): Promise<ModelView | null> {
-  await getProject(db, userId, projectId);
+  const project = await getProject(db, userId, projectId);
   const [row] = await db
     .select({
       baseUrl: projectModels.baseUrl,
@@ -103,7 +116,7 @@ export async function projectModelView(
       autoPassNoise: projectModels.autoPassNoise,
     })
     .from(projectModels)
-    .where(eq(projectModels.projectId, projectId));
+    .where(eq(projectModels.projectId, topProjectId(project)));
   return row ? { ...row, keySet: true } : null;
 }
 
@@ -247,7 +260,7 @@ export async function setProjectModel(
   projectId: string,
   settings: ModelSettings,
 ): Promise<void> {
-  await getProject(db, userId, projectId);
+  refuseOnSubproject(await getProject(db, userId, projectId), "model");
   const fields = await fieldsToStore(await storedModel(db, projectId), settings);
   await db
     .insert(projectModels)
@@ -260,7 +273,7 @@ export async function setProjectModel(
  * one, and no model otherwise: no shot is sent anywhere the org did not name.
  */
 export async function clearProjectModel(db: Db, userId: string, projectId: string): Promise<void> {
-  await getProject(db, userId, projectId);
+  refuseOnSubproject(await getProject(db, userId, projectId), "model");
   await db.delete(projectModels).where(eq(projectModels.projectId, projectId));
 }
 

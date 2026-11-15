@@ -10,7 +10,7 @@ import {
   setProjectModel,
 } from "./models";
 import { NotFoundError } from "./db";
-import { projectModels } from "./schema";
+import { projectModels } from "./schema-models";
 import { TEST_MODEL_KEY_SECRET as SECRET } from "./test-db";
 import { signInGithubUser } from "./users";
 

@@ -5,6 +5,7 @@ import type { runFields } from "#/db/server-timings";
 import type { Db } from "#/db/db";
 import { type DiffLocation, builds, projects, snapshots } from "#/db/schema";
 import type { ProcessDeps } from "./process";
+import { effectiveDefaultBranch, parentJoin, parentProjects } from "#/db/effective";
 
 /**
  * What a diff run writes on a build as a whole, beside each shot's result: its removed markers, the
@@ -39,8 +40,10 @@ export type ProjectOfBuild = { defaultBranch: string; diffLocation: DiffLocation
 
 export async function projectOf(db: Db, build: Build): Promise<ProjectOfBuild> {
   const [project] = await db
-    .select({ defaultBranch: projects.defaultBranch, diffLocation: projects.diffLocation })
+    // A subproject's default branch is its parent's; its diff location is its own.
+    .select({ defaultBranch: effectiveDefaultBranch(), diffLocation: projects.diffLocation })
     .from(projects)
+    .leftJoin(parentProjects, parentJoin)
     .where(eq(projects.id, build.projectId));
   if (!project) throw new Error("the build's project is gone");
   return project;

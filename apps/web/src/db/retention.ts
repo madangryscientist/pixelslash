@@ -5,6 +5,7 @@ import { chunk, inChunks } from "./chunks";
 import type { Db } from "./db";
 import { heldShot } from "./markers";
 import { builds, flakes, projects, snapshots } from "./schema";
+import { effectiveDefaultBranch, parentJoin, parentProjects } from "./effective";
 
 /**
  * Retention (PS-239): a build older than the window, on a branch that is not its project's
@@ -68,7 +69,8 @@ async function candidatesOf(db: Db, { days, now }: RetentionOptions): Promise<Ca
     })
     .from(builds)
     .innerJoin(projects, eq(projects.id, builds.projectId))
-    .where(and(lt(builds.createdAt, cutoff), ne(builds.branch, projects.defaultBranch)))
+    .leftJoin(parentProjects, parentJoin)
+    .where(and(lt(builds.createdAt, cutoff), ne(builds.branch, effectiveDefaultBranch())))
     .orderBy(asc(builds.createdAt), asc(builds.id));
 }
 

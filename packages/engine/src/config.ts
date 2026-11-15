@@ -59,8 +59,14 @@ export type Route = {
 
 export type StartCommand = { command: string; readyUrl: string; timeoutMs: number };
 
-/** Where `upload` sends builds, the merge-base branch, and the project a personal token means. */
-export type UploadConfig = Record<"server" | "baseBranch" | "project", string | undefined>;
+/**
+ * Where `upload` sends builds, the merge-base branch, the project a personal token means, and the
+ * subproject of it the build goes to.
+ */
+export type UploadConfig = Record<
+  "server" | "baseBranch" | "project" | "subproject",
+  string | undefined
+>;
 
 export type CaptureConfig = {
   baseUrl: string;
@@ -238,14 +244,15 @@ function start(v: unknown, baseUrl: string): StartCommand | undefined {
 }
 
 function upload(v: unknown): UploadConfig {
-  if (v === undefined) return { server: undefined, baseBranch: undefined, project: undefined };
-  if (!isObj(v)) bad("upload", "must be { server?, baseBranch?, project? }");
+  if (v === undefined) return upload({});
+  if (!isObj(v)) bad("upload", "must be { server?, baseBranch?, project?, subproject? }");
   const server = v.server === undefined ? undefined : str(v.server, "upload.server");
   if (server !== undefined && !isHttpUrl(server)) bad("upload.server", "must be an http(s) URL");
   return {
     server,
     baseBranch: v.baseBranch === undefined ? undefined : str(v.baseBranch, "upload.baseBranch"),
     project: v.project === undefined ? undefined : str(v.project, "upload.project"),
+    subproject: v.subproject === undefined ? undefined : str(v.subproject, "upload.subproject"),
   };
 }
 

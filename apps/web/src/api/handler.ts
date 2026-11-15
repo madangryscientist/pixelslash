@@ -1,4 +1,5 @@
-import { type Actor, actorBuild, actorProject, actorUser } from "#/db/actor";
+import { type Actor, actorBuild, actorUser } from "#/db/actor";
+import { buildProject, projectIdOf, skippedBuild } from "./build-target";
 import { type Build, createBuild, finaliseBuild, putSnapshot } from "#/db/builds";
 import { putHeldSnapshots } from "#/db/held-snapshots";
 import type { Db } from "#/db/db";
@@ -69,20 +70,12 @@ async function jsonBody(request: Request): Promise<unknown> {
 
 type Ctx = ApiDeps & { actor: Actor; request: Request; timer: ServerTimer };
 
-/**
- * A CI token's build goes to its project; a personal or org token names one it can see in
- * `projectId`.
- */
-function projectIdOf(body: unknown, actor: Actor): string {
-  const named = object(body, "body").projectId;
-  if (named !== undefined && typeof named !== "string")
-    throw new BadRequest("projectId must be a string");
-  if (actor.kind === "ci") return named ?? actor.projectId;
-  if (!named)
-    throw new BadRequest(
-      `projectId is required with ${actor.kind === "org-ci" ? "an org" : "a personal"} token`,
-    );
-  return named;
+/** `skipped: true`: the build stands for a run that captured nothing on purpose. */
+function skippedOf(body: unknown): boolean {
+  const skipped = object(body, "body").skipped;
+  if (skipped !== undefined && typeof skipped !== "boolean")
+    throw new BadRequest("skipped must be a boolean");
+  return skipped === true;
 }
 
 /**
@@ -93,7 +86,13 @@ function projectIdOf(body: unknown, actor: Actor): string {
 async function startBuild(ctx: Ctx): Promise<Response> {
   const body = await jsonBody(ctx.request);
   const input = parseNewBuild(body);
-  const project = await actorProject(ctx.db, ctx.actor, projectIdOf(body, ctx.actor));
+  const project = await buildProject(ctx.db, ctx.actor, body);
+  if (skippedOf(body)) {
+    const made = await skippedBuild(ctx.db, project.id, input);
+    if (made.skipped && ctx.checkRuns)
+      await syncCheckRuns({ db: ctx.db, ...ctx.checkRuns }, [made.id]);
+    return json({ ...made, diffLocation: project.diffLocation }, made.skipped ? 201 : 200);
+  }
   if (project.diffLocation === "ci" && object(body, "body").clientDiff !== true)
     return fail(426, "this project diffs in CI; upgrade the CLI");
   const id = await createBuild(ctx.db, project.id, input);

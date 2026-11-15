@@ -782,7 +782,7 @@ pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wai
 pixelslash parity --build ID [--manifest PATH] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 pixelslash parity --release android|ios [--project ID|NAME] [--manifest PATH] [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash flakes [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
-pixelslash project create NAME [--org NAME] [--server URL] [--token-path PATH] [--config FILE] [--json]
+pixelslash project create NAME [--org NAME] [--parent PROJECT] [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash project list [--server URL] [--token-path PATH] [--config FILE] [--json]
 pixelslash flake ID [--runs N] [--out DIR] [--write | --suggest] [--resolve [--note TEXT]] [--json] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE]
 pixelslash mcp [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--base BRANCH] [--figma-token-path PATH]
@@ -800,7 +800,7 @@ pixelslash --version
 
 1. **Token:** `--token-path` (a file), else `PIXELSLASH_TOKEN` (CI), else the credential `login` stored for the resolved server.
 2. **Server:** `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`--config`, or a `pixelslash.config.*` in the working dir).
-3. **Project** (`builds`, `build latest`, `flakes`, `flake`, `upload` with a personal token): `--project` (an id, or a name the token sees once), else `upload.project` in the config, else the only project the token sees. More than one and none named is exit 2, listing them.
+3. **Project** (`builds`, `build latest`, `flakes`, `flake`, `upload` with a personal token): `--project` (an id, or a name the token sees once), else `upload.project` in the config, else the only project the token sees. More than one and none named is exit 2, listing them. `--project` names a top-level project only, and only top-level projects count for "the only one": a [subproject](#subprojects-one-project-several-kinds-of-shot) is named with `--subproject` under its project, and `--project` given a subproject is exit 2 with the flags that name it.
 
 **Exit codes.** They are a contract: CI reads them, and none changes meaning.
 
@@ -936,13 +936,15 @@ The same server drives [`pixelslash dev`](#feature-mode-pixelslash-dev), so an a
 Nothing leaves the machine unless you ask: `pixelslash upload` and `pixelslash capture --upload` are the only commands that send page shots to a PixelSlash server, and they send them only to the server you name. The one other way a shot leaves is a hosted judge model, which only a set `PIXELSLASH_OPENCODE_MODEL` turns on (see [The opencode judge](#the-opencode-judge)). The same CLI talks to the hosted app and to a self-hosted one.
 
 ```
-pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--concurrency N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]
-pixelslash capture [--config FILE] [--out DIR] [--concurrency N] --upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]
+pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--concurrency N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]
+pixelslash upload --skipped [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE]
+pixelslash capture [--config FILE] [--out DIR] [--concurrency N] --upload [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]
 ```
 
 - `DIR` is a snapshot dir: a `manifest.json` and the PNGs it names (what `capture` writes). An entry's [layout metrics file](metrics.md), when it has one, is sent with its PNG. The whole manifest and every PNG are checked before anything is sent, so a bad dir never opens a build on the server.
 - The token is a per-project CI token (`psci_…`, issued in the project's settings). An org token (`psorg_…`, issued under Organizations → Tokens) reaches every project of its org; like a personal token it names the project, but it never defaults to "the only one": with neither `--project` nor `upload.project` it is exit 2, naming both. A personal token (`psu_…`, issued under Settings → API tokens, with an optional 30-day, 90-day or 1-year expiry) acts as its user and reaches every project of that user's orgs; with one, `upload` names the project it opens the build in, resolved as in [Signing in](#signing-in-and-reading-builds) (`--project`, `upload.project`, or the only one the token sees). It comes from the file `--token-path` names, else `PIXELSLASH_TOKEN`, else the one `pixelslash login` stored for the server. Never put it in git.
-- The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main", "project": "web" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
+- The build goes to the project's subproject `--subproject NAME`, else `upload.subproject` in the config, else to the project itself ([Subprojects](#subprojects-one-project-several-kinds-of-shot)).
+- The server is `--server`, else `PIXELSLASH_SERVER`, else `upload.server` in the config (`"upload": { "server": "https://…", "baseBranch": "main", "project": "web", "subproject": "e2e" }`; `upload` finds a config without `--config` only if one sits in the working dir, and runs fine without one).
 - From the local git checkout it sends the commit, the branch, the **merge-base** with the base branch (`--base`, else `upload.baseBranch`, else `main`; `origin/<base>` is tried first) and up to **200 ancestor SHAs of the merge-base** (its first-parent history, nearest first; `git rev-list --first-parent`), so a project that nx or turbo "affected" skipped for many commits on main still finds its last build there. Without the base branch in the checkout (a shallow clone) it warns and sends no merge-base, and only HEAD's 20 nearest parents: check out full history in CI (`fetch-depth: 0`). The branch is `--branch`, else `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`, else the checked-out branch; a detached `HEAD` with none of those is a usage error. The PR number is `--pr`, else read from `GITHUB_REF` (`refs/pull/N/…`).
 - **A brief.** `--brief FILE` or `--brief-text "…"` sends your own words on what the build means to change (a PR body, a ticket's acceptance) with the build; giving both is exit 2. It is trimmed and at most 4000 characters: a longer one, or a missing file, is exit 2 before anything is sent. The CLI reads it from the file or the flag only; nothing fetches a PR body, a commit message or a ticket. It is stored on the build (`builds.brief`), never in the manifest or the local report, and capture, `check` and `compare` do not read it. The build and branch pages show it as plain text, labelled as the uploader's words, and the build's AI summary reads it (below). It decides nothing: status, counts, exit codes and the review are the pixels' alone. `capture --upload` sends none.
 - It opens a build, uploads each PNG, then finalises with the snapshot count and the run's [timings](#step-timings); the server diffs inside that request. Exit 0 on success. Exit 1 when the server refuses (wrong or revoked token, 4xx/5xx) or cannot be reached, and the last two stderr lines are then `nothing was uploaded` or `upload incomplete: <n>/<m> shots sent`, and `UPLOAD FAILED: <reason>`; the build is then left open on the server, unfinalised, and its snapshots are not counted. The message names the step (`open build`, `upload <snapshot>`, `finalize`) and the server's answer in one line. A request the API never answered (the connection failed, a 502/503/504, or a 5xx that is not the API's `{"error"}` JSON, such as `vite preview`'s proxy page) is tried again after 1, 2, 4, 8 and 15 s (30 s in all, six tries: a server restart is about 13 s), with a warning on stderr for each retry; an error the API itself answered is not retried. Every step is safe to repeat, and a repeated open at worst leaves an empty unfinalised build behind. A finalise whose answer is `processing` (a retry that met an earlier try's diff still running, or one the runtime killed) is exit 1: nothing has been measured yet. So is one whose answer is `errored` (`UPLOAD FAILED: build <id> errored on the server: <reason> (<build page>)`), after the CLI has finalised again while the server's unmeasured count kept falling. Exit 2 on a bad flag, a missing token or server, or a bad manifest. Re-running makes a new build.
@@ -1130,6 +1132,29 @@ done
 - An upload never creates a project. A name the org does not have is exit 2 naming it (and `project create NAME`), so a typo makes no stray project.
 - An org token reaches the projects of its org and nothing else: another org's project is a 404. Per-project `psci_` tokens keep working as before.
 
+### Subprojects: one project, several kinds of shot
+
+A project may hold **subprojects**: a product's own shots in the project, its end-to-end shots in an `e2e` subproject, its stories in `storybook`. Each subproject has its own builds, baselines, review, thresholds, ignore boxes, flakes and diff location, so one kind of shot is never compared with another. Everything about the repo is the parent's: the GitHub repo and the PR comment switch, the default branch (a build on it is auto-accepted in every subproject), the AI model, and the CI tokens. A project with no subprojects works as it always did; give it subprojects only when it has more than one kind of shot to keep apart. Depth is two: a subproject has no subprojects.
+
+```sh
+pixelslash project create e2e --parent web       # an org or personal token; idempotent, as for a project
+pixelslash capture --config e2e.config.ts --out snapshots/e2e
+pixelslash upload snapshots/e2e --subproject e2e  # the project's own psci_ token reaches its subprojects
+```
+
+- **Tokens.** The project's CI token (`psci_…`) uploads to the project and to each of its subprojects; a subproject has no token of its own. An org or personal token names the project with `--project` and the subproject with `--subproject`, or the subproject's id as `projectId` in the API.
+- **No subproject named, no subproject used.** An upload without `--subproject` (or `upload.subproject`) goes to the project itself, with its own baselines, as before. An upload never creates a subproject: an unknown name is exit 1, the server's `unknown_subproject`.
+- **One PixelSlash status per project.** A pull request shows one PixelSlash status for the project and all its subprojects together, from the newest build on that commit of the project and of each subproject. It is a failure when any of them failed or errored, pending while any is still diffed or has a change waiting for review, and a success when all of them passed. Its description is the one-line total (`3 changes to review in 2 subprojects`), and its Details link opens the one build that counted, or the project's page, which lists its subprojects. A subproject whose capture a task cache skipped uploads nothing on that commit and does not hold the status; its baselines are untouched. The status may move after it first goes green, when a later subproject's upload arrives. A subproject's build posts no PR comment; the project's own build comments as before.
+- **Nothing ran at all.** When the cache skipped every capture, no build exists and a required status would wait forever. Run `pixelslash upload --skipped` instead: it takes no DIR, records a passed build with no shots on the project (or `--subproject`), and changes no baseline, so the commit gets its status. A commit the project (or subproject) already built keeps that build (one still `uploading`, from an upload that died, does not count): a rerun whose cache skips the capture never hides what the first run found, and the command says nothing was recorded:
+
+```sh
+if [ -d snapshots/e2e ]; then
+  pixelslash upload snapshots/e2e --subproject e2e
+else
+  pixelslash upload --skipped --subproject e2e     # the capture task was cached
+fi
+```
+
 ### Check before you push
 
 `pixelslash check` measures this checkout against the baselines the server would pick for it, and uploads nothing. It is `capture`, then the server's pick, then `compare`, all on this machine:
@@ -1197,7 +1222,7 @@ curl -H "Authorization: Bearer $PIXELSLASH_TOKEN" "$PIXELSLASH_SERVER/api/v1/me"
 
 Send the token as `Authorization: Bearer <token>`. There are three kinds:
 
-- A **CI token** (`psci_…`) reaches its one project.
+- A **CI token** (`psci_…`) reaches its one project and that project's subprojects. A subproject has no CI token of its own.
 - An **org token** (`psorg_…`, issued by any member under Organizations → Tokens) reaches every project of its org and nothing else. It names the project in the request, as a personal token does, and can create one by name (`POST /api/v1/projects`). An upload never creates a project: an unknown project is a 404.
 - A **personal token** (`psu_…`) acts as its user and reaches every project of that user's orgs.
 - A project, build or snapshot the token cannot reach is a **404**, never a 403, so a 404 does not tell you whether the id exists.
@@ -1207,15 +1232,15 @@ Send the token as `Authorization: Bearer <token>`. There are three kinds:
 | Request | Auth | Query or body | Reply |
 | --- | --- | --- | --- |
 | `GET /api/v1/me` | CI, org or personal | n/a | `200 { kind: "user", user: { id, login, name } }`, `200 { kind: "ci", projectId }` or `200 { kind: "org-ci", orgId }` |
-| `POST /api/v1/builds` | CI, org or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤200, more is a 400), prNumber?, projectId?, clientDiff?, brief? }`; `brief` is trimmed and at most 4000 characters (422 otherwise); `projectId` is required with a personal or org token; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }` |
+| `POST /api/v1/builds` | CI, org or personal | JSON `{ commitSha, branch, mergeBaseSha?, ancestorShas? (≤200, more is a 400), prNumber?, projectId?, clientDiff?, brief? }`; `brief` is trimmed and at most 4000 characters (422 otherwise); `projectId` is required with a personal or org token, and may name a subproject; `subproject?` names a subproject of that project (or of the CI token's) to open the build in, and an unknown one is a 404 with `code: "unknown_subproject"` (no build is made, and an upload never makes a subproject); `skipped?: true` records a run that captured nothing on purpose, a build that is `passed` at once with no shots and never a baseline, which needs no snapshots or finalize, unless that project already has a build at `commitSha` past `uploading`, which is then returned as it is; a `ci` project needs `clientDiff: true` (426 otherwise) | `201 { id, diffLocation }`, and with `skipped`, `201 { id, status: "passed", skipped: true, diffLocation }`, or `200 { id, status, skipped: false, diffLocation }` for the build already at the commit |
 | `POST /api/v1/builds/:id/baselines` | CI, org or personal | JSON `{ keys: [{ name, platform, browser, viewport, theme }] }` (≤2000) | `200 { diff_location, baselines: [pick] }`, one per key, in order |
 | `POST /api/v1/baselines` | CI, org or personal | JSON `{ keys, commitSha, branch, mergeBaseSha?, ancestorShas?, projectId? }`: the pick a build at this commit would get now; creates nothing | `200 { diff_location, baselines: [pick], removed: [{ name, platform, browser, viewport, theme }] }`: `removed` is what the baseline build holds and no key asked about |
 | `POST /api/v1/builds/:id/known` | CI, org or personal | JSON `{ sha256: [hex, …] }`: the sha256 of PNGs the client holds, 64 lowercase hex characters each, at most 1000 (more, or a malformed hash, is a 400); an upload endpoint, so its errors are `{ "error": "message" }` | `200 { known: [hex, …] }`: the hashes asked for that a snapshot of the build's **project** holds, in a build that is no longer `uploading`, in the order asked and each once. Another project's or another org's PNG is never named |
 | `POST /api/v1/builds/:id/snapshots/batch` | CI, org or personal | JSON `{ snapshots: [meta, …] }`, at most 1000 (more is a 400): each `meta` is the `PUT` snapshot's `meta` with `sha256` required (64 lowercase hex characters), so a shot is stored with an image a finished build of the project already holds. One invalid item is a 400 for the whole request, naming the item (`snapshots[3]: …`), and nothing is written. An item with a `flake` or `ci` member is invalid: a shot with a flake record or CI results goes by its own `PUT`. An upload endpoint, so its errors are `{ "error": "message" }`; a build that is no longer `uploading` is a 409 | `200 { stored, missing: [hex, …] }`: `stored` is how many shots were written, `missing` the hashes the project no longer holds, whose shots were not stored: send each with the `PUT` and its `file`. Every other shot is stored as the `PUT` stores it by hash (same row, same flake label), and a shot sent again replaces the earlier one |
 | `PUT /api/v1/builds/:id/snapshots` | CI, org or personal | multipart: `meta` (JSON `{ name, platform, browser, viewport, theme, tags, diff?, ignore?, fingerprint, flaky?, ci?, flake?, changeNote?, composition?, a11y?, sha256? }`), `file` (PNG, ≤32 MiB; **or** `meta.sha256` with no `file`, which stores the shot with the image a finished build of the project already holds: every other part is stored as for a shot sent with its file, and no PNG is written. A hash the project does not hold is a `409` with `code: "image_unknown"`; send the shot with its `file`. A `sha256` sent beside a `file` is ignored: the server hashes the bytes it received); in a `ci` project, one `diff:<baselineId>` mask PNG per result in `ci`; for a flaky shot, one `flake:<run>` PNG per re-capture (≤32 MiB each, counted in the request's size cap); optional `metrics`, the shot's [layout metrics file](metrics.md) (JSON, ≤1 MiB; a malformed or oversize one is a 400 naming the field) | `200 { id }` |
 | `POST /api/v1/builds/:id/finalize` | CI, org or personal | JSON `{ snapshots: N, timings? }`: `timings` is the CLI's [step timings](#step-timings), optional and stored as sent when well formed | `200 { id, status, error, unmeasured, web_url }`: `web_url` is the build's page in the web app, which the CLI prints when it fails an upload on an `errored` build |
-| `GET /api/v1/projects` | CI, org or personal | n/a | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; an org token's org's; a CI token's one project |
-| `POST /api/v1/projects` | org or personal | JSON `{ name, org? }`: `name` is 1 to 100 characters; `org` (an id or exact name) is needed only when a personal token belongs to several orgs, and an org token's is its own | `201 { …project, created: true }` for a new project, `200 { …project, created: false }` for the one of that name already in the org (idempotent). A project's `ci` token is a 403; an unknown `org` a 404 |
+| `GET /api/v1/projects` | CI, org or personal | n/a | `200 { projects: [project], next_cursor: null }`: a personal token's projects, ordered by org then name; an org token's org's; a CI token's project and its subprojects. Each row's `parent_project_id` is the top-level project a subproject belongs to, `null` for a top-level project |
+| `POST /api/v1/projects` | org or personal | JSON `{ name, org?, parent? }`: `name` is 1 to 100 characters; `org` (an id or exact name) is needed only when a personal token belongs to several orgs, and an org token's is its own; `parent` (an id, or the exact name of a top-level project in the org) makes the project a subproject of it, named uniquely under it. A subproject as `parent` is a 400 (depth is two); an unknown one a 404 | `201 { …project, created: true }` for a new project, `200 { …project, created: false }` for the one of that name already in the org (idempotent). A project's `ci` token is a 403; an unknown `org` a 404 |
 | `GET /api/v1/projects/:id/builds` | CI, org or personal | `branch?`, `status?` (`uploading`, `processing`, `changes`, `passed`, `failed`, `errored`), `limit?`, `cursor?` | `200 { builds: [build], next_cursor }`, newest first |
 | `GET /api/v1/builds/:id` | CI, org or personal | n/a | `200 { build: { …build, snapshots: [snapshot], twins? } }`, snapshots in review order. A snapshot also carries `device` (the device label of a native shot, else `null`) and `scale` (its device pixel ratio, else `null`). `twins` pairs the build's shots with the same name and theme on another platform ([Twins](#twins-across-platforms)); it is **absent** unless a second platform is in play, so a web-only build's reply is unchanged |
 | `GET /api/v1/builds/:id/parity` | CI, org or personal | `name`, `theme` (both required) | `200 { name, theme, columns, metrics, web_url }`: the [parity view](#parity-view) of one snapshot key of the build; 400 without `name` and `theme`, 404 when the build holds no shot under the key |
@@ -1229,7 +1254,7 @@ Send the token as `Authorization: Bearer <token>`. There are three kinds:
 
 There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), linking a twin project (`PUT /api/v1/projects/:id/twin`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
-**The upload endpoints** (`me`, `builds`, `known`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`. The one error a client acts on beside its status also carries a `code` next to the message: `image_unknown` (a `409` on a snapshot sent by hash, above). A client that ignores `code` reads the same answer as before.
+**The upload endpoints** (`me`, `builds`, `known`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`. The errors a client acts on beside their status also carry a `code` next to the message: `image_unknown` (a `409` on a snapshot sent by hash, above) and `unknown_subproject` (a `404` on `POST /api/v1/builds` whose `subproject` names none). A client that ignores `code` reads the same answer as before.
 
 **The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `flakes`, `baselines`), resolving a flake and marking a flag exported use snake_case keys, and every reply carries `"api_version": 1`. An error is:
 
@@ -1240,9 +1265,11 @@ There are no write endpoints besides the four upload ones, creating a project by
 | Status | `code` | When |
 | --- | --- | --- |
 | 400 | `bad_request` | a bad `status`, `limit` or `cursor`, or a `twin_project_id` that is not a project of the same org |
+| 400 | `inherited_from_parent` | a write of a setting a subproject reads from its parent (repo, PR comment switch, default branch, model, CI tokens) |
 | 401 | `unauthorized` | a missing, wrong, expired or revoked token |
 | 403 | `forbidden` | a CI or org token resolving a flake, marking a flag exported or linking a twin project (only a person does) |
 | 404 | `not_found` | an unknown path, or an id the token cannot reach |
+| 404 | `unknown_subproject` | `POST /api/v1/builds` with a `subproject` the project does not have |
 | 405 | `method_not_allowed` | a path that exists, with another method |
 | 426 | `cli_outdated` | the CLI is older than the server takes (below) |
 | 429 | `rate_limited` | too many requests from one token (or, for a refused token, one IP); wait and retry (below) |
@@ -1265,6 +1292,8 @@ A **project**:
   "name": "web",
   "org": { "id": "…", "name": "Acme" },
   "default_branch": "main",
+  "twin_project_id": null,
+  "parent_project_id": null,
   "created_at": "2026-10-22T09:00:00.000Z",
   "web_url": "https://<server>/projects/…"
 }
