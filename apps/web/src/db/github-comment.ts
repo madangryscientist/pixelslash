@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "./db";
+import { refuseOnSubproject } from "./effective";
 import { getProject } from "./orgs";
 import { projects } from "./schema";
 
@@ -10,6 +11,6 @@ export async function setGithubComment(
   projectId: string,
   githubComment: boolean,
 ): Promise<void> {
-  await getProject(db, userId, projectId);
+  refuseOnSubproject(await getProject(db, userId, projectId), "PR comment switch");
   await db.update(projects).set({ githubComment }).where(eq(projects.id, projectId));
 }

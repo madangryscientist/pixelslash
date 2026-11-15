@@ -32,6 +32,8 @@ export type UploadOptions = {
   git: Omit<GitOptions, "env" | "warn">;
   /** The project to open the build in: required with a personal token, which reaches several. */
   projectId?: string | undefined;
+  /** The subproject of that project to open the build in, by name; none opens it in the project. */
+  subproject?: string | undefined;
   /**
    * How many more times a shot that differs from its baseline is captured (ob 1737); 0 turns it
    * off. Default 2. It needs `recapture`: without one nothing is captured again.
@@ -169,9 +171,9 @@ type OpenBuild = {
 async function openBuild(
   client: Client,
   ctx: GitContext,
-  projectId: string | undefined,
-  brief: string | undefined,
+  opts: Pick<UploadOptions, "projectId" | "subproject" | "brief">,
 ): Promise<OpenBuild> {
+  const { projectId, subproject, brief } = opts;
   const body = await send(client, {
     step: "open build",
     method: "POST",
@@ -179,6 +181,7 @@ async function openBuild(
     body: JSON.stringify({
       ...ctx,
       ...(projectId ? { projectId } : {}),
+      ...(subproject ? { subproject } : {}),
       ...(brief ? { brief } : {}),
       clientDiff: true,
     }),
@@ -226,7 +229,7 @@ export async function uploadSnapshots(
     sleep: deps.sleep ?? ((ms) => Bun.sleep(ms)),
     onRequest: (step, ms, server) => log.record(step, ms, server),
   };
-  const { id, diffLocation } = await openBuild(client, ctx, opts.projectId, opts.brief);
+  const { id, diffLocation } = await openBuild(client, ctx, opts);
   progress.opened = true;
   progress.buildId = id;
   // A server from before ob 1727 has no baselines endpoint and diffs every build itself.

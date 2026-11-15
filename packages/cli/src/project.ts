@@ -10,20 +10,21 @@ import type { Io } from "./run.ts";
  */
 
 const REMOTE = "[--server URL] [--token-path PATH] [--config FILE]";
-export const PROJECT_USAGE = `pixelslash project create NAME [--org NAME] ${REMOTE} [--json]\nMakes the project NAME in the token's org, or says it already exists; running it twice is fine. Exit 0 either way, 1 when the server refuses, 2 on a usage error. An org token (psorg_…) creates in its own org; a personal token in its only org, else --org says which.\npixelslash project list ${REMOTE} [--json]\nThe projects the token reaches.`;
+export const PROJECT_USAGE = `pixelslash project create NAME [--org NAME] [--parent PROJECT] ${REMOTE} [--json]\nMakes the project NAME in the token's org, or says it already exists; running it twice is fine. With --parent (a top-level project's id or name), NAME is a subproject of it: its own builds and review, its parent's repo, default branch, model and CI tokens. Exit 0 either way, 1 when the server refuses, 2 on a usage error. An org token (psorg_…) creates in its own org; a personal token in its only org, else --org says which.\npixelslash project list ${REMOTE} [--json]\nThe projects the token reaches.`;
 
 /** `project create`: a refusal by the server is exit 1, as it is for `upload`. */
 async function create(rest: string[], io: Io, deps: RemoteDeps): Promise<number> {
   const [name, ...more] = rest;
   if (!name || name.startsWith("--")) throw new UsageError("need a project NAME");
   const { json, rest: pairs } = takeJson(more);
-  const flags = readFlagPairs(pairs, [...REMOTE_FLAGS, "org"]);
+  const flags = readFlagPairs(pairs, [...REMOTE_FLAGS, "org", "parent"]);
   const remote = await connect(flags, deps);
   let reply;
   try {
     reply = await remote.client.post("/api/v1/projects", {
       name,
       ...(flags.org !== undefined && { org: flags.org }),
+      ...(flags.parent !== undefined && { parent: flags.parent }),
     });
   } catch (e) {
     if (e instanceof RemoteError) throw new UploadError(e.message);
@@ -50,7 +51,13 @@ async function list(rest: string[], io: Io, deps: RemoteDeps): Promise<number> {
   }
   const projects = await listProjects(remote.client);
   if (projects.length === 0) io.stdout.write("no projects\n");
-  for (const p of projects) io.stdout.write(`${p.name} (${p.org}) ${p.id}\n`);
+  const names = new Map(projects.map((p) => [p.id, p.name]));
+  for (const p of projects) {
+    // A subproject is shown under its parent's name, as `--project P --subproject S` names it.
+    const name =
+      p.parentId === null ? p.name : `${names.get(p.parentId) ?? p.parentId} / ${p.name}`;
+    io.stdout.write(`${name} (${p.org}) ${p.id}\n`);
+  }
   return 0;
 }
 

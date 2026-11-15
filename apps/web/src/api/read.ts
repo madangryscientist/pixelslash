@@ -219,6 +219,8 @@ export function projectOf(ctx: ReadCtx, p: Awaited<ReturnType<typeof actorProjec
     default_branch: p.defaultBranch,
     // The project whose shots this one's are paired with (PS-295); null when none is linked.
     twin_project_id: p.twinProjectId,
+    // The top-level project this one is a subproject of; null for a top-level project.
+    parent_project_id: p.parentId,
     created_at: iso(p.createdAt),
     web_url: `${ctx.origin}/projects/${p.id}`,
   };

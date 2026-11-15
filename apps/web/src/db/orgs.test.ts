@@ -44,7 +44,7 @@ describe("org isolation", () => {
     const project = await createProject(db, alice.id, org.id, "web");
 
     expect(await getProjectWithOrg(db, alice.id, project.id)).toEqual({
-      project,
+      project: { ...project, parent: null },
       org: { id: org.id, name: "Acme" },
     });
     await expect(getProjectWithOrg(db, bob.id, project.id)).rejects.toThrow(NotFoundError);
@@ -61,7 +61,10 @@ describe("org isolation", () => {
 
     expect(await getProject(db, carol.id, project.id)).toEqual(project);
     expect(await listOrgs(db, carol.id)).toEqual([
-      expect.objectContaining({ id: org.id, projects: [{ ...project, latest: null }] }),
+      expect.objectContaining({
+        id: org.id,
+        projects: [{ ...project, latest: null, parentName: null }],
+      }),
     ]);
   });
 

@@ -2,6 +2,7 @@ import { and, eq, inArray, ne } from "drizzle-orm";
 import { inChunks } from "./chunks";
 import type { Db } from "./db";
 import { builds, projects, snapshots, users } from "./schema";
+import { effectiveDefaultBranch, parentJoin, parentProjects } from "./effective";
 
 /**
  * Where an unchanged shot's difference from the default branch was decided (ob 1722). Since 1712 a
@@ -78,8 +79,9 @@ const approves = (link: Link) =>
 
 async function defaultBranchOf(db: Db, projectId: string): Promise<string | undefined> {
   const [project] = await db
-    .select({ defaultBranch: projects.defaultBranch })
+    .select({ defaultBranch: effectiveDefaultBranch() })
     .from(projects)
+    .leftJoin(parentProjects, parentJoin)
     .where(eq(projects.id, projectId));
   return project?.defaultBranch;
 }

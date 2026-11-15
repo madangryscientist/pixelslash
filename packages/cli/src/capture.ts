@@ -30,7 +30,7 @@ type SnapshotResult = Awaited<ReturnType<typeof captureInto>>;
 type TimedSnapshotResult = SnapshotResult & { timings: Timings };
 
 export const CAPTURE_USAGE =
-  "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--concurrency N] [--json] | [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
+  "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--concurrency N] [--json] | [--upload [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
 
 type CaptureFlags = {
   out: string;
@@ -59,7 +59,7 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
   const { config: _config, ...uploadOnly } = uploadFlags;
   if (!upload && (judge || Object.keys(uploadOnly).length > 0))
     throw new UsageError(
-      "--server, --token-path, --base, --branch, --pr, --flake-retries and --judge need --upload",
+      "--server, --token-path, --project, --subproject, --base, --branch, --pr, --flake-retries and --judge need --upload",
     );
   // A partial build would tell the server the other routes were removed.
   if (upload && (only || json)) throw new UsageError("--only and --json do not go with --upload");

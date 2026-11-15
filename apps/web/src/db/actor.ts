@@ -1,6 +1,7 @@
-import { type SQL, and, asc, eq, inArray, sql } from "drizzle-orm";
+import { type SQL, and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Build } from "./builds";
 import { type Db, NotFoundError } from "./db";
+import { effectiveDefaultBranch, effectiveProject, parentJoin, parentProjects } from "./effective";
 import type { Project } from "./orgs";
 import { type DiffLocation, builds, members, orgs, projects, snapshots, users } from "./schema";
 
@@ -16,7 +17,11 @@ export type Actor =
 
 /** The projects the actor may reach, as a condition on `projects`. Anything else is a 404. */
 function visible(db: Db, actor: Actor): SQL {
-  if (actor.kind === "ci") return eq(projects.id, actor.projectId);
+  // A CI token's project includes its subprojects (a token is never made for a subproject).
+  if (actor.kind === "ci")
+    return (
+      or(eq(projects.id, actor.projectId), eq(projects.parentProjectId, actor.projectId)) ?? sql`0`
+    );
   if (actor.kind === "org-ci") return eq(projects.orgId, actor.orgId);
   const orgIds = db
     .select({ orgId: members.orgId })
@@ -31,7 +36,7 @@ export async function actorProject(db: Db, actor: Actor, projectId: string): Pro
     .from(projects)
     .where(and(eq(projects.id, projectId), visible(db, actor)));
   if (!row) throw new NotFoundError("project");
-  return row;
+  return effectiveProject(db, row);
 }
 
 /** A build of a project the actor may reach, with the org its blobs live under. */
@@ -78,13 +83,15 @@ export async function actorProjects(db: Db, actor: Actor) {
     .select({
       id: projects.id,
       name: projects.name,
-      defaultBranch: projects.defaultBranch,
+      defaultBranch: effectiveDefaultBranch(),
       twinProjectId: projects.twinProjectId,
+      parentId: projects.parentProjectId,
       createdAt: projects.createdAt,
       org: { id: orgs.id, name: orgs.name },
     })
     .from(projects)
     .innerJoin(orgs, eq(orgs.id, projects.orgId))
+    .leftJoin(parentProjects, parentJoin)
     .where(visible(db, actor))
     .orderBy(asc(sql`lower(${orgs.name})`), asc(sql`lower(${projects.name})`), asc(projects.id));
 }

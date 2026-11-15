@@ -12,7 +12,6 @@ import {
   type UploadProgress,
   type UploadResult,
   UsageError,
-  briefTooLong,
   defaultConcurrency,
   findConfigIfAny,
   fontSetHash,
@@ -21,7 +20,6 @@ import {
   openCaptureSession,
   recapture,
   timingLine,
-  trimBrief,
   uploadSnapshots,
   type UploadDeps,
   type DevJudgeDeps,
@@ -33,11 +31,13 @@ import { ESCALATE, enterStage, uploadLine, uploadProgress } from "./failure.ts";
 import { connect, namesProject, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
 import { type WaitOptions, follow, recordBuild, waitOptions } from "./status.ts";
+import { uploadSkippedRun } from "./upload-skipped.ts";
+import { readBrief } from "./upload-brief.ts";
 
 export const UPLOAD_USAGE =
-  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--concurrency N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]\n`--brief FILE` or `--brief-text TEXT` sends your own words on what the build means to change (at most " +
+  "pixelslash upload DIR [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--brief FILE | --brief-text TEXT] [--config FILE] [--flake-retries N] [--concurrency N] [--judge] [--wait [--timeout DURATION] [--interval DURATION]]\n`--brief FILE` or `--brief-text TEXT` sends your own words on what the build means to change (at most " +
   BRIEF_LIMIT +
-  " characters); the build's AI summary says whether the changes match it, and it decides nothing.\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes, up to --concurrency (else `concurrency` in the config) at a time.\nA failed upload ends on `UPLOAD FAILED: <reason>` and prints no build link, except that a build the server `errored` names its page in the reason. " +
+  " characters); the build's AI summary says whether the changes match it, and it decides nothing.\n`--judge` has the local vision model write one sentence per changed shot, shown on the build and branch pages; it decides nothing. With no judge it prints `skip: no judge`.\n`--wait` then waits for review as `pixelslash status --wait` does, and exits as it does.\nThe token is --token-path, PIXELSLASH_TOKEN, or the one `pixelslash login` stored. The server is --server, PIXELSLASH_SERVER, or `upload.server` in the config.\nA shot that differs from its baseline is captured again --flake-retries times (else `flake.retries` in the config, else 2; 0 turns it off), through the config's routes, up to --concurrency (else `concurrency` in the config) at a time.\n`--subproject NAME` (else `upload.subproject` in the config) sends the build to that subproject of the project; `--project` names a top-level project only.\npixelslash upload --skipped [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--config FILE] records that this commit captured nothing on purpose (a task cache skipped the capture): a passed build with no shots, so the commit still gets its PixelSlash status. It takes no DIR and changes no baseline.\nA failed upload ends on `UPLOAD FAILED: <reason>` and prints no build link, except that a build the server `errored` names its page in the reason. " +
   ESCALATE;
 
 /** The flags `upload` and `capture --upload` share. */
@@ -45,6 +45,7 @@ export const UPLOAD_FLAGS = [
   "server",
   "token-path",
   "project",
+  "subproject",
   "base",
   "branch",
   "pr",
@@ -73,21 +74,33 @@ function judgeDeps(flags: UploadFlags, io: Io, deps: UploadDeps & DevJudgeDeps):
   return { ...deps, describe };
 }
 
-type Target = { server: string; token: string; baseBranch: string; projectId?: string };
+type Target = {
+  server: string;
+  token: string;
+  baseBranch: string;
+  projectId?: string;
+  /** `--subproject`, else `upload.subproject` in the config: the build goes to that subproject. */
+  subproject?: string | undefined;
+};
 
 /**
  * Where to send and as whom, resolved as every remote command does. A personal or org token
  * reaches several projects, so it also names one; a CI token's project is its own.
  */
-async function resolveTarget(flags: UploadFlags, deps: UploadDeps, cwd: string): Promise<Target> {
+export async function resolveTarget(
+  flags: UploadFlags,
+  deps: UploadDeps,
+  cwd: string,
+): Promise<Target> {
   const remote = await connect(flags, { ...deps, cwd });
   const { server } = remote.client;
   const { token } = remote;
   const baseBranch = flags.base ?? remote.upload?.baseBranch ?? "main";
-  if (!namesProject(token)) return { server, token, baseBranch };
+  const subproject = flags.subproject ?? remote.upload?.subproject;
+  if (!namesProject(token)) return { server, token, baseBranch, subproject };
   try {
     const project = await resolveProject(remote, flags.project);
-    return { server, token, baseBranch, projectId: project.id };
+    return { server, token, baseBranch, projectId: project.id, subproject };
   } catch (e) {
     // `upload` keeps exit 1 for a server that refused it, whichever request it refused.
     if (e instanceof RemoteError) throw new UploadError(e.message);
@@ -181,7 +194,7 @@ const FAILED_UPLOADS = new WeakSet<Error>();
  * A refused or failed upload ends on `UPLOAD FAILED: <reason>`, after what reached the server
  * (PS-223): the last lines a runner sees are never a link. The exit code is the error's own.
  */
-function failedUpload(e: unknown, progress: UploadProgress): unknown {
+export function failedUpload(e: unknown, progress: UploadProgress): unknown {
   if (!(e instanceof UploadError || e instanceof RemoteError)) return e;
   const reason = e.message.replace(/^upload failed: /, "");
   const message = `${uploadLine(progress)}\nUPLOAD FAILED: ${reason}`;
@@ -266,6 +279,7 @@ export async function uploadDir(
           server: target.server,
           token: target.token,
           projectId: target.projectId,
+          subproject: target.subproject,
           flakeRetries: retries ?? own?.retries ?? DEFAULT_FLAKE_RETRIES,
           timings,
           brief: flags.brief,
@@ -307,35 +321,18 @@ export async function uploadDir(
   return follow({ remote, id, wait: flags.wait, json: false }, io, deps);
 }
 
-/**
- * `--brief FILE` or `--brief-text TEXT`, trimmed: the author's words, refused here when over the
- * limit, so no build is opened for a brief the server would refuse. Undefined when neither is given.
- */
-async function readBrief(
-  file: string | undefined,
-  given: string | undefined,
-  cwd: string,
-): Promise<string | undefined> {
-  if (file !== undefined && given !== undefined)
-    throw new UsageError("give --brief FILE or --brief-text TEXT, not both");
-  let raw = given;
-  if (file !== undefined) {
-    const at = Bun.file(resolve(cwd, file));
-    if (!(await at.exists())) throw new UsageError(`--brief: no such file: ${file}`);
-    raw = await at.text();
-  }
-  if (raw === undefined) return undefined;
-  const brief = trimBrief(raw);
-  if (brief && brief.length > BRIEF_LIMIT) throw new UsageError(briefTooLong(brief.length));
-  return brief ?? undefined;
-}
-
-/** `pixelslash upload DIR`. */
+/** `pixelslash upload DIR`, or `pixelslash upload --skipped`. */
 export async function runUpload(
   argv: string[],
   io: Io,
   deps: UploadDeps & DevJudgeDeps = {},
 ): Promise<number> {
+  if (argv.includes("--skipped"))
+    return uploadSkippedRun(
+      argv.filter((a) => a !== "--skipped"),
+      io,
+      deps,
+    );
   const [dir, ...rest] = argv;
   if (!dir || dir.startsWith("--")) throw new UsageError("need a snapshot DIR");
   const {
