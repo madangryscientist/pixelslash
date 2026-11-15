@@ -250,23 +250,22 @@ export function ViewerBar({
             <ShotTitle snapshot={snapshot} label={label} />
           </ClusterGrow>
           <MetaList nowrap separator="none" data-testid="shot-meta">
-            {[
-              ...shotMeta(build, snapshot, label),
-              <Text key="review" data-testid="review-position" tone="muted" numeric>
-                {reviewText(review)}
-              </Text>,
-              <Text key="position" data-testid="position" tone="muted" numeric>
-                {`shot ${position} of ${total}`}
-              </Text>,
-              // The date is the first thing a narrow row gives up: below xl the title keeps the room.
-              // It goes last, so the empty item it leaves below xl adds no gap between the others.
-              snapshot.reviewedAt ? (
-                <div key="date" className="hidden xl:block">
-                  <Text tone="muted">{formatDateTime(snapshot.reviewedAt)}</Text>
-                </div>
-              ) : null,
-            ]}
+            {shotMeta(build, snapshot, label)}
+            <Text data-testid="review-position" tone="muted" numeric>
+              {reviewText(review)}
+            </Text>
+            <Text data-testid="position" tone="muted" numeric>
+              {`shot ${position} of ${total}`}
+            </Text>
           </MetaList>
+          {/* The date is the first thing a narrow row gives up: below xl the title keeps the room. It
+              sits outside the MetaList, whose item would keep a gap (and could wrap onto a row of
+              its own) when the date is hidden. */}
+          {snapshot.reviewedAt && (
+            <div className="hidden xl:block">
+              <Text tone="muted">{formatDateTime(snapshot.reviewedAt)}</Text>
+            </div>
+          )}
         </Cluster>
         <Cluster justify="end">
           <Actions actions={actions} canDecide={reviewable && !busy} why={why} />
