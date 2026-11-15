@@ -13,6 +13,7 @@ For a bug, open an issue with the version, the command and the `report.html` it 
 anything bigger than a fix, open an issue first so we can agree on it before you build it. The
 [capability matrix](docs/capabilities/matrix.html) and the [CLI reference](docs/cli.md) say what
 PixelSlash does today; a change that moves either updates it in the same pull request.
+A feature issue can name the [persona](docs/personas.md) it is for.
 
 ## The gate
 
