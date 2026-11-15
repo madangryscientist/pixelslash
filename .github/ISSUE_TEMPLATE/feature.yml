@@ -13,7 +13,7 @@ body:
     id: proposal
     attributes:
       label: What you would like
-      description: The behaviour you expect, for example a flag, a report change or an API field. `docs/cli.md` is the contract, and changes to `/api/v1` are additive only.
+      description: The behaviour you expect, for example a flag, a report change or an API field. `docs/cli.md` is the contract. PixelSlash is in alpha, so `/api/v1` can still change.
     validations:
       required: true
   - type: textarea

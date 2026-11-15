@@ -67,8 +67,9 @@ needs its own issue first.
 4. **Local unless told to upload.** Without `--upload`, page shots never leave the machine. See
    invariant 4 in `AGENTS.md` for the two opt-in exceptions and the error sink.
 5. **The local pair mode does not start a dev server.**
-6. **`/api/v1` is a stable contract.** Changes are additive only; a breaking change is
-   `/api/v2`. Every endpoint is in `ENDPOINTS` (`apps/web/src/api/handler.ts`) and in the API
+6. **`/api/v1` follows the project's stage.** PixelSlash is in alpha, so `/api/v1` may change
+   in any way and keeps its name until a real V2 release; a breaking change is marked with `!` on
+   its commit subject. Every endpoint is in `ENDPOINTS` (`apps/web/src/api/handler.ts`) and in the API
    table of [`docs/cli.md`](docs/cli.md), and a test fails when the two differ.
 
 The CLI reference, [`docs/cli.md`](docs/cli.md), is the contract for every flag: do not drop one,

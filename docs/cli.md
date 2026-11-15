@@ -1202,7 +1202,7 @@ Send the token as `Authorization: Bearer <token>`. There are three kinds:
 - A **personal token** (`psu_…`) acts as its user and reaches every project of that user's orgs.
 - A project, build or snapshot the token cannot reach is a **404**, never a 403, so a 404 does not tell you whether the id exists.
 
-**`/api/v1` is a stable contract.** A field or an endpoint may be added; nothing is renamed, retyped or removed. A breaking change is `/api/v2`. Clients should ignore fields they do not know.
+**`/api/v1` can still change.** PixelSlash is in alpha: a field or an endpoint may be renamed, retyped or removed between versions, and the path stays `/api/v1` until a 2.0 release. A change that breaks a client is marked with `!` in its commit subject. Clients should ignore fields they do not know.
 
 | Request | Auth | Query or body | Reply |
 | --- | --- | --- | --- |

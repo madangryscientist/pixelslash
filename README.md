@@ -78,8 +78,8 @@ The hosted app is at [app.pixelslash.dev](https://app.pixelslash.dev); the proje
 `apps/web` is the review server: TanStack Start on Cloudflare Workers, D1 for data, R2 for the
 shots, GitHub sign-in. CI uploads a build with the CLI, and people review it there. The
 [self-host guide](apps/web/SELF-HOST.md) takes you from an empty Cloudflare account (or a box on
-your own network) to a first upload. The [API](docs/cli.md#api) under `/api/v1` is a stable
-contract: changes are additive only.
+your own network) to a first upload. The [API](docs/cli.md#api) under `/api/v1` can still change while
+PixelSlash is in alpha.
 
 Nothing leaves your machine unless you pass `--upload`, and then only to the server you name.
 `SECURITY.md` has the rest of the threat model and how to report a vulnerability.

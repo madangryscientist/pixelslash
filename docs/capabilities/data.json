@@ -584,7 +584,7 @@
       "label": "Documented upload API",
       "ps": {
         "v": "y",
-        "note": "upload and capture --upload; /api/v1, a stable additive-only contract: me, projects, builds, snapshots (with their images), baselines, detection flags, flakes, stale, twins, parity",
+        "note": "upload and capture --upload; /api/v1 (in alpha, so it may still change): me, projects, builds, snapshots (with their images), baselines, detection flags, flakes, stale, twins, parity",
         "commit": "cad8b76"
       },
       "t": {
