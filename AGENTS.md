@@ -35,6 +35,17 @@ holds what they inherit:
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
 | `dotnet` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract (`PixelSlash.Diff`), and its xunit tests (`PixelSlash.Diff.Tests`): two `.csproj` files, one moon project, tagged `dotnet`. `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
 
+**Files another site reads by path.** The slashslash.build site fetches these from this repo at a
+pinned commit, and refreshes the pin when one of them changes on `main`:
+`apps/web/github-app/manifest.json`, `apps/site/public/favicon.svg`,
+`apps/site/public/fonts/inter-latin-wght-normal.woff2`, `apps/site/public/fonts/OFL.txt`,
+`apps/site/public/hero/main.png`, `apps/site/public/hero/branch.png`, `apps/site/public/report.png`,
+`apps/site/src/content/hero.json` and `docs/capabilities/data.json`. Changing their content is
+fine; moving, renaming or deleting one breaks that site's next update, so do not, unless the change
+says how the other side follows. One more is read live, not at a pin: its PixelSlash pages use
+`https://pixelslash.dev/social-card.png` (`apps/site/public/social-card.png`) as their share image,
+so keep it served at that URL, with no delete and no redirect, until that site hosts its own.
+
 `bunfig.toml` sets `[install] linker = "isolated"`: a package sees its own
 declared dependencies and the root's, not another package's. Declare what a
 package imports in that package's `package.json`; do not lean on a sibling's.
