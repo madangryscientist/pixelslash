@@ -89,10 +89,10 @@ export const projects = sqliteTable(
      * a new one takes the deployment's `DEFAULT_DIFF_LOCATION`. Set on the settings page.
      */
     diffLocation: text("diff_location", { enum: DIFF_LOCATIONS }).notNull().default("server"),
-    /** The GitHub repo (`owner/name`) its builds' check runs go to (PS-23); null sends none. */
+    /** The GitHub repo (`owner/name`) its builds' commit statuses go to (PS-23); null sends none. */
     githubRepo: text("github_repo"),
     /**
-     * Whether a build with a PR posts the PR comment (PS-82); the check run is sent either way.
+     * Whether a build with a PR posts the PR comment (PS-82); the commit status is sent either way.
      * On by default, and for projects from before it.
      */
     githubComment: integer("github_comment", { mode: "boolean" }).notNull().default(true),
@@ -227,7 +227,10 @@ export const builds = sqliteTable(
      * cannot write `errored`, so this is how a `processing` build is told from a dead one.
      */
     processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
-    /** The build's "PixelSlash" check run on GitHub (PS-23), once one is created; updated in place. */
+    /**
+     * Legacy: the "PixelSlash" check run the App posted before it moved to a commit status (PS-23).
+     * The App's next sync of the build completes that run as `neutral` and clears this; nothing sets it.
+     */
     checkRunId: integer("check_run_id"),
     /** The project model's summary of what changed (ob 1668); null when none was made. Text only. */
     aiSummary: text("ai_summary", { mode: "json" }).$type<AiSummary>(),

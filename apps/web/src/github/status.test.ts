@@ -6,7 +6,7 @@ import type { StatusBody } from "./check-run";
 import { type Call, TEST_TOKEN } from "./test-github";
 import { CHANGED, PLAIN, world } from "./test-world";
 
-/** The commit status a token-only server posts instead of a check run (PS-235). */
+/** The commit status a token-only server posts (PS-235); the App posts the same (check-run.test.ts). */
 
 const statusBodies = (calls: Call[]) => calls.map((c): StatusBody => JSON.parse(c.raw));
 const statusStates = (calls: Call[]) =>
@@ -74,15 +74,6 @@ describe("the PixelSlash commit status (token, no App)", () => {
     expect(last?.state).toBe("failure");
     expect(last?.description).toMatch(/^Build errored: x+$/);
     expect(last?.description.length).toBeLessThanOrEqual(140);
-  });
-
-  test("the App wins when both are configured: check runs only, no status", async () => {
-    const w = await world({ token: true });
-    const main = await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
-    expect(main.body.status).toBe("passed");
-    expect(w.github.checkRunCalls().length).toBe(2);
-    expect(w.github.statusCalls()).toEqual([]);
-    expect(w.github.calls.some((c) => c.auth === `Bearer ${TEST_TOKEN}`)).toBe(false);
   });
 
   test("with neither configured, or no repo, GitHub is not called", async () => {

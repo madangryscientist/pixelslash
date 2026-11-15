@@ -21,7 +21,7 @@ export const saveGithubRepo = createServerFn({ method: "POST" })
     await or404(setGithubRepo(database(), user.id, data.projectId, data.repo));
   });
 
-/** Turn the PR comment on or off for the project (PS-82); the check run is sent either way. */
+/** Turn the PR comment on or off for the project (PS-82); the commit status is sent either way. */
 export const saveGithubComment = createServerFn({ method: "POST" })
   .validator((d: unknown) => ({
     projectId: field(d, "projectId"),

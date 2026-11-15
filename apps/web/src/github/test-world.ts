@@ -9,7 +9,7 @@ import { RED, shot } from "#/diff/test-shots";
 import { syncCheckRuns } from "./check-run";
 import { fakeGithub } from "./test-github";
 
-/** A server, a project on `acme/web` and a stand-in GitHub, for the check run and status tests. Tests only. */
+/** A server, a project on `acme/web` and a stand-in GitHub, for the commit status and PR comment tests. Tests only. */
 
 const PUBLIC_URL = "https://pixelslash.test/";
 export const PLAIN = shot({});

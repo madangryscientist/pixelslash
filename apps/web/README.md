@@ -181,44 +181,56 @@ numbers. Sending finalise again resumes a server-diff build, as for any `errored
 409 that build recovery gives, and a build that never finalised is completed only by sending it again. The hourly cron runs the sweep for
 every project; a self-host fires no cron, so there a project is swept only when it next creates a build.
 
-## GitHub check runs (PS-23)
+## The GitHub commit status (PS-23)
 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a
-**PixelSlash** check run on each build's commit: in progress while the build is diffed and while
-changes await review (titled with what waits, "3 changes to review"), passing once every change is
-accepted or nothing changed, failing when a shot is rejected or the build errored, updated in place
-as the build is reviewed. A waiting change is pending, not failed, so it never reads as red CI; a
-branch protection rule that requires the PixelSlash check therefore blocks the merge until the
-changes are reviewed. GitHub marks a check run left in progress for 14 days as stale, which here
-means a build nobody reviewed in two weeks. When several projects of one org are connected to the same repo (compared ignoring case),
-each project's check is named `PixelSlash / <project name>` instead, so they can be told apart on
-the commit; the commit status below follows the same rule. Connecting a second project renames the
-first one's check from its next sync, so a branch protection rule that requires `PixelSlash` must
-name the new checks, and a commit status already posted under the old name stays on its commit. A build of a pull request also keeps one
-comment on the PR, edited in place on each build (below). It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
-`PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. `GITHUB_APP_API_BASE`
-(PS-281) is the App's own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
-`https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub. Registering the
-App, its permissions and deploying its key: [`github-app/README.md`](github-app/README.md).
+**PixelSlash** commit status on each build's commit: `pending` while the build is diffed and while
+changes await review (titled with what waits, "3 changes to review"), `success` once every change is
+accepted or nothing changed, `failure` when a shot is rejected or the build errored. Each state
+change is a new status on the commit and GitHub shows the latest. Its **Details** link opens the
+build page in one click, which is why it is a status and not a check run: a check run's Details
+opens GitHub's own check page. A status has no body, so it carries only the one-line title and the
+link; the counts and the waiting shots are in the PR comment (below) and on the build page. A
+waiting change is pending, not failed, so it never reads as red CI; a branch protection rule that
+requires `PixelSlash` therefore blocks the merge until the changes are reviewed. When several
+projects of one org are connected to the same repo (compared ignoring case), each project's status
+is named `PixelSlash / <project name>` instead, so they can be told apart on the commit. Connecting
+a second project renames the first one's status from its next sync, so a branch protection rule
+that requires `PixelSlash` must name the new ones, and a status already posted under the old name
+stays on its commit. A build of a pull request also keeps one comment on the PR, edited in place
+on each build (below).
+
+It is posted by the GitHub App when one is configured: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a
+secret) and `PIXELSLASH_PUBLIC_URL` for the link. Without both App vars, a token can post it
+instead (below); with neither, nothing calls GitHub. `GITHUB_APP_API_BASE` (PS-281) is the App's
+own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
+`https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub.
+Registering the App, its permissions and deploying its key:
+[`github-app/README.md`](github-app/README.md).
+
+**Moving from the check run.** The App used to post a check run instead. It now needs
+`statuses: write`: the owner grants **Commit statuses: Read and write** in the App's settings and
+each installation accepts the request GitHub sends; until then the status calls get a 403, which is
+logged and not reported. A branch protection rule that requires `PixelSlash` keeps working by name;
+if the rule was tied to the check run's app, pick `PixelSlash` from the list again. A build that
+still has a check run from before gets it completed once as `neutral` ("Moved to the PixelSlash
+commit status") on its next sync, so no old run is left spinning.
 
 ### The pull request comment (PS-82)
 
 A build uploaded for a PR (`prNumber`) gets one comment on it, edited in place by every later build
 of the PR: the model's summary or "Summary skipped", the counts, the three to five most changed shots
 as links, and the build page link. Text and links only; no screenshot goes to GitHub. It is sent
-with the same client as the check run (the App, or the token), only to the project's connected repo,
+with the same client as the commit status (the App, or the token), only to the project's connected repo,
 and only when the project's "Comment on pull requests" setting (on by default) is on. A failed
 comment call is logged and never changes a build's verdict. The App needs `pull_requests: write`
 (`github-app/README.md`).
 
 ### Without the App: a commit status with a token (PS-235)
 
-A self-host that has not registered the App can post the same verdict as a **commit status**,
-context `PixelSlash`, with a fine-grained personal access token. The states are the check run's:
-`pending` while the build is diffed and while a change awaits review, `failure` once a shot is
-rejected or the build errored, `success` once every change is accepted or nothing changed. A status has no
-body, so it carries only the one-line title and the link to the build page; each state change is a
-new status on the commit and GitHub shows the latest.
+A self-host that has not registered the App can post the same **commit status**, context
+`PixelSlash`, with a fine-grained personal access token. The states, the title and the link are the
+App's; only the credential differs. When both are configured the App posts it and the token is not used.
 
 - **Token scope.** Create a fine-grained token (GitHub → Settings → Developer settings → Personal
   access tokens), resource owner = the account or org that owns the repos, repositories = only the

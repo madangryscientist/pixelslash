@@ -308,7 +308,7 @@ export async function setDiffLocation(
   await db.update(projects).set({ diffLocation }).where(eq(projects.id, projectId));
 }
 
-/** The GitHub repo the project's builds report a check run to (PS-23); null disconnects it. */
+/** The GitHub repo the project's builds report a commit status to (PS-23); null disconnects it. */
 export async function setGithubRepo(
   db: Db,
   userId: string,

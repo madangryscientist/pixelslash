@@ -47,7 +47,7 @@ describe("the PixelSlash PR comment", () => {
     await w.finalise({ commit: sha(1), branch: "main", png: PLAIN });
     await w.finalise({ commit: sha(2), branch: "feat/x", mergeBase: sha(1), png: CHANGED });
     expect(w.github.commentCalls()).toEqual([]);
-    expect(w.github.checkRunCalls().length).toBeGreaterThan(0);
+    expect(w.github.statusCalls().length).toBeGreaterThan(0);
   });
 
   test("a later build of the same PR edits that comment in place; accept and reject follow", async () => {
@@ -180,7 +180,7 @@ describe("the PixelSlash PR comment", () => {
     await setGithubComment(w.db, w.acme.user.id, w.acme.project.id, false);
     await pullRequest(w);
     expect(w.github.commentCalls()).toEqual([]);
-    expect(w.github.checkRunCalls().length).toBeGreaterThan(0);
+    expect(w.github.statusCalls().length).toBeGreaterThan(0);
     expect(await w.db.select().from(prComments)).toEqual([]);
   });
 
@@ -229,7 +229,7 @@ describe("the PixelSlash PR comment", () => {
     expect(await w.db.select().from(prComments)).toEqual([]);
   });
 
-  test("a failing comment leaves the check run synced", async () => {
+  test("a failing comment leaves the commit status synced", async () => {
     const w = await world();
     const feature = await pullRequest(w);
     // The comment is deleted and the create fails: only the comment is lost.
@@ -237,7 +237,7 @@ describe("the PixelSlash PR comment", () => {
     const accepted = await w.decide(feature.id, "accepted");
     w.github.failComments(500);
     await w.sync(accepted);
-    const last = w.github.checkRunCalls().at(-1);
+    const last = w.github.statusCalls().at(-1);
     expect(last?.raw).toContain("All changes accepted");
   });
 });

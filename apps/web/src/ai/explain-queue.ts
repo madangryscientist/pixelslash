@@ -155,7 +155,7 @@ export type ConsumerDeps = {
   /** The model's transport; a test passes a stub. Never a real endpoint in tests. */
   modelFetch?: ModelFetch | undefined;
   modelKeySecret?: string | undefined;
-  /** The GitHub App a build's check run is synced with when a shot's notes pass it (PS-23). */
+  /** The GitHub App a build's commit status is synced with when a shot's notes pass it (PS-23). */
   checkRuns?: Omit<CheckRunDeps, "db"> | undefined;
 };
 

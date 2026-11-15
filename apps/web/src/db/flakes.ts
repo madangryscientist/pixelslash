@@ -172,7 +172,7 @@ export async function labelOpenFlakes(
  * A reviewer marks a shot flaky by hand: the key's flake opens (or reopens) with no CLI evidence,
  * and the shot is labelled with it. Its config's policy then applies, so the build's verdict is
  * read again. A member of the project's org only; anything else is the same 404. Returns the flake
- * and the shot's build, whose check run is synced (PS-23).
+ * and the shot's build, whose commit status is synced (PS-23).
  */
 export async function markFlaky(
   db: Db,
