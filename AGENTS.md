@@ -155,7 +155,7 @@ against main's. It is not required, and with no secret (a fork) it skips and pas
 changed it force-pushes `bot/site-images` and opens (or updates) a pull request titled `chore(site): regenerate
 the site images`, which may change only `apps/site/public/hero/*.png`, `apps/site/public/report.png`,
 `apps/site/src/content/hero.json` and `apps/site/src/content/report.json`. It acts with the `SITE_IMAGES_TOKEN`
-secret, so the Gate runs on that pull request like any other, and it merges itself on green
+secret, so `gate` runs on that pull request like any other, and it merges itself on green
 (`gh pr merge --auto`). With no change it ends green, opens nothing and closes a bot pull request an
 earlier run left open, whose images `main` no longer needs.
 
@@ -184,7 +184,7 @@ bunx moon run site:test-e2e       # Playwright on the build, desktop and phone: 
 (cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/ps-site-dry")
 ```
 
-CI runs `Site gate (build, e2e)` in two tiers. The build (`bunx moon run site:build`) runs on a pull request that
+CI runs `site` in two tiers. The build (`bunx moon run site:build`) runs on a pull request that
 touches `apps/site/`, `docs/`, a root file the site renders or installs from (`README.md`, `SECURITY.md`,
 `apps/web/SELF-HOST.md`, `apps/web/github-app/manifest.json`, `package.json`, `.moon/`,
 `tsconfig.base.json`, `bun.lock`, `bunfig.toml`, `scripts/test-tmp-scope.ts`) or `ci.yml`, and on every push to

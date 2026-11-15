@@ -19,15 +19,16 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only a pull request run is cancelled by a newer push: a push to main writes the moon cache and
+  # always runs to the end.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # The Bun the repo is built and pinned against (docker/capture/Dockerfile, bench/PERF.md).
-  BUN_VERSION: "1.4.2"
+# Bun's version comes from .tool-versions (every setup-bun step reads it, and mise reads it locally).
+# The Dockerfiles (docker/capture, docker/self-host) pin the same version as an oven/bun image digest,
+# since an image tag cannot read a file: bump both together.
 
 jobs:
   gate:
-    name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The moon remote cache (.moon/workspace.yml `remote:`): moon sends MOON_REMOTE_TOKEN as a bearer
@@ -53,9 +54,9 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       # global.json pins the SDK; engines/dotnet is part of the gate where an SDK exists.
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
       - run: bun install --frozen-lockfile
@@ -73,7 +74,6 @@ jobs:
   # installed from their tarballs into a copy of examples/playwright-node, its tests run with no `bun`
   # on PATH, and `pixelslash upload` takes the dir they wrote. Nothing is published.
   example:
-    name: Playwright example on Node (packed tarballs)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -82,7 +82,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
@@ -94,7 +94,6 @@ jobs:
       - run: bun run check:example
 
   changes:
-    name: Did the web app change?
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -130,7 +129,7 @@ jobs:
           fi
           # apps/web and packages (what it imports), plus what decides how they install and run.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
@@ -138,7 +137,7 @@ jobs:
           # The site's build inputs (apps/site/moon.yml: the docs it renders), its Playwright globalSetup,
           # and what decides how it installs.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
             echo "site=true" >> "$GITHUB_OUTPUT"
           else
             echo "site=false" >> "$GITHUB_OUTPUT"
@@ -148,14 +147,13 @@ jobs:
           # docs-only edit skips the browser run. A spec that quotes a docs sentence is only run on a site
           # change or on main. Keep this list inside the one above.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
             echo "site_e2e=true" >> "$GITHUB_OUTPUT"
           else
             echo "site_e2e=false" >> "$GITHUB_OUTPUT"
           fi
 
   web:
-    name: Web gate (build, e2e, deploy dry run)
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
@@ -176,7 +174,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         working-directory: apps/web
@@ -217,7 +215,6 @@ jobs:
   # project) only when the site itself changed. Not a required check and not run on a tag: a release
   # publishes the CLI, which does not ship the site.
   site:
-    name: Site gate (build, e2e)
     needs: changes
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
@@ -237,7 +234,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         if: needs.changes.outputs.site_e2e == 'true'
@@ -275,7 +272,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         working-directory: apps/web
