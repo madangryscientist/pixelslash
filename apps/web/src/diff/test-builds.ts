@@ -141,6 +141,53 @@ export async function explaining<T>(
   return result;
 }
 
+/** What diffing a build may stand in for; see `upload`. */
+type RunOptions = {
+  now?: () => number;
+  db?: Db;
+  blobs?: BlobStore;
+  diff?: typeof diffPngs | undefined;
+  diffSidecar?: string | undefined;
+  modelFetch?: ModelFetch | undefined;
+  /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
+  modelKeySecret?: string | null;
+  queue?: MemoryQueue;
+};
+
+/** Create, fill and finalise one build, not yet diffed: a test's setup, for `diffFinalised` later. */
+export async function finalised(ctx: Uploads, spec: BuildSpec): Promise<Build> {
+  return finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
+}
+
+/**
+ * Diff a build `finalised` returned, as `upload` does; returns it as the database holds it afterwards.
+ * For a test that times only the diff, with the upload in its setup.
+ */
+export async function diffFinalised(
+  ctx: Uploads,
+  done: Build,
+  {
+    now,
+    db = ctx.db,
+    blobs = ctx.scoped,
+    diff,
+    diffSidecar,
+    modelFetch,
+    modelKeySecret = TEST_MODEL_KEY_SECRET,
+    queue,
+  }: RunOptions = {},
+): Promise<Build> {
+  const explain = queue ?? memoryQueue();
+  const secret = modelKeySecret ?? undefined;
+  await processBuild(
+    { db, blobs, now, diff, diffSidecar, explainQueue: explain.queue, modelKeySecret: secret },
+    done,
+  );
+  if (!queue)
+    await explain.drain(consumerDeps({ db, blobs, now, modelFetch, modelKeySecret: secret }));
+  return getBuild(ctx.db, ctx.projectId, done.id);
+}
+
 /**
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
@@ -153,37 +200,9 @@ export async function explaining<T>(
 export async function upload(
   ctx: Uploads,
   spec: BuildSpec,
-  {
-    now,
-    db = ctx.db,
-    blobs = ctx.scoped,
-    diff,
-    diffSidecar,
-    modelFetch,
-    modelKeySecret = TEST_MODEL_KEY_SECRET,
-    queue,
-  }: {
-    now?: () => number;
-    db?: Db;
-    blobs?: BlobStore;
-    diff?: typeof diffPngs | undefined;
-    diffSidecar?: string | undefined;
-    modelFetch?: ModelFetch | undefined;
-    /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
-    modelKeySecret?: string | null;
-    queue?: MemoryQueue;
-  } = {},
+  options: RunOptions = {},
 ): Promise<Build> {
-  const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
-  const explain = queue ?? memoryQueue();
-  const secret = modelKeySecret ?? undefined;
-  await processBuild(
-    { db, blobs, now, diff, diffSidecar, explainQueue: explain.queue, modelKeySecret: secret },
-    done,
-  );
-  if (!queue)
-    await explain.drain(consumerDeps({ db, blobs, now, modelFetch, modelKeySecret: secret }));
-  return getBuild(ctx.db, ctx.projectId, done.id);
+  return diffFinalised(ctx, await finalised(ctx, spec), options);
 }
 
 export async function rows(ctx: Uploads, build: Build) {

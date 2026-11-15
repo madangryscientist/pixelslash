@@ -1,9 +1,10 @@
 import { drizzle } from "drizzle-orm/d1";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { memoryStore } from "#/api/test-support";
-import { type Uploads, onlyShot, sha, upload } from "#/diff/test-builds";
+import { type Uploads, diffFinalised, finalised, onlyShot, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
 import { orgBlobs } from "#/storage/blobs";
+import type { Build } from "./builds";
 import { retryBusy } from "./busy";
 import type { Db } from "./db";
 import { createOrg, createProject } from "./orgs";
@@ -15,8 +16,12 @@ import { signInGithubUser } from "./users";
  * Runs on a local D1 (miniflare), with the lock stood in for by a binding that throws it.
  */
 
+const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
+
 let held: Awaited<ReturnType<typeof d1Db>>;
 let ctx: Uploads;
+/** The branch build each test diffs, uploaded and finalised in the hook. */
+let forTest: { once: Build; forGood: Build };
 
 beforeAll(async () => {
   held = await d1Db();
@@ -34,6 +39,21 @@ beforeAll(async () => {
   ctx = { db: held.db, projectId: project.id, scoped: orgBlobs(memoryStore().store, org.id) };
   // The baseline both tests diff against. It is setup, and the file's first diff run pays its one-off costs here.
   await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: shot() }] });
+  // Each test's branch upload is setup too: a test times only the diff that meets the lock.
+  forTest = {
+    once: await finalised(ctx, {
+      branch: "feat/a",
+      commit: sha(2),
+      mergeBase: sha(1),
+      shots: [{ png: red }],
+    }),
+    forGood: await finalised(ctx, {
+      branch: "feat/b",
+      commit: sha(3),
+      mergeBase: sha(1),
+      shots: [{ png: red }],
+    }),
+  };
 }, 60_000);
 
 afterAll(() => held?.dispose());
@@ -78,7 +98,6 @@ function locked(d1: D1Database, sql: RegExp, times: number) {
   return { binding, state };
 }
 
-const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
 // The write the repro failed on: a shot's resolved diff, stored when the run starts measuring it.
 const RESOLVED = /update "snapshots" set .*"resolved_diff"/;
 
@@ -87,11 +106,7 @@ describe("a D1 write that meets the lock (PS-228)", () => {
     const { binding, state } = locked(held.d1, RESOLVED, 2);
     const db: Db = drizzle(retryBusy(binding));
 
-    const build = await upload(
-      ctx,
-      { branch: "feat/a", commit: sha(2), mergeBase: sha(1), shots: [{ png: red }] },
-      { db },
-    );
+    const build = await diffFinalised(ctx, forTest.once, { db });
 
     expect(build).toMatchObject({ status: "changes", error: null });
     expect(await onlyShot(ctx, build)).toMatchObject({ diffStatus: "changed" });
@@ -102,11 +117,7 @@ describe("a D1 write that meets the lock (PS-228)", () => {
     const { binding, state } = locked(held.d1, RESOLVED, Infinity);
     const db: Db = drizzle(retryBusy(binding));
 
-    const build = await upload(
-      ctx,
-      { branch: "feat/b", commit: sha(3), mergeBase: sha(1), shots: [{ png: red }] },
-      { db },
-    );
+    const build = await diffFinalised(ctx, forTest.forGood, { db });
 
     expect(build.status).toBe("errored");
     expect(build.error).toMatch(/SQLITE_BUSY/);
