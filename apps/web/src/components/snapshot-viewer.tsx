@@ -1,3 +1,4 @@
+import { CardGrid } from "@hackcove/ui-react";
 import { type ReactNode, useState } from "react";
 import { type Crop, changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import type { Composition } from "#/components/composition";
@@ -59,7 +60,7 @@ function SideBySide({
   const marking = { marks, onDraw, ignored };
   const regions = result && highlight ? result.regions : null;
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <CardGrid columns={2}>
       <Pane
         label={names.pane}
         {...sideSize(result, "main")}
@@ -83,7 +84,7 @@ function SideBySide({
         composition={showFindings ? composition : null}
         {...marking}
       />
-    </div>
+    </CardGrid>
   );
 }
 

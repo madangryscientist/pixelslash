@@ -98,7 +98,7 @@ export function CompositionBoxes({
     zIndex: isFocused(focus, kind, i) ? 1 : undefined,
   });
   return (
-    <div aria-label="Composition findings" className="pointer-events-none absolute inset-0">
+    <>
       {composition.gaps.map((gap, i) => (
         <div
           // Findings are stored in walk order: the index is a stable key.
@@ -122,7 +122,7 @@ export function CompositionBoxes({
           onMouseLeave={() => setFocus(null)}
         />
       ))}
-    </div>
+    </>
   );
 }
 

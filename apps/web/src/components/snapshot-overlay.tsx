@@ -3,8 +3,10 @@ import {
   Card,
   Checkbox,
   Cluster,
+  EmptyState,
   Legend,
   type LegendItem,
+  RegionFrame,
   Stack,
 } from "@hackcove/ui-react";
 import { useState } from "react";
@@ -71,13 +73,9 @@ function ShotStack({
   opacity: number;
   boxes: { result: DiffResult; regions: DiffRegion[] } | null;
 }) {
+  if (!shown) return <EmptyState title="No image to show." />;
   return (
-    <div className="relative">
-      {shown ? (
-        <img src={shown} alt={`${name} with measured regions`} className="block w-full" />
-      ) : (
-        <p className="py-16 text-center text-sm">No image to show.</p>
-      )}
+    <RegionFrame src={shown} alt={`${name} with measured regions`}>
       {diffUrl && showDiff && (
         <img
           src={diffUrl}
@@ -94,7 +92,7 @@ function ShotStack({
           regions={boxes.regions}
         />
       )}
-    </div>
+    </RegionFrame>
   );
 }
 
