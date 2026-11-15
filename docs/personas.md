@@ -26,10 +26,12 @@ packages build under a task runner (moon, Nx or Turbo) whose cache skips the pac
 change. His goal is one visual check per pull request across every package, without spending CI
 minutes on packages that did not change.
 
-He uses subprojects: each package is one subproject with its own builds and its own review, and
-each subproject has one commit status on the pull request. A subproject that the task runner skipped
-does not hold the status open. `pixelslash upload --skipped` lets the upload say which packages were
-skipped, so the cache does not look like missing work. A combined review across subprojects is
+He uses subprojects: each package is one subproject with its own builds and its own review. The
+project posts one commit status on the pull request that covers every subproject; a subproject posts
+none of its own. A subproject that the task runner skipped does not hold that status open.
+`pixelslash upload --skipped` posts a passed build with no shots for a package the cache skipped, so
+that package does not look like missing work. It captures nothing, so a commit where the cache skipped
+every capture still gets a green status. A combined review across subprojects is
 planned and not built yet.
 
 He wins when twenty subprojects with one change each show as twenty changes in one place, and when
