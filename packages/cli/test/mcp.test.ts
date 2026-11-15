@@ -49,7 +49,7 @@ const json = (r: Result): Record<string, unknown> => {
 };
 
 describe("pixelslash mcp", () => {
-  test("lists the server's read tools, each read-only, and the local dev and fix-loop tools", async () => {
+  test("lists the server's read tools, each read-only, its two review tools, and the local dev and fix-loop tools", async () => {
     const { client } = await connected();
     const { tools } = await client.listTools();
     const dev = tools.filter((t) => t.name.startsWith("dev_"));
@@ -62,8 +62,10 @@ describe("pixelslash mcp", () => {
       "dev_stop",
       "dev_unpin",
     ]);
-    // Nothing that writes to the server: the dev tools touch the worktree's store only.
-    expect(tools.some((t) => /accept|reject|upload/.test(t.name))).toBe(false);
+    // Nothing uploads: the dev tools touch the worktree's store only.
+    expect(tools.some((t) => /upload/.test(t.name))).toBe(false);
+    // Of the server's tools, exactly the two review tools write, and neither destroys anything.
+    const REVIEW = ["accept_build", "review_snapshot"];
     const LOCAL = [
       "capture_local",
       "check_flake",
@@ -73,7 +75,16 @@ describe("pixelslash mcp", () => {
     ];
     const local = tools.filter((t) => LOCAL.includes(t.name));
     expect(local.map((t) => t.name).toSorted()).toEqual(LOCAL);
-    const read = tools.filter((t) => !t.name.startsWith("dev_") && !LOCAL.includes(t.name));
+    const review = tools.filter((t) => REVIEW.includes(t.name));
+    expect(review.map((t) => t.name).toSorted()).toEqual(REVIEW);
+    for (const t of review) {
+      expect(t.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+      expect(t.description).toContain("recorded under the token's user");
+      expect(t.description).toContain("get_snapshot_images");
+    }
+    const read = tools.filter(
+      (t) => !t.name.startsWith("dev_") && !LOCAL.includes(t.name) && !REVIEW.includes(t.name),
+    );
     expect(read.map((t) => t.name).toSorted()).toEqual([
       "get_build",
       "get_parity",
@@ -89,6 +100,23 @@ describe("pixelslash mcp", () => {
     ]);
     expect(read.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
     await client.close();
+  });
+
+  test("each review tool sends one request to its endpoint and returns the reply as sent", async () => {
+    const { call, fake } = await connected();
+    const decided = { api_version: 1, status: "passed", build_ids: ["b2", "b1"] };
+    fake.replies["/api/v1/snapshots/s1/review"] = decided;
+    fake.replies["/api/v1/builds/b2/accept-all"] = decided;
+    const before = fake.seen.length;
+    const shot = await call("review_snapshot", { snapshot_id: "s1", state: "rejected" });
+    expect(json(shot)).toEqual(decided);
+    const build = await call("accept_build", { build_id: "b2" });
+    expect(json(build)).toEqual(decided);
+    expect(fake.seen.slice(before).map((s) => [s.method, s.url.pathname, s.auth, s.body])).toEqual([
+      ["POST", "/api/v1/snapshots/s1/review", `Bearer ${USER_TOKEN}`, '{"state":"rejected"}'],
+      ["POST", "/api/v1/builds/b2/accept-all", `Bearer ${USER_TOKEN}`, ""],
+    ]);
+    expect(fake.images).toEqual([]);
   });
 
   test("each read tool returns the API's reply", async () => {

@@ -29,6 +29,8 @@ import {
   markDetectionFlagExported,
 } from "./read";
 import { putProjectTwin } from "./twins-link";
+import { acceptBuild, reviewShot } from "./review";
+import { jsonBody } from "./json-body";
 import { BadRequest, object, parseFinalise, parseNewBuild } from "./validate";
 import { knownImages } from "./known";
 import { belowMinimum } from "./cli-version";
@@ -59,14 +61,6 @@ export type ApiDeps = {
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
-
-async function jsonBody(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new BadRequest("body must be JSON");
-  }
-}
 
 type Ctx = ApiDeps & { actor: Actor; request: Request; timer: ServerTimer };
 
@@ -282,6 +276,8 @@ export const ENDPOINTS: readonly Endpoint[] = [
   { method: "GET", path: "/api/v1/builds/:id", run: byId(getBuild) },
   { method: "GET", path: "/api/v1/builds/:id/parity", run: byId(getParity) },
   { method: "GET", path: "/api/v1/snapshots/:id", run: byId(getSnapshot) },
+  { method: "POST", path: "/api/v1/snapshots/:id/review", run: reviewShot },
+  { method: "POST", path: "/api/v1/builds/:id/accept-all", run: acceptBuild },
 ];
 
 /** The `:param` values when `path` fits the pattern, else null. */

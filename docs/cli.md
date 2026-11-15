@@ -861,7 +861,7 @@ ever attached.
 
 ## Your coding agent: `pixelslash mcp`
 
-`pixelslash mcp` is a stdio [MCP](https://modelcontextprotocol.io) server, so the coding agent you already run can read PixelSlash (which builds have changes, what changed in a shot, which shots are flaky, what reviewers flagged) and drive feature mode in the worktree it was started in ([below](#feature-mode-from-your-agent)). Add it to Claude Code with:
+`pixelslash mcp` is a stdio [MCP](https://modelcontextprotocol.io) server, so the coding agent you already run can read PixelSlash (which builds have changes, what changed in a shot, which shots are flaky, what reviewers flagged), accept or reject a change for you, and drive feature mode in the worktree it was started in ([below](#feature-mode-from-your-agent)). Add it to Claude Code with:
 
 ```
 claude mcp add pixelslash -- pixelslash mcp
@@ -887,9 +887,16 @@ It resolves the server, the token and the default project as every remote comman
 | `list_flakes` | `project?` | `GET /api/v1/projects/:id/flakes` |
 | `list_detection_flags` | `project?`, `limit?`, `cursor?` | `GET /api/v1/projects/:id/detection-flags` |
 
+Two tools decide, each one `/api/v1` call whose text is the API's reply as sent. They do what the web app's buttons do, so the build page, the shot's reviewer and the PR's PixelSlash status then read as after the same click:
+
+| Tool | Arguments | Writes |
+| --- | --- | --- |
+| `review_snapshot` | `snapshot_id`, `state` (`accepted`, `rejected`) | `POST /api/v1/snapshots/:id/review` |
+| `accept_build` | `build_id` | `POST /api/v1/builds/:id/accept-all` |
+
 `project` is an id or a name; without it, `--project`, then `upload.project`, then the only project the token sees.
 
-- **It only reads the server, with one exception.** There is no tool to accept or reject a shot, upload or manage tokens: a review decision is a person's, in the web app. `resolve_flake` ([below](#using-pixelslash-from-your-agent)) marks a flake resolved, and only after a stable run on this machine. The `dev_*` tools write only to the worktree's `.pixelslash/dev/`, and the fix-loop tools only to their `out` dirs.
+- **What it writes to the server.** `review_snapshot` and `accept_build` record a review decision, and `resolve_flake` ([below](#using-pixelslash-from-your-agent)) marks a flake resolved, and only after a stable run on this machine. A decision stays a person's: it needs a personal token (a CI or org token is refused) and is recorded under that token's user, as a click in the web app is, so let the agent decide only for you, after it has looked at the images with `get_snapshot_images`. No tool uploads or manages tokens. The `dev_*` tools write only to the worktree's `.pixelslash/dev/`, and the fix-loop tools only to their `out` dirs.
 - **`get_snapshot_images` hands page shots to whatever model your agent uses.** The PNGs are fetched from the configured server only when that tool is called, and go back to the agent, which sends them to its model wherever that model runs. No other read tool returns pixels; the `dev_*` tools return the local shots, diffs and refs the same way. An image URL that is not on the configured server is not fetched.
 - Nothing is sent anywhere but the configured server. Stdout is the MCP channel; the server logs one line to stderr.
 
@@ -911,7 +918,7 @@ The server also runs the local fix loop: **read** what the server says changed o
 - **`explain-build`** (argument `build_id?`): `get_build`, `get_snapshot` and `get_snapshot_images` to say what changed, `check_local` on the changed shots to reproduce them, fix, `check_local` again, then report what is fixed, what still differs and what the user should accept on the server.
 
 - **Progress and cancelling.** A client that sends a progress token gets one `notifications/progress` per shot (`progress` of `total` runs). Cancelling a call stops it before its next shot; the shot already in the browser finishes, bounded by its timeout.
-- **What an agent cannot do.** No tool accepts, rejects or uploads anything, or writes the config. Nothing is sent anywhere but the configured server: `check_local` reads baselines and their PNGs, the flake tools read the flake list, and only `resolve_flake` writes, as `pixelslash flake --resolve` does.
+- **What an agent cannot do.** No tool uploads anything or writes the config. Nothing is sent anywhere but the configured server: `check_local` reads baselines and their PNGs, the flake tools read the flake list, and of these tools only `resolve_flake` writes, as `pixelslash flake --resolve` does. Accepting and rejecting are the two review tools [above](#your-coding-agent-pixelslash-mcp).
 
 ### Feature mode from your agent
 
@@ -928,7 +935,7 @@ The same server drives [`pixelslash dev`](#feature-mode-pixelslash-dev), so an a
 
 - **The loop.** The prompt `build-to-spec` (argument `target?`) walks it: read `dev_spec`, `dev_start`, edit, `dev_run` or `dev_latest`, repeat until the shot matches, then `dev_pin` and `dev_stop`. The tool descriptions tell the agent to check after every edit. A save re-runs the session as it does in a terminal, so `dev_latest` after a save shows that run.
 - **The session lives as long as the server.** One the server started stops when the agent's client closes it; one started in a terminal is driven through its live page, as a second `pixelslash dev` would be. One session per worktree still holds: `dev_start` on a different target than the live session's is an error.
-- **What an agent can change.** It can run and pin, and pins are local to the worktree. It cannot accept, reject or upload anything, and no tool writes a config. `--against main` reads main's baselines with the server's credentials, read-only; the server flags (`--config`, `--server`, `--token-path`, `--project`, `--base`, `--figma-token-path`) are the session's.
+- **What an agent can change.** It can run and pin, and pins are local to the worktree. The `dev_*` tools accept, reject and upload nothing, and no tool writes a config. `--against main` reads main's baselines with the server's credentials, read-only; the server flags (`--config`, `--server`, `--token-path`, `--project`, `--base`, `--figma-token-path`) are the session's.
 - The judge's `differences` are descriptions, never a pass or a score, as on the live page.
 
 ## Uploading to a server
@@ -1251,12 +1258,14 @@ Send the token as `Authorization: Bearer <token>`. There are three kinds:
 | `GET /api/v1/projects/:id/stale` | CI, org or personal | `platform?` (`android` or `ios`; anything else is a 400) | `200 { stale: [item], next_cursor: null }`: the project's [stale twins](#stale-twins), each `{ name, theme, platform, sentence, cause, shots }`; a CI token reads its own project only. With `platform` also `baselines: { platform, linked: [entry] }`, the accepted baseline pairs for `parity --release` |
 | `GET /api/v1/projects/:id/flakes` | CI, org or personal | n/a | `200 { flakes: [flake], next_cursor: null }`, open ones first, then the most recently changed |
 | `POST /api/v1/flakes/:id/resolve` | personal | JSON `{ note? }` (≤200 characters) | `200 { flake }`, with `resolved_by` the token's user; resolving a flake that is already resolved changes nothing and keeps the first resolver, time and note; a CI token gets 403 |
+| `POST /api/v1/snapshots/:id/review` | personal | JSON `{ state }`, `"accepted"` or `"rejected"` (anything else is a 400) | `200 { status, build_ids }`: the web app's accept or reject, recorded under the token's user (the shot's `reviewed_by`), reaching the other builds that carry the same change, and syncing the PR's PixelSlash status. `status` is the build's verdict after the write (`changes`, `passed` or `failed`); `build_ids` are the builds it moved, the shot's build first, then the carried builds. A CI or org token gets 403; a shot of a project the user is not a member of is a 404; a shot of a build that is not `changes` or `passed` is a 409 |
+| `POST /api/v1/builds/:id/accept-all` | personal | n/a | `200 { status, build_ids }`, as above: the web app's **Accept all**. A skipped flaky shot is left as it is. A build with a rejected shot is `failed` and cannot be accepted (409), nor can a build that is not `changes` or `passed`. A CI or org token gets 403; a build of a project the user is not a member of is a 404 |
 
-There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), linking a twin project (`PUT /api/v1/projects/:id/twin`), resolving a flake and marking a detection flag exported: accepting and rejecting stay in the web app. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
+There are no write endpoints besides the four upload ones, creating a project by name (`POST /api/v1/projects`), linking a twin project (`PUT /api/v1/projects/:id/twin`), resolving a flake, marking a detection flag exported, and the two review decisions (`snapshots/:id/review`, `builds/:id/accept-all`), which take a personal token as the web app takes a signed-in person. The two `baselines` endpoints are `POST` only because they take a list; they change nothing.
 
 **The upload endpoints** (`me`, `builds`, `known`, `snapshots`, `finalize`) are the ones the shipped CLI speaks. They keep their camelCase keys, carry no `api_version`, and answer an error as `{ "error": "<message>" }`. The errors a client acts on beside their status also carry a `code` next to the message: `image_unknown` (a `409` on a snapshot sent by hash, above) and `unknown_subproject` (a `404` on `POST /api/v1/builds` whose `subproject` names none). A client that ignores `code` reads the same answer as before.
 
-**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `flakes`, `baselines`), resolving a flake and marking a flag exported use snake_case keys, and every reply carries `"api_version": 1`. An error is:
+**The read endpoints** (`projects`, `builds` lists and reads, `snapshots`, `detection-flags`, `flakes`, `baselines`), resolving a flake, marking a flag exported and the review decisions use snake_case keys, and every reply carries `"api_version": 1`. An error is:
 
 ```json
 { "api_version": 1, "error": { "code": "not_found", "message": "build not found" } }
