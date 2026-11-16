@@ -5,10 +5,13 @@ import {
   Card,
   CardGrid,
   Disclosure,
+  Overline,
   PageHeader,
   ProseLayout,
   SidebarLayout,
+  Stack,
   Tabs,
+  Text,
   TextLink,
 } from "@hackcove/ui-react";
 import { type ReactNode, Suspense } from "react";
@@ -59,38 +62,40 @@ function groupItems(groupId: string, current: string | undefined) {
  */
 export function DocsNav({ current }: { current?: string }): ReactNode {
   return (
-    <nav aria-label="Docs" data-testid="docs-nav" className="flex flex-col gap-4">
-      <DocsSearch />
-      <Tabs
-        variant="pill"
-        orientation="vertical"
-        size="sm"
-        label="Docs overview"
-        items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
-      />
-      <div className="flex flex-col">
-        {GROUPS.map((group) => {
-          const items = groupItems(group.id, current);
-          const open = items.some((item) => item.active);
-          return (
-            // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
-            <Disclosure
-              key={`${group.id}-${open}`}
-              summary={group.title}
-              defaultOpen={open}
-              data-testid={`docs-group-${group.id}`}
-            >
-              <Tabs
-                variant="pill"
-                orientation="vertical"
-                size="sm"
-                label={group.title}
-                items={items}
-              />
-            </Disclosure>
-          );
-        })}
-      </div>
+    <nav aria-label="Docs" data-testid="docs-nav">
+      <Stack gap="sm">
+        <DocsSearch />
+        <Tabs
+          variant="pill"
+          orientation="vertical"
+          size="sm"
+          label="Docs overview"
+          items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
+        />
+        <div className="flex flex-col">
+          {GROUPS.map((group) => {
+            const items = groupItems(group.id, current);
+            const open = items.some((item) => item.active);
+            return (
+              // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
+              <Disclosure
+                key={`${group.id}-${open}`}
+                summary={group.title}
+                defaultOpen={open}
+                data-testid={`docs-group-${group.id}`}
+              >
+                <Tabs
+                  variant="pill"
+                  orientation="vertical"
+                  size="sm"
+                  label={group.title}
+                  items={items}
+                />
+              </Disclosure>
+            );
+          })}
+        </div>
+      </Stack>
     </nav>
   );
 }
@@ -106,6 +111,7 @@ function OnThisPage({
   const shown = headings.filter((heading) => heading.depth <= 3);
   const active = useActiveHeading(shown.map((heading) => heading.id).join("|"), track);
   return (
+    // A contents list of anchor links, its own size and line height: no kit part draws one (Tabs would make each a pill).
     <ul className="flex flex-col gap-1 text-sm/6">
       {shown.map((heading) => {
         const here = heading.id === active;
@@ -128,10 +134,10 @@ function OnThisPage({
 /** A page that can end a run non-zero says where the numbers are explained. */
 function ExitsLine(): ReactNode {
   return (
-    <p className="text-sm/6 text-slate-600" data-testid="docs-exits">
+    <Text as="p" data-testid="docs-exits">
       This command can end with a non-zero exit code.{" "}
       <TextLink href="/docs/exit-codes">Exit codes</TextLink> says what each number means.
-    </p>
+    </Text>
   );
 }
 
@@ -139,9 +145,9 @@ function ExitsLine(): ReactNode {
 export function EditLink({ source }: { source: string }): ReactNode {
   if (!REPO_PUBLIC) return null;
   return (
-    <p className="text-sm/6 text-slate-600" data-testid="docs-edit">
+    <Text as="p" data-testid="docs-edit">
       <TextLink href={`${REPO_URL}/edit/main/${source}`}>Edit this page on GitHub</TextLink>
-    </p>
+    </Text>
   );
 }
 
@@ -203,20 +209,21 @@ function DocArticle({ slug }: { slug: string }): ReactNode {
     <Breadcrumbs crumbs={[{ label: "Docs", href: "/docs" }, group?.title ?? "", page.title]} />
   );
   const article = (
-    <div className="flex flex-col gap-8">
+    <Stack gap="lg">
       {hasRail && (
-        <details className="rounded-md border border-slate-200 px-4 py-2 xl:hidden">
-          <summary className="cursor-pointer text-sm font-medium">On this page</summary>
-          <div className="py-2">
+        // From xl the contents list is the aside beside the text, so the fold steps out. The kit's
+        // Disclosure takes no class, so the breakpoint sits on a bare wrapper.
+        <div className="xl:hidden">
+          <Disclosure bordered summary="On this page" data-testid="docs-contents-fold">
             <OnThisPage headings={doc.headings} />
-          </div>
-        </details>
+          </Disclosure>
+        </div>
       )}
       <DocBody doc={doc} />
       {page.exits === true ? <ExitsLine /> : null}
       <EditLink source={doc.source} />
       <PrevNext slug={slug} />
-    </div>
+    </Stack>
   );
   return (
     <div>
@@ -231,10 +238,10 @@ function DocArticle({ slug }: { slug: string }): ReactNode {
           <aside className="hidden min-w-0 xl:sticky xl:top-[var(--app-header,0px)] xl:block xl:self-start">
             <div className="xl:-m-1 xl:max-h-[calc(100dvh-var(--app-header,0px)-2rem)] xl:overflow-y-auto xl:p-1">
               <nav aria-label="On this page" data-testid="docs-contents">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  On this page
-                </p>
-                <OnThisPage headings={doc.headings} track />
+                <Stack gap="xs">
+                  <Overline as="p">On this page</Overline>
+                  <OnThisPage headings={doc.headings} track />
+                </Stack>
               </nav>
             </div>
           </aside>
@@ -277,6 +284,7 @@ export function DocsIndexPage(): ReactNode {
         >
           {FIRST_STEP.text}
         </Callout>
+        {/* Held to 75ch (docs-index-hierarchy.spec.ts): the kit's narrow Stack is 48rem, wider than that. */}
         <div className="max-w-[75ch]" data-testid="docs-intro">
           <DocBody doc={CLI_INTRO_DOC} />
         </div>

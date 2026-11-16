@@ -3,8 +3,10 @@ import {
   AppShellBrand,
   Button,
   Caption,
+  Cluster,
   ColourSchemeToggle,
   Container,
+  Stack,
   Tabs,
   TextLink,
 } from "@hackcove/ui-react";
@@ -49,18 +51,18 @@ function Controls(): ReactNode {
 /** The footer every page shares: the wordmark, the stage, the licence and contact lines, then the trademark line. */
 export function Footer(): ReactNode {
   return (
-    <div data-testid="footer" className="home-footer flex flex-col gap-4 py-6">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <a href={SLASHSLASH} className="flex items-center" aria-label="PixelSlash home">
+    <Stack gap="sm" data-testid="footer">
+      <Cluster wrap gap="md">
+        <TextLink href={SLASHSLASH} aria-label="PixelSlash home">
           <Wordmark />
-        </a>
+        </TextLink>
         <Caption data-testid="stage-footer">{STAGE_LINE}</Caption>
         <span>Elastic License 2.0</span>
         <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
         <SourceLink />
-      </div>
+      </Cluster>
       <span data-testid="trademark">{TRADEMARK}</span>
-    </div>
+    </Stack>
   );
 }
 

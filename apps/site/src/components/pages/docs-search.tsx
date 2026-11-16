@@ -1,4 +1,4 @@
-import { Icon, Input } from "@hackcove/ui-react";
+import { Icon, Input, ListRow, Stack, Text } from "@hackcove/ui-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type SearchEntry, type SearchHit, search } from "../../content/search.ts";
 
@@ -73,46 +73,55 @@ export function DocsSearch(): ReactNode {
   const searching = query.trim() !== "";
 
   return (
-    <div role="search" ref={rootRef} className="flex flex-col gap-2">
-      <Input
-        type="search"
-        icon={<Icon name="search" />}
-        aria-label="Search the docs"
-        placeholder={query === "" ? HINT : undefined}
-        data-testid="docs-search"
-        value={query}
-        onFocus={load}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          load();
-        }}
-      />
-      {searching && failed ? (
-        <p className="px-1 text-sm text-slate-600" data-testid="docs-search-status">
-          The search index did not load. Reload the page to try again.
-        </p>
-      ) : null}
-      {searching && entries && hits.length === 0 ? (
-        <p className="px-1 text-sm text-slate-600" data-testid="docs-search-status">
-          Nothing matches "{query.trim()}".
-        </p>
-      ) : null}
-      {hits.length > 0 ? (
-        <ul className="flex flex-col gap-2" data-testid="docs-search-results">
-          {hits.map((hit) => (
-            <li key={hit.entry.url} className="text-sm/5">
-              <a
-                href={hit.entry.url}
-                className="font-medium text-slate-900 hover:text-violet-700 hover:underline"
-              >
-                {hit.entry.heading}
-              </a>
-              <span className="block text-xs text-slate-500">{hit.entry.page}</span>
-              <span className="block text-xs text-slate-600">{hit.snippet}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+    // The role and the ref sit on a bare wrapper: the kit's Stack takes neither.
+    <div role="search" ref={rootRef}>
+      <Stack gap="xs">
+        <Input
+          type="search"
+          icon={<Icon name="search" />}
+          aria-label="Search the docs"
+          placeholder={query === "" ? HINT : undefined}
+          data-testid="docs-search"
+          value={query}
+          onFocus={load}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            load();
+          }}
+        />
+        {searching && failed ? (
+          <Text as="p" data-testid="docs-search-status">
+            The search index did not load. Reload the page to try again.
+          </Text>
+        ) : null}
+        {searching && entries && hits.length === 0 ? (
+          <Text as="p" data-testid="docs-search-status">
+            Nothing matches "{query.trim()}".
+          </Text>
+        ) : null}
+        {hits.length > 0 ? (
+          <Stack as="ul" gap="xs" data-testid="docs-search-results">
+            {hits.map((hit) => (
+              <li key={hit.entry.url}>
+                <ListRow
+                  href={hit.entry.url}
+                  // Named by the heading alone, as the plain link was; the row would read its snippet too.
+                  aria-label={hit.entry.heading}
+                  size="sm"
+                  secondary={
+                    <>
+                      <div>{hit.entry.page}</div>
+                      <div>{hit.snippet}</div>
+                    </>
+                  }
+                >
+                  {hit.entry.heading}
+                </ListRow>
+              </li>
+            ))}
+          </Stack>
+        ) : null}
+      </Stack>
     </div>
   );
 }

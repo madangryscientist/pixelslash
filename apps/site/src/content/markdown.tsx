@@ -5,8 +5,10 @@ import {
   CodeBlock,
   type CodeLanguage,
   Divider,
+  Image,
   Prose,
   SectionHeading,
+  Stack,
   SubsectionHeading,
   Table,
   TableBody,
@@ -81,7 +83,7 @@ function InlineLink({ token, doc }: { token: Tokens.Link; doc: Doc }): ReactNode
 function InlineImage({ token, doc }: { token: Tokens.Image; doc: Doc }): ReactNode {
   const src = resolveImageSrc(token.href, doc.source);
   if (src === null) return token.text;
-  return <img src={src} alt={token.text} className="block h-auto max-w-full rounded" />;
+  return <Image src={src} alt={token.text} width="full" aspect="natural" />;
 }
 
 function InlineToken({ token, doc }: { token: MarkedToken; doc: Doc }): ReactNode {
@@ -226,9 +228,9 @@ function Blocks({ tokens, doc }: { tokens: MarkedToken[]; doc: Doc }): ReactNode
 export function DocBody({ doc }: { doc: Doc }): ReactNode {
   return (
     <Prose data-doc={doc.source}>
-      <div className="flex min-w-0 flex-col gap-4">
+      <Stack gap="sm">
         <Blocks tokens={doc.tokens} doc={doc} />
-      </div>
+      </Stack>
     </Prose>
   );
 }
