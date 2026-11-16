@@ -22,6 +22,9 @@ vi.mock(import("../../engine/src/diff.ts"), async (original) => {
 
 afterEach(() => vi.restoreAllMocks());
 afterAll(cleanup);
+// The mock above is of this thread's module: the diff must run here, not in a pool worker.
+vi.stubEnv("PIXELSLASH_DIFF_CORES", "1");
+afterAll(() => vi.unstubAllEnvs());
 
 type Envelope = {
   headers: Record<string, unknown>;

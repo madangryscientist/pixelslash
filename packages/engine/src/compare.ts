@@ -11,6 +11,7 @@ import {
   type PairSteps,
 } from "./capture.ts";
 import type { DiffOptions, IgnoreRect } from "./diff.ts";
+import { withDiffPool } from "./diff-pool.ts";
 import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import {
@@ -80,7 +81,12 @@ export type CompareResult = {
 
 type Verdict = { already: Violation[]; fresh: Violation[]; skipped: boolean; skipReason?: string };
 
-export async function compareRoutes(opts: CompareOptions, deps: Deps = {}): Promise<CompareResult> {
+/** Every route of a `--routes` run, sharing one diff pool. */
+export function compareRoutes(opts: CompareOptions, deps: Deps = {}): Promise<CompareResult> {
+  return withDiffPool(() => routesIn(opts, deps));
+}
+
+async function routesIn(opts: CompareOptions, deps: Deps): Promise<CompareResult> {
   const started = performance.now();
   const routes = opts.routes ?? [];
   const pixel = !opts.ds;

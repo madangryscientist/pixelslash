@@ -1,4 +1,5 @@
-import { ENGINE_VERSION, diffPngs } from "./diff.ts";
+import { ENGINE_VERSION } from "./diff.ts";
+import { pooledDiff, withDiffPool } from "./diff-pool.ts";
 import type { FlakyPolicy } from "./config.ts";
 import type { Region } from "./regions.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
@@ -45,13 +46,19 @@ export async function checkFlake(
   again: () => Promise<Shoot>,
 ): Promise<FlakeCheck> {
   const shots = await Promise.allSettled(Array.from({ length: retries }, () => again()));
-  const runs: FlakeRun[] = shots.map((settled, i) => {
+  const taken = shots.map((settled) => {
     if (settled.status === "rejected") throw settled.reason;
-    const { png, ignore } = settled.value;
-    const diff = diffPngs(first, png, shot.diff, { main: shot.ignore, branch: ignore });
-    const regions = diff.changed ? diff.regions.filter((r) => r.kind === "change") : [];
-    return { run: i + 2, png, differed: diff.changed, regions };
+    return settled.value;
   });
+  const runs: FlakeRun[] = await withDiffPool(() =>
+    Promise.all(
+      taken.map(async ({ png, ignore }, i) => {
+        const diff = await pooledDiff(first, png, shot.diff, { main: shot.ignore, branch: ignore });
+        const regions = diff.changed ? diff.regions.filter((r) => r.kind === "change") : [];
+        return { run: i + 2, png, differed: diff.changed, regions };
+      }),
+    ),
+  );
   const differed = runs.filter((r) => r.differed);
   return {
     flaky: differed.length > 0,

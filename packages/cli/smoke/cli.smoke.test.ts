@@ -40,12 +40,12 @@ afterAll(async () => {
 });
 
 /** The CLI with a clean environment: no token, server or error sink can reach it from the shell. */
-async function pixelslash(args: string[]) {
+async function pixelslash(args: string[], extra: Record<string, string> = {}) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !k.startsWith("PIXELSLASH_")),
   );
   const proc = Bun.spawn(["bun", CLI, ...args], {
-    env: { ...env, TMPDIR: work },
+    env: { ...env, TMPDIR: work, ...extra },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -91,6 +91,23 @@ describe("the built CLI", () => {
     const report = await Bun.file(join(out, "report.html")).text();
     for (const image of ["main.png", "branch.png", "diff.png"])
       expect(report).toContain(`src="${image}"`);
+  });
+
+  test("PIXELSLASH_DIFF_CORES=2: the pair is diffed in the bundled worker, with the same result", async () => {
+    const [live, local, out] = [join(work, "c.png"), join(work, "d.png"), join(work, "pool-out")];
+    await shot(live, false);
+    await shot(local, true);
+
+    const args = ["--live-png", live, "--local-png", local, "--out", out];
+    const run = await pixelslash(args, { PIXELSLASH_DIFF_CORES: "2" });
+
+    expect(run.stderr).not.toContain("FAILED");
+    expect(run.code).toBe(0);
+    expect(run.stdout).toContain("pixelslash: 100 changed pixels");
+    expect(existsSync(join(CLI, "..", "diff-worker.js"))).toBe(true);
+    expect(await Bun.file(join(out, "diff.png")).bytes()).toEqual(
+      await Bun.file(join(work, "png-out", "diff.png")).bytes(),
+    );
   });
 
   test("an identical PNG pair is unchanged and still writes a report", async () => {

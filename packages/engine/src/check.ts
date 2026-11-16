@@ -1,7 +1,10 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { type BaselinesReply, baselinePng, fetchBaselines } from "./baselines-client.ts";
-import { type BaselinePick, type PickedShot, measureShot } from "./ci-diff.ts";
+import { type BaselinePick, type PickedShot, measureShotWith } from "./ci-diff.ts";
+import { pooledMeasure, withDiffPool } from "./diff-pool.ts";
+
+const measurePooled = measureShotWith(pooledMeasure);
 import { type CheckShot, addRemoved, shotsOf } from "./check-rows.ts";
 import { renderCompareIndex } from "./compare-report.ts";
 import {
@@ -111,7 +114,7 @@ async function settle(
   if (!baseline || !pick.carry) return baseline;
   const same = fingerprintOf(baseline.fingerprint, identity(e));
   if (FINGERPRINT_KEYS.every((k) => same[k] === e.fingerprint[k])) {
-    const [measured] = await measureShot(e, png, { ...pick, accepted: null }, fetchPng);
+    const [measured] = await measurePooled(e, png, { ...pick, accepted: null }, fetchPng);
     if (measured?.status === "unchanged") return baseline;
   }
   return pick.accepted;
@@ -131,21 +134,24 @@ async function writeBaselines(
     return got;
   };
   const snapshots: SnapshotEntry[] = [];
-  for (const [i, e] of entries.entries()) {
-    const pick = picks[i];
-    if (!pick) continue;
-    const png = Buffer.from(await Bun.file(pngPath(dirs.branch, e)).arrayBuffer());
-    const chosen = await settle(e, png, pick, fetchPng);
-    if (!chosen) continue;
-    const dest = join(dirs.main, e.file);
-    await mkdir(dirname(dest), { recursive: true });
-    await Bun.write(dest, await fetchPng(chosen));
-    snapshots.push({
-      ...e,
-      ignore: chosen.ignore,
-      fingerprint: fingerprintOf(chosen.fingerprint, identity(e)),
-    });
-  }
+  // One diff pool for every settle, rather than one per shot.
+  await withDiffPool(async () => {
+    for (const [i, e] of entries.entries()) {
+      const pick = picks[i];
+      if (!pick) continue;
+      const png = Buffer.from(await Bun.file(pngPath(dirs.branch, e)).arrayBuffer());
+      const chosen = await settle(e, png, pick, fetchPng);
+      if (!chosen) continue;
+      const dest = join(dirs.main, e.file);
+      await mkdir(dirname(dest), { recursive: true });
+      await Bun.write(dest, await fetchPng(chosen));
+      snapshots.push({
+        ...e,
+        ignore: chosen.ignore,
+        fingerprint: fingerprintOf(chosen.fingerprint, identity(e)),
+      });
+    }
+  });
   const manifest = { version: 1, snapshots };
   await Bun.write(join(dirs.main, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }

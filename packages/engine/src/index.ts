@@ -170,3 +170,5 @@ export {
 } from "./dev-lock.ts";
 export { DEV_HEADER, serveDevPage, type DevState } from "./dev-page.ts";
 export { devController, type DevController } from "./dev-session.ts";
+export { DIFF_CORES_VAR, MAX_DIFF_CORES, diffCores } from "./diff-cores.ts";
+export { pooledDiff, pooledMeasure, withDiffPool } from "./diff-pool.ts";

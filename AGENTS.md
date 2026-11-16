@@ -118,6 +118,10 @@ Lint rules are all errors; fix the code, do not disable a rule.
 Tests live in `packages/*/test/` and run with `bun --bun vitest`, because the
 code and tests use Bun APIs (`Bun.file`, `Bun.serve`, `Bun.spawn`).
 Real-browser tests run on Chromium only; Firefox and WebKit are never used in testing.
+`PIXELSLASH_DIFF_CORES` (`docs/cli.md`, "Environment variables") caps how many pixel diffs the engine
+runs at once, each in a Bun `Worker` (`packages/engine/src/diff-pool.ts`). The gate's own test runs read
+it too, so a shared machine can set it (for example `PIXELSLASH_DIFF_CORES=4`) to leave cores to everything
+else; unset, it takes capture's default. It does not touch the capture's `concurrency`.
 
 The bench regression guard is part of `test`: `bench:test` depends on `bench:check`
 (`bun bench/src/check.ts`, no VM, no browser), which fails when a score is worse than the

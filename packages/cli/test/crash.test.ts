@@ -23,6 +23,9 @@ beforeEach(() => {
   boom.on = () => false;
 });
 afterAll(cleanup);
+// The mock above is of this thread's module: the diff must run here, not in a pool worker.
+vi.stubEnv("PIXELSLASH_DIFF_CORES", "1");
+afterAll(() => vi.unstubAllEnvs());
 
 /** A snapshot dir as `pixelslash capture` writes it: one solid 40x40 shot per name. */
 async function snapshotDir(shots: Record<string, number>): Promise<string> {

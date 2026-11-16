@@ -3,10 +3,13 @@ import {
   type BaselinePick,
   type CiResult,
   type PickedShot,
-  measureShot,
+  measureShotWith,
   withoutSame,
 } from "./ci-diff.ts";
 import type { ChangeNoter } from "./change-note.ts";
+import { pooledMeasure } from "./diff-pool.ts";
+
+const measurePooled = measureShotWith(pooledMeasure);
 import { identity } from "./manifest.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 import { elapsed, type ShotTiming } from "./timings.ts";
@@ -120,7 +123,7 @@ async function measureTimed(
     return bytes;
   };
   const started = performance.now();
-  const results = await measureShot(e, png, pick, fetchMain);
+  const results = await measurePooled(e, png, pick, fetchMain);
   timing.diffMs = Math.max(0, elapsed(started) - fetching);
   return results;
 }

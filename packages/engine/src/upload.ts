@@ -21,6 +21,7 @@ import {
 import { type Client, isObj, send } from "./upload-client.ts";
 import { readShot } from "./upload-form.ts";
 import { shotSender } from "./upload-send.ts";
+import { withDiffPool } from "./diff-pool.ts";
 import { changeNote, measurePng, sameAsBaselines } from "./upload-measure.ts";
 import { knownImages } from "./upload-known.ts";
 
@@ -260,7 +261,8 @@ export async function uploadSnapshots(
       await sender.send(shot);
     }
   };
-  await runWorkers(worker, stop);
+  // One diff pool across the workers, so the cap holds over every shot they measure at once.
+  await withDiffPool(() => runWorkers(worker, stop));
   await sender.flush();
   await saveReshot(opts.dir, manifest, flakes.reshot());
   const runTimings = uploadRun(timed, manifest.snapshots.length, loadStart);
