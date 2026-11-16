@@ -115,7 +115,7 @@ function reply(req: DiffRequest): DiffReply {
   }
 }
 
-function countingWorkers(fail?: (req: DiffRequest) => boolean) {
+function countingWorkers(fail?: (req: DiffRequest) => boolean, dieIdle = false) {
   const seen = { inFlight: 0, most: 0, jobs: 0, spawned: 0, terminated: 0 };
   const spawn = (): WorkerLike => {
     seen.spawned++;
@@ -140,6 +140,8 @@ function countingWorkers(fail?: (req: DiffRequest) => boolean) {
             return;
           }
           listeners.message?.(new MessageEvent("message", { data: reply(req) }));
+          // A worker that answers and then dies while idle.
+          if (dieIdle) listeners.error?.(new ErrorEvent("error", { message: "died idle" }));
         }, 2);
       },
       terminate() {
@@ -250,6 +252,18 @@ describe("the diff pool", () => {
     );
     expect(seen.spawned).toBe(2);
     expect(seen.terminated).toBe(2);
+  });
+
+  test("a worker that dies while idle is not handed the next job", async () => {
+    const { seen, spawn } = countingWorkers(undefined, true);
+    await withDiffPool(
+      async () => {
+        expect((await pooledDiff(png(-1), png(1))).changed).toBe(true);
+        expect((await pooledDiff(png(-1), png(2))).changed).toBe(true);
+      },
+      { cores: 2, spawn },
+    );
+    expect(seen.spawned).toBe(2);
   });
 
   test("1 core starts no worker", async () => {

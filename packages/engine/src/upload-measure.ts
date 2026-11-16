@@ -8,13 +8,14 @@ import {
 } from "./ci-diff.ts";
 import type { ChangeNoter } from "./change-note.ts";
 import { pooledMeasure } from "./diff-pool.ts";
-
-const measurePooled = measureShotWith(pooledMeasure);
 import { identity } from "./manifest.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 import { elapsed, type ShotTiming } from "./timings.ts";
 import type { Client } from "./upload-client.ts";
 import { sha256Of } from "./upload-form.ts";
+
+/** `measureShot` in the run's diff pool. */
+const measurePooled = measureShotWith(pooledMeasure);
 
 /** One shot's measure in an upload: against its baselines, by bytes or by diff, and the judge's note on a change. */
 

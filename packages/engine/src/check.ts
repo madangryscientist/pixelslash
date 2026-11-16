@@ -3,8 +3,6 @@ import { dirname, join, relative, resolve } from "node:path";
 import { type BaselinesReply, baselinePng, fetchBaselines } from "./baselines-client.ts";
 import { type BaselinePick, type PickedShot, measureShotWith } from "./ci-diff.ts";
 import { pooledMeasure, withDiffPool } from "./diff-pool.ts";
-
-const measurePooled = measureShotWith(pooledMeasure);
 import { type CheckShot, addRemoved, shotsOf } from "./check-rows.ts";
 import { renderCompareIndex } from "./compare-report.ts";
 import {
@@ -23,6 +21,9 @@ import { type CaptureSession, type SnapshotEntry, captureInto, recapture } from 
 import { withTimings } from "./report-timings.ts";
 import { buildTimings, captureFacts, mergeShots } from "./timings.ts";
 import { type Client, isObj } from "./upload-client.ts";
+
+/** `measureShot` in the run's diff pool. */
+const measurePooled = measureShotWith(pooledMeasure);
 
 /**
  * `pixelslash check` (ob 1732): capture here, measure against the baselines the server would pick

@@ -2,10 +2,10 @@ import { defaultConcurrency } from "./capture-into.ts";
 import { UsageError } from "./errors.ts";
 
 /** The most comparisons `PIXELSLASH_DIFF_CORES` may run at once. */
-export const MAX_DIFF_CORES = 32;
+const MAX_DIFF_CORES = 32;
 
 /** The variable that caps the local comparisons a run makes at once. */
-export const DIFF_CORES_VAR = "PIXELSLASH_DIFF_CORES";
+const DIFF_CORES_VAR = "PIXELSLASH_DIFF_CORES";
 
 /**
  * How many comparisons run at once, each on its own core: `PIXELSLASH_DIFF_CORES` when it is a whole

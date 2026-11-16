@@ -47,7 +47,7 @@ export type WorkerLike = {
 
 type Job = Omit<DiffRequest, "id" | "main" | "branch"> & { main: Buffer; branch: Buffer };
 
-export type DiffPool = {
+type DiffPool = {
   /** How many comparisons may be in flight at once. */
   readonly cores: number;
   run(job: Job): Promise<PixelDiff>;
@@ -112,6 +112,8 @@ function workerPool(cores: number, spawn: () => WorkerLike): DiffPool {
     const job = running.get(w);
     running.delete(w);
     all.delete(w);
+    const at = idle.indexOf(w);
+    if (at >= 0) idle.splice(at, 1);
     w.terminate();
     job?.reject(new Error(event.message || "diff worker failed"));
     pump();
@@ -162,13 +164,13 @@ function workerPool(cores: number, spawn: () => WorkerLike): DiffPool {
 }
 
 /** A pool of `cores`: in-process for 1, else up to `cores` workers made by `spawn` (Bun `Worker`s). */
-export function openDiffPool(cores: number, spawn: () => WorkerLike = bunWorker): DiffPool {
+function openDiffPool(cores: number, spawn: () => WorkerLike = bunWorker): DiffPool {
   return cores <= 1 ? inProcess() : workerPool(cores, spawn);
 }
 
 const scope = new AsyncLocalStorage<DiffPool>();
 
-export type PoolOptions = {
+type PoolOptions = {
   /** The cores to use; `diffCores()` (the env) when left out. */
   cores?: number;
   /** How a worker is made; a Bun `Worker` on `diff-worker` when left out. */
