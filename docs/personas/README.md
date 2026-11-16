@@ -5,6 +5,32 @@ ticket, a doc or a design review can name one of them and say what that person g
 personas are read from what the product does today, not from what we hope it will do. Where a
 persona needs something that is not built yet, it is marked as a gap at the end.
 
+## At a glance
+
+The table is generated from [`personas.json`](personas.json), which is the source. Each persona
+says what they look for in the hosted review app (`review`), on pixelslash.dev and its docs
+(`docs`) and in the CLI (`cli`).
+
+<!-- personas:start -->
+| Persona | Group | Model | Who | Looks for (review) | Looks for (docs) | Looks for (cli) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Priya | Product team | sonnet | Frontend lead of six engineers on one React app with a half kept up Storybook, on Chromatic today. She uploads each build from GitHub Actions and accepts or rejects each change on the build page; her goal is that every pull request shows what changed visually and nothing merges until someone has looked. | One click from the pull request to the change, few false alarms from anti-aliasing and font hinting, and no red X on every pull request or two clicks to review. | How the commit status and the pull request comment work, so baselines never drift without her knowing why. | An upload step in GitHub Actions that leaves the commit status pending until the changes are approved. |
+| Marcus | Platform or monorepo | opus | Platform engineer on a monorepo of about twenty packages (a design system, three apps and the docs) built under a task runner whose cache skips unchanged packages. His goal is one visual check per pull request across every package, without spending CI minutes on packages that did not change. | Twenty subprojects with one change each shown as twenty changes in one place, not twenty checks or twenty pages to visit. | A setup that fits the task runner he already has, without each package needing its own configuration. | A skipped package that posts a passed build, so a required check never waits forever for a package the cache skipped. |
+| Lena | Product team | sonnet | Design-system maintainer who owns the component library and its tokens, which product teams consume, so one change ripples into every app. Her goal is to catch a token or spacing regression before a consumer ships it, and to know which stories the change touched. | A diff measured at the level of a region with a note, twins across themes and viewports, and a way to accept a library-wide change in one step. | How to capture every story in light and dark, from Storybook or from Playwright. | A design-system judge on a local vision model, so a violation is flagged without a screenshot leaving her machine and an intended change does not make noise on every story. |
+| Tomás | Privacy-bound | opus | Engineer at a fintech or health company whose screenshots can show data that looks like customer data, where nothing leaves the network without security sign-off. His goal is visual review with every screenshot kept in-house, self-hosted with Docker or on a box inside the LAN. | A self-hosted app with all of the hosted features, and nothing that works only on the hosted app. | A written data flow that lists every outbound call, says plainly where data goes and shows each one off by default. | Local unless told to upload, with no required SaaS call and error reports scrubbed before they leave. |
+| Sam | Solo or agency | sonnet | Solo developer or small agency building client sites, often without Storybook, sometimes with Playwright tests and sometimes with only a URL. Sam wants to know in a minute whether a CSS change broke the other pages. | A local report.html that opens in a browser and never claims more than it measured. | No sign-up wall and no heavy configuration between Sam and the first answer. | Pair mode against a live URL or two PNG files with no setup and no account, and exit codes that CI can read. |
+<!-- personas:end -->
+
+## Edit, add or remove
+
+Edit `personas.json`, then run `bun scripts/personas.ts` from the repository root to rewrite the
+table above. `bun scripts/personas.ts --check` fails when the file is invalid or the table is
+stale, and the gate runs it. There are always exactly five personas, an odd number, so a vote
+between them always has a winner: to add one, remove one. Each persona needs a lower-case kebab
+`id`, a `name`, a `group` from `groups`, a `model` from `models`, a `profile`, and one `focus`
+line for each of `review`, `docs` and `cli`. No field the table prints may hold a `|` or a line
+break.
+
 ## 1. Priya, frontend lead on a product team
 
 Priya leads six engineers on one React app. The app has a Storybook that is half kept up, and she
