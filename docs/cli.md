@@ -58,7 +58,7 @@ Each capture waits for the page to settle before shooting: web fonts, every imag
 
 ### Choosing the browser
 
-`--browser` (default `chromium`) picks the engine for both pages, so a pair is always shot in one browser; the report's sizes line names it (`firefox · Main 1280x720 · Branch 1280x720`). It applies to `--live` / `--local` only: with PNG inputs the pixels are already shot, and `--browser` there is exit 2. Firefox and WebKit need `pixelslash install-browser firefox` (or `webkit`, or `all`) once per machine; the capture image ships all three.
+`--browser` (default `chromium`) picks the engine for both pages, so a pair is always shot in one browser; the report's sizes line names it (`firefox · Main 1280x720 · Branch 1280x720`). It applies to `--live` / `--local` only: with PNG inputs the pixels are already shot, and `--browser` there is exit 2. Firefox and WebKit need `pixelslash install-browser firefox` (or `webkit`, or `all`) once per machine; the capture image ships all three. Our own test runs use Chromium only, so Firefox and WebKit capture is offered but not exercised in a real browser by this repo's tests; unit tests cover the flag, the config and the shot names.
 
 ### What a run writes
 
