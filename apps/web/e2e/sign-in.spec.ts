@@ -27,7 +27,10 @@ test("sign in with GitHub, and a project's pages hydrate in the reader's own zon
   await expect(page).toHaveURL(/\/orgs$/);
   await expect(page.getByRole("heading", { name: "Organizations", exact: true })).toBeVisible();
 
-  const { orgId, orgName, projectId } = await provision({ org: "Acme", project: "storefront" });
+  const { orgId, orgName, projectId, token } = await provision({
+    org: "Acme",
+    project: "storefront",
+  });
   await open(page, `/orgs?org=${orgId}`);
   await expect(page.getByRole("heading", { name: orgName, exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "storefront", exact: true })).toBeVisible();
@@ -37,6 +40,7 @@ test("sign in with GitHub, and a project's pages hydrate in the reader's own zon
 
   await open(page, `/projects/${projectId}/settings`);
   await expect(page.getByRole("heading", { name: "storefront · settings" })).toBeVisible();
-  await expect(page.getByRole("row", { name: /ci/ })).toContainText("active");
+  const row = page.getByRole("row").filter({ hasText: token.slice(0, 9) });
+  await expect(row).toContainText("active");
   expect(hydrationErrors).toEqual([]);
 });

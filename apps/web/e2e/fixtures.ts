@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { type Page, test as base, expect } from "@playwright/test";
 import { sql } from "./d1";
 
-export { SIGNED_IN, SIGNED_OUT } from "./session";
+export { SIGNED_OUT } from "./session";
 
 /**
  * What every web e2e spec imports instead of `@playwright/test`: the signed-in session the `setup`
@@ -21,7 +21,7 @@ export async function open(page: Page, path: string, { hydrated = true } = {}) {
   return response;
 }
 
-export type Provisioned = {
+type Provisioned = {
   orgId: string;
   orgName: string;
   projectId: string;
@@ -29,7 +29,7 @@ export type Provisioned = {
   token: string;
 };
 
-export type ProvisionOptions = {
+type ProvisionOptions = {
   /** The org name before its suffix; the spec's own literal. */
   org?: string;
   project?: string;

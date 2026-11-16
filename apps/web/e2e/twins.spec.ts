@@ -12,8 +12,7 @@ test("the project settings link a twin project of the same org, and clear it", a
   provision,
 }) => {
   const app = await provision({ org: "Link Co", project: "app" });
-  const projectId = app.projectId;
-  await open(page, `/projects/${projectId}/settings`);
+  await open(page, `/projects/${app.projectId}/settings`);
   // A one-project org has nothing to link to.
   await expect(page.getByTestId("no-twin-options")).toBeVisible();
 
@@ -25,5 +24,5 @@ test("the project settings link a twin project of the same org, and clear it", a
   await card.getByRole("button", { name: "Save twin project" }).click();
   await page.reload();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-  await expect(card.getByLabel("Twin project")).toHaveValue(projectId);
+  await expect(card.getByLabel("Twin project")).toHaveValue(app.projectId);
 });

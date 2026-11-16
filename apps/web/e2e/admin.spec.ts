@@ -1,4 +1,4 @@
-import { SIGNED_IN, SIGNED_OUT, expect, open, test } from "./fixtures";
+import { SIGNED_OUT, expect, open, test } from "./fixtures";
 import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { rivalContext, rivalSession } from "./rival";
 
@@ -80,7 +80,8 @@ test("each window reads snapshots per build and time per snapshot, in both theme
   ];
   for (const colorScheme of ["light", "dark"] as const) {
     for (const viewport of sizes) {
-      const context = await browser.newContext({ storageState: SIGNED_IN, colorScheme, viewport });
+      // `browser.newContext` takes the project's `use`, so this context is signed in as the operator.
+      const context = await browser.newContext({ colorScheme, viewport });
       const view = await context.newPage();
       await open(view, "/_admin");
       await expect(view.locator("html")).toHaveClass(

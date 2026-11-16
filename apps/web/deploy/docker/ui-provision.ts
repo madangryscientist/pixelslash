@@ -1,4 +1,5 @@
 import { type Page, expect } from "@playwright/test";
+import { open } from "../../e2e/fixtures";
 import { createOrg, createProject, openSettings } from "../../e2e/orgs-page";
 
 /**
@@ -7,7 +8,7 @@ import { createOrg, createProject, openSettings } from "../../e2e/orgs-page";
  * main suite's store write (`e2e/fixtures.ts`, `provision`) cannot reach.
  */
 export async function provisionByClicking(page: Page, org: string, project: string) {
-  await page.goto("/");
+  await open(page, "/");
   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
   await expect(page).toHaveURL(/\/orgs$/);
   await createOrg(page, org);
