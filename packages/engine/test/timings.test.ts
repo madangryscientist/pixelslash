@@ -12,7 +12,7 @@ const steps = (n: number): CaptureSteps => ({
   navigateMs: n,
   settleMs: 4 * n,
   screenshotMs: 2 * n,
-  settle: { fontsMs: n, imagesMs: n, networkIdleMs: n, framesMs: n },
+  settle: { fontsMs: n, imagesMs: n, networkIdleMs: n, framesMs: n, idleMs: n },
 });
 
 /** The report for one shot of `captureMs` whose parts add up to 3 ms. */

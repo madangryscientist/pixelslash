@@ -6,7 +6,7 @@ import { call, openBuild, setup, snapshotForm } from "./test-support";
 describe("the timings a finalize stores", () => {
   test("the capture profile sent at finalize is stored whole; a malformed extra is dropped alone", async () => {
     const { db, deps, acme } = await setup();
-    const settle = { fontsMs: 5, imagesMs: 6, networkIdleMs: 500, framesMs: 30 };
+    const settle = { fontsMs: 5, imagesMs: 6, networkIdleMs: 500, framesMs: 30, idleMs: 12 };
     const profile = {
       totalMs: 2000,
       browserLaunchMs: 300,
@@ -65,6 +65,16 @@ describe("the timings a finalize stores", () => {
       shots: [{ name: "pricing", captureMs: 800 }],
     };
     expect(await stored({ snapshots: 1, timings: old })).toEqual(old);
+    // An older CLI's settle split has no idle wait: it is kept without one, and a malformed one is dropped alone.
+    const { idleMs: _idle, ...olderSettle } = settle;
+    const older = { totalMs: 1200, captureMs: 800, settle: olderSettle, shots: [] };
+    expect(await stored({ snapshots: 1, timings: older })).toEqual(older);
+    expect(
+      await stored({
+        snapshots: 1,
+        timings: { ...older, settle: { ...olderSettle, idleMs: "x" } },
+      }),
+    ).toEqual(older);
     // Each malformed new field is dropped on its own; the rest of the timings is kept.
     const kept = await stored({
       snapshots: 1,

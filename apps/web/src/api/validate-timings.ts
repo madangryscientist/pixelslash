@@ -47,16 +47,20 @@ const CAPTURE_PARTS = [
   "measureMs",
 ] as const;
 
-/** The settle split when all four conditions are well formed; otherwise none. */
+/**
+ * The settle split when its first four conditions are well formed; otherwise none. `idleMs` is kept
+ * when it is well formed and left out otherwise: an older CLI sends none.
+ */
 function settleOf(split: unknown): TimedSettle | undefined {
   if (!isObj(split)) return undefined;
-  const { fontsMs, imagesMs, networkIdleMs, framesMs } = split;
+  const { fontsMs, imagesMs, networkIdleMs, framesMs, idleMs } = split;
   if (!ms(fontsMs) || !ms(imagesMs) || !ms(networkIdleMs) || !ms(framesMs)) return undefined;
   return {
     fontsMs: Math.round(fontsMs),
     imagesMs: Math.round(imagesMs),
     networkIdleMs: Math.round(networkIdleMs),
     framesMs: Math.round(framesMs),
+    ...(ms(idleMs) && { idleMs: Math.round(idleMs) }),
   };
 }
 

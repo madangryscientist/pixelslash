@@ -12,6 +12,8 @@ export type SettleSteps = {
   imagesMs: number;
   networkIdleMs: number;
   framesMs: number;
+  /** The wait for the page's main thread to go idle after the frames; 0 where the settle has no request tracker. */
+  idleMs: number;
 };
 
 /**
@@ -101,7 +103,7 @@ const PARTS = [
   "storyMs",
   "measureMs",
 ] as const;
-const SETTLE = ["fontsMs", "imagesMs", "networkIdleMs", "framesMs"] as const;
+const SETTLE = ["fontsMs", "imagesMs", "networkIdleMs", "framesMs", "idleMs"] as const;
 
 /** `a` and `b` added up, part by part: a pair's two captures as one shot's steps. */
 export function addSteps(a: CaptureSteps, b: CaptureSteps): CaptureSteps {
@@ -182,7 +184,7 @@ function sumShots(shots: ShotTiming[]): Partial<Timings> {
   }
   const settled = shots.flatMap((s) => (s.settle ? [s.settle] : []));
   if (settled.length > 0) {
-    const settle = { fontsMs: 0, imagesMs: 0, networkIdleMs: 0, framesMs: 0 };
+    const settle = { fontsMs: 0, imagesMs: 0, networkIdleMs: 0, framesMs: 0, idleMs: 0 };
     for (const s of settled) for (const k of SETTLE) settle[k] += s[k];
     sums.settle = settle;
   }
