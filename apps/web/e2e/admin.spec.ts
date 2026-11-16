@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, provision, uploadBuild } from "./api-upload";
+import { SIGNED_OUT, expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { rivalContext, rivalSession } from "./rival";
 
 /**
@@ -10,9 +10,9 @@ import { rivalContext, rivalSession } from "./rival";
  */
 
 test("a visitor who is not signed in gets a 404, not a sign-in redirect", async ({ browser }) => {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ storageState: SIGNED_OUT });
   const page = await context.newPage();
-  const response = await page.goto("/_admin");
+  const response = await open(page, "/_admin");
   expect(response?.status()).toBe(404);
   expect(new URL(page.url()).pathname).toBe("/_admin");
   await expect(page.getByTestId("operator-health")).toHaveCount(0);
@@ -23,7 +23,7 @@ test("a signed-in user who is not listed gets a 404", async ({ browser }) => {
   const token = await rivalSession("admin-rival", 9101, "Not An Operator Co");
   const context = await rivalContext(browser, token);
   const page = await context.newPage();
-  const response = await page.goto("/_admin");
+  const response = await open(page, "/_admin");
   expect(response?.status()).toBe(404);
   await expect(page.getByTestId("operator-health")).toHaveCount(0);
   // Signed in, so the page they are refused is not a sign-in prompt.
@@ -34,13 +34,11 @@ test("a signed-in user who is not listed gets a 404", async ({ browser }) => {
 test("a listed operator sees the page: every group, and what it cannot read says why", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs$/);
-  // No link to it from a customer page.
+  // Signed in from the start (the setup project); no link to it from a customer page.
+  await open(page, "/orgs");
   await expect(page.getByRole("link", { name: /operator|admin/i })).toHaveCount(0);
 
-  const response = await page.goto("/_admin");
+  const response = await open(page, "/_admin");
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Operator health", exact: true })).toBeVisible();
   await expect(page.getByTestId("admin-now")).toContainText("as of");
@@ -66,10 +64,10 @@ test("a listed operator sees the page: every group, and what it cannot read says
 
 test("each window reads snapshots per build and time per snapshot, in both themes, at desktop and phone width", async ({
   browser,
-  page,
+  provision,
 }) => {
   // A real build with a diffed shot, so the window has a build and a server compare to count.
-  const { token } = await provision(page, "Window Figures Co", "figures");
+  const { token } = await provision({ org: "Window Figures Co", project: "figures" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
   await uploadBuild(
     token,
@@ -82,12 +80,10 @@ test("each window reads snapshots per build and time per snapshot, in both theme
   ];
   for (const colorScheme of ["light", "dark"] as const) {
     for (const viewport of sizes) {
+      // `browser.newContext` takes the project's `use`, so this context is signed in as the operator.
       const context = await browser.newContext({ colorScheme, viewport });
       const view = await context.newPage();
-      await view.goto("/");
-      await view.getByRole("link", { name: "Sign in with GitHub" }).click();
-      await expect(view).toHaveURL(/\/orgs$/);
-      await view.goto("/_admin");
+      await open(view, "/_admin");
       await expect(view.locator("html")).toHaveClass(
         colorScheme === "dark" ? /dark/ : /^(?!.*dark)/,
       );

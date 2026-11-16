@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const WEB = fileURLToPath(new URL("..", import.meta.url));
 
-/** One statement against the running e2e D1, as the wrangler CLI does. */
+/** SQL against the running e2e D1, as the wrangler CLI runs it: one statement, or several joined by `;`. */
 export function sql(command: string) {
   const args = ["wrangler", "d1", "execute", "DB", "--local", "--env", "e2e"];
   const result = spawnSync(

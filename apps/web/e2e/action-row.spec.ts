@@ -1,5 +1,6 @@
-import { type Page, expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import type { Page } from "@playwright/test";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 
 /**
  * The review bar keeps Accept in one place as j walks shots (PS-264): the title line never pushes
@@ -41,10 +42,11 @@ async function walk(page: Page) {
 
 test("the action row keeps its place as j walks shots with short and long titles", async ({
   page,
+  provision,
 }) => {
   // Two full walks of the shots, one per width, on top of the upload and the sign-in.
   test.setTimeout(90_000);
-  const { token, projectId } = await provision(page, "Walk Co", "walk");
+  const { token, projectId } = await provision({ org: "Walk Co", project: "walk" });
   await uploadBuild(
     token,
     { branch: "main", commitSha: SHA_MAIN },

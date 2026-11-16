@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "@playwright/test";
-import { provision } from "../../e2e/api-upload";
+import { provisionByClicking } from "./ui-provision";
+import { open } from "../../e2e/fixtures";
 import { png } from "../../e2e/png";
 import { SERVER, SERVER_PORT, SIDECAR_PORT, STUB } from "../../e2e/ports";
 
@@ -130,7 +131,7 @@ test("signs in, takes an upload, diffs it, and keeps it all across a restart", a
   containers.push(name);
   await up(SERVER);
 
-  const { token } = await provision(page, "Self Co", "home");
+  const { token } = await provisionByClicking(page, "Self Co", "home");
   const first = await upload(WHITE, token);
   expect(await shotOf(first, token)).toMatchObject({ diff_status: "new" });
   const second = await upload(CHANGED, token);
@@ -152,7 +153,7 @@ test("signs in, takes an upload, diffs it, and keeps it all across a restart", a
   await up(SERVER);
   // The rows, the session and the token are where they were.
   expect(await shotOf(second, token)).toMatchObject({ diff_status: "changed" });
-  await page.goto("/orgs");
+  await open(page, "/orgs");
   await expect(page.getByRole("heading", { name: "Self Co" })).toBeVisible();
   // The blobs are still on the volume: the shot's PNG is served, and a new upload diffs against
   // a baseline read back from disk.

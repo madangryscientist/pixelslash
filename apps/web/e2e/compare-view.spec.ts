@@ -1,5 +1,6 @@
-import { type Page, expect, test } from "@playwright/test";
-import { SHA_MAIN, SHA_WORK, explained, open, provision, uploadBuild } from "./api-upload";
+import type { Page } from "@playwright/test";
+import { type Provision, expect, open, test } from "./fixtures";
+import { SHA_MAIN, SHA_WORK, explained, uploadBuild } from "./api-upload";
 import { png } from "./png";
 import { STUB } from "./ports";
 import { highlightToggle, showPanel } from "./snapshot-viewer";
@@ -19,8 +20,8 @@ const BRANCH = png(1300, 500, [{ x: 100, y: 100, w: 400, h: 200, rgb: [220, 30, 
 const PANEL = (page: Page) => page.getByRole("complementary", { name: "Review panel" });
 
 /** A changed shot (`hero`) and an unchanged one, opened on the changed one. */
-async function openChangedShot(page: Page) {
-  const { token, projectId } = await provision(page, "Compare Co", "compare");
+async function openChangedShot(page: Page, provision: Provision) {
+  const { token, projectId } = await provision({ org: "Compare Co", project: "compare" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "hero", png: MAIN },
     { name: "footer", png: MAIN },
@@ -43,9 +44,10 @@ async function openChangedShot(page: Page) {
 
 test("a phone gets the controls, the image and the panel stacked, with no sideways scroll", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   // Below `lg` the panel is never folded away: it stacks under the image.
   await expect(PANEL(page)).toBeVisible();
@@ -63,9 +65,10 @@ test("a phone gets the controls, the image and the panel stacked, with no sidewa
 
 test("labelled counters, the share of changed pixels, and highlight that starts off", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   await expect(page.getByTestId("review-position")).toHaveText("change 1 of 1");
   await expect(page.getByTestId("position")).toHaveText("shot 1 of 2");
 
@@ -84,9 +87,9 @@ test("labelled counters, the share of changed pixels, and highlight that starts 
   await expect(changed).toHaveText(/^[\d,]+ \(12\.3%\)$/);
 });
 
-test("the slider's divider is visible on a light and a dark theme", async ({ page }) => {
+test("the slider's divider is visible on a light and a dark theme", async ({ page, provision }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   await page.getByRole("radio", { name: "Slider", exact: true }).click();
   const divider = page.getByTestId("slider-divider");
   const grip = page.getByTestId("slider-grip");
@@ -107,11 +110,15 @@ test("the slider's divider is visible on a light and a dark theme", async ({ pag
   }
 });
 
-test("a shot whose judge failed says so and why, not that there is no judge", async ({ page }) => {
+test("a shot whose judge failed says so and why, not that there is no judge", async ({
+  page,
+  provision,
+}) => {
   // The queue tries the shot three times, 10 s then 20 s apart, before it stores why it failed.
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  const { token, projectId } = await provision(page, "Judge Co", "judged");
+  const { token, projectId } = await provision({ org: "Judge Co", project: "judged" });
+  await open(page, `/projects/${projectId}/settings`);
   // The stub answers only to its own key, so any other key makes every call fail.
   const form = page.getByTestId("model-settings");
   await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
@@ -138,9 +145,10 @@ test("a shot whose judge failed says so and why, not that there is no judge", as
 
 test("the view mode picker keeps the chosen mode checked, also across a theme toggle", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   const radio = (name: string) => page.getByRole("radio", { name, exact: true });
   for (const mode of ["Slider", "Overlay", "Side by side"]) {
     await radio(mode).click();
@@ -155,9 +163,9 @@ test("the view mode picker keeps the chosen mode checked, also across a theme to
   }
 });
 
-test("the overlay's opacity range sets the top layer's opacity", async ({ page }) => {
+test("the overlay's opacity range sets the top layer's opacity", async ({ page, provision }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   await page.getByRole("radio", { name: "Overlay", exact: true }).click();
   const range = page.getByLabel("Overlay opacity");
   const top = page.getByTestId("overlay-top");
@@ -175,9 +183,10 @@ test("the overlay's opacity range sets the top layer's opacity", async ({ page }
 
 test("at Fit, side by side, the side panel folds away and the panes take the width", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   const viewer = page.getByRole("region", { name: "Snapshot viewer" });
   const toggle = page.getByRole("button", { name: "Side panel", exact: true });
 
@@ -211,9 +220,12 @@ test("at Fit, side by side, the side panel folds away and the panes take the wid
   await expect(PANEL(page)).toBeVisible();
 });
 
-test("flagging a detection keeps the folded panel open for its form", async ({ page }) => {
+test("flagging a detection keeps the folded panel open for its form", async ({
+  page,
+  provision,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openChangedShot(page);
+  await openChangedShot(page, provision);
   await expect(PANEL(page)).toHaveCount(0);
   await page.getByRole("button", { name: "Flag detection" }).click();
   await expect(PANEL(page)).toBeVisible();

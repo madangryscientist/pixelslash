@@ -306,6 +306,17 @@ free ports per run, so two runs from two worktrees can go at once. Set `PIXELSLA
 `.wrangler/e2e`, and turns the Workers debugger port off (it probes from 9229 and two runs at once
 both get it).
 
+The suite signs in once: the `setup` project (`e2e/signed-in.setup.ts`) clicks "Sign in with GitHub"
+and saves the session to `.wrangler/e2e/signed-in.json`, and every spec starts signed in from it.
+Only that file, `sign-in.spec.ts` and `google-sign-in.spec.ts` click the button; a spec about visitors
+opts out with `test.use({ storageState: SIGNED_OUT })`. Specs import `test`, `expect` and `open` from
+`e2e/fixtures.ts`. Its `provision({ org, project })` fixture writes an org (its name suffixed so it is
+unique per test and per repeat), the stub user's membership, a project and a CI token straight into
+the run's D1, and returns their ids, names and the token. Making those three by clicking is proved once,
+in `orgs.spec.ts`. Every navigation goes through `open(page, path)`, which waits for the hydration
+marker; the Docker self-host spec, whose D1 is inside the container, still provisions by clicking
+(`deploy/docker/ui-provision.ts`).
+
 Then, in a browser at `http://127.0.0.1:3000` (use one host throughout: the session cookie is per
 host, and the OAuth callback is built from the host you came in on):
 

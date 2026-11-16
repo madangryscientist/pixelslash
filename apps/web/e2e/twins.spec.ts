@@ -1,6 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { open, provision } from "./api-upload";
-import { createProject, openSettings } from "./orgs-page";
+import { expect, open, test } from "./fixtures";
 
 /**
  * Twin snapshots (PS-295): the project settings link a twin project of the same org. What a twin
@@ -9,21 +7,22 @@ import { createProject, openSettings } from "./orgs-page";
  * server function behind a hydrated select, saves and survives a reload.
  */
 
-test("the project settings link a twin project of the same org, and clear it", async ({ page }) => {
-  const { projectId } = await provision(page, "Link Co", "app");
-  await open(page, `/projects/${projectId}/settings`);
+test("the project settings link a twin project of the same org, and clear it", async ({
+  page,
+  provision,
+}) => {
+  const app = await provision({ org: "Link Co", project: "app" });
+  await open(page, `/projects/${app.projectId}/settings`);
   // A one-project org has nothing to link to.
   await expect(page.getByTestId("no-twin-options")).toBeVisible();
 
-  // Add a second project from the org page, then link it to the first.
-  await page.goBack();
-  await createProject(page, "native");
-  await openSettings(page, "native");
+  // A second project in the same org, linked to the first from its settings.
+  const native = await provision({ project: "native", into: app });
+  await open(page, `/projects/${native.projectId}/settings`);
   const card = page.getByTestId("twin-project");
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await card.getByLabel("Twin project").selectOption({ label: "app" });
   await card.getByRole("button", { name: "Save twin project" }).click();
   await page.reload();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-  await expect(card.getByLabel("Twin project")).toHaveValue(projectId);
+  await expect(card.getByLabel("Twin project")).toHaveValue(app.projectId);
 });

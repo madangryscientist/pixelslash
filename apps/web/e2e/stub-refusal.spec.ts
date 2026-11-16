@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { expect, test } from "@playwright/test";
 import { Log, LogLevel, Miniflare, convertV4MiniflareOptions } from "miniflare";
+import { SIGNED_OUT, expect, test } from "./fixtures";
 
 /**
  * A production build pointed at the GitHub stand-in does not start (PS-250): the stand-in lets
@@ -11,6 +11,9 @@ import { Log, LogLevel, Miniflare, convertV4MiniflareOptions } from "miniflare";
  * workerd once with the stand-in's bases and once with GitHub's. The second load is also the
  * deployment with no Google client (PS-274): no Google button, and `/auth/google` is a 404.
  */
+
+// It loads the Worker in workerd, not a browser page; a session would be a stranger's anyway.
+test.use({ storageState: SIGNED_OUT });
 
 const WEB_ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(WEB_ROOT, ".wrangler/stub-refusal");

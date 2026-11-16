@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { showPanel } from "./snapshot-viewer";
 
 /**
@@ -12,9 +12,10 @@ import { showPanel } from "./snapshot-viewer";
 test("a flaky shot under each policy: badge, summary line, config line, resolve and reopen", async ({
   page,
   context,
+  provision,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  const { token, projectId } = await provision(page);
+  const { token, projectId } = await provision();
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "hero", png: WHITE },
     { name: "ticker", png: WHITE },

@@ -1,15 +1,55 @@
-import { expect, test } from "@playwright/test";
-import { createOrg, createProject } from "./orgs-page";
+import { randomUUID } from "node:crypto";
+import type { Page } from "@playwright/test";
+import { expect, open, test } from "./fixtures";
+import { createOrg, createProject, openSettings } from "./orgs-page";
 
-test("an empty org says what a project is, and a pending invite can be withdrawn", async ({
+/** On a fresh project's settings: issue a CI token, see it once, revoke it, and save the default branch. */
+async function issueToken(page: Page) {
+  await expect(page.getByRole("heading", { name: "storefront · settings" })).toBeVisible();
+  await expect(page.getByTestId("no-tokens")).toBeVisible();
+  await expect(page.locator("[data-hydrated=true]")).toHaveCount(1);
+  // Empty, the button is grey and says why rather than doing nothing.
+  await expect(page.getByRole("button", { name: "Issue token" })).toBeDisabled();
+  await expect(page.getByText("Name the token first")).toBeVisible();
+
+  await page.getByLabel("Token name, e.g. github-actions").fill("github-actions");
+  await page.getByRole("button", { name: "Issue token" }).click();
+  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
+  expect(token).toMatch(/^psci_/);
+  const row = page.getByRole("row", { name: /github-actions/ });
+  await expect(row).toContainText(token.slice(0, 9));
+  await expect(row).toContainText("active");
+
+  await page.reload();
+  await expect(page.getByTestId("issued-token")).toHaveCount(0);
+  await row.getByRole("button", { name: "Revoke" }).click();
+  await expect(row).toContainText("revoked");
+
+  // The default branch starts at main and is what auto-accepts (ob 1559); a save survives a reload.
+  const branch = page.getByLabel("Default branch, e.g. main");
+  await expect(branch).toHaveValue("main");
+  await branch.fill("master");
+  // Reload only once the save's server call has returned: its response is what makes the value stick.
+  const saved = page.waitForResponse(
+    (res) => res.request().method() === "POST" && !!res.request().postData()?.includes("master"),
+  );
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  expect((await saved).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByLabel("Default branch, e.g. main")).toHaveValue("master");
+}
+
+/**
+ * The one test that makes an org, a project and a CI token by clicking. Every other spec has them
+ * written straight to the D1 (`provision` in fixtures.ts), so this is where those three flows are
+ * proved in a browser.
+ */
+test("create an org, a project and a CI token by clicking; an empty org says what a project is, and an invite can be withdrawn", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs/);
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-
-  await createOrg(page, "Fresh Co");
+  await open(page, "/orgs");
+  const orgName = `Fresh Co ${randomUUID().slice(0, 8)}`;
+  const orgId = await createOrg(page, orgName);
   const empty = page.getByTestId("empty-org");
   await expect(empty).toContainText("No projects yet");
   await expect(page.getByTestId("upload-command").locator("code")).toContainText(
@@ -39,6 +79,12 @@ test("an empty org says what a project is, and a pending invite can be withdrawn
   await page.goBack();
   await projectRow.click({ position: { x: 600, y: 3 } });
   await expect(page).toHaveURL(/\/projects\/[^/]+$/);
+  // A project with no builds says how to make one: the token, then the exact upload command.
+  const emptyProject = page.getByTestId("empty-project");
+  await expect(emptyProject).toContainText("No builds yet");
+  await expect(emptyProject.getByTestId("upload-command").locator("code")).toContainText(
+    `pixelslash upload DIR --server ${new URL(page.url()).origin}`,
+  );
   await page.goBack();
   await expect(page.getByTestId("project-row")).toHaveCount(1);
 
@@ -61,4 +107,9 @@ test("an empty org says what a project is, and a pending invite can be withdrawn
   await expect(page.getByTestId("timings-empty")).toContainText(
     "No finished builds in the last 30 days",
   );
+
+  // Issue a CI token from the project's settings, through its row's gear.
+  await open(page, `/orgs?org=${orgId}`);
+  await openSettings(page, "storefront");
+  await issueToken(page);
 });

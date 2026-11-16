@@ -1,16 +1,12 @@
-import { expect, test } from "@playwright/test";
-import { createOrg } from "./orgs-page";
+import { expect, open, test } from "./fixtures";
 
 test("mint an org token in the org settings, see it is live, revoke it", async ({
   page,
   request,
+  provision,
 }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs/);
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-
-  const orgId = await createOrg(page, "Monorepo Co");
+  const { orgId } = await provision({ org: "Monorepo Co" });
+  await open(page, `/orgs?org=${orgId}`);
 
   await page.getByRole("link", { name: /^Tokens/ }).click();
   await expect(page).toHaveURL(/tab=tokens/);

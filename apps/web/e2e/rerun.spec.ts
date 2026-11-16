@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { sql } from "./d1";
 
 /**
@@ -10,8 +10,9 @@ import { sql } from "./d1";
 
 test("an errored shot is re-run from the build page, and the build gets its verdict", async ({
   page,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page, "Rerun Co", "rerun");
+  const { token, projectId } = await provision({ org: "Rerun Co", project: "rerun" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "hero", png: WHITE },
     { name: "ticker", png: WHITE },
