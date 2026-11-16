@@ -1,9 +1,19 @@
-import { expect, open, test } from "./fixtures";
+import { SIGNED_OUT, expect, open, test } from "./fixtures";
+import { SERVER } from "./ports";
+import { rivalSession } from "./rival";
+
+// A personal token is the user's own, so the stub user's list holds every earlier repeat's token.
+// This test signs in as a user of its own per repeat, whose list starts empty.
+test.use({ storageState: SIGNED_OUT });
 
 test("issue a personal token in settings, see it once, use it, revoke it", async ({
   page,
+  context,
   request,
-}) => {
+}, testInfo) => {
+  const n = testInfo.repeatEachIndex;
+  const session = await rivalSession(`tokens-${n}`, 9300 + n, `Tokens Co ${n}`);
+  await context.addCookies([{ name: "ps_session", value: session, url: SERVER }]);
   await open(page, "/orgs");
 
   await page.getByRole("link", { name: "Settings", exact: true }).click();
