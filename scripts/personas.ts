@@ -158,6 +158,14 @@ function rendered(dir: string): { errors: string[]; readme?: string; next?: stri
   return { errors: [], readme, next };
 }
 
+/** Rewrites the README's table; returns the errors that stopped it, empty when written. */
+function write(dir: string = PERSONAS_DIR): string[] {
+  const { errors, next } = rendered(dir);
+  if (errors.length || next === undefined) return errors;
+  writeFileSync(join(dir, "README.md"), next);
+  return [];
+}
+
 /** The problems with the personas in `dir`; empty when the file is valid and the table current. */
 export function checkPersonas(dir: string = PERSONAS_DIR): string[] {
   const { errors, readme, next } = rendered(dir);
@@ -166,17 +174,14 @@ export function checkPersonas(dir: string = PERSONAS_DIR): string[] {
 }
 
 if (import.meta.main) {
-  const check = process.argv.includes("--check");
-  const { errors, readme, next } = rendered(PERSONAS_DIR);
-  const stale = check && next !== readme;
-  if (errors.length || next === undefined || stale) {
-    console.error(
-      errors.length
-        ? errors.join("\n")
-        : "README.md: the table is stale: run bun scripts/personas.ts",
-    );
+  const errors = process.argv.includes("--check") ? checkPersonas() : write();
+  if (errors.length) {
+    console.error(errors.join("\n"));
     process.exit(1);
   }
-  if (!check) writeFileSync(join(PERSONAS_DIR, "README.md"), next);
-  console.log(check ? `ok: ${COUNT} personas` : `wrote the table for ${COUNT} personas`);
+  console.log(
+    process.argv.includes("--check")
+      ? `ok: ${COUNT} personas`
+      : `wrote the table for ${COUNT} personas`,
+  );
 }
