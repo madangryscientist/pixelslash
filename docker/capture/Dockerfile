@@ -14,7 +14,7 @@
 # The model key is never baked in: pass it at run time (-e OPENCODE_API_KEY=… or a
 # mounted ~/.local/share/opencode/auth.json). Nothing the capture does uses it.
 
-FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS base
+FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS base
 
 # The font set: Liberation 2.1.5 (metric-compatible with Arial, Times New Roman,
 # Courier New), DejaVu 2.37 (wide coverage, fontconfig's default sans/serif/mono)

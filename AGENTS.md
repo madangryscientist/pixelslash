@@ -75,7 +75,7 @@ scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `script
   activates it in this directory, with no `mise trust` needed) and in `global.json` (what `dotnet`
   itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
   "dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
-  network once. `.tool-versions` also pins Bun (`bun 1.4.2`), which CI's `setup-bun` steps read too, so
+  network once. `.tool-versions` also pins Bun (`bun 1.4.4`), which CI's `setup-bun` steps read too, so
   `mise install` installs that as well.
 - **Without one** (a container, an outside contributor): the wrapper prints
   `dotnet SDK not found: skipping engines/dotnet` and adds `--query "tag!=dotnet"` to `moon run`, so
