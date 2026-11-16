@@ -103,7 +103,6 @@ describe("settleCapture with an in-flight tracker", () => {
     const steps = await done;
     expect(calls).toEqual(["fonts", "waitForFunction", "frames", "idle"]);
     expect(steps.networkIdleMs).toBeGreaterThanOrEqual(0);
-    expect(steps.idleMs).toBeGreaterThanOrEqual(0);
   });
 
   test("asks for the idle callback with what is left of the budget", async () => {

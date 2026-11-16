@@ -113,11 +113,11 @@ const twoFrames = () =>
  */
 const idleCallback = (timeout: number) =>
   new Promise<void>((resolve) => {
-    const idle =
-      window.pixelslashIdle ??
-      (typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback.bind(window)
-        : undefined);
+    // Once `keepNativeRaf` has run, only what it kept is native: a page clock may have added a
+    // `requestIdleCallback` that never fires.
+    const idle = window.pixelslashRaf
+      ? window.pixelslashIdle
+      : window.requestIdleCallback?.bind(window);
     if (idle) {
       idle(() => resolve(), { timeout });
       return;
