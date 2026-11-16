@@ -5,6 +5,32 @@ ticket, a doc or a design review can name one of them and say what that person g
 personas are read from what the product does today, not from what we hope it will do. Where a
 persona needs something that is not built yet, it is marked as a gap at the end.
 
+## At a glance
+
+The table is generated from [`personas.json`](personas.json), which is the source. Each persona
+says what they look for in the hosted review app (`review`), on pixelslash.dev and its docs
+(`docs`) and in the CLI (`cli`).
+
+<!-- personas:start -->
+| Persona | Group | Model | Who | Looks for (review) | Looks for (docs) | Looks for (cli) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Priya | Product team | sonnet | Frontend lead of six engineers on one React app with a half kept up Storybook, on Chromatic today. She uploads each build from GitHub Actions and accepts or rejects each change on the build page; her goal is that every pull request shows what changed visually and nothing merges until someone has looked. | One click from the pull request to the change, never two clicks to review. | An answer to why a baseline moved, so baselines never drift without anyone knowing why. | Few false alarms, with anti-aliasing and font hinting absorbed, so not every pull request shows a red X. |
+| Marcus | Platform or monorepo | opus | Platform engineer on a monorepo of about twenty packages (a design system, three apps and the docs) built under a task runner whose cache skips unchanged packages. His goal is one visual check per pull request across every package, without spending CI minutes on packages that did not change. | Twenty subprojects with one change each shown as twenty changes in one place, not as twenty checks on the pull request. | A setup that fits the task runner he already has, without each package needing its own configuration. | A package the cache skipped never leaves a required check waiting forever. |
+| Lena | Product team | sonnet | Design-system maintainer who owns the component library and its tokens, which product teams consume, so one change ripples into every app. Her goal is to catch a token or spacing regression before a consumer ships it, and to know which stories the change touched. | A diff measured at the level of a region that comes with a note, and a way to accept a library-wide change in one step. | How to keep an intended change from producing noise on every story. | A violation flagged without a screenshot leaving her machine. |
+| Tomás | Privacy-bound | opus | Engineer at a fintech or health company whose screenshots can show data that looks like customer data, where nothing leaves the network without security sign-off. His goal is visual review with every screenshot kept in-house, self-hosted with Docker or on a box inside the LAN. | A self-hosted app with all of the hosted features, and no feature that works only on the hosted app. | Every outbound call listed and off by default, and a data flow written down that says plainly where data goes. | No SaaS call that is required to run it. |
+| Sam | Solo or agency | sonnet | Solo developer or small agency building client sites, often without Storybook, sometimes with Playwright tests and sometimes with only a URL. Sam wants to know in a minute whether a CSS change broke the other pages. | A report that never claims more than it measured. | No sign-up wall and no heavy configuration between Sam and the first answer. | No setup, no account and no Storybook, and exit codes that CI can read. |
+<!-- personas:end -->
+
+## Edit, add or remove
+
+Edit `personas.json`, then run `bun scripts/personas.ts` from the repository root to rewrite the
+table above. `bun scripts/personas.ts --check` fails when the file is invalid or the table is
+stale, and the gate runs it. There are always exactly five personas, an odd number, so a vote
+between them always has a winner: to add one, remove one. Each persona needs a lower-case kebab
+`id`, a `name`, a `group` from `groups`, a `model` from `models`, a `profile`, and one `focus`
+line for each of `review`, `docs` and `cli`. No field the table prints may hold a `|` or a line
+break.
+
 ## 1. Priya, frontend lead on a product team
 
 Priya leads six engineers on one React app. The app has a Storybook that is half kept up, and she
