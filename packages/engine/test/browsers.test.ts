@@ -15,7 +15,6 @@ import {
   type CaptureSession,
 } from "../src/snapshot.ts";
 import { cleanupDev, png, tmpDir } from "./dev-fixtures.ts";
-import { testBrowsers } from "./test-browsers.ts";
 
 const dirs: string[] = [];
 const server = Bun.serve({
@@ -167,63 +166,55 @@ describe("one page × three browsers", { timeout: 60_000 }, () => {
   });
 });
 
-describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
-  test.skipIf(!testBrowsers.has(name))(
-    "captures a page, fingerprints itself, and writes the same bytes twice",
-    async () => {
-      const config = parseConfig({
-        ...base,
-        routes: ["/"],
-        variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
-      });
-      const [a, b] = [await out(), await out()];
-      const first = await captureSnapshots(config, a, pinned);
-      await captureSnapshots(config, b, pinned);
-      expect(first.manifest.snapshots[0]?.variant.browser).toBe(name);
-      expect(first.manifest.snapshots[0]?.fingerprint.browser).toMatch(
-        new RegExp(`^${name} \\d+\\.`),
-      );
-      const [left, right] = await Promise.all(
-        [a, b].map((d) => Bun.file(join(d, "index/small.png")).bytes()),
-      );
-      expect(Buffer.compare(left ?? new Uint8Array(), right ?? new Uint8Array())).toBe(0);
-      expect(left?.length).toBeGreaterThan(0);
-    },
-    60_000,
-  );
+// Real-browser tests run on Chromium only; Firefox and WebKit are never used in testing.
+describe("a real chromium", () => {
+  const name = "chromium";
+  test("captures a page, fingerprints itself, and writes the same bytes twice", async () => {
+    const config = parseConfig({
+      ...base,
+      routes: ["/"],
+      variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
+    });
+    const [a, b] = [await out(), await out()];
+    const first = await captureSnapshots(config, a, pinned);
+    await captureSnapshots(config, b, pinned);
+    expect(first.manifest.snapshots[0]?.variant.browser).toBe(name);
+    expect(first.manifest.snapshots[0]?.fingerprint.browser).toMatch(
+      new RegExp(`^${name} \\d+\\.`),
+    );
+    const [left, right] = await Promise.all(
+      [a, b].map((d) => Bun.file(join(d, "index/small.png")).bytes()),
+    );
+    expect(Buffer.compare(left ?? new Uint8Array(), right ?? new Uint8Array())).toBe(0);
+    expect(left?.length).toBeGreaterThan(0);
+  }, 60_000);
 
-  test.skipIf(!testBrowsers.has(name))(
-    "fails a page that never settles with the settle timeout, not Playwright's",
-    async () => {
-      const config = parseConfig({
-        ...base,
-        routes: ["/hangs"],
-        variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
-        stabilise: { timeoutMs: SETTLE_MS },
-      });
-      // Proved from the error, not the clock. The settle gives up with `capture settle exceeded
-      // <n>ms`; Playwright's own 30 s timeout would reject as `page.waitForFunction: Timeout
-      // 30000ms exceeded`, so the message says which one ended the capture, however slow the host
-      // is. The hang is paid twice (a shot that times out is retried alone once the run has
-      // drained), so the second timeout carries `RETRIED_ALONE`.
-      const session = await openCaptureSession(config, pinned);
-      const dir = await out();
-      let failure: unknown;
-      try {
-        failure = await captureInto(session, dir, undefined, { warn() {} }).then(
-          () => undefined,
-          (e: unknown) => e,
-        );
-      } finally {
-        await session.close();
-      }
-      if (!(failure instanceof CaptureError))
-        throw new Error(
-          `expected the capture to reject with a CaptureError, got ${String(failure)}`,
-        );
-      expect(failure.message).toMatch(/^capture settle exceeded \d+ms/);
-      expect(failure.message.endsWith(RETRIED_ALONE)).toBe(true);
-    },
-    60_000,
-  );
+  test("fails a page that never settles with the settle timeout, not Playwright's", async () => {
+    const config = parseConfig({
+      ...base,
+      routes: ["/hangs"],
+      variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
+      stabilise: { timeoutMs: SETTLE_MS },
+    });
+    // Proved from the error, not the clock. The settle gives up with `capture settle exceeded
+    // <n>ms`; Playwright's own 30 s timeout would reject as `page.waitForFunction: Timeout
+    // 30000ms exceeded`, so the message says which one ended the capture, however slow the host
+    // is. The hang is paid twice (a shot that times out is retried alone once the run has
+    // drained), so the second timeout carries `RETRIED_ALONE`.
+    const session = await openCaptureSession(config, pinned);
+    const dir = await out();
+    let failure: unknown;
+    try {
+      failure = await captureInto(session, dir, undefined, { warn() {} }).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+    } finally {
+      await session.close();
+    }
+    if (!(failure instanceof CaptureError))
+      throw new Error(`expected the capture to reject with a CaptureError, got ${String(failure)}`);
+    expect(failure.message).toMatch(/^capture settle exceeded \d+ms/);
+    expect(failure.message.endsWith(RETRIED_ALONE)).toBe(true);
+  }, 60_000);
 });

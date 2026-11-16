@@ -20,4 +20,3 @@ tasks:
       - "!/engines/wasm/target/**/*"
       - "/bench/corpus/**/*"
       - "/bench/src/perf/fixtures.ts"
-      - "$PIXELSLASH_TEST_BROWSERS"

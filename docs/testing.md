@@ -15,6 +15,10 @@ Integration and unit share a runner (Vitest under Bun) and the `test` target, so
 is by what a test touches, not by a folder. A unit test is added only for a gap: logic with branches the
 layers above do not reach.
 
+Real-browser tests run on Chromium only; Firefox and WebKit are never used in testing, at any layer,
+local or CI. Every Playwright config's projects are Chromium devices (`Desktop Chrome`, `Pixel 7`), and a
+phone project that ever uses an iPhone device sets `browserName: "chromium"`.
+
 ## Smoke
 
 A smoke test runs the **released shape**, not the source: the CLI smoke imports nothing from `src/`, and

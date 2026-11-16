@@ -19,7 +19,6 @@ tasks:
     inputs:
       - "**/*"
       - "/fixtures/**/*"
-      - "$PIXELSLASH_TEST_BROWSERS"
   # Everything scripts/build-cli.ts writes, so a cache hit restores the whole package.
   build:
     command: "bun scripts/build-cli.ts"
