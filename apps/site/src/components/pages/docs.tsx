@@ -111,6 +111,7 @@ function OnThisPage({
   const shown = headings.filter((heading) => heading.depth <= 3);
   const active = useActiveHeading(shown.map((heading) => heading.id).join("|"), track);
   return (
+    // A contents list of anchor links, its own size and line height: no kit part draws one (Tabs would make each a pill).
     <ul className="flex flex-col gap-1 text-sm/6">
       {shown.map((heading) => {
         const here = heading.id === active;
@@ -283,9 +284,10 @@ export function DocsIndexPage(): ReactNode {
         >
           {FIRST_STEP.text}
         </Callout>
-        <Stack width="narrow" data-testid="docs-intro">
+        {/* Held to 75ch (docs-index-hierarchy.spec.ts): the kit's narrow Stack is 48rem, wider than that. */}
+        <div className="max-w-[75ch]" data-testid="docs-intro">
           <DocBody doc={CLI_INTRO_DOC} />
-        </Stack>
+        </div>
         <DocsGroupGrid />
       </ProseLayout>
     </>

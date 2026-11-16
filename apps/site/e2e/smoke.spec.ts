@@ -161,7 +161,7 @@ for (const doc of LISTED_PAGES) {
 
     // The rail is the desktop view; a phone gets the fold above the page.
     const contents = info.project.name.includes("mobile")
-      ? page.locator("details", { hasText: "On this page" })
+      ? page.getByTestId("docs-contents-fold")
       : page.getByTestId("docs-contents");
     if ((await contents.count()) > 0) await expect(contents.first()).toBeVisible();
   });
