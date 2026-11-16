@@ -9,7 +9,6 @@
 
 .dark {
   --home-page: #11111b;
-  --home-sub: #a6adc8;
   --home-mauve: #cba6f7;
   --home-blue: #89b4fa;
   --home-peach: #fab387;
@@ -21,7 +20,6 @@
 /* Latte's accents, darkened where they are text on the light ground, as the theme's own are. */
 .latte {
   --home-page: #eff1f5;
-  --home-sub: #4a4d65;
   --home-mauve: #8035e1;
   --home-blue: #1e5bd4;
   --home-peach: #ad4308;
@@ -141,10 +139,6 @@ body:has([data-art]) {
     linear-gradient(to bottom, var(--home-grid) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 70% 55% at 50% 25%, #000 30%, transparent 75%);
-}
-
-.home-footer {
-  color: var(--home-sub);
 }
 
 /* Motion */

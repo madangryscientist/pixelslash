@@ -1,4 +1,4 @@
-import { Card, Icon, SubsectionHeading, TextLink } from "@hackcove/ui-react";
+import { Card, Icon, Stack, SubsectionHeading, Text, TextLink } from "@hackcove/ui-react";
 import type { ReactNode } from "react";
 import { EXTRA_NAV, GROUPS, LISTED_PAGES } from "../../content/docs-map.ts";
 
@@ -53,28 +53,30 @@ export function DocsGroupGrid(): ReactNode {
             </SubsectionHeading>
           </div>
           <Card>
-            <p className="mb-3 text-sm text-slate-600">{group.summary}</p>
-            <ul
-              className={
-                long[index]
-                  ? "flex flex-col gap-1 md:block md:columns-2 md:gap-x-6"
-                  : "flex flex-col gap-1"
-              }
-            >
-              {links[index]?.map((link) => (
-                <li
-                  key={link.key}
-                  className={long[index] ? "md:mb-1 break-inside-avoid" : undefined}
-                >
-                  <TextLink href={link.href}>
-                    {link.title}
-                    <span className="ml-1 inline-block align-[-0.1em]">
-                      <Icon name="chevron-right" size="sm" />
-                    </span>
-                  </TextLink>
-                </li>
-              ))}
-            </ul>
+            <Stack gap="xs">
+              <Text as="p">{group.summary}</Text>
+              <ul
+                className={
+                  long[index]
+                    ? "flex flex-col gap-1 md:block md:columns-2 md:gap-x-6"
+                    : "flex flex-col gap-1"
+                }
+              >
+                {links[index]?.map((link) => (
+                  <li
+                    key={link.key}
+                    className={long[index] ? "md:mb-1 break-inside-avoid" : undefined}
+                  >
+                    <TextLink href={link.href}>
+                      {link.title}
+                      <span className="ml-1 inline-block align-[-0.1em]">
+                        <Icon name="chevron-right" size="sm" />
+                      </span>
+                    </TextLink>
+                  </li>
+                ))}
+              </ul>
+            </Stack>
           </Card>
         </li>
       ))}

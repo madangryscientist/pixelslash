@@ -75,7 +75,7 @@ test.describe("doc page columns", () => {
     const article = await box(page.getByTestId("docs-article"));
 
     await expect(page.locator('aside:has([data-testid="docs-contents"])')).toBeHidden();
-    await expect(page.locator("details", { hasText: "On this page" })).toBeVisible();
+    await expect(page.getByTestId("docs-contents-fold")).toBeVisible();
     expect(article.w, "content column width").toBeGreaterThanOrEqual(760);
     expect(Math.abs(article.x - (rail.x + rail.w + RAIL_GAP)), "content left").toBeLessThanOrEqual(
       TOLERANCE,

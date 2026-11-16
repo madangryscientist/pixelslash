@@ -85,9 +85,11 @@ test("on a phone the rail and the contents are folded, and every page is still r
   test.skip(!isPhone(info), "the phone view");
   await page.goto(PAGE, { waitUntil: "networkidle" });
   const rail = page.locator("details", { has: page.getByTestId("docs-nav") });
-  const contents = page.locator("details", { hasText: "On this page" });
+  const contents = page
+    .getByTestId("docs-contents-fold")
+    .getByRole("button", { name: "On this page" });
   await expect(rail).not.toHaveAttribute("open", "");
-  await expect(contents.first()).not.toHaveAttribute("open", "");
+  await expect(contents).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByTestId("docs-nav")).toBeHidden();
   await expect(page.getByTestId("docs-contents")).toBeHidden();
   const overflow = await page.evaluate(
@@ -215,10 +217,13 @@ test("390 wide: no docs page scrolls sideways, and the fold opens to reach the r
 
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await expect(page.getByTestId("docs-contents")).toBeHidden();
-  const fold = page.locator("summary", { hasText: /^On this page$/ });
-  await fold.click();
-  const link = page.locator("details", { hasText: "On this page" }).locator("a").first();
-  await expect(link).toBeVisible();
+  // The fold is the kit's Disclosure, a button that works once the page has hydrated: press until it opens.
+  const fold = page.getByTestId("docs-contents-fold");
+  const link = fold.locator("a").first();
+  await expect(async () => {
+    await fold.getByRole("button", { name: "On this page" }).click();
+    await expect(link).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await openRail(page);
   await expect(page.getByTestId("docs-nav").locator('a[href="/docs/upload"]')).toBeVisible();
 });
