@@ -174,7 +174,7 @@ describe("a flaky shot that holds media", () => {
       if (!route || !variant) throw new Error("no route or variant");
       const shots = [];
       for (let i = 0; i < 4; i++) shots.push(await session.shoot(route, variant));
-      const repro = measureRepro(shots, resolveDiff(cfg, route, variant));
+      const repro = await measureRepro(shots, resolveDiff(cfg, route, variant));
       expect(repro.stable).toBe(false);
       const media = mediaOfShots(shots);
       expect(media).toEqual([{ tag: "video", x: 100, y: 100, width: 300, height: 100 }]);

@@ -1,6 +1,7 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { diffPngs, type DiffIgnore, type DiffOptions, type IgnoreRect } from "./diff.ts";
+import type { DiffIgnore, DiffOptions, IgnoreRect } from "./diff.ts";
+import { pooledDiff } from "./diff-pool.ts";
 import type { Region, Specks } from "./regions.ts";
 import { elapsed, type Timings } from "./timings.ts";
 
@@ -60,7 +61,7 @@ export async function writeRunFiles(
   },
 ): Promise<WrittenRun> {
   const diffStarted = performance.now();
-  const diff = diffPngs(input.main, input.branch, input.diff, input.ignore);
+  const diff = await pooledDiff(input.main, input.branch, input.diff, input.ignore);
   const diffMs = elapsed(diffStarted);
   const manifest: RunManifest = {
     id: input.id && isSafeRunId(input.id) ? input.id : newRunId(),

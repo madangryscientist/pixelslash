@@ -170,3 +170,4 @@ export {
 } from "./dev-lock.ts";
 export { DEV_HEADER, serveDevPage, type DevState } from "./dev-page.ts";
 export { devController, type DevController } from "./dev-session.ts";
+export { diffCores } from "./diff-cores.ts";

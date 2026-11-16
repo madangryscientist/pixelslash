@@ -231,3 +231,21 @@ describe("figma file", () => {
     });
   });
 });
+
+describe("PIXELSLASH_DIFF_CORES", () => {
+  test.each(["0", "33", "abc"])("%j exits 2 before any work, naming the variable", async (v) => {
+    const out = join(await tmp(), "never");
+    for (const argv of [
+      ["--live-png", "a.png", "--local-png", "b.png", "--out", out],
+      ["compare", "main", "branch", "--out", out],
+    ]) {
+      const cap = capture();
+      const code = await run(argv, cap.io, { env: { PIXELSLASH_DIFF_CORES: v } });
+      expect(code).toBe(2);
+      expect(cap.stderr).toContain(
+        `PIXELSLASH_DIFF_CORES must be a whole number from 1 to 32 (got "${v}")`,
+      );
+      expect(existsSync(out)).toBe(false);
+    }
+  });
+});

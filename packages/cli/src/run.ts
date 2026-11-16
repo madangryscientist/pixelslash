@@ -12,6 +12,7 @@ import {
   UsageError,
   compare,
   compareRoutes,
+  diffCores,
   fetchFigmaRasters,
   isBrowserName,
   loadRoutes,
@@ -215,14 +216,26 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
     return 0;
   }
   const command = COMMANDS[argv[0] ?? ""];
+  // A bad PIXELSLASH_DIFF_CORES is a usage error (exit 2) before any command starts work.
+  const checked =
+    <T>(work: () => Promise<T>) =>
+    () => {
+      diffCores(deps.env ?? process.env);
+      return work();
+    };
   if (command)
-    return guarded(() => command.run(argv.slice(1), io, deps), io, command.usage, {
-      name: argv[0] ?? "",
-      stage: command.stage,
-      env: deps.env ?? process.env,
-    });
+    return guarded(
+      checked(() => command.run(argv.slice(1), io, deps)),
+      io,
+      command.usage,
+      {
+        name: argv[0] ?? "",
+        stage: command.stage,
+        env: deps.env ?? process.env,
+      },
+    );
   return guarded(
-    async () => {
+    checked(async () => {
       const cli = parseArgs(argv);
       if (cli.routesFile) cli.routes = await loadRoutes(cli.routesFile);
       const figma = cli.file ? await figmaDs(cli, cli.file, deps) : undefined;
@@ -234,7 +247,7 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
         // `compare` has already copied the rasters into `--out/ds`, so the temp dir is spent.
         if (figma) await rm(figma, { recursive: true, force: true });
       }
-    },
+    }),
     io,
     USAGE,
     { name: "compare", stage: "compare", env: deps.env ?? process.env },
