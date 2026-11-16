@@ -177,6 +177,8 @@ export type TimedSettle = {
   imagesMs: number;
   networkIdleMs: number;
   framesMs: number;
+  /** The wait for the page's main thread to go idle; absent from a build an older CLI uploaded. */
+  idleMs?: number;
 };
 
 /** One shot's steps and, when the CLI sent them, the parts of its capture. */

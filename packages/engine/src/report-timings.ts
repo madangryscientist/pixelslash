@@ -31,6 +31,7 @@ const SETTLE_HEAD = [
   ["imagesMs", "images"],
   ["networkIdleMs", "network"],
   ["framesMs", "frames"],
+  ["idleMs", "idle"],
 ] as const;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

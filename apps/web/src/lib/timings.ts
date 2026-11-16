@@ -212,6 +212,7 @@ const SETTLE_LABELS = [
   ["imagesMs", "images"],
   ["networkIdleMs", "network idle"],
   ["framesMs", "frames"],
+  ["idleMs", "idle"],
 ] as const;
 
 function capturePartsRow(t: BuildTimings): ProfileRow[] {
@@ -224,7 +225,11 @@ function capturePartsRow(t: BuildTimings): ProfileRow[] {
     // The settle wait split by condition, and the story's own render wait, are inside it.
     const inside = [
       ...(t.settle
-        ? SETTLE_LABELS.map(([k, name]) => `${name} ${share(t.settle?.[k] ?? 0, whole)}`)
+        ? SETTLE_LABELS.flatMap(([k, name]) => {
+            // An older CLI sent no idle wait: leave it out rather than show it as 0.
+            const part = t.settle?.[k];
+            return part === undefined ? [] : [`${name} ${share(part, whole)}`];
+          })
         : []),
       ...(t.storyMs === undefined ? [] : [`story ${share(t.storyMs, whole)}`]),
     ];

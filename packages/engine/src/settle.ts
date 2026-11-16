@@ -12,7 +12,7 @@ export const CAPTURE_TIMEOUT_MS = 8_000;
  * browser or the DOM lib.
  */
 export type SettlePage = {
-  evaluate(callback: () => unknown): Promise<unknown>;
+  evaluate(callback: (arg: number) => unknown, arg?: number): Promise<unknown>;
   waitForFunction(callback: () => unknown): Promise<unknown>;
   waitForLoadState(state: "networkidle"): Promise<void>;
 };
@@ -79,18 +79,24 @@ declare const document: {
   images: ArrayLike<{ complete: boolean; naturalWidth: number }>;
 };
 declare function requestAnimationFrame(callback: () => void): number;
+type IdleCallback = (callback: () => void, options: { timeout: number }) => number;
 declare const window: {
   pixelslashRaf?: (callback: () => void) => number;
+  pixelslashIdle?: IdleCallback;
   requestAnimationFrame(callback: () => void): number;
+  requestIdleCallback?: IdleCallback;
 };
 
 /**
- * Init script that keeps the browser's own `requestAnimationFrame` where the settle can reach it.
- * Added before a fake clock is installed: the clock replaces the page's rAF with one that only
- * fires when the clock is advanced, and the settle must not advance it (that would run page timers).
+ * Init script that keeps the browser's own `requestAnimationFrame` and `requestIdleCallback` where
+ * the settle can reach them. Added before a fake clock is installed: the clock replaces the page's
+ * with ones that only fire when the clock is advanced, and the settle must not advance it (that would
+ * run page timers).
  */
 export function keepNativeRaf(): void {
   window.pixelslashRaf = window.requestAnimationFrame.bind(window);
+  if (typeof window.requestIdleCallback === "function")
+    window.pixelslashIdle = window.requestIdleCallback.bind(window);
 }
 
 const twoFrames = () =>
@@ -100,16 +106,40 @@ const twoFrames = () =>
   });
 
 /**
+ * The browser's next idle callback: it runs only once the main thread has no task waiting, so a page
+ * still hydrating (a scheduler posting slice after slice) holds it. `timeout` bounds it by what is
+ * left of the capture budget. A browser with no `requestIdleCallback` runs two frames instead. Self
+ * contained: Playwright sends its source to the page.
+ */
+const idleCallback = (timeout: number) =>
+  new Promise<void>((resolve) => {
+    const idle =
+      window.pixelslashIdle ??
+      (typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback.bind(window)
+        : undefined);
+    if (idle) {
+      idle(() => resolve(), { timeout });
+      return;
+    }
+    const raf = window.pixelslashRaf ?? requestAnimationFrame;
+    raf(() => raf(() => resolve()));
+  });
+
+/**
  * Wait for a page to settle before screenshotting: web fonts, every image, the network, then two
  * animation frames. With `inflight` (made by `trackInflight` before navigation) the network wait is
- * no request in flight: after the frames the tracker is read again, and a request that started
- * meanwhile (even one that already finished) makes the settle wait and run the frames again. Without it the wait is Playwright's
+ * no request in flight, and the frames are followed by the browser's next idle callback, which waits
+ * out a page that is still hydrating and has not yet started its data fetch. Then the tracker is read
+ * again, and a request that started during the frames or the idle wait (even one that already
+ * finished) makes the settle wait and run both again. There is no quiet window: a page that is idle
+ * with nothing in flight is shot at once. Without a tracker the wait is Playwright's
  * `networkidle` (500ms with no connection), which is all a page the caller already navigated
  * allows. Bounded by `timeoutMs`
  * (default CAPTURE_TIMEOUT_MS) so a page whose fonts never load does not hang
  * the capture past it. Resolves to how long each condition took.
  *
- * The frames are the browser's real ones even when page timers are frozen (see
+ * The frames and the idle callback are the browser's real ones even when page timers are frozen (see
  * `keepNativeRaf`), so the settle never gives a frozen page any timer time.
  */
 export function settleCapture(
@@ -117,6 +147,7 @@ export function settleCapture(
   timeoutMs = CAPTURE_TIMEOUT_MS,
   inflight?: Inflight,
 ): Promise<SettleSteps> {
+  const deadline = Date.now() + timeoutMs;
   const steps = (async () => {
     const fontsMs = await timedMs(() => page.evaluate(() => document.fonts.ready));
     const imagesMs = await timedMs(() =>
@@ -127,17 +158,20 @@ export function settleCapture(
     if (!inflight) {
       const networkIdleMs = await timedMs(() => page.waitForLoadState("networkidle"));
       const framesMs = await timedMs(() => page.evaluate(twoFrames));
-      return { fontsMs, imagesMs, networkIdleMs, framesMs };
+      return { fontsMs, imagesMs, networkIdleMs, framesMs, idleMs: 0 };
     }
     let networkIdleMs = 0;
     let framesMs = 0;
+    let idleMs = 0;
     let seen: number;
     do {
       seen = inflight.started();
       networkIdleMs += await timedMs(() => inflight.idle());
       framesMs += await timedMs(() => page.evaluate(twoFrames));
+      const left = Math.max(1, deadline - Date.now());
+      idleMs += await timedMs(() => page.evaluate(idleCallback, left));
     } while (inflight.count() > 0 || inflight.started() !== seen);
-    return { fontsMs, imagesMs, networkIdleMs, framesMs };
+    return { fontsMs, imagesMs, networkIdleMs, framesMs, idleMs };
   })();
   return withTimeout(steps, timeoutMs, `capture settle exceeded ${timeoutMs}ms`);
 }

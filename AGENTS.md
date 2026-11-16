@@ -367,7 +367,7 @@ dependencies.
    the non-overlap is not painted as changed. With no judge available the run
    prints `skip: no judge` and invents no violations.
 2. **Capture waits for the page to settle** (fonts, images, no request in flight, two
-   frames; the Playwright helper keeps `networkidle`), bounded by the timeout: a page that never settles fails, it does
+   frames, an idle main thread; the Playwright helper keeps `networkidle` and two frames), bounded by the timeout: a page that never settles fails, it does
    not hang and it does not shoot early.
 3. **Exit codes are a contract.** Exit 1 on NEW violations on Branch, or when the
    run itself failed (a capture, Figma, the dev lock, a refused upload); pixel-only

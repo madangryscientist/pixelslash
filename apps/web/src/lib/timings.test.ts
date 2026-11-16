@@ -220,6 +220,15 @@ describe("the CLI's speed profile", () => {
     );
   });
 
+  test("the idle wait shows inside settle when the CLI sent it", () => {
+    const timings: BuildTimings = {
+      ...full,
+      settle: { fontsMs: 100, imagesMs: 200, networkIdleMs: 5_500, framesMs: 30, idleMs: 300 },
+    };
+    const rows = Object.fromEntries(cliProfileRows(timings).map((r) => [r.key, r.text]));
+    expect(rows["capture-parts"]).toContain("frames <1%, idle 3%, story 6%");
+  });
+
   test("each request kind has its p50, p90, max and wall; the host has its cores and load", () => {
     const rows = Object.fromEntries(cliProfileRows(full).map((r) => [r.key, r.text]));
     expect(rows["requests-upload"]).toMatch(
