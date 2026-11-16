@@ -1,35 +1,20 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
-import {
-  checkPersonas,
-  PERSONAS_DIR,
-  type PersonasFile,
-  readPersonas,
-  renderTable,
-} from "../personas";
+import { checkPersonas, PERSONAS_DIR, type PersonasFile, readPersonas } from "../personas";
 
 const root = mkdtempSync(join(tmpdir(), "personas-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 let n = 0;
-/** A copy of the real personas dir, with `edit` applied to its JSON. */
-function fixture(edit: (f: PersonasFile) => void, rerender = true): string {
+/** A copy of the real personas dir, with `edit` applied to its JSON and the README left as it was. */
+function fixture(edit: (f: PersonasFile) => void): string {
   const dir = join(root, String(n++));
   cpSync(PERSONAS_DIR, dir, { recursive: true });
-  const jsonPath = join(dir, "personas.json");
   const f = readPersonas(dir).file!;
   edit(f);
-  writeFileSync(jsonPath, JSON.stringify(f, null, 2));
-  if (rerender) {
-    const readmePath = join(dir, "README.md");
-    const readme = readFileSync(readmePath, "utf8");
-    const start = "<!-- personas:start -->";
-    const a = readme.indexOf(start) + start.length;
-    const b = readme.indexOf("<!-- personas:end -->");
-    writeFileSync(readmePath, `${readme.slice(0, a)}\n${renderTable(f)}\n${readme.slice(b)}`);
-  }
+  writeFileSync(join(dir, "personas.json"), JSON.stringify(f, null, 2));
   return dir;
 }
 
@@ -41,11 +26,11 @@ describe("personas", () => {
   test("a table that no longer matches the JSON is stale", () => {
     const dir = fixture((f) => {
       f.personas[0]!.name = "Priyanka";
-    }, false);
+    });
     expect(checkPersonas(dir)).toEqual([expect.stringContaining("the table is stale")]);
   });
 
-  test("four personas fail, even with a current table", () => {
+  test("four personas fail", () => {
     const dir = fixture((f) => {
       f.personas.pop();
     });

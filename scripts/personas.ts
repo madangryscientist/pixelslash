@@ -20,7 +20,7 @@ const FOCUS_KEYS = ["review", "docs", "cli"] as const;
 const DASH = new RegExp(`[${String.fromCharCode(0x2013)}${String.fromCharCode(0x2014)}]`, "u");
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-export type Persona = {
+type Persona = {
   id: string;
   name: string;
   group: string;
