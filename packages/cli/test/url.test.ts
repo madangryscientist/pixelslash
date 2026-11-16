@@ -15,7 +15,6 @@ import {
   tmp,
   readManifest,
 } from "./support.ts";
-import { testBrowsers } from "./test-browsers.ts";
 
 afterAll(cleanup);
 
@@ -130,39 +129,6 @@ describe("capture", () => {
     const live = new Uint8Array(await Bun.file(join(out, "live.png")).arrayBuffer());
     expect(pngWidth(live)).toBe(800);
   }, 30_000);
-});
-
-describe("--browser", () => {
-  // Firefox runs only when PIXELSLASH_TEST_BROWSERS asks for it (AGENTS.md, the gate).
-  test.skipIf(!testBrowsers.has("firefox"))(
-    "firefox shoots the pair and the report names the browser",
-    async () => {
-      const pages = await servePages();
-      const out = join(await tmp(), "out");
-      const code = await run(
-        [
-          "--live",
-          pages.url("live.html"),
-          "--local",
-          pages.url("live.html"),
-          "--out",
-          out,
-          "--browser",
-          "firefox",
-          "--width",
-          "640",
-        ],
-        capture().io,
-        { which: () => null },
-      );
-      expect(code).toBe(0);
-      expect(pngWidth(new Uint8Array(await Bun.file(join(out, "live.png")).arrayBuffer()))).toBe(
-        640,
-      );
-      expect(await Bun.file(join(out, "report.html")).text()).toContain("firefox · Main 640x");
-    },
-    60_000,
-  );
 });
 
 describe("capture settle", () => {

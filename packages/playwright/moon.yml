@@ -22,7 +22,6 @@ tasks:
     inputs:
       - "**/*"
       - "/fixtures/**/*"
-      - "$PIXELSLASH_TEST_BROWSERS"
   build:
     command: "bun scripts/build-playwright.ts"
     inputs:

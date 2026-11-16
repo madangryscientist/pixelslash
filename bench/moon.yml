@@ -21,7 +21,6 @@ tasks:
     inputs:
       - "**/*"
       - "/fixtures/**/*"
-      - "$PIXELSLASH_TEST_BROWSERS"
   # The regression guard: its own inputs, so an apps/web change replays it from cache.
   check:
     command: "bun bench/src/check.ts"

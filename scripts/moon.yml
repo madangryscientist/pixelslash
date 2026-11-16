@@ -23,4 +23,3 @@ tasks:
     inputs:
       - "**/*"
       - "/fixtures/**/*"
-      - "$PIXELSLASH_TEST_BROWSERS"
