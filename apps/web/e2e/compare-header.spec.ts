@@ -1,5 +1,6 @@
-import { type Locator, type Page, expect, test } from "@playwright/test";
-import { SHA_MAIN, SHA_WORK, open, provision, uploadBuild } from "./api-upload";
+import type { Locator, Page } from "@playwright/test";
+import { type Provision, expect, open, test } from "./fixtures";
+import { SHA_MAIN, SHA_WORK, uploadBuild } from "./api-upload";
 import { png } from "./png";
 import { showPanel } from "./snapshot-viewer";
 
@@ -18,8 +19,8 @@ const BRANCH = png(1300, 5000, [{ x: 100, y: 200, w: 400, h: 200, rgb: [220, 30,
 const NAME = "overview-all-themes-in-every-state";
 
 /** A changed tall shot, opened on its compare view. */
-async function openTallShot(page: Page) {
-  const { token, projectId } = await provision(page, "Header Co", "header");
+async function openTallShot(page: Page, provision: Provision) {
+  const { token, projectId } = await provision({ org: "Header Co", project: "header" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: NAME, png: MAIN }]);
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
   await page.waitForTimeout(1100);
@@ -57,9 +58,12 @@ const boxOf = async (locator: Locator): Promise<Box> => {
   return box;
 };
 
-test("a phone gives the title its own row, and the sticky header stays short", async ({ page }) => {
+test("a phone gives the title its own row, and the sticky header stays short", async ({
+  page,
+  provision,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await openTallShot(page);
+  await openTallShot(page, provision);
   const bar = page.getByTestId("viewer-bar");
   const title = bar.getByRole("heading", { level: 1 });
   await expect(title).toBeVisible();
@@ -90,9 +94,10 @@ test("a phone gives the title its own row, and the sticky header stays short", a
 
 test("the panes are labelled with their side and stay labelled while a tall shot scrolls", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openTallShot(page);
+  await openTallShot(page, provision);
 
   // A snapshot has one theme and one viewport: the header names them once, beside the chips.
   const bar = page.getByTestId("viewer-bar");
@@ -118,9 +123,10 @@ test("the panes are labelled with their side and stay labelled while a tall shot
 
 test("the side rail's content sticks beside the image wherever the page is scrolled", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openTallShot(page);
+  await openTallShot(page, provision);
   // At Fit, side by side, the panel folds away behind its toggle: open it first.
   await showPanel(page);
   const rail = page.getByRole("complementary", { name: "Review panel" });

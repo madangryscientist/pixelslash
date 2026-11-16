@@ -1,41 +1,17 @@
-import { type Locator, type Page, expect } from "@playwright/test";
-import { createOrg, createProject, openSettings } from "./orgs-page";
+import { type Page, expect } from "@playwright/test";
 import { png } from "./png";
 import { SERVER } from "./ports";
 
 /**
- * Builds uploaded straight to the API, as the CLI sends them (ob 1724, 1738): a signed-in project
- * with a CI token, a shot's multipart form, and a build opened, filled and finalised.
+ * Builds uploaded straight to the API, as the CLI sends them (ob 1724, 1738): a shot's multipart
+ * form, and a build opened, filled and finalised with a project's CI token (`provision` in
+ * `fixtures.ts` makes both).
  */
 
 export const SHA_MAIN = "a".repeat(40);
 export const SHA_WORK = "b".repeat(40);
 export const WHITE = png(40, 40);
 export const CHANGED = png(40, 40, [{ x: 10, y: 10, w: 10, h: 10, rgb: [220, 30, 30] }]);
-
-async function submit(input: Locator, value: string, button: Locator) {
-  await input.fill(value);
-  await button.click();
-}
-
-/** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
-export async function provision(page: Page, org = "Flake Co", project = "flaky") {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs$/);
-  await createOrg(page, org);
-  await createProject(page, project);
-  await openSettings(page, project);
-  await submit(
-    page.getByLabel("Token name, e.g. github-actions"),
-    "ci",
-    page.getByRole("button", { name: "Issue token" }),
-  );
-  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
-  const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1] ?? "";
-  expect(projectId).not.toBe("");
-  return { token, projectId };
-}
 
 /** `png()`'s buffer may sit on a shared buffer, which `Blob` does not take: copy it out. */
 const pngBlob = (buf: Buffer) => new Blob([new Uint8Array(buf)], { type: "image/png" });
@@ -100,11 +76,6 @@ export async function uploadBuild(token: string, build: object, shots: Shot[]) {
   });
   expect(done.status).toBe(200);
   return id;
-}
-
-export async function open(page: Page, url: string) {
-  await page.goto(url);
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
 }
 
 /**

@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { showPanel } from "./snapshot-viewer";
 
 /**
@@ -9,8 +9,9 @@ import { showPanel } from "./snapshot-viewer";
 
 test("Details and Tools start shut; the slider draws both shots at one scale, drags on the image and takes the keyboard", async ({
   page,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page, "Slider Co", "slider");
+  const { token, projectId } = await provision({ org: "Slider Co", project: "slider" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
   await page.waitForTimeout(1100);
@@ -22,6 +23,7 @@ test("Details and Tools start shut; the slider draws both shots at one scale, dr
 
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await showPanel(page);
 

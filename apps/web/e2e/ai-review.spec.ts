@@ -1,14 +1,5 @@
-import { expect, test } from "@playwright/test";
-import {
-  CHANGED,
-  SHA_MAIN,
-  SHA_WORK,
-  WHITE,
-  explained,
-  open,
-  provision,
-  uploadBuild,
-} from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, explained, uploadBuild } from "./api-upload";
 import { STUB } from "./ports";
 import { highlightToggle, showPanel } from "./snapshot-viewer";
 
@@ -18,8 +9,12 @@ import { highlightToggle, showPanel } from "./snapshot-viewer";
  * build page lists it as AI-filtered; the shot's page shows the label and the sentence.
  */
 
-test("an opted-in project's model auto-passes a noise-only shot and says why", async ({ page }) => {
-  const { token, projectId } = await provision(page, "Model Co", "modelled");
+test("an opted-in project's model auto-passes a noise-only shot and says why", async ({
+  page,
+  provision,
+}) => {
+  const { token, projectId } = await provision({ org: "Model Co", project: "modelled" });
+  await open(page, `/projects/${projectId}/settings`);
   const form = page.getByTestId("model-settings");
   await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
   await form.getByTestId("model-name").fill("deepseek-flash");
@@ -82,9 +77,11 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
  */
 test("a project without its own model uses the org's, and its own overrides it", async ({
   page,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page, "Shared Co", "shared");
+  const { token, projectId } = await provision({ org: "Shared Co", project: "shared" });
   const settings = `/projects/${projectId}/settings`;
+  await open(page, settings);
   const inUse = page.getByTestId("model-in-use");
   await expect(inUse).toHaveAttribute("data-source", "none");
 

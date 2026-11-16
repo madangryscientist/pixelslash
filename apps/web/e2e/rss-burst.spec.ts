@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { expect, test } from "@playwright/test";
-import { SHA_MAIN, SHA_WORK, explained, open, provision, uploadBuild } from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { SHA_MAIN, SHA_WORK, explained, uploadBuild } from "./api-upload";
 import { type Block, png } from "./png";
 import { SERVER, SERVER_PORT, SIDECAR_PORT, STUB } from "./ports";
 
@@ -107,10 +107,11 @@ function shots(blockAt: number) {
 
 test.skip(COUNT === 0, "PS-200 measurement: set PIXELSLASH_RSS_BURST to the shot count");
 
-test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page }) => {
+test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, provision }) => {
   test.setTimeout(1_200_000);
-  const { token, projectId } = await provision(page, "Burst Co", "burst");
+  const { token, projectId } = await provision({ org: "Burst Co", project: "burst" });
   if (MODEL) {
+    await open(page, `/projects/${projectId}/settings`);
     const form = page.getByTestId("model-settings");
     await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
     await form.getByTestId("model-name").fill("deepseek-flash");

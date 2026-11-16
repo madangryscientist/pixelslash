@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { Browser } from "@playwright/test";
 import { SERVER } from "./ports";
+import { SIGNED_OUT } from "./session";
 
 const WEB = fileURLToPath(new URL("..", import.meta.url));
 
@@ -57,7 +58,7 @@ export async function rivalSession(
 
 /** A browser context signed in as the rival. */
 export async function rivalContext(browser: Browser, token: string) {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ storageState: SIGNED_OUT });
   await context.addCookies([{ name: "ps_session", value: token, url: SERVER }]);
   return context;
 }

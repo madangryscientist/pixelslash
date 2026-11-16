@@ -1,8 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { type Provision, expect, open, test } from "./fixtures";
+import type { Page } from "@playwright/test";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { sql } from "./d1";
 
 /**
@@ -14,13 +15,13 @@ const WEB = fileURLToPath(new URL("..", import.meta.url));
 /** Screens kept outside the wiped e2e state, for the PR. */
 const SHOTS = process.env["PS_SHOT_DIR"] ?? join(WEB, ".wrangler/e2e/shots");
 
-async function capture(page: import("@playwright/test").Page, name: string) {
+async function capture(page: Page, name: string) {
   await mkdir(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
 }
 
-async function seed(page: import("@playwright/test").Page) {
-  const { token, projectId } = await provision(page, "List Co", "list");
+async function seed(page: Page, provision: Provision) {
+  const { token, projectId } = await provision({ org: "List Co", project: "list" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "hero", png: WHITE },
     { name: "ticker", png: WHITE },
@@ -52,8 +53,11 @@ async function seed(page: import("@playwright/test").Page) {
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("every field of a build is on its card, inside the viewport", async ({ page }) => {
-    const projectId = await seed(page);
+  test("every field of a build is on its card, inside the viewport", async ({
+    page,
+    provision,
+  }) => {
+    const projectId = await seed(page, provision);
     await open(page, `/projects/${projectId}`);
 
     const card = page.getByTestId("build-card").first();
@@ -102,8 +106,8 @@ for (const scheme of ["light", "dark"] as const) {
   test.describe(`on a desktop, ${scheme}`, () => {
     test.use({ colorScheme: scheme, viewport: { width: 1280, height: 800 } });
 
-    test("a build with work to review does not read passed", async ({ page }) => {
-      const projectId = await seed(page);
+    test("a build with work to review does not read passed", async ({ page, provision }) => {
+      const projectId = await seed(page, provision);
       await open(page, `/projects/${projectId}`);
 
       const row = page.getByTestId("build-row").first();

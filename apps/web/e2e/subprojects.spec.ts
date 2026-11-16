@@ -1,19 +1,13 @@
-import { expect, test } from "@playwright/test";
-import { createOrg, createProject, openSettings } from "./orgs-page";
+import { expect, open, test } from "./fixtures";
 
 test("a subproject is added on its project's settings and shown nested under it", async ({
   page,
+  provision,
 }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs/);
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-  const orgId = await createOrg(page, "Nest Co");
-  await createProject(page, "storefront");
+  const { orgId, projectId } = await provision({ org: "Nest Co", project: "storefront" });
 
   // A top-level project's settings offer the form; adding one opens the subproject's page.
-  await openSettings(page, "storefront");
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await open(page, `/projects/${projectId}/settings`);
   const add = page.getByTestId("add-subproject");
   await add.getByLabel("Subproject name, e.g. e2e").fill("e2e");
   await add.getByRole("button", { name: "Add a subproject" }).click();
@@ -26,7 +20,7 @@ test("a subproject is added on its project's settings and shown nested under it"
   const empty = page.getByTestId("empty-project");
   await expect(empty.getByTestId("upload-command")).toContainText("--subproject e2e");
   await expect(empty.getByRole("link", { name: "storefront's settings" })).toBeVisible();
-  await page.goto(`${page.url()}/settings`);
+  await open(page, `${new URL(page.url()).pathname}/settings`);
   const inherited = page.getByTestId("inherited-settings");
   await expect(inherited).toContainText("This is a subproject of storefront");
   await expect(page.getByTestId("diff-location")).toBeVisible();
@@ -37,12 +31,12 @@ test("a subproject is added on its project's settings and shown nested under it"
   await expect(page.getByTestId("add-subproject")).toBeVisible();
 
   // The parent's page lists it above its own builds.
-  await page.goto(page.url().replace(/\/settings$/, ""));
+  await open(page, `/projects/${projectId}`);
   await expect(page.getByTestId("subproject-row")).toHaveCount(1);
   await expect(page.getByTestId("subproject-row")).toContainText("e2e");
 
   // The org page lists it as an indented row under its project.
-  await page.goto(`/orgs?org=${orgId}`);
+  await open(page, `/orgs?org=${orgId}`);
   await expect(page.getByTestId("project-row")).toHaveCount(1);
   const sub = page.getByTestId("subproject-row");
   await expect(sub).toHaveCount(1);

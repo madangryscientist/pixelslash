@@ -1,5 +1,6 @@
-import { type Page, expect, test } from "@playwright/test";
-import { SHA_MAIN, SHA_WORK, open, provision, uploadBuild } from "./api-upload";
+import type { Page } from "@playwright/test";
+import { type Provision, expect, open, test } from "./fixtures";
+import { SHA_MAIN, SHA_WORK, uploadBuild } from "./api-upload";
 import { openRunCard } from "./build-workspace";
 import { sql } from "./d1";
 import { png } from "./png";
@@ -26,8 +27,8 @@ const BRANCH = png(400, 1600, [{ x: 0, y: 800, w: 400, h: 6, rgb: [220, 30, 30] 
 const sentence = (text: string, shots: string[]) => ({ text, shots });
 
 /** A build of twelve changed tall shots, and an AI summary stored on it that names them. */
-async function seed(page: Page) {
-  const { token, projectId } = await provision(page, "Build Page Co", "buildpage");
+async function seed(page: Page, provision: Provision) {
+  const { token, projectId } = await provision({ org: "Build Page Co", project: "buildpage" });
   await uploadBuild(
     token,
     { branch: "main", commitSha: SHA_MAIN },
@@ -68,9 +69,10 @@ const scrollOverflow = (page: Page) =>
 
 test("the changes come first, the run is folded, the summary is a lead and the thumbnails are 16:10", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await seed(page);
+  await seed(page, provision);
 
   // The first changed shot is above "This run" in the DOM, and on the first screen.
   const first = page.getByTestId("snapshot-row").first();
@@ -123,9 +125,10 @@ test("the changes come first, the run is folded, the summary is a lead and the t
 
 test("a phone has no sideways scroll, with the run card closed or open, and the progress fits", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await seed(page);
+  await seed(page, provision);
   expect(await scrollOverflow(page)).toBeLessThanOrEqual(0);
 
   // "N of M reviewed" is one line, and the buttons are on screen.

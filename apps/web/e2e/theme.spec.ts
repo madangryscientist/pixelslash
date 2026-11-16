@@ -1,10 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { SIGNED_OUT, expect, open, test } from "./fixtures";
+
+// Visitors: the toggle before anyone signs in, and no cookie until one is chosen.
+test.use({ storageState: SIGNED_OUT });
 
 test.describe("a visitor who follows the system and has chosen nothing", () => {
   test.use({ colorScheme: "dark" });
 
   test("reaches dark with no cookie", async ({ page }) => {
-    await page.goto("/");
+    await open(page, "/");
     await expect(page.locator("html")).toHaveClass(/dark/);
     expect(await page.context().cookies()).toEqual([]);
   });
@@ -16,7 +19,7 @@ test.describe("a light system", () => {
   test("starts light, and an explicit choice survives a reload with the class server-rendered", async ({
     page,
   }) => {
-    await page.goto("/");
+    await open(page, "/");
     const toggle = page.getByTestId("theme-toggle");
     await expect(toggle).toBeEnabled();
     await expect(page.locator("html")).not.toHaveClass(/dark/);
@@ -44,7 +47,7 @@ test.describe("a light system", () => {
 test("an explicit light choice beats a dark system", async ({ browser }) => {
   const context = await browser.newContext({ colorScheme: "dark" });
   const page = await context.newPage();
-  await page.goto("/");
+  await open(page, "/");
   const toggle = page.getByTestId("theme-toggle");
   await expect(toggle).toBeEnabled();
   await toggle.click();

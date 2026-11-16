@@ -10,6 +10,7 @@ import {
   STUB,
   STUB_PORT,
 } from "./e2e/ports";
+import { SIGNED_IN } from "./e2e/session";
 
 // The web server starts before `globalSetup` scopes TMPDIR, so it gets its own under .wrangler/e2e,
 // which the next run clears: miniflare and wrangler leave nothing in /tmp.
@@ -36,7 +37,16 @@ export default defineConfig({
   // A failure keeps its trace and `error-context.md` in test-results, which CI uploads (ci.yml). There
   // are no retries, so `on-first-retry` never recorded anything.
   use: { baseURL: SERVER, trace: "retain-on-failure" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // Signs in once and saves the session. Not `/.*\.setup\.ts/`: dogfood-orgs.setup.ts is a capture
+    // setup, not part of this run.
+    { name: "setup", testMatch: /signed-in\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: SIGNED_IN },
+    },
+  ],
   webServer: [
     {
       command: "bun e2e/github-stub.ts",

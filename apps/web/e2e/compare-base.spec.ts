@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { type Provision, expect, open, test } from "./fixtures";
+import type { Page } from "@playwright/test";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 import { highlightToggle } from "./snapshot-viewer";
 
 /**
@@ -12,8 +13,8 @@ const SHA_NEXT = "c".repeat(40);
 const LABEL = '[data-testid="pane-label"]';
 const BOXES = 'svg[aria-label="Measured regions"] rect[data-kind="change"]';
 
-async function carriedShot(page: import("@playwright/test").Page) {
-  const { token, projectId } = await provision(page, "Base Co", "base");
+async function carriedShot(page: Page, provision: Provision) {
+  const { token, projectId } = await provision({ org: "Base Co", project: "base" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "home", png: WHITE },
     { name: "about", png: WHITE },
@@ -42,15 +43,17 @@ async function carriedShot(page: import("@playwright/test").Page) {
   );
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await page.getByTestId("group-changed").getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await expect(page.locator("h1")).toHaveAttribute("title", "about");
 }
 
 test("a carried shot opens on Against main and switches to the earlier build by keyboard", async ({
   page,
+  provision,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await carriedShot(page);
+  await carriedShot(page, provision);
 
   const against = page.getByRole("radiogroup", { name: "Compared with" });
   await expect(against.getByRole("radio", { name: "Against main" })).toBeChecked();
@@ -72,9 +75,9 @@ test("a carried shot opens on Against main and switches to the earlier build by 
   await expect(page.locator(LABEL).first().getByRole("link")).toBeVisible();
 });
 
-test("on a phone nothing scrolls sideways", async ({ page }) => {
+test("on a phone nothing scrolls sideways", async ({ page, provision }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await carriedShot(page);
+  await carriedShot(page, provision);
   await expect(page.getByRole("radiogroup", { name: "Compared with" })).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

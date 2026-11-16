@@ -3,14 +3,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Browser, type Locator, type Page, expect, test } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { type Provision, expect, open, test } from "./fixtures";
 import { expectApprovedEarlier } from "./approved-earlier";
 import { JUDGE_SAYS, expectBranchPage } from "./branch-page";
 import { png } from "./png";
 import { expectBaselineBuild, expectBuildWorkspaceOpen, walkBuildTabs } from "./build-workspace";
 import { checkout, removeHistoryRepo } from "./history-repo";
 import { expectProjectFlag, flagFalsePositive } from "./detection-flag";
-import { createOrg, createProject, openSettings } from "./orgs-page";
 import { SERVER } from "./ports";
 import { rejectThenWalkFailedBuild } from "./review-keys";
 import { rivalContext, rivalSession } from "./rival";
@@ -120,43 +120,6 @@ const REVIEW: Fixture[] = [
 
 /* --------------------------------------------------------------------------------- the walk */
 
-async function submit(input: Locator, value: string, button: Locator) {
-  await input.fill(value);
-  await button.click();
-}
-
-/** Sign in through the GitHub stub and make one org with one project and one CI token. */
-async function provision(
-  page: Page,
-  orgName = "Review Co",
-): Promise<{ token: string; projectId: string }> {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs$/);
-  const orgId = await createOrg(page, orgName);
-  await createProject(page, "shop");
-  await openSettings(page, "shop");
-  await submit(
-    page.getByLabel("Token name, e.g. github-actions"),
-    "ci",
-    page.getByRole("button", { name: "Issue token" }),
-  );
-  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
-  await open(page, `/orgs?org=${orgId}`);
-  await page.getByRole("link", { name: "shop", exact: true }).click();
-  // `click()` resolves once the click is dispatched, not when the client navigation commits.
-  await expect(page).toHaveURL(/\/projects\/[^/]+/);
-  const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1];
-  if (!projectId) throw new Error(`no project id in ${page.url()}`);
-  return { token, projectId };
-}
-
-/** A full load, then wait for hydration: before it a click or key can be lost. */
-async function open(page: Page, url: string) {
-  await page.goto(url);
-  await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
-}
-
 async function capture(page: Page, name: string) {
   await mkdir(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
@@ -181,9 +144,9 @@ function group(page: Page, name: string) {
 async function rivalGets404(browser: Browser, projectId: string, buildId: string) {
   const context = await rivalContext(browser, await rivalSession());
   const page = await context.newPage();
-  await page.goto("/orgs");
+  await open(page, "/orgs");
   await expect(page.getByRole("heading", { name: "Rival Co" })).toBeVisible();
-  const response = await page.goto(`/projects/${projectId}/builds/${buildId}`);
+  const response = await open(page, `/projects/${projectId}/builds/${buildId}`);
   expect(response?.status()).toBe(404);
   await context.close();
 }
@@ -198,8 +161,9 @@ async function reupload(page: Page, token: string, projectId: string) {
 test("the review screens: j/k walk, overlay from stored regions, accept, reject, accept all", async ({
   page,
   browser,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page);
+  const { token, projectId } = await provision({ org: "Review Co", project: "shop" });
 
   upload(await snapshotDir(BASE), token, "main");
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
@@ -294,8 +258,9 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
 
 test("the branch page: against main, since last build, and an accept the build page agrees with", async ({
   page,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page, "Branch Co");
+  const { token, projectId } = await provision({ org: "Branch Co", project: "shop" });
   upload(await snapshotDir(BASE), token, "main");
   await page.waitForTimeout(1100);
   upload(await snapshotDir(REVIEW), token, "feature", { judge: await stubJudge() });
@@ -312,8 +277,8 @@ const THREE_CHANGED: Fixture[] = ["s1", "s2", "s3"].map((name) => ({
 }));
 
 /** Three changed shots in one review build, opened from its project page: the page is hydrated. */
-async function threeChangedBuild(page: Page, orgName: string) {
-  const { token, projectId } = await provision(page, orgName);
+async function threeChangedBuild(page: Page, provision: Provision, org: string) {
+  const { token, projectId } = await provision({ org, project: "shop" });
   upload(await snapshotDir(THREE_BASE), token, "main");
   await page.waitForTimeout(1100);
   upload(await snapshotDir(THREE_CHANGED), token, "review", { pr: 7 });
@@ -324,8 +289,9 @@ async function threeChangedBuild(page: Page, orgName: string) {
 
 test("a decision moves the reviewer on: accept advances, a failed decision stays put", async ({
   page,
+  provision,
 }) => {
-  await threeChangedBuild(page, "Advance Co");
+  await threeChangedBuild(page, provision, "Advance Co");
   const position = page.getByTestId("position");
   await group(page, "changed").getByRole("link", { name: /s2/i }).click();
   await expect(position).toHaveText("shot 2 of 3");
@@ -353,8 +319,8 @@ test("a decision moves the reviewer on: accept advances, a failed decision stays
   await page.waitForURL(/\/builds\/[^/?]+(\?.*)?$/);
 });
 
-test("re-deciding a shot: a rejection goes to the build page", async ({ page }) => {
-  await threeChangedBuild(page, "Redecide Co");
+test("re-deciding a shot: a rejection goes to the build page", async ({ page, provision }) => {
+  await threeChangedBuild(page, provision, "Redecide Co");
   const position = page.getByTestId("position");
   await group(page, "changed").getByRole("link", { name: /s1/i }).click();
   await expect(position).toHaveText("shot 1 of 3");

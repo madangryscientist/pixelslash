@@ -1,12 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, open, test } from "./fixtures";
 
 test("issue a personal token in settings, see it once, use it, revoke it", async ({
   page,
   request,
 }) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  await expect(page).toHaveURL(/\/orgs$/);
+  await open(page, "/orgs");
 
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/);
