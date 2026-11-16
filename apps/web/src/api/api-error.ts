@@ -2,6 +2,7 @@ import { BuildFinalisedError, ImageUnknownError, SnapshotCountError } from "#/db
 import { NotFoundError } from "#/db/db";
 import { InheritedFromParentError } from "#/db/effective";
 import { SubprojectDepthError } from "#/db/orgs";
+import { NotReviewableError } from "#/db/review";
 import { UnknownSubprojectError } from "./build-target";
 import { NoRecoveryError } from "#/diff/process";
 import { reportError } from "#/server/sentry";
@@ -22,6 +23,8 @@ function codedError(e: unknown): ApiError | null {
     return { status: 400, code: e.code, message: e.message };
   if (e instanceof SubprojectDepthError)
     return { status: 400, code: "bad_request", message: e.message };
+  // A decision on a build still uploading, processing or errored, or already rejected.
+  if (e instanceof NotReviewableError) return { status: 409, code: "conflict", message: e.message };
   return null;
 }
 

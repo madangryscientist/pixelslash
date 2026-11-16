@@ -66,7 +66,8 @@ code.
 - **While you build:** [`pixelslash dev`](docs/cli.md#feature-mode-pixelslash-dev) re-captures a
   page or component on every save and diffs it with the previous iteration, uploading nothing.
 - **Your coding agent:** [`pixelslash mcp`](docs/cli.md#your-coding-agent-pixelslash-mcp) is a
-  stdio MCP server, so the agent you already run can read builds, changed shots and flakes.
+  stdio MCP server, so the agent you already run can read builds, changed shots and flakes, and
+  accept or reject a change for you.
 - **Start a repo:** [`pixelslash init`](docs/cli.md#start-a-repo-pixelslash-init) writes a
   `pixelslash.config.ts` from a few questions.
 

@@ -620,7 +620,7 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; shots leave only through `upload` or `capture --upload`, or to the model's provider when `PIXELSLASH_OPENCODE_MODEL` names a hosted one (opt-in); `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake",
+        "note": "the default; shots leave only through `upload` or `capture --upload`, or to the model's provider when `PIXELSLASH_OPENCODE_MODEL` names a hosted one (opt-in); `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake and the review decisions a personal token makes",
         "commit": "cad8b76"
       },
       "t": {
