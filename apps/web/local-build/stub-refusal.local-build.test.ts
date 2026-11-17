@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { Log, LogLevel, Miniflare, convertV4MiniflareOptions } from "miniflare";
-import { SIGNED_OUT, expect, test } from "./fixtures";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 /**
  * A production build pointed at the GitHub stand-in does not start (PS-250): the stand-in lets
@@ -11,9 +11,6 @@ import { SIGNED_OUT, expect, test } from "./fixtures";
  * workerd once with the stand-in's bases and once with GitHub's. The second load is also the
  * deployment with no Google client (PS-274): no Google button, and `/auth/google` is a 404.
  */
-
-// It loads the Worker in workerd, not a browser page; a session would be a stranger's anyway.
-test.use({ storageState: SIGNED_OUT });
 
 const WEB_ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(WEB_ROOT, ".wrangler/stub-refusal");
@@ -97,8 +94,8 @@ async function start(
   }
 }
 
-test.describe("a production build and the GitHub stand-in", () => {
-  test.beforeAll(async () => {
+describe("a production build and the GitHub stand-in", () => {
+  beforeAll(() => {
     const redirect = existsSync(DEPLOY_REDIRECT) ? readFileSync(DEPLOY_REDIRECT) : null;
     const env = { ...process.env };
     delete env["CLOUDFLARE_ENV"];
@@ -109,14 +106,14 @@ test.describe("a production build and the GitHub stand-in", () => {
         env,
         encoding: "utf8",
       });
-      expect(built.status, built.stderr || built.stdout).toBe(0);
+      if (built.status !== 0) throw new Error(`vite build: ${built.stderr || built.stdout}`);
     } finally {
       if (redirect) writeFileSync(DEPLOY_REDIRECT, redirect);
       else rmSync(DEPLOY_REDIRECT, { force: true });
     }
   });
 
-  test.afterAll(() => rmSync(OUT, { recursive: true, force: true }));
+  afterAll(() => rmSync(OUT, { recursive: true, force: true }));
 
   test("pointed at the stand-in, it does not start, and says why", async () => {
     const stub = "http://localhost:4174";

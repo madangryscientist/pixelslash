@@ -183,13 +183,14 @@ jobs:
       - name: e2e (production build)
         id: e2e
         run: bunx moon run web:test-e2e
-      # Only the specs that make the server diff: the upload, and the review of its result. The dev run is
-      # there so the pngjs diff inside workerd stays under an e2e run (apps/web/playwright.config.ts); the
-      # production run above already covers every spec.
-      - name: e2e against vite dev (upload and review)
+      # Only the spec that makes the server diff and reads its result in the browser. The dev run is there
+      # so the pngjs diff inside workerd stays under an e2e run (apps/web/playwright.config.ts); the
+      # production run above already covers every spec, and the CLI's uploads diff in workerd on a
+      # production build in the local-build step below.
+      - name: e2e against vite dev (review)
         id: e2e_dev
         working-directory: apps/web
-        run: bun run test:e2e:dev -- e2e/upload.spec.ts e2e/review.spec.ts
+        run: bun run test:e2e:dev -- e2e/review.spec.ts
       # A failed e2e test leaves its trace and `error-context.md` (the page snapshot) in test-results
       # (`trace: "retain-on-failure"`); without this the runner takes them away and a flake leaves no
       # evidence. Open a trace with `npx playwright show-trace <trace.zip>`. The dev step only runs
@@ -202,6 +203,23 @@ jobs:
           path: apps/web/test-results
           retention-days: 7
           if-no-files-found: warn
+      # The local build on a local D1 (apps/web/local-build): the API and the real CLI against the
+      # production build, integration with no browser. Free ports and its own `.wrangler/local-build`, so it
+      # never meets the e2e's server or D1.
+      - name: Local-build integration
+        id: local_build
+        run: bunx moon run web:test-local-build
+      # The server's log is what its "did not come up" error points at.
+      - name: Keep the local-build server log of a failure
+        if: failure() && steps.local_build.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-local-build-log
+          path: apps/web/.wrangler/local-build/preview.log
+          retention-days: 7
+          if-no-files-found: warn
+      # This reads the `dist` the local-build step left: a `CLOUDFLARE_ENV=e2e` build, the same kind the
+      # e2e left here before that step ran.
       - name: Deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry"

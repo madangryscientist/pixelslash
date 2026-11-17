@@ -1,65 +1,14 @@
-import { execFile, spawnSync } from "node:child_process";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { SHA_MAIN, uploadBuild } from "./api-upload";
 import { expect, open, test } from "./fixtures";
-import { showPanel } from "./snapshot-viewer";
 import { png } from "./png";
 import { SERVER } from "./ports";
+import { showPanel } from "./snapshot-viewer";
 
 /**
- * Layout metrics (PS-294, `docs/metrics.md`): a native import and a web import, each with a
- * `<name>.metrics.json` beside its PNG, uploaded by the real CLI. The server shows both shots'
- * metrics in the side panel and in the API read; a shot without a file shows neither.
+ * Layout metrics (PS-294, `docs/metrics.md`) in the side panel: a per-part table for a shot that has a
+ * metrics file, and none for a shot without. The CLI's import and upload of those files, and the API
+ * read, are `local-build/upload.local-build.test.ts`.
  */
-
-const run = promisify(execFile);
-const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
-const WEB = fileURLToPath(new URL("..", import.meta.url));
-const CLI = join(ROOT, "packages/cli/src/index.ts");
-
-const temps: string[] = [];
-test.afterAll(async () => {
-  await Promise.all(temps.map((d) => rm(d, { recursive: true, force: true })));
-});
-async function tempDir(prefix: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), prefix));
-  temps.push(dir);
-  return dir;
-}
-
-function cli(args: string[], env: Record<string, string> = {}) {
-  const res = spawnSync("bun", [CLI, ...args], {
-    cwd: ROOT,
-    env: { ...process.env, ...env },
-    encoding: "utf8",
-  });
-  return { code: res.status, stdout: res.stdout, stderr: res.stderr };
-}
-
-async function rows(sql: string): Promise<Record<string, string>[]> {
-  const { stdout } = await run(
-    "bunx",
-    [
-      "wrangler",
-      "d1",
-      "execute",
-      "DB",
-      "--json",
-      "--local",
-      "--env",
-      "e2e",
-      "--persist-to",
-      ".wrangler/e2e",
-      "--command",
-      sql,
-    ],
-    { cwd: WEB },
-  );
-  return JSON.parse(stdout.slice(stdout.indexOf("[")))[0].results;
-}
 
 const BUTTON = {
   version: "1.0",
@@ -89,88 +38,24 @@ const CARD = {
   },
 };
 
-/** A generated dir of loose PNGs and, for some, their metrics files. */
-async function pngs(prefix: string, shots: Record<string, object | null>) {
-  const dir = await tempDir(prefix);
-  for (const [name, metrics] of Object.entries(shots)) {
-    await writeFile(join(dir, `${name}.png`), png(120, 240));
-    if (metrics) await writeFile(join(dir, `${name}.metrics.json`), JSON.stringify(metrics));
-  }
-  return dir;
-}
-
-async function imported(from: string, ...flags: string[]) {
-  const out = join(await tempDir("ps-e2e-metrics-out-"), "snaps");
-  const made = cli(["import", from, "--out", out, ...flags]);
-  expect(made.code, made.stderr).toBe(0);
-  return { out, stdout: made.stdout };
-}
-
-test("metrics beside imported PNGs are uploaded, shown in the side panel and given by the API read", async ({
+test("the side panel shows a shot's layout metrics, part by part, and none for a plain shot", async ({
   page,
-  request,
   provision,
 }) => {
   const { token, projectId } = await provision({ org: "Metrics Co", project: "parts" });
-  const droid = await imported(
-    await pngs("ps-e2e-droid-", { login: BUTTON, plain: null }),
-    "--platform",
-    "android",
-    "--device",
-    "Pixel 8 API 35",
-    "--scale",
-    "3",
-  );
-  const web = await imported(await pngs("ps-e2e-web-", { home: CARD }), "--viewport", "120x240");
-  expect(droid.stdout).toContain("metrics: 1");
-  expect(web.stdout).toContain("metrics: 1");
-
-  // One build carries the native and the web dir.
-  const dir = await tempDir("ps-e2e-both-");
-  const manifests = await Promise.all(
-    [droid.out, web.out].map(async (d) =>
-      JSON.parse(await readFile(join(d, "manifest.json"), "utf8")),
-    ),
-  );
-  for (const d of [droid.out, web.out]) await cp(d, dir, { recursive: true, force: true });
-  await writeFile(
-    join(dir, "manifest.json"),
-    JSON.stringify({ version: 1, snapshots: manifests.flatMap((m) => m.snapshots) }),
-  );
-  const up = cli(["upload", dir, "--server", SERVER, "--branch", "main"], {
-    PIXELSLASH_TOKEN: token,
+  const image = png(40, 40);
+  const buildId = await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
+    { name: "login", png: image, metrics: BUTTON },
+    { name: "home", png: image, metrics: CARD },
+    { name: "plain", png: image },
+  ]);
+  const read = await fetch(`${SERVER}/api/v1/builds/${buildId}`, {
+    headers: { authorization: `Bearer ${token}` },
   });
-  expect(up.code, up.stderr).toBe(0);
-  const buildId = /build: (\S+)/.exec(up.stdout)?.[1] ?? "";
-
-  const shots = await rows(
-    `SELECT id, name, metrics_key FROM snapshots WHERE build_id = '${buildId}' ORDER BY name`,
-  );
-  const by = new Map(shots.map((s) => [s.name, s]));
-  expect(by.get("home")?.metrics_key).toMatch(/\.metrics\.json$/);
-  expect(by.get("login")?.metrics_key).toMatch(/\.metrics\.json$/);
-  expect(by.get("plain")?.metrics_key).toBeNull();
-
-  // The API read: a URL for a shot with metrics, null for one without; the URL serves the file.
-  const read = async (name: string) => {
-    const res = await request.get(`${SERVER}/api/v1/snapshots/${by.get(name)?.id}`, {
-      headers: { authorization: `Bearer ${token}` },
-    });
-    expect(res.status()).toBe(200);
-    const body: { snapshot: { metrics_url: string | null } } = await res.json();
-    return body.snapshot;
-  };
-  const login = await read("login");
-  expect(login.metrics_url).toContain("/images/");
-  const file = await request.get(login.metrics_url ?? "");
-  expect(file.headers()["content-type"]).toContain("application/json");
-  expect(await file.json()).toEqual(BUTTON);
-  expect((await read("home")).metrics_url).toContain("/images/");
-  expect((await read("plain")).metrics_url).toBeNull();
-
-  // The side panel: a per-part table for each shot that has one, and none for the plain shot.
+  const { build }: { build: { snapshots: { id: string; name: string }[] } } = await read.json();
   const shotUrl = (name: string) =>
-    `/projects/${projectId}/builds/${buildId}/snapshots/${by.get(name)?.id}`;
+    `/projects/${projectId}/builds/${buildId}/snapshots/${build.snapshots.find((s) => s.name === name)?.id}`;
+
   await open(page, shotUrl("login"));
   await showPanel(page);
   await page.getByTestId("metrics-summary").click();
