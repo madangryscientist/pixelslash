@@ -1,18 +1,8 @@
-import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { branchView } from "#/db/branch-view";
 import { reviewSnapshot } from "#/db/review";
 import { awaitsDecision, groupOf } from "#/lib/snapshot-groups";
-import { builds } from "#/db/schema";
-import {
-  type BuildSpec,
-  type Ctx,
-  type Shot,
-  context,
-  rows,
-  sha,
-  upload as send,
-} from "./test-builds";
+import { type Ctx, type Shot, context, rows, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 
 /**
@@ -27,22 +17,6 @@ const shots = (a: Shot["png"], b: Shot["png"]): Shot[] => [
   { name: "a", png: a },
   { name: "b", png: b },
 ];
-
-let clock = 0;
-
-/**
- * Upload, then date the build a second after the last one: the clock is in seconds, and builds made
- * in the same second would leave which one is the branch's newest to their random ids.
- */
-async function upload(ctx: Ctx, spec: BuildSpec) {
-  const build = await send(ctx, spec);
-  clock += 1;
-  await ctx.db
-    .update(builds)
-    .set({ createdAt: new Date(Date.now() - 600_000 + clock * 1000) })
-    .where(eq(builds.id, build.id));
-  return build;
-}
 
 const onFeat = (commit: number, list: Shot[]) => ({
   branch: "feat",

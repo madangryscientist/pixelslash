@@ -12,15 +12,7 @@ import { builds, snapshots } from "#/db/schema";
 import { fakeGithub } from "#/github/test-github";
 import { type StatusBody, syncCheckRuns } from "#/github/check-run";
 import { rediffShots } from "./rerun";
-import {
-  type BuildSpec,
-  type Ctx,
-  type Shot,
-  context,
-  rows,
-  sha,
-  upload as send,
-} from "./test-builds";
+import { type BuildSpec, type Ctx, type Shot, context, rows, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 
 /**
@@ -39,19 +31,6 @@ const featShots = (): Shot[] => [
   { name: "about", png: red },
   { name: "pricing", png: red },
 ];
-
-let clock = 0;
-
-/** Upload, then date the build a second after the last one: the branch's newest build must be unambiguous. */
-async function upload(ctx: Ctx, spec: BuildSpec) {
-  const build = await send(ctx, spec);
-  clock += 1;
-  await ctx.db
-    .update(builds)
-    .set({ createdAt: new Date(Date.now() - 600_000 + clock * 1000) })
-    .where(eq(builds.id, build.id));
-  return build;
-}
 
 const onFeat = (commit: number, list: Shot[] = featShots()): BuildSpec => ({
   branch: "feat",

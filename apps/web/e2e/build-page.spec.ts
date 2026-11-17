@@ -34,8 +34,6 @@ async function seed(page: Page, provision: Provision) {
     { branch: "main", commitSha: SHA_MAIN },
     NAMES.map((name) => ({ name, png: MAIN })),
   );
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

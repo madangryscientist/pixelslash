@@ -23,13 +23,11 @@ async function carriedShot(page: Page, provision: Provision) {
     { name: "home", png: WHITE },
     { name: "about", png: CHANGED },
   ];
-  await page.waitForTimeout(1100);
   await uploadBuild(
     token,
     { branch: "feat", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
     feat,
   );
-  await page.waitForTimeout(1100);
   // The same pixels again, before anything was decided.
   const buildId = await uploadBuild(
     token,

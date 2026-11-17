@@ -22,7 +22,8 @@ const CLI = join(ROOT, "packages/cli/src/index.ts");
 /** Screens I actually looked at; kept outside the wiped e2e state. */
 const SHOTS = process.env["PS_SHOT_DIR"] ?? join(WEB, ".wrangler/e2e/shots");
 
-// Three uploads plus two diffed builds are slower than Playwright's default.
+// The review-screens test takes 25 to 31 s against `vite dev` in CI (main's last three runs and
+// this branch's, 2026-11-17; 10 to 20 s on the production build): past Playwright's 30 s default.
 test.describe.configure({ timeout: 180_000 });
 
 /* ---------------------------------------------------------------------------- upload fixtures */
@@ -151,9 +152,8 @@ async function rivalGets404(browser: Browser, projectId: string, buildId: string
   await context.close();
 }
 
-/** The review fixtures once more, a second later, then the project page. */
+/** The review fixtures once more, then the project page. */
 async function reupload(page: Page, token: string, projectId: string) {
-  await page.waitForTimeout(1100);
   upload(await snapshotDir(REVIEW), token, "review");
   await open(page, `/projects/${projectId}`);
 }
@@ -166,8 +166,6 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   const { token, projectId } = await provision({ org: "Review Co", project: "shop" });
 
   upload(await snapshotDir(BASE), token, "main");
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   upload(await snapshotDir(REVIEW), token, "review", { pr: 7 });
 
   // The project page: newest first, with the counts the build measured.
@@ -236,7 +234,6 @@ test("the review screens: j/k walk, overlay from stored regions, accept, reject,
   await capture(page, "06-build-after-reject");
 
   // A new build carries the same shots: accept all clears it to passed.
-  await page.waitForTimeout(1100);
   upload(await snapshotDir(REVIEW), token, "review");
   await open(page, `/projects/${projectId}`);
   await expect(page.getByTestId("build-row").first().getByTestId("to-review")).toHaveText(
@@ -262,7 +259,6 @@ test("the branch page: against main, since last build, and an accept the build p
 }) => {
   const { token, projectId } = await provision({ org: "Branch Co", project: "shop" });
   upload(await snapshotDir(BASE), token, "main");
-  await page.waitForTimeout(1100);
   upload(await snapshotDir(REVIEW), token, "feature", { judge: await stubJudge() });
   await open(page, `/projects/${projectId}`);
   await expectBranchPage(page, projectId, "feature", capture);
@@ -280,7 +276,6 @@ const THREE_CHANGED: Fixture[] = ["s1", "s2", "s3"].map((name) => ({
 async function threeChangedBuild(page: Page, provision: Provision, org: string) {
   const { token, projectId } = await provision({ org, project: "shop" });
   upload(await snapshotDir(THREE_BASE), token, "main");
-  await page.waitForTimeout(1100);
   upload(await snapshotDir(THREE_CHANGED), token, "review", { pr: 7 });
   await open(page, `/projects/${projectId}`);
   await page.getByTestId("build-row").first().getByRole("link", { name: "review" }).click();

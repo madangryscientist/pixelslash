@@ -26,8 +26,6 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
   await expect(page.getByText("sk-e2e-model")).toHaveCount(0);
 
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
@@ -105,7 +103,6 @@ test("a project without its own model uses the org's, and its own overrides it",
 
   // The org's model reads the project's builds: the stub calls the region noise, auto-pass accepts.
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

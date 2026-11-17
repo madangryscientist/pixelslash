@@ -51,8 +51,6 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
 }, testInfo) => {
   const { token, projectId } = await provision({ org: "Ignore Co", project: "ignores" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

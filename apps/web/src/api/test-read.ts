@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { builds as buildRows, snapshots } from "#/db/schema";
+import { snapshots } from "#/db/schema";
 import { issueUserToken } from "#/db/tokens";
 import { signInGithubUser } from "#/db/users";
 import { context, sha, upload } from "#/diff/test-builds";
@@ -26,11 +26,6 @@ export async function world() {
       { name: "contact", png: shot() },
     ],
   });
-  // `created_at` has second resolution: move main a minute back so the order is not a tie.
-  await ctx.db
-    .update(buildRows)
-    .set({ createdAt: new Date(Date.now() - 60_000) })
-    .where(eq(buildRows.id, main.id));
   const feature = await upload(ctx, {
     branch: "feature",
     commit: sha(2),

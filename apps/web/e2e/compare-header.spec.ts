@@ -22,8 +22,6 @@ const NAME = "overview-all-themes-in-every-state";
 async function openTallShot(page: Page, provision: Provision) {
   const { token, projectId } = await provision({ org: "Header Co", project: "header" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: NAME, png: MAIN }]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

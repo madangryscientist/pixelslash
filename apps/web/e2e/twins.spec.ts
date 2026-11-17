@@ -21,7 +21,11 @@ test("the project settings link a twin project of the same org, and clear it", a
   await open(page, `/projects/${native.projectId}/settings`);
   const card = page.getByTestId("twin-project");
   await card.getByLabel("Twin project").selectOption({ label: "app" });
-  await card.getByRole("button", { name: "Save twin project" }).click();
+  const save = card.getByRole("button", { name: "Save twin project" });
+  await save.click();
+  // Saved: the button reads "Saving…" while the server function runs, then is disabled once the
+  // page holds the saved choice. Reloading before that could beat the save.
+  await expect(save).toBeDisabled();
   await page.reload();
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await expect(card.getByLabel("Twin project")).toHaveValue(app.projectId);
