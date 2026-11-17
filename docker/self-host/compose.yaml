@@ -6,6 +6,9 @@ services:
     build:
       context: ../..
       dockerfile: docker/self-host/Dockerfile
+      # The commit the pages name (`BUILD_COMMIT=$(git rev-parse HEAD) docker compose up -d --build`); unset, `unknown`.
+      args:
+        BUILD_COMMIT: "${BUILD_COMMIT:-}"
     image: pixelslash-self-host:local
     env_file: .env
     ports:

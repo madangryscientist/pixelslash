@@ -25,6 +25,9 @@ tasks:
   # build (vite.config.ts, pointAtStub). So the three share the `web-dist` mutex, and moon runs one at a time.
   build:
     command: "bun run vite build"
+    inputs:
+      # The commit the page's build-commit meta names (build-commit.ts): another value is another build.
+      - "$BUILD_COMMIT"
     # .wrangler/deploy/config.json is written by @cloudflare/vite-plugin and read by `vite preview`
     # and `wrangler`, so a cache hit must restore it with dist.
     outputs:

@@ -13,19 +13,24 @@
 # CLOUDFLARE_ENV is the build's wrangler env. Empty (the default) is the production build, which
 # signs in only through github.com (src/auth/stub-guard.ts). `e2e` is the test build, which may be
 # pointed at the GitHub stand-in: apps/web/deploy/docker/self-host.spec.ts builds it for its sign-in check, and nothing else should.
+#
+# BUILD_COMMIT is the commit the pages name in their build-commit meta (apps/web/build-commit.ts).
+# The image has no .git, so empty (the default) reads as unset and the meta says `unknown`; pass
+# `--build-arg BUILD_COMMIT=$(git rev-parse HEAD)` to name it.
 
 FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS base
 WORKDIR /opt/pixelslash
 
 FROM base AS build
 ARG CLOUDFLARE_ENV=
+ARG BUILD_COMMIT=
 COPY package.json bun.lock tsconfig.base.json ./
 COPY packages/engine/package.json packages/engine/
 COPY apps/web/package.json apps/web/
 RUN bun install --frozen-lockfile
 COPY packages/engine packages/engine
 COPY apps/web apps/web
-RUN cd apps/web && CLOUDFLARE_ENV=${CLOUDFLARE_ENV} bun run build
+RUN cd apps/web && CLOUDFLARE_ENV=${CLOUDFLARE_ENV} BUILD_COMMIT=${BUILD_COMMIT} bun run build
 
 FROM base
 ENV NODE_ENV=production \

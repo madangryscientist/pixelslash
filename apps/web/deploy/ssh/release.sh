@@ -28,6 +28,10 @@
 # The CT is built with CLOUDFLARE_ENV=e2e, so GITHUB_API_BASE is the sign-in stand-in. Whenever
 # PIXELSLASH_GITHUB_APP_ID is set, release.sh also carries GITHUB_APP_API_BASE=https://api.github.com
 # (PS-281), so the App's check runs reach GitHub while sign-in stays on the stand-in.
+#
+# After the switch, with PIXELSLASH_PUBLIC_URL set, scripts/check-commit.ts fetches that URL until its
+# build-commit meta names the sha, and the release fails if it never does. Unset, it prints the
+# command to run against the CT's own address.
 set -Eeuo pipefail
 
 # Writes value $2 to the private file $1 in the release, for update.sh to save with the CT's
@@ -90,6 +94,13 @@ pct exec "$ct" -- rm -f "/root/pixelslash-$short.tar.gz" /root/pixelslash-update
 exit $status'
   ssh "${ssh_args[@]}" "$ssh_dest" "bash -c $(printf %q "$remote") _ $(printf %q "$ct") $short $(printf %q "${PIXELSLASH_DEPLOY_FORCE:-}")" \
     <"$stage/$short.tar.gz"
+
+  # The page names the commit it was built from (apps/web/build-commit.ts): prove it is this one.
+  if [[ -n ${PIXELSLASH_PUBLIC_URL:-} ]]; then
+    bun scripts/check-commit.ts "${PIXELSLASH_PUBLIC_URL%/}/" "$sha"
+  else
+    echo "check it with: bun scripts/check-commit.ts <the CT's URL> $sha" >&2
+  fi
 }
 
 main "$@"
