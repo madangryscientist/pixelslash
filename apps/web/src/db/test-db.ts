@@ -1,12 +1,14 @@
 import { Buffer } from "node:buffer";
 import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 
 /** The tests' `MODEL_KEY_SECRET`: base64 of 32 fixed bytes. Never a real secret. */
 export const TEST_MODEL_KEY_SECRET = Buffer.alloc(32, 7).toString("base64");
 
-const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
+// A path, not a URL: under happy-dom the global `URL` is the DOM's, which `node:fs` does not take.
+const MIGRATIONS = join(import.meta.dirname, "../../drizzle");
 
 /**
  * An in-memory SQLite with the real migrations applied, behind the same async Drizzle API
@@ -20,7 +22,7 @@ export function testDb(beforeQuery?: (query: string, exec: (sql: string) => void
   for (const file of readdirSync(MIGRATIONS)
     .filter((f) => f.endsWith(".sql"))
     .toSorted()) {
-    for (const stmt of readFileSync(new URL(file, MIGRATIONS), "utf8").split(
+    for (const stmt of readFileSync(join(MIGRATIONS, file), "utf8").split(
       "--> statement-breakpoint",
     )) {
       sqlite.exec(stmt);

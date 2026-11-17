@@ -3,7 +3,7 @@ import { twinSourceLabel, unlinkedLine } from "#/lib/twins";
 import { NotFoundError } from "./db";
 import { createOrg, createProject } from "./orgs";
 import { projects } from "./schema";
-import { TwinProjectError, setTwinProject, twinsOfBuild } from "./twins";
+import { TwinProjectError, setTwinProject, twinCandidates, twinsOfBuild } from "./twins";
 import { signInGithubUser } from "./users";
 import { type World, shaOf as sha, world } from "./twins-test-support";
 
@@ -14,9 +14,10 @@ let userId: World["userId"];
 let web: World["web"];
 let native: World["native"];
 let build: World["build"];
+let orgId: World["orgId"];
 
 beforeEach(async () => {
-  ({ db, userId, web, native, build } = await world());
+  ({ db, userId, web, native, build, orgId } = await world());
 });
 
 describe("twinsOfBuild: a linked twin project", () => {
@@ -155,5 +156,33 @@ describe("setTwinProject", () => {
     await expect(setTwinProject(db, stranger.id, web, native)).rejects.toBeInstanceOf(
       NotFoundError,
     );
+  });
+});
+
+describe("twinCandidates", () => {
+  test("offers the org's other projects by name, never the project itself or another org's", async () => {
+    const admin = await createProject(db, userId, orgId, "admin");
+    const stranger = await signInGithubUser(db, {
+      githubId: 2,
+      login: "eve",
+      name: null,
+      avatarUrl: null,
+    });
+    const elsewhere = await createOrg(db, stranger.id, "Elsewhere");
+    await createProject(db, stranger.id, elsewhere.id, "app");
+    expect(await twinCandidates(db, userId, web)).toEqual([
+      { id: admin.id, name: "admin" },
+      { id: native, name: "native" },
+    ]);
+  });
+
+  test("a non-member gets the same not-found as every other setting", async () => {
+    const stranger = await signInGithubUser(db, {
+      githubId: 2,
+      login: "eve",
+      name: null,
+      avatarUrl: null,
+    });
+    await expect(twinCandidates(db, stranger.id, web)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
