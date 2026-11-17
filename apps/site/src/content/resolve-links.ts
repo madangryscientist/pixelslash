@@ -1,5 +1,6 @@
 import { ANCHOR_PAGE } from "virtual:cli-meta";
 import { DOC_PAGES } from "./docs-map.ts";
+import { SLASHSLASH } from "./moved.ts";
 import { APP_LIVE, APP_URL, REPO_PUBLIC, REPO_URL } from "./links.ts";
 
 /*
@@ -16,7 +17,7 @@ const SITE_PATHS: Record<string, string> = {
   ),
   "apps/web/SELF-HOST.md": "/self-host",
   "SECURITY.md": "/security",
-  "docs/capabilities/matrix.html": "/compare",
+  "docs/capabilities/matrix.html": `${SLASHSLASH}/compare`,
 };
 
 type Gates = { repoPublic: boolean; appLive: boolean };

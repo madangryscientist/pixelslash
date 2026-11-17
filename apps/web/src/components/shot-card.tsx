@@ -3,7 +3,7 @@ import { Caption, Card, Cluster, ClusterGrow, Pill, Stack, Text } from "@hackcov
 import { changeCrop } from "../../../../packages/engine/src/report-crop.ts";
 import { IDENTICAL_NOTE } from "../../../../packages/engine/src/identical-note.ts";
 import { a11yLine } from "#/components/a11y";
-import type { Composition } from "#/components/composition";
+import { type Composition, findingsLine } from "#/components/composition";
 import type { SnapshotView } from "#/db/review";
 import { labelSummary } from "#/components/ai-notes";
 import { FlakyBadge } from "#/components/flake";
@@ -17,12 +17,12 @@ import {
   skippedFlaky,
 } from "#/lib/snapshot-groups";
 import { type ShotLabel, shotChips } from "#/lib/shot-label";
-import { coversMostOfShot } from "#/lib/thumb-crop";
+import { THUMB_RATIO, coversMostOfShot, thumbWindow } from "#/lib/thumb-crop";
 
 const THUMB_BOX = "w-full overflow-hidden rounded-md bg-slate-100";
 
-/** A thumbnail is as wide as its card and no taller than a crop of 3:2 or squatter would be; a sliver is not stretched into a box. */
-const thumbAspect = (ratio: number) => ({ aspectRatio: String(Math.min(3, Math.max(1.5, ratio))) });
+/** A thumbnail is as wide as its card and 16:10, whatever the shot or its crop (PS-419). */
+const THUMB_STYLE = { aspectRatio: String(THUMB_RATIO) };
 
 /**
  * The change, cropped from the branch shot with the measured boxes drawn on it. The server holds no
@@ -32,7 +32,7 @@ const thumbAspect = (ratio: number) => ({ aspectRatio: String(Math.min(3, Math.m
  */
 export function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | undefined }) {
   if (!src) {
-    return <div className={THUMB_BOX} style={thumbAspect(1.5)} data-testid="shot-thumb-missing" />;
+    return <div className={THUMB_BOX} style={THUMB_STYLE} data-testid="shot-thumb-missing" />;
   }
   const result = shot.diffResult;
   const crop =
@@ -42,7 +42,7 @@ export function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | und
   if (!result || !crop) {
     // A new shot, or a changed one with no box to zoom on: the shot itself, top-aligned.
     return (
-      <div className={THUMB_BOX} style={thumbAspect(1.5)} data-testid="shot-thumb">
+      <div className={THUMB_BOX} style={THUMB_STYLE} data-testid="shot-thumb">
         <img src={src} alt="" loading="lazy" className="size-full object-cover object-top" />
       </div>
     );
@@ -50,7 +50,7 @@ export function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | und
   if (coversMostOfShot(result.regions, result)) {
     // The change spans the page: a tint over all of it hides the shot, so show it plainly with a badge.
     return (
-      <div className={`${THUMB_BOX} relative`} style={thumbAspect(1.5)} data-testid="shot-thumb">
+      <div className={`${THUMB_BOX} relative`} style={THUMB_STYLE} data-testid="shot-thumb">
         <img src={src} alt="" loading="lazy" className="size-full object-cover object-top" />
         {/* Fixed colours, not the theme's: the badge sits on a screenshot, which has its own theme. */}
         <span
@@ -62,10 +62,11 @@ export function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | und
       </div>
     );
   }
+  const view = thumbWindow(crop, result.height);
   return (
-    <div className={THUMB_BOX} style={thumbAspect(crop.w / crop.h)} data-testid="shot-thumb">
+    <div className={THUMB_BOX} style={THUMB_STYLE} data-testid="shot-thumb">
       <svg
-        viewBox={`0 0 ${crop.w} ${crop.h}`}
+        viewBox={`0 0 ${view.w} ${view.h}`}
         preserveAspectRatio="xMidYMid meet"
         className="size-full"
         role="img"
@@ -74,9 +75,9 @@ export function ShotThumb({ shot, src }: { shot: SnapshotView; src: string | und
         <svg
           x={0}
           y={0}
-          width={crop.w}
-          height={crop.h}
-          viewBox={`${crop.x} ${crop.y} ${crop.w} ${crop.h}`}
+          width={view.w}
+          height={view.h}
+          viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
           overflow="hidden"
         >
           <image href={src} width={result.branchWidth} height={result.branchHeight} />
@@ -117,7 +118,8 @@ function approvedEarlierLine(shot: SnapshotView): string | null {
   const approved = shot.approvedEarlier;
   if (!approved) return null;
   const by = approved.reviewedBy ? ` by ${approved.reviewedBy}` : "";
-  return `no change since build ${approved.commitSha.slice(0, 7)} · change from ${approved.defaultBranch} approved${by}`;
+  const moved = approved.mainChangedSince ? ` · ${approved.defaultBranch} has changed since` : "";
+  return `no change since build ${approved.commitSha.slice(0, 7)} · change from ${approved.defaultBranch} approved${by}${moved}`;
 }
 
 /** An unchanged native shot of a twin key the web side changed (PS-297): nothing differs here, yet it was not looked at since. */
@@ -147,12 +149,6 @@ export function measured(shot: SnapshotView, baseline: boolean): string {
     return boxes > 0 ? `${changed} · size changed ${sizes}` : `size changed ${sizes}`;
   }
   return changed;
-}
-
-/** A composition-only shot's findings in a line: the gaps, and the special cases when there are any. */
-export function findingsLine({ library, gaps, special }: Composition): string {
-  const gap = `${gaps.length} ${gaps.length === 1 ? "gap" : "gaps"} not from ${library}`;
-  return special.length > 0 ? `${gap} · ${special.length} special` : gap;
 }
 
 function GapsLine({ composition }: { composition: Composition | null | undefined }) {
@@ -217,7 +213,9 @@ export function ShotCard({
 }) {
   const line = measured(shot, baseline);
   return (
-    <div data-testid="snapshot-row">
+    // min-w-0: a grid item is as wide as its widest unbroken word by default, so one long shot name
+    // would widen the column past a phone; with it the name truncates at the column instead.
+    <div className="min-w-0" data-testid="snapshot-row">
       <Card
         size="sm"
         badge={

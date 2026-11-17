@@ -1,13 +1,17 @@
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { DOC_PAGES, GROUPS, LISTED_PAGES, neighbours } from "../src/content/docs-map.ts";
+import { SLASHSLASH } from "../src/content/moved.ts";
+import { NAV } from "../src/content/nav.ts";
 import { PAGES } from "../src/content/pages.ts";
+import { groupRows } from "./support/docs-rows.ts";
 import { siteNav } from "./support/site-nav.ts";
 
 /*
  * Every page, on a desktop and a phone: the nav and the footer are there, every internal link and
- * anchor lands on something, nothing links to the hosted app while it is closed, and nothing scrolls sideways. That the docs and compare pages agree with their source
- * files is checked in the unit tests (src/content/docs.test.tsx, matrix.test.tsx).
+ * anchor lands on something, nothing links to the hosted app while it is closed, and nothing scrolls
+ * sideways. That the docs pages agree with their source files is checked in the unit tests
+ * (src/content/docs.test.tsx).
  */
 
 const CLOSED = ["app.pixelslash.dev"];
@@ -36,11 +40,17 @@ async function checkPage(
     expect(response?.status()).toBe(200);
 
     const nav = await siteNav(page);
-    for (const item of PAGES)
-      await expect(nav.getByRole("link", { name: item.label, exact: true })).toHaveCount(1);
+    for (const item of NAV)
+      await expect(nav.getByRole("link", { name: item.label, exact: true })).toHaveAttribute(
+        "href",
+        item.href,
+      );
 
     const footer = page.getByTestId("footer");
-    await expect(footer.getByRole("link", { name: "PixelSlash home" })).toBeVisible();
+    await expect(footer.getByRole("link", { name: "PixelSlash home" })).toHaveAttribute(
+      "href",
+      SLASHSLASH,
+    );
     await expect(footer.getByTestId("trademark")).toContainText("PixelSlash is a name of");
     await expect(footer.getByRole("link", { name: "hello@hack-cove.com" })).toHaveAttribute(
       "href",
@@ -75,7 +85,7 @@ async function checkPage(
 
     const dir = process.env["SITE_SHOTS_DIR"];
     if (dir) {
-      const name = to === "/" ? "home" : to.slice(1).replaceAll("/", "-");
+      const name = to.slice(1).replaceAll("/", "-");
       // Still, and with every scroll reveal shown: a full-page shot does not scroll the page.
       await page.emulateMedia({ reducedMotion: "reduce" });
       // The phone Menu was opened to read the nav; the shot is of the page, so close it.
@@ -104,7 +114,9 @@ test("/docs is the index: a card per group, every page linked", async ({ page },
     await expect(index.locator(`a[href="/docs/${item.slug}"]`)).toHaveCount(1);
 });
 
-// PS-351: the groups are packed into columns, so no card is a box with a void under its links.
+// PS-351: no card is a box with a void under its links. Since PS-385 cards in a row end level, so the
+// shorter card of a pair has slack by design; the guard is per row: the fullest card of each row ends
+// within 24px of its last link, plus one link line for a two-column group whose columns differ by one.
 for (const size of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
@@ -116,20 +128,10 @@ for (const size of [
       await page.setViewportSize(size);
       await page.emulateMedia({ colorScheme });
       await checkPage(page, "/docs", info);
-      const gaps = await page
-        .getByTestId("docs-index")
-        .locator(":scope > li")
-        .evaluateAll((items) =>
-          items.map((item) => {
-            const card = item.querySelector("section") ?? item;
-            const links = card.querySelectorAll("a");
-            const last = links[links.length - 1];
-            if (last === undefined) return Number.POSITIVE_INFINITY;
-            return card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
-          }),
-        );
-      expect(gaps).toHaveLength(GROUPS.length);
-      for (const gap of gaps) expect(gap).toBeLessThanOrEqual(24);
+      const rows = await groupRows(page);
+      expect(rows.flatMap((row) => row.groups)).toHaveLength(GROUPS.length);
+      for (const row of rows)
+        expect(Math.min(...row.groups.map((g) => g.gap))).toBeLessThanOrEqual(56);
     });
   }
 }
@@ -159,7 +161,7 @@ for (const doc of LISTED_PAGES) {
 
     // The rail is the desktop view; a phone gets the fold above the page.
     const contents = info.project.name.includes("mobile")
-      ? page.locator("details", { hasText: "On this page" })
+      ? page.getByTestId("docs-contents-fold")
       : page.getByTestId("docs-contents");
     if ((await contents.count()) > 0) await expect(contents.first()).toBeVisible();
   });
@@ -200,6 +202,18 @@ for (const scheme of ["light", "dark"] as const) {
       });
 
       await page.goto(to, { waitUntil: "networkidle" });
+      // `fonts.ready` resolves when nothing is pending, which is also true before layout has asked
+      // for the face (status `unloaded`; the preload fetches the file, not the FontFace). So wait
+      // for the page itself to have loaded Inter, and read the loaded families in that same call:
+      // the font state is read once, here, so nothing between a wait and a second read can change
+      // the answer. Nothing here loads the face.
+      const loadedFamilies = await page.waitForFunction(() => {
+        const loaded = [...document.fonts]
+          .filter((face) => face.status === "loaded")
+          .map((face) => face.family.replaceAll('"', ""));
+        return loaded.includes("Inter") ? loaded : null;
+      });
+      const loaded = await loadedFamilies.jsonValue();
       await page.evaluate(() => document.fonts.ready);
 
       expect(foreign, "a request left the site's own origin").toEqual([]);
@@ -210,11 +224,7 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.locator("html")).toHaveClass(
         scheme === "dark" ? /\bdark\b/ : /^(?!.*\bdark\b)/,
       );
-
-      const loaded = await page.evaluate(() =>
-        [...document.fonts].filter((face) => face.status === "loaded").map((face) => face.family),
-      );
-      expect(loaded.map((family) => family.replaceAll('"', ""))).toContain("Inter");
+      expect(loaded).toContain("Inter");
 
       // What the browser drew with: Inter, the served file, for the page's heading and its body.
       const cdp = await page.context().newCDPSession(page);
@@ -280,7 +290,7 @@ const contrast = (a: string, b: string) => {
 for (const scheme of ["light", "dark"] as const) {
   test(`the ${scheme} scope is set alone and the wordmark reads on it`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/pricing", { waitUntil: "networkidle" });
+    await page.goto("/security", { waitUntil: "networkidle" });
 
     const html = page.locator("html");
     await expect(html).toHaveClass(scheme === "dark" ? /\bdark\b/ : /\blatte\b/);

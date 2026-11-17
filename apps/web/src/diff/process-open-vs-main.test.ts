@@ -1,15 +1,16 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
+import { baselineBuildOf } from "#/db/baseline-build";
 import { type Build, getBuild } from "#/db/builds";
 import { setGithubRepo } from "#/db/orgs";
 import { countBuilds } from "#/db/build-counts";
 import { buildView, reviewSnapshot } from "#/db/review";
 import { counts as apiCounts } from "#/api/read";
 import { tabCounts } from "#/lib/build-tabs";
-import { reviewGroupOf } from "#/lib/snapshot-groups";
+import { awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
 import { builds, snapshots } from "#/db/schema";
 import { fakeGithub } from "#/github/test-github";
-import { type CheckRunBody, syncCheckRuns } from "#/github/check-run";
+import { type StatusBody, syncCheckRuns } from "#/github/check-run";
 import { rediffShots } from "./rerun";
 import {
   type BuildSpec,
@@ -128,21 +129,21 @@ async function decide(ctx: Ctx, snapshotId: string, state: "accepted" | "rejecte
   });
 }
 
-/** The check run the build gets on GitHub, as it is sent. */
-async function checkRunOf(ctx: Ctx, buildId: string): Promise<CheckRunBody> {
+/** The commit status the build gets on GitHub, as it is sent. */
+async function statusOf(ctx: Ctx, buildId: string): Promise<StatusBody> {
   await setGithubRepo(ctx.db, ctx.userId, ctx.projectId, "acme/web");
   const github = fakeGithub();
   await syncCheckRuns(
     { db: ctx.db, app: github.app({ timeoutMs: 50 }), token: null, publicUrl: "https://ps.test/" },
     [buildId],
   );
-  const body = github.checkRunCalls().at(-1);
-  if (!body) throw new Error("no check run was sent");
+  const body = github.statusCalls().at(-1);
+  if (!body) throw new Error("no commit status was sent");
   return JSON.parse(body.raw);
 }
 
 describe("open changes against main (PS-284)", () => {
-  test("a build after the chain ends at changes, and the check run names the changed and new shots", async () => {
+  test("a build after the chain ends at changes, and its status waits on the changed and new shots", async () => {
     const { ctx, passedOnIt } = await theChain();
     expect((await getBuild(ctx.db, ctx.projectId, passedOnIt.id)).status).toBe("passed");
 
@@ -161,15 +162,8 @@ describe("open changes against main (PS-284)", () => {
     expect(shots["home"]?.carriedFrom).toBeNull();
     expect(next.status).toBe("changes");
 
-    const run = await checkRunOf(ctx, next.id);
-    expect(run.conclusion).toBe("failure");
-    expect(run.output.title).toBe("2 changes to review");
-    expect(run.output.summary).toContain("Waiting for review: 1 changed shot and 1 new shot.");
-    expect(run.output.summary).toContain("- Changed: about (1280x720, light)");
-    expect(run.output.summary).toContain("- New: pricing (1280x720, light)");
-    expect(run.output.summary).not.toContain("home");
-    // Carried from main, they count under their against-main status, not as Unchanged (PS-285).
-    expect(run.output.summary).toContain("| 1 | 2 | 0 | 0 | 1 | 0 | 1 |");
+    const status = await statusOf(ctx, next.id);
+    expect(status).toMatchObject({ state: "pending", description: "2 changes to review" });
   });
 
   test("the build page files the carried shots under Changed and New, and the API keeps them unchanged (PS-285)", async () => {
@@ -187,10 +181,15 @@ describe("open changes against main (PS-284)", () => {
     ]);
     expect(tabCounts(view?.snapshots ?? [])).toMatchObject({ changed: 1, new: 1, unchanged: 1 });
     // The API's counts and each shot's `group` are the measured ones, as before.
-    expect(counts && apiCounts(counts)).toMatchObject({ changed: 0, new: 0, unchanged: 3 });
+    expect(counts && apiCounts(counts)).toMatchObject({
+      changed: 0,
+      new: 0,
+      unchanged: 3,
+      against_main: { changed: 1, new: 1 },
+    });
   });
 
-  test("accepting the open shots turns the build and the check run to passed", async () => {
+  test("accepting the open shots turns the build and its status to passed", async () => {
     const { ctx } = await theChain();
     const next = await upload(ctx, onFeat(5));
     expect(next.status).toBe("changes");
@@ -199,9 +198,10 @@ describe("open changes against main (PS-284)", () => {
     expect(await decide(ctx, shots["pricing"]?.id ?? "", "accepted")).toBe("passed");
 
     expect((await getBuild(ctx.db, ctx.projectId, next.id)).status).toBe("passed");
-    const run = await checkRunOf(ctx, next.id);
-    expect(run.conclusion).toBe("success");
-    expect(run.output.summary).not.toContain("Waiting for review");
+    expect(await statusOf(ctx, next.id)).toMatchObject({
+      state: "success",
+      description: "All changes accepted",
+    });
 
     // The decision holds for the build after it: the shots are accepted, not open again.
     const after = await upload(ctx, onFeat(6));
@@ -265,5 +265,95 @@ describe("open changes against main (PS-284)", () => {
     // Nothing else was rewritten: the stored results are the ones the build had.
     expect(after["about"]?.mainDiffStatus).toBe("changed");
     expect(after["about"]?.diffStatus).toBe("unchanged");
+  });
+});
+
+async function viewOf(ctx: Ctx, build: Build) {
+  const view = await buildView(ctx.db, ctx.projectId, build.id);
+  return Object.fromEntries(view.snapshots.map((row) => [row.name, row]));
+}
+
+/**
+ * The timeline of a build re-uploaded with byte-identical images before anything was decided: the
+ * second build's shots read unchanged against the first's open shots, are carried and still await a
+ * decision, and the one accept settles both builds. Afterwards the second build's shots read
+ * approved earlier and the build passes. The approval machinery is right; the viewer used to show
+ * the carried shot's identical previous image as "Main", so the reviewer saw no change to decide.
+ */
+describe("a re-upload before any decision settles with one accept", () => {
+  const withChange: Shot[] = [
+    { name: "home", png: white },
+    { name: "about", png: red },
+  ];
+
+  test("build 2 carries build 1's pending change, and one accept on build 1 settles both", async () => {
+    const ctx = await onMain();
+    const first = await upload(ctx, onFeat(2, withChange));
+    const second = await upload(ctx, onFeat(2, withChange));
+    expect([first.status, second.status]).toEqual(["changes", "changes"]);
+
+    const before = await viewOf(ctx, second);
+    const firstAbout = (await viewOf(ctx, first))["about"];
+    expect(before["about"]).toMatchObject({
+      diffStatus: "unchanged",
+      carriedFrom: firstAbout?.id,
+      mainDiffStatus: "changed",
+      reviewState: "pending",
+      approvedEarlier: null,
+    });
+    expect(before["about"] && awaitsDecision(before["about"])).toBe(true);
+    // The shot equal to main has nothing to decide.
+    expect(before["home"] && awaitsDecision(before["home"])).toBe(false);
+
+    expect(await decide(ctx, firstAbout?.id ?? "", "accepted")).toBe("passed");
+
+    expect((await getBuild(ctx.db, ctx.projectId, first.id)).status).toBe("passed");
+    expect((await getBuild(ctx.db, ctx.projectId, second.id)).status).toBe("passed");
+    const after = await viewOf(ctx, second);
+    expect(after["about"]?.approvedEarlier).toMatchObject({ buildId: first.id });
+    expect(after["about"] && awaitsDecision(after["about"])).toBe(false);
+  });
+
+  test("the viewer is told which build each shot's left pane shows", async () => {
+    const ctx = await onMain();
+    const first = await upload(ctx, onFeat(2, withChange));
+    const second = await upload(ctx, onFeat(2, withChange));
+    const of = async (build: Build, name: string) =>
+      baselineBuildOf(ctx.db, {
+        projectId: ctx.projectId,
+        snapshotId: (await viewOf(ctx, build))[name]?.id ?? "",
+        defaultBranch: "main",
+      });
+    // Build 1 was compared with main's accepted shot; build 2 with build 1's open one.
+    expect(await of(first, "about")).toMatchObject({ branch: "main", isDefaultBranch: true });
+    expect(await of(second, "about")).toMatchObject({
+      buildId: first.id,
+      branch: "feat",
+      isDefaultBranch: false,
+    });
+  });
+
+  test("one accept on build 2 settles both builds as well", async () => {
+    const ctx = await onMain();
+    const first = await upload(ctx, onFeat(2, withChange));
+    const second = await upload(ctx, onFeat(2, withChange));
+    const secondAbout = (await viewOf(ctx, second))["about"];
+    expect(await decide(ctx, secondAbout?.id ?? "", "accepted")).toBe("passed");
+    expect((await getBuild(ctx.db, ctx.projectId, first.id)).status).toBe("passed");
+    expect((await getBuild(ctx.db, ctx.projectId, second.id)).status).toBe("passed");
+  });
+
+  test("build 1 accepted first, then build 2 identical, needs no decision", async () => {
+    const ctx = await onMain();
+    const first = await upload(ctx, onFeat(2, withChange));
+    const firstAbout = (await viewOf(ctx, first))["about"];
+    expect(await decide(ctx, firstAbout?.id ?? "", "accepted")).toBe("passed");
+
+    const second = await upload(ctx, onFeat(2, withChange));
+    expect(second.status).toBe("passed");
+    const about = (await viewOf(ctx, second))["about"];
+    expect(about).toMatchObject({ diffStatus: "unchanged", carriedFrom: null });
+    expect(about?.approvedEarlier).toMatchObject({ buildId: first.id });
+    expect(about && awaitsDecision(about)).toBe(false);
   });
 });

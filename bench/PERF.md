@@ -13,6 +13,11 @@ Perf runs are on demand only and never in the gate.
 > the desktop as it was, with the browser and the editor running; `dedicated` is `--env dedicated`,
 > with whole cores and memory reserved and boost off. Only rows from the same run and the same env
 > are compared; a `dedicated` number is not "faster" than a `shared` one, it is steadier.
+> The dedicated env is for short timing runs only, never for repro or test loops: it squeezes every
+> other process on the machine onto the cores left. The helper now keeps at least 4 CPUs for the
+> host and ends a reservation after 30 minutes unless `renew` is run (`bench/README.md`, "A quiet
+> machine"). The setups below that name `--cpus 1-5,7-11` record what was run; the helper now
+> refuses that list because it leaves the host two CPUs.
 >
 > **Compare within a run, not across runs.** Interleaving makes A against B fair inside one run.
 > Two runs on different days differ by machine load: TS long-page wall time was 1132 ms in the
@@ -151,6 +156,8 @@ diff) unless it says wall. The full table is `bench/results/decoders-2026-10.md`
 | 22 | The WASM differ's overlay encode: pngjs's adaptive filter pass in the module (wasm SIMD), deflate in workerd's zlib at pngjs's level and strategy, chunks in JS | web (workerd) | ✅ measured, shipped; the only overlay encode since PS-210 | workerd, 15 rounds, wasm with pngjs's encode → its own: phone 23.1 → 12.2 ms (−47%), desktop 76.0 → 32.2 (−58%), long 528.8 → 238.0 (−55%); against pngjs −71 to −74%; overlay byte-equal | PS-205 |
 | 23 | diff.wasm's unfilter writes each RGBA line straight into the raster, the line above read from it, one loop per filter with the pixel width a constant (an RGB line goes through two scratch lines, then is widened). SIMD on the pixel loop and the blob boxes tried and dropped (1 to 4 ms, inside the noise) | ts + web | ✅ measured, shipped | dedicated, self: phone 37.2 → 32.7 ms (−12%), desktop 65.1 → 50.3 (−23%), long 360.1 → 288.5 (−20%); bench:native long unfilter 64.7 → 12.9 ms in wasm (25.6 → 12.9 natively); workerd long 297.1 → 211.0 ms (−29%); byte-equal | PS-212 |
 | 24 | Tile hashes: hash both shots in 64 px tiles (a hand-written 4-lane multiply-rotate hash over the decoded pixels) and run the pixel loop and the region pass only over the tiles that differ, the region pass over each dirty tile row plus the rows the merge gap reaches | ts + web | ✅ measured, shipped as the default (`--no-tiles` / `tiles: false` turn it off) | dedicated, self, off → on: phone 34.3 → 28.9 ms (−16%), desktop 52.8 → 50.0 (−5%), long 367.5 → 253.3 (−31%), long + one badge 306.6 → 175.0 (−43%), long + 10 px shift 422.4 → 388.0 (−8%); hashing 0.7 / 2.9 / 10.6 / 9.6 / 9.6 ms; same result on all 157 corpus pairs, overlay included | PS-191 |
+| 25 | Flake re-captures through a limit of the capture concurrency instead of one serial queue; a shot's retries run together | CLI upload (`flakePass`, `checkFlake`) | ✅ measured, shipped | 240 re-captures on HackCove's Storybook, dedicated: 73.2 s → 18.0 s median of three, same flaky and changed lists | n/a |
+| 26 | Reuse one Storybook preview page per capture worker in `capture --upload`: switch it to the next story through the preview's channel instead of loading the iframe again; a shot that is not byte for byte its baseline is shot again on a fresh page | CLI capture (`capture --upload`) | ✅ measured, shipped | 786 shots on HackCove's Storybook, dedicated: 57.1 s fresh → 28.5 s with reuse, re-shots included (median of three); 16 to 19 re-shot per run | n/a |
 
 Upper bounds (estimates, not measured; one phase's whole share removed):
 - cs long with regions free: about 207 − 76 = 131 ms (−37%).
@@ -205,6 +212,9 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 
 | Run | Ticket | env | What |
 | --- | --- | --- | --- |
+| 2026-11-12 | n/a | desktop, dedicated | capture reuse: one preview page per worker, switched story to story, against a fresh page per story, 786 shots, 57.1 s to 28.5 s |
+| 2026-11-12 | n/a | desktop, dedicated | the flake pass: re-captures bounded by the capture concurrency instead of one at a time, 240 re-captures, 73.2 s to 18.0 s |
+| 2026-11-12 | n/a | desktop, dedicated | capture workers 2 to 10 on a Storybook of 786 shots; the default is ten, capped by the cores |
 | 2026-10-26 | PS-191 | desktop, dedicated | tile hashes: diff.wasm compares only the 64 px tiles that differ, off against on |
 | 2026-10-26 | PS-212 | desktop, dedicated | why diff.wasm is 2.3x slower than cs on the long page: each step in wasm, natively and in cs; the unfilter fixed |
 | 2026-10-25 | PS-205 | desktop, shared | the WASM differ's overlay encode: pngjs's filter pass in the module, timed in workerd |
@@ -219,6 +229,144 @@ Newest first. One entry per perf run that landed. The `env` column says what the
 | 2026-10-24 | ob 1948 | desktop, shared | identical-bytes shortcut |
 | 2026-10-24 | ob 1932 | desktop, shared | per-phase timings, parallel decode |
 | 2026-10-24 | ob 1910 | desktop, shared | the C# engine against ts |
+
+### 2026-11-12 · capture reuse · desktop, dedicated · one preview page per worker, against a fresh page per story
+
+**A Storybook capture of 786 shots takes 28.5 s with reused preview pages where it took 57.1 s on a
+fresh page per story (medians of three, interleaved), 2.0x faster, counting the fresh re-shots the reuse
+needs.**
+
+**Question.** Each story shot opens a new context and page, loads Storybook's `iframe.html` and boots
+the preview before the story renders. What does keeping one preview page per worker, and telling it to
+render the next story through the preview's own channel, do to a capture's wall? A switched page's PNG
+is not always byte for byte a fresh page's, so `capture --upload` shoots again on a fresh page any
+shot that is not byte for byte its baseline: how many is that, and what do they cost?
+
+**Setup.** `env` dedicated: `pixelslash-bench-reserve on --cpus 1-5,7-11 --mem 10G --pid $$` at the
+top of one script with an exit trap running `off`; afterwards `"active":false`. The Storybook is
+HackCove's whole static build at one theme (`catppuccin-mocha`), 786 shots, `concurrency: 10`. A
+baseline was captured once by the CLI, on fresh pages, into its own dir. Each run opens a capture
+session (the browser launch is not in the time) and times `captureInto` into a fresh dir, fresh
+(`reuse` off) or reuse (`reuse` on). A reuse run then shoots again on a fresh page, through
+`recapture` and 4 at a time (the upload's worker count), every shot whose PNG is not byte for byte
+the baseline's, and that is timed too. The order was fresh, reuse, fresh, reuse, fresh, reuse, all
+from one script. Seconds:
+
+| Mode | Stage | Run 1 | Run 2 | Run 3 | Median |
+| --- | --- | ---: | ---: | ---: | ---: |
+| fresh | capture | 60.4 | 56.9 | 57.1 | 57.1 |
+| reuse | capture | 26.3 | 26.8 | 26.4 | 26.4 |
+| reuse | fresh re-shots | 2.1 | 2.4 | 2.1 | 2.1 |
+| reuse | total | 28.4 | 29.2 | 28.5 | 28.5 |
+
+| Mode | Differ from the baseline | Re-shot on a fresh page | Still differ after the fresh shot |
+| --- | --- | --- | --- |
+| fresh, runs 1 to 3 | 12, 13, 11 | n/a | n/a |
+| reuse, runs 1 to 3 | 17, 19, 16 | 17, 19, 16 | 9, 11, 9 |
+
+**What differs.** A fresh capture already differs from a fresh baseline on 11 to 13 shots (the video
+spinner, the gallery and all-themes overviews, a few drawers and dialogs): those shots flake on any
+page. A reuse capture differs on 16 to 19; after the fresh re-shot 9 to 11 still differ, the same kind
+of shots as the fresh runs' list, so reuse leaves no difference of its own behind. The 5 to 8 it adds
+before the re-shot are reuse artifacts (the `kbd` stories, the card grid, sidebar and prose layouts, the
+full dialog and a field dialog), each put right by its fresh shot. The upload's flake retries then run on the fresh PNG as
+before; they are not in this time.
+
+The runs were on the change's first version, which counted a worker's first story on a page as reused
+too; the shipped version counts only a story switched to in place, so it re-shoots at most as many.
+The script and raw log were scratch files and are not committed.
+
+### 2026-11-12 · flake pass · desktop, dedicated · re-captures in parallel, not one at a time
+
+**The flake pass takes 18.0 s where it took 73.2 s (medians of three, interleaved), 4.1x faster, with
+the same flaky and changed lists.**
+
+**Question.** A changed shot is captured `retries` more times (default 2) after the first capture. Every
+re-capture went through one serial queue, although the session shoots each shot in its own browser
+context and `captureInto` already runs up to `concurrency` of them at once. A live build with 193 changed
+shots spent about 1m30s of its 1m45s upload phase there. What does bounding the re-captures by the
+capture concurrency instead (and taking one shot's retries together) do to the pass?
+
+**Setup.** `env` dedicated, as in the capture workers run above:
+`pixelslash-bench-reserve on --cpus 1-5,7-11 --mem 10G --pid $$` at the top of one script with an exit
+trap running `off`; afterwards `"active":false`. The Storybook is HackCove's whole static build at one
+theme (`catppuccin-mocha`), 786 shots, captured once with `concurrency: 10` into a snapshot dir that all
+six runs share. Each run opens a fresh capture session (the browser launch is not in the time), then runs
+`flakePass` the way `uploadSnapshots` does: 4 workers (the upload's), each calling `check(entry, png)`
+for the next of 120 changed shots, with 2 retries, so 240 real re-captures. The 120 are evenly spaced over the
+786 shots minus the `video`, `gallery` and `all-themes` shots (the video spinner flakes by itself). The
+known set: 12 of the 120 have their first capture's PNG altered on purpose (4000 bytes flipped), so every
+re-capture of them differs from it and they must be called flaky; the other 108 are as captured. The
+time is the first `check` to the last, in seconds; `finish` (the runs and the report written) is
+outside it. The base is `dcdfd54` (`main`, the serial queue) and the head is this change, both from one
+script, alternating base, head, base, head, base, head; the concurrency given to both is 10 (the base
+ignores it).
+
+| Run | Run 1 | Run 2 | Run 3 | Median |
+| --- | --- | --- | --- | --- |
+| base (serial queue) | 73.2 | 73.2 | 74.3 | 73.2 |
+| head (limit 10) | 18.0 | 17.9 | 19.2 | 18.0 |
+
+**Same answer.** All six runs return the same 12 flaky shots (exactly the 12 altered ones), the same 108
+changed shots in the same order, and no skipped shot. 240 re-captures take 18.0 s, 75 ms each, against
+305 ms each when serial. With 4 workers and 2 retries at most 8 re-captures wait on the limit of 10, so
+the limit is never the cap here; the four upload workers are, which is why this is 4.1x and not 10x.
+The live upload phase also holds the PUTs and baseline fetches; its end-to-end time is measured on a
+release, not here.
+
+The script and raw log were scratch files and are not committed.
+
+### 2026-11-12 · capture workers · desktop, dedicated · how many shots at once
+
+**Question.** `captureInto` took four shots at once, fixed. Where does more stop paying?
+
+**Setup.** `env` dedicated: `pixelslash-bench-reserve on --cpus 1-5,7-11 --mem 10G --pid $$` at the top of
+one script, five whole cores (ten logical CPUs; CPUs 0 and 6 stay with the host), with the Storybook
+server, the CLI and Chromium all inside `pixelslash-bench.scope`. Status at the start:
+`{"version":2,"active":false,"reserved":[],...}`; with the reservation on:
+`{"version":2,"active":true,"reserved":[1,2,3,4,5,7,8,9,10,11],"allowed":{"system.slice":"0 6","user.slice":"0 6","init.scope":"0 6"}}`.
+Afterwards `"active":false` (the script's exit trap ran `off`). The host's load outside the reserved
+cores was about 24 and was not waited on.
+
+The workload is HackCove's whole Storybook static build at one theme (`catppuccin-mocha`): **786 shots**,
+`capture` from a config that spreads HackCove's own and sets `concurrency`. The brief's first choice, the
+`content` group alone, is 148 shots at one theme (444 would be three themes), and a run of 25 s is too short
+to separate worker counts, so the accepted substitute (the whole one-theme run) was used. A first
+attempt on `content` was stopped after round 1 and its numbers are not used.
+
+Order: 2, 4, 6, 8, 10, then again, then a third time, in one script. Wall time is the `capture` process
+start to exit, in seconds. Timeouts and crashes are lines on stderr (`settle exceeded`, `timed out`,
+`crashed`); all runs exited 0. Peak RSS is the sampled maximum, every 0.5 s, of the scope's `anon` memory
+(and in brackets the scope's `memory.current`, which includes page cache); the scope's `MemoryPeak` over all
+15 runs was 1541840896 bytes (1.44 GiB) with no OOM event, so 10G was enough.
+
+| Workers | Run 1 | Run 2 | Run 3 | Median | vs fastest | Timeouts | Crashes | Peak RSS, MB (with cache) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 337.3 | 324.1 | 317.5 | 324.1 | +284% | 0 | 0 | 307 (598) |
+| 4 | 174.6 | 165.8 | 173.6 | 173.6 | +106% | 0 | 0 | 443 (767) |
+| 6 | 124.2 | 117.3 | 117.3 | 117.3 | +39% | 0 | 0 | 628 (1071) |
+| 8 | 94.4 | 99.3 | 94.3 | 94.4 | +12% | 0 | 0 | 807 (1373) |
+| **10** | 85.7 | 82.2 | 84.3 | **84.3** | fastest | 0 | 0 | 956 (1423) |
+
+**CAP is 10.** The rule is the smallest count whose median is within 5% of the fastest median with no timeout
+and no crash in its three runs. Eight is 12% behind the fastest, so ten is the smallest, and it is the fastest.
+Four to eight is 1.84x here and eight to ten 1.12x. Because the sweep stopped at ten, this says the curve had
+not yet flattened on ten logical CPUs, not that it flattens at ten; the default is
+`min(10, os.availableParallelism())`, at least 1, so a machine with fewer CPUs gets fewer workers. The number
+is for five cores, as the brief says; on a bigger machine ten is a cap, not a measurement.
+
+**Pixels.** `sha256sum` of the 786 PNGs of each run against the first 4-worker run. Control: the three
+4-worker runs differ from one another on four shots (the three `content-video-*` shots and
+`overview-all-themes-sections-text`); those are set aside. Of the rest, the 10-worker runs differ on:
+`overview-gallery-sections-text` (all three runs; 685, 80 and 471 pixels, in one box of about 70 x 70 px, and the
+three 10-worker PNGs differ from each other) and `content-chat-thread-chat-with-a-tool-call-and-an-approval`
+(runs 2 and 3; 8 pixels in a 8 x 7 px box). So the CAP run is not byte-identical to a 4-worker run on two shots.
+`overview-gallery-sections-text` also differs from the 4-worker PNG at 2 workers (all three runs) and at 6
+and 8, so it is not a high-count effect. Other counts differ from the 4-worker run on 0 to 3 more shots each
+(`forms-date-field-open`, `forms-date-field-in-dialog`, `feedback-drawer-small`, `feedback-dialog-tall-form`;
+none at 4). The sizes of every shot are the same.
+
+The script and raw log were scratch files and are not committed.
 
 ### 2026-10-25 · PS-205 · desktop, shared · the overlay encode's filter pass in WASM, in workerd
 
@@ -667,9 +815,9 @@ Fonts, images and frames together are under 6% of settle, so they were not lever
 
 **Levers considered and not taken.** A shorter network-idle window (an own idle check instead of
 Playwright's 500 ms) would shoot earlier than today, which invariant 2 forbids without showing pixel
-equality on every page; overlapping gets more and changes nothing a page sees. More than four at once
-was not measured: the capture image runs on CI runners of unknown size, and four kept screenshot
-contention small here. Each shot keeps its own timeout while four share the CPU, so a page that
+equality on every page (the CLI's capture has since replaced the window with an in-flight request
+count: 2,330 HackCove story shots came out pixel-identical to main's); overlapping gets more and changes nothing a page sees. More than four at once
+was not measured here (the 2026-11-12 entry above did: the cap is now ten, fewer on a smaller machine). With four sharing the CPU, each shot keeps its own timeout, so a page that
 only just settles in time alone can now time out; none of these pages came near it.
 
 **Pixels.** All 102 PNGs from the runs (diff.png left out) hashed identically across the three runs and

@@ -38,7 +38,8 @@ npx @hackcove/pixelslash install-browser   # once per machine: Playwright's chro
 npx @hackcove/pixelslash --live https://example.com --local http://localhost:3000 --out out
 ```
 
-Each capture waits for the page to settle (fonts, images, network idle, two animation frames) and
+Each capture waits for the page to settle (fonts, images, the network, two animation frames, an
+idle main thread) and
 fails after a timeout rather than shooting early or hanging. Exit code 0 means the run finished,
 whatever it found in pixels; 1 means a design-system judge found new violations on Branch; 2 is a
 usage error. A crash never exits 1; [Exit codes](docs/cli.md#exit-codes-and-the-failed-line) has
@@ -66,7 +67,8 @@ code.
 - **While you build:** [`pixelslash dev`](docs/cli.md#feature-mode-pixelslash-dev) re-captures a
   page or component on every save and diffs it with the previous iteration, uploading nothing.
 - **Your coding agent:** [`pixelslash mcp`](docs/cli.md#your-coding-agent-pixelslash-mcp) is a
-  stdio MCP server, so the agent you already run can read builds, changed shots and flakes.
+  stdio MCP server, so the agent you already run can read builds, changed shots and flakes, and
+  accept or reject a change for you.
 - **Start a repo:** [`pixelslash init`](docs/cli.md#start-a-repo-pixelslash-init) writes a
   `pixelslash.config.ts` from a few questions.
 
@@ -78,8 +80,8 @@ The hosted app is at [app.pixelslash.dev](https://app.pixelslash.dev); the proje
 `apps/web` is the review server: TanStack Start on Cloudflare Workers, D1 for data, R2 for the
 shots, GitHub sign-in. CI uploads a build with the CLI, and people review it there. The
 [self-host guide](apps/web/SELF-HOST.md) takes you from an empty Cloudflare account (or a box on
-your own network) to a first upload. The [API](docs/cli.md#api) under `/api/v1` is a stable
-contract: changes are additive only.
+your own network) to a first upload. The [API](docs/cli.md#api) under `/api/v1` can still change while
+PixelSlash is in alpha.
 
 Nothing leaves your machine unless you pass `--upload`, and then only to the server you name.
 `SECURITY.md` has the rest of the threat model and how to report a vulnerability.
@@ -102,5 +104,5 @@ compares what PixelSlash does with other tools, including where it is behind.
 
 ## Licence
 
-MIT; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). PixelSlash is a name of Jacobus
-Langner; the MIT licence does not grant it.
+Elastic License 2.0; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). PixelSlash is a name of
+Jacobus Langner; the licence does not grant it.

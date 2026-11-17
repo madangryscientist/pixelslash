@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { showPanel } from "./snapshot-viewer";
 
 /**
  * On a build page just accepted, `reupload` sends the same pixels again and opens the project. The
@@ -28,6 +29,7 @@ export async function expectApprovedEarlier(
   );
   await capture(page, "08-approved-earlier-build");
   await about.getByRole("link").click();
+  await showPanel(page);
   const panel = page.getByTestId("approved-earlier");
   await expect(panel).toContainText(/Approved on build [0-9a-f]{7} by e2e-octocat/);
   await capture(page, "09-approved-earlier-shot");

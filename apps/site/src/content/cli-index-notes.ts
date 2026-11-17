@@ -17,6 +17,11 @@ export const FLAG_NOTES: Readonly<Record<string, string>> = {
     "The review server to talk to; else PIXELSLASH_SERVER, else the config's upload.server.",
   "--project":
     "The project, by id or name; else the config's upload.project, else the only one the token sees.",
+  "--subproject":
+    "The subproject of the project the build goes to; else the config's upload.subproject, else the project itself.",
+  "--skipped":
+    "Record that this commit captured nothing on purpose: a passed build with no shots, so the commit still gets its status.",
+  "--parent": "Make the project a subproject of this top-level project, by id or name.",
   "--yes": "Take the default for every question not answered by a flag.",
   "--force": "Overwrite a config that already exists.",
   "--only": "Capture just these routes or stories; repeat it for more.",
@@ -28,6 +33,8 @@ export const FLAG_NOTES: Readonly<Record<string, string>> = {
   "--pr": "The pull request number the build is recorded under.",
   "--flake-retries":
     "How many more times a shot that differs from its baseline is captured (default 2); 0 turns it off.",
+  "--concurrency":
+    "How many shots run at once, 1 to 32, over the config's concurrency; it also bounds the re-captures of changed shots.",
   "--brief": "A file holding your own words on what the build means to change.",
   "--brief-text": "Your own words on what the build means to change, given inline.",
   "--wait":

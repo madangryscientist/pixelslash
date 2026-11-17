@@ -19,8 +19,8 @@ export type Reply = { text: string; body: Record<string, unknown> };
 export type ApiClient = {
   server: string;
   get(path: string, query?: Record<string, string | undefined>): Promise<Reply>;
-  /** A JSON body to one of the API's few writes (resolving a flake). */
-  post(path: string, body: unknown): Promise<Reply>;
+  /** One of the API's few writes (resolving a flake, a review decision), with a JSON body when it takes one. */
+  post(path: string, body?: unknown): Promise<Reply>;
 };
 
 /** A signed blob URL (an image, a metrics file), fetched only when it is on the configured server. */

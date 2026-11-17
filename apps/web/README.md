@@ -139,6 +139,31 @@ migration the database reports against the ones the code carries, and row counts
 everyone else, signed out or not, and when the variable is unset; nothing links to it. The LAN stub build lists nobody (every visitor there signs in as `e2e-octocat`), so set `PIXELSLASH_ADMIN_LOGINS` in its `.dev.vars` to open the page. A figure that
 cannot be read (R2's total, failed summary calls) says "unavailable" and why instead of a 0.
 
+## Rows written per build
+
+Cloudflare bills D1 by rows written, and each index entry a statement writes counts as a row. `src/db/rows-written.test.ts`
+(part of `web:test`) counts D1's own `meta.rows_written` on a local D1 for a fixed fixture: one project, the server diff,
+100 shots uploaded and finalised in three builds. (a) is a first main build (every shot new, auto-accepted); (b) a second
+main build with 50 shots unchanged, 40 changed and 10 new (so 10 removed markers); (c) a branch build off (a) with the same
+mix, which is also measured against main. The test prints the numbers and fails when a build writes more than the last
+measured count.
+
+| Build | Before | Each write sets only what moves | And no `build_id` index | Saved |
+| --- | ---: | ---: | ---: | ---: |
+| (a) first main build | 1,008 | 808 | 708 | 30% |
+| (b) second main build | 1,078 | 878 | 768 | 29% |
+| (c) branch build | 1,068 | 868 | 758 | 29% |
+
+- **Each write sets only what moves.** A diff run's write to a shot sets only the fields whose value differs from the row
+  (`SnapshotWrites`), so a column left as it was, and the index on it, is not written, and a shot whose result is what it
+  was sends no statement. The resolved options, which used to be a statement of their own, go in the shot's result
+  statement. This took a shot's follow-up writes from 3 rows to 1.
+- **No `build_id` index.** It was the left prefix of the shots' unique index, which serves every lookup by build, so a
+  shot's insert writes 5 rows, not 6 (migration 0037).
+- **A re-run of a build** writes no shot that was already accepted or whose result stands.
+- **Tokens** (not in these numbers, which go through no request): a token's `last_used_at` is written at most once in 5
+  minutes, not on every request, so "last used" on the settings pages is true to within 5 minutes.
+
 ## Retention (PS-239)
 
 Off unless you set it. `PIXELSLASH_RETENTION_DAYS=30` (a whole number above 0; anything else is off)
@@ -181,36 +206,57 @@ numbers. Sending finalise again resumes a server-diff build, as for any `errored
 409 that build recovery gives, and a build that never finalised is completed only by sending it again. The hourly cron runs the sweep for
 every project; a self-host fires no cron, so there a project is swept only when it next creates a build.
 
-## GitHub check runs (PS-23)
+## The GitHub commit status (PS-23)
 
 Optional. A project connected to a GitHub repo (project settings → GitHub repo) gets a
-**PixelSlash** check run on each build's commit: failing while changes await review or one is
-rejected, passing once every change is accepted or nothing changed, updated in place as the build
-is reviewed. A build of a pull request also keeps one comment on the PR, edited in place on each
-build (below). It needs the GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a secret) and
-`PIXELSLASH_PUBLIC_URL` for the link. Without both App vars nothing calls GitHub. `GITHUB_APP_API_BASE`
-(PS-281) is the App's own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
-`https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub. Registering the
-App, its permissions and deploying its key: [`github-app/README.md`](github-app/README.md).
+**PixelSlash** commit status on each build's commit: `pending` while the build is diffed and while
+changes await review (titled with what waits, "3 changes to review"), `success` once every change is
+accepted or nothing changed, `failure` when a shot is rejected or the build errored. Each state
+change is a new status on the commit and GitHub shows the latest. Its **Details** link opens the
+build page in one click, which is why it is a status and not a check run: a check run's Details
+opens GitHub's own check page. A status has no body, so it carries only the one-line title and the
+link; the counts and the waiting shots are in the PR comment (below) and on the build page. A
+waiting change is pending, not failed, so it never reads as red CI; a branch protection rule that
+requires `PixelSlash` therefore blocks the merge until the changes are reviewed. When several
+projects of one org are connected to the same repo (compared ignoring case), each project's status
+is named `PixelSlash / <project name>` instead, so they can be told apart on the commit. Connecting
+a second project renames the first one's status from its next sync, so a branch protection rule
+that requires `PixelSlash` must name the new ones, and a status already posted under the old name
+stays on its commit. A build of a pull request also keeps one comment on the PR, edited in place
+on each build (below).
+
+It is posted by the GitHub App when one is configured: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (a
+secret) and `PIXELSLASH_PUBLIC_URL` for the link. Without both App vars, a token can post it
+instead (below); with neither, nothing calls GitHub. `GITHUB_APP_API_BASE` (PS-281) is the App's
+own API base; empty, the App uses `GITHUB_API_BASE`. The LAN self-host sets it to
+`https://api.github.com` (`release.sh` carries it with the App id) while sign-in stays on the stub.
+Registering the App, its permissions and deploying its key:
+[`github-app/README.md`](github-app/README.md).
+
+**Moving from the check run.** The App used to post a check run instead. It now needs
+`statuses: write`: the owner grants **Commit statuses: Read and write** in the App's settings and
+each installation accepts the request GitHub sends; until then the status calls get a 403, which is
+logged and not reported. A branch protection rule that requires `PixelSlash` keeps working by name;
+if the rule was tied to the check run's app, pick `PixelSlash` from the list again. A build that
+still has a check run from before gets it completed once as `neutral` ("Moved to the PixelSlash
+commit status") on its next sync; a failed completion is logged and not tried again, and a build
+that is never synced again keeps its old run until GitHub marks it stale.
 
 ### The pull request comment (PS-82)
 
 A build uploaded for a PR (`prNumber`) gets one comment on it, edited in place by every later build
 of the PR: the model's summary or "Summary skipped", the counts, the three to five most changed shots
 as links, and the build page link. Text and links only; no screenshot goes to GitHub. It is sent
-with the same client as the check run (the App, or the token), only to the project's connected repo,
+with the same client as the commit status (the App, or the token), only to the project's connected repo,
 and only when the project's "Comment on pull requests" setting (on by default) is on. A failed
 comment call is logged and never changes a build's verdict. The App needs `pull_requests: write`
 (`github-app/README.md`).
 
 ### Without the App: a commit status with a token (PS-235)
 
-A self-host that has not registered the App can post the same verdict as a **commit status**,
-context `PixelSlash`, with a fine-grained personal access token. The states are the check run's:
-`pending` while the build is diffed, `failure` while a change awaits review, a shot is rejected or
-the build errored, `success` once every change is accepted or nothing changed. A status has no
-body, so it carries only the one-line title and the link to the build page; each state change is a
-new status on the commit and GitHub shows the latest.
+A self-host that has not registered the App can post the same **commit status**, context
+`PixelSlash`, with a fine-grained personal access token. The states, the title and the link are the
+App's; only the credential differs. When both are configured the App posts it and the token is not used.
 
 - **Token scope.** Create a fine-grained token (GitHub → Settings → Developer settings → Personal
   access tokens), resource owner = the account or org that owns the repos, repositories = only the
@@ -254,11 +300,22 @@ it as it does in a build; to serve the production build instead, `CLOUDFLARE_ENV
 then `HOST=127.0.0.1 bun deploy/ssh/serve.ts` (the LAN self-host's server, below; `PORT` moves it off :3000).
 `bunx vite preview --host 127.0.0.1 --port 3000 --strictPort` still serves the same build.
 
-`bunx nx test:e2e web` (and `bun run test:e2e:dev`) does not use :3000 or :4174: `e2e/ports.ts` picks two
+`bunx moon run web:test-e2e` (and `bun run test:e2e:dev`) does not use :3000 or :4174: `e2e/ports.ts` picks two
 free ports per run, so two runs from two worktrees can go at once. Set `PIXELSLASH_E2E_PORT` and
 `PIXELSLASH_E2E_STUB_PORT` to pin them. Each run builds and keeps its D1 under its own worktree's
 `.wrangler/e2e`, and turns the Workers debugger port off (it probes from 9229 and two runs at once
 both get it).
+
+The suite signs in once: the `setup` project (`e2e/signed-in.setup.ts`) clicks "Sign in with GitHub"
+and saves the session to `.wrangler/e2e/signed-in.json`, and every spec starts signed in from it.
+Only that file, `sign-in.spec.ts` and `google-sign-in.spec.ts` click the button; a spec about visitors
+opts out with `test.use({ storageState: SIGNED_OUT })`. Specs import `test`, `expect` and `open` from
+`e2e/fixtures.ts`. Its `provision({ org, project })` fixture writes an org (its name suffixed so it is
+unique per test and per repeat), the stub user's membership, a project and a CI token straight into
+the run's D1, and returns their ids, names and the token. Making those three by clicking is proved once,
+in `orgs.spec.ts`. Every navigation goes through `open(page, path)`, which waits for the hydration
+marker; the Docker self-host spec, whose D1 is inside the container, still provisions by clicking
+(`deploy/docker/ui-provision.ts`).
 
 Then, in a browser at `http://127.0.0.1:3000` (use one host throughout: the session cookie is per
 host, and the OAuth callback is built from the host you came in on):

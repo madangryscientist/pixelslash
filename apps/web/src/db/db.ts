@@ -1,10 +1,14 @@
+import type { BatchItem } from "drizzle-orm/batch";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 
 /**
  * The repository layer's seam. Every query in `src/db` takes this, never D1 itself: D1 in
  * production, in-memory SQLite in tests, and any async Drizzle SQLite driver for a self-host.
+ * `batch` runs its statements in order as one transaction: all of them or none.
  */
-export type Db = BaseSQLiteDatabase<"async", unknown>;
+export type Db = BaseSQLiteDatabase<"async", unknown> & {
+  batch(batch: readonly [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]): Promise<unknown>;
+};
 
 /** Thrown when a row does not exist or the viewer may not see it; the two are one 404. */
 export class NotFoundError extends Error {

@@ -1,11 +1,12 @@
 import { sql } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { STALE_PROCESSING_MS } from "#/diff/claim";
+import { sweepAbandoned } from "./abandoned";
 import { operatorHealth, type HealthInputs } from "./admin-health";
-import { createOrg, createProject } from "./orgs";
-import { builds, orgs, snapshots } from "./schema";
+import { nowSection } from "./admin-health-now";
+import { build, setup, shot } from "./admin-health-kit";
+import { builds, orgs } from "./schema";
 import { testDb } from "./test-db";
-import { signInGithubUser } from "./users";
 
 const now = new Date("2026-11-05T12:00:00Z");
 const MIN = 60 * 1000;
@@ -25,48 +26,6 @@ const create = (db: ReturnType<typeof testDb>) =>
   );
 const apply = (db: ReturnType<typeof testDb>, name: string) =>
   db.run(sql`insert into d1_migrations (name, applied_at) values (${name}, 'now')`);
-
-async function setup() {
-  const db = testDb();
-  const ada = await signInGithubUser(db, {
-    githubId: 1,
-    login: "ada",
-    name: null,
-    avatarUrl: null,
-  });
-  const org = await createOrg(db, ada.id, "Acme");
-  const project = await createProject(db, ada.id, org.id, "web");
-  return { db, org, project };
-}
-
-type Row = Partial<typeof builds.$inferInsert> & { projectId: string };
-
-async function build(db: ReturnType<typeof testDb>, row: Row) {
-  const id = crypto.randomUUID();
-  await db
-    .insert(builds)
-    .values({ id, commitSha: "abc", branch: "main", status: "passed", ...row });
-  return id;
-}
-
-async function shot(
-  db: ReturnType<typeof testDb>,
-  buildId: string,
-  over: Partial<typeof snapshots.$inferInsert> = {},
-) {
-  await db.insert(snapshots).values({
-    id: crypto.randomUUID(),
-    buildId,
-    name: `page-${crypto.randomUUID()}`,
-    platform: "web",
-    browser: "chromium",
-    viewport: "1280x720",
-    theme: "light",
-    envFingerprint: "fp",
-    imageKey: "k.png",
-    ...over,
-  });
-}
 
 const ago = (ms: number) => new Date(now.getTime() - ms);
 
@@ -312,5 +271,38 @@ describe("operatorHealth", () => {
       expect(deployment.latestApplied).toEqual({ ok: true, value: "0001_b.sql" });
       expect(deployment.unapplied).toEqual({ ok: true, value: ["0002_c.sql", "0003_d.sql"] });
     });
+  });
+});
+
+describe("an ended abandoned build on the operator page", () => {
+  test("is no longer in flight, and a live one still is", async () => {
+    const { db, project } = await setup();
+    const projectId = project.id;
+    const row = { projectId, commitSha: "abc", branch: "feat/x" };
+    await db.insert(builds).values([
+      { ...row, id: "gone-up", status: "uploading", createdAt: ago(30 * HOUR) },
+      {
+        ...row,
+        id: "gone-proc",
+        status: "processing",
+        createdAt: ago(30 * HOUR),
+        processingStartedAt: ago(29 * HOUR),
+      },
+      { ...row, id: "live", status: "uploading", createdAt: ago(HOUR) },
+    ]);
+    const before = await nowSection(db, now);
+    expect(before.inFlight).toBe(3);
+
+    expect((await sweepAbandoned(db, { now: now, limit: 100 })).toSorted()).toEqual([
+      "gone-proc",
+      "gone-up",
+    ]);
+
+    const after = await nowSection(db, now);
+    expect(after.byStatus).toEqual({ uploading: 1, errored: 2 });
+    expect(after.inFlight).toBe(1);
+    expect(after.oldestInFlight?.id).toBe("live");
+    expect(after.flying.map((b) => b.id)).toEqual(["live"]);
+    expect(after.stuckTotal).toBe(0);
   });
 });

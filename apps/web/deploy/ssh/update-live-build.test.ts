@@ -1,7 +1,16 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { type Setup, cleanup, current, deploy, pack, releaseNames, setup } from "./update-harness";
+import {
+  type Setup,
+  cleanup,
+  current,
+  deploy,
+  pack,
+  releaseNames,
+  serve,
+  setup,
+} from "./update-harness";
 
 // update.sh refuses to deploy under a live build (PS-228).
 afterEach(cleanup);
@@ -10,7 +19,7 @@ const MIN = 60_000;
 // A release already serving, so there is a D1 to ask; the next deploy is the one under test.
 function serving() {
   const s = setup();
-  expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+  serve(s, "aaaaaaa");
   return s;
 }
 const nothingChanged = (s: Setup) => {

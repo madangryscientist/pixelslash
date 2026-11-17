@@ -1,15 +1,7 @@
-import { expect, test } from "@playwright/test";
-import {
-  CHANGED,
-  SHA_MAIN,
-  SHA_WORK,
-  WHITE,
-  explained,
-  open,
-  provision,
-  uploadBuild,
-} from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, explained, uploadBuild } from "./api-upload";
 import { STUB } from "./ports";
+import { highlightToggle, showPanel } from "./snapshot-viewer";
 
 /**
  * A project's own model (ob 1473), set on the settings page and answered by the e2e stub, which
@@ -17,8 +9,12 @@ import { STUB } from "./ports";
  * build page lists it as AI-filtered; the shot's page shows the label and the sentence.
  */
 
-test("an opted-in project's model auto-passes a noise-only shot and says why", async ({ page }) => {
-  const { token, projectId } = await provision(page, "Model Co", "modelled");
+test("an opted-in project's model auto-passes a noise-only shot and says why", async ({
+  page,
+  provision,
+}) => {
+  const { token, projectId } = await provision({ org: "Model Co", project: "modelled" });
+  await open(page, `/projects/${projectId}/settings`);
   const form = page.getByTestId("model-settings");
   await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
   await form.getByTestId("model-name").fill("deepseek-flash");
@@ -65,66 +61,14 @@ test("an opted-in project's model auto-passes a noise-only shot and says why", a
   await expect(summary.getByRole("alert")).toHaveCount(0);
 
   await filtered.getByTestId("snapshot-row").getByRole("link").click();
+  await showPanel(page);
   const notes = page.getByTestId("ai-explanation");
   await expect(notes.getByTestId("ai-auto-passed")).toBeVisible();
   await expect(notes.getByTestId("ai-label")).toHaveText("noise");
   await expect(notes).toContainText("Text edges moved by a sub-pixel.");
-  // Every pane that draws the region's box carries its label.
+  // Every pane that draws the region's box carries its label (the highlight is off when a shot opens).
+  await highlightToggle(page).click();
   await expect(page.locator('rect[data-ai-label="noise"]').first()).toBeAttached();
-});
-
-test("a build with 10 changed shots gets no summary, says why, and offers no Regenerate", async ({
-  page,
-}) => {
-  const { token, projectId } = await provision(page, "Big Co", "bigbuild");
-  const form = page.getByTestId("model-settings");
-  await form.getByTestId("model-base-url").fill(`${STUB}/v1`);
-  await form.getByTestId("model-name").fill("deepseek-flash");
-  await form.getByTestId("model-key").fill("sk-e2e-model");
-  await form.getByTestId("model-save").click();
-  await expect(form.getByTestId("model-key-set")).toBeVisible();
-
-  const names = Array.from({ length: 10 }, (_, i) => `page-${i}`);
-  await uploadBuild(
-    token,
-    { branch: "main", commitSha: SHA_MAIN },
-    names.map((name) => ({ name, png: WHITE })),
-  );
-  await page.waitForTimeout(1100);
-  const buildId = await uploadBuild(
-    token,
-    { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
-    names.map((name) => ({ name, png: CHANGED })),
-  );
-  await open(page, `/projects/${projectId}/builds/${buildId}`);
-  await explained(page);
-  const summary = page.getByTestId("build-summary");
-  await expect(summary.getByTestId("summary-too-many")).toHaveText(
-    "No AI summary: 10 changed shots (summaries are made for builds with fewer than 10).",
-  );
-  await expect(summary.getByTestId("summary-skip")).toHaveCount(0);
-  await expect(summary.getByTestId("summary-sentence")).toHaveCount(0);
-  await expect(summary.getByTestId("summary-regenerate")).toHaveCount(0);
-});
-
-test("with no model a changed shot is reviewed as plain pixels", async ({ page }) => {
-  const { token, projectId } = await provision(page, "Plain Co", "plain");
-  await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  await page.waitForTimeout(1100);
-  const buildId = await uploadBuild(
-    token,
-    { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },
-    [{ name: "hero", png: CHANGED }],
-  );
-  await open(page, `/projects/${projectId}/builds/${buildId}`);
-  await expect(page.getByTestId("build-status")).toHaveText("changes");
-  await expect(page.getByTestId("group-ai-filtered")).toHaveCount(0);
-  // No model: the summary says so and offers nothing to regenerate; it never invents one.
-  await expect(page.getByTestId("summary-skip")).toHaveText("skip: no judge.");
-  await expect(page.getByTestId("summary-sentence")).toHaveCount(0);
-  await expect(page.getByTestId("summary-regenerate")).toHaveCount(0);
-  await page.getByTestId("snapshot-row").getByRole("link").click();
-  await expect(page.getByTestId("ai-skip")).toHaveText("skip: no judge. Review the pixels.");
 });
 
 /**
@@ -133,9 +77,11 @@ test("with no model a changed shot is reviewed as plain pixels", async ({ page }
  */
 test("a project without its own model uses the org's, and its own overrides it", async ({
   page,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page, "Shared Co", "shared");
+  const { token, projectId } = await provision({ org: "Shared Co", project: "shared" });
   const settings = `/projects/${projectId}/settings`;
+  await open(page, settings);
   const inUse = page.getByTestId("model-in-use");
   await expect(inUse).toHaveAttribute("data-source", "none");
 

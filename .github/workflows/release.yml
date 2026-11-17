@@ -16,19 +16,15 @@ permissions:
 
 jobs:
   gate:
-    name: Gate
     uses: ./.github/workflows/ci.yml
 
   publish:
-    name: Publish to npm
     needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
-    # A release builds from scratch and never restores an Nx cache (the gate it calls skips the cache on a tag too):
+    # A release builds from scratch and never restores a moon cache (the gate it calls gets no cache token on a tag either):
     # what is published is what this job built.
-    env:
-      NX_NO_CLOUD: "true"
     permissions:
       contents: read
       # The OIDC token npm trusted publishing and the provenance statement are signed with.
@@ -39,8 +35,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          # The Bun the repo is built and pinned against (the same as ci.yml).
-          bun-version: "1.4.2"
+          bun-version-file: .tool-versions
       # Trusted publishing needs npm 11.5.1 or newer, which Node 24 ships.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

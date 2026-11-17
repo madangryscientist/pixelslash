@@ -3,6 +3,7 @@ import {
   IMAGE_BROWSERS,
   UsageError,
   isBrowserName,
+  parseConcurrency,
   parseDiffOption,
   type BrowserName,
   type CompareOptions,
@@ -189,6 +190,45 @@ export function parseArgs(argv: string[]): Cli {
     diff: parseDiff(flags),
     ignore,
   };
+}
+
+/** `--pr N`: a positive integer; unset stays unset. */
+export function prNumber(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0) throw new UsageError("--pr must be a positive integer");
+  return n;
+}
+
+/** `--flake-retries N`: a non-negative integer; unset stays unset, so the config decides. */
+export function flakeRetries(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(n))
+    throw new UsageError("--flake-retries must be a non-negative integer");
+  return n;
+}
+
+/**
+ * `--concurrency N`: how many shots run at once, checked like the config's `concurrency` (a whole
+ * number from 1 to 32). Unset stays unset, so the config and then the default decide.
+ */
+export function concurrencyFlag(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const fail = (what: string): never => {
+    throw new UsageError(`--concurrency ${what} (got "${raw}")`);
+  };
+  // Number() takes "2.0", "0x2" and " 2"; the config's key is a number, the flag is digits.
+  if (!WHOLE.test(raw)) return fail("must be a whole number");
+  return parseConcurrency(Number(raw), (_key, what) => fail(what));
+}
+
+/** The config with the flag's `concurrency` over its own: flag, then config, then the default. */
+export function withConcurrency<C extends { concurrency?: number | undefined }>(
+  config: C,
+  concurrency: number | undefined,
+): C {
+  return concurrency === undefined ? config : { ...config, concurrency };
 }
 
 /** `--json` is a switch, not a `--flag value` pair: take it out before the pairs are read. */

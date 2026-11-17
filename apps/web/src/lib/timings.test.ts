@@ -1,8 +1,10 @@
+import type { BuildTimings } from "#/db/diff-json";
 import { describe, expect, test } from "vitest";
 import {
   CLI_TOTAL_NOTE,
   STEP_LABELS,
   SUMMARY_SKIPPED_NOTE,
+  cliProfileRows,
   cliStepRows,
   percentile,
   serverStepRows,
@@ -167,6 +169,108 @@ describe("the build page's rows", () => {
     expect(cliStepRows(null)).toEqual([]);
     expect(CLI_TOTAL_NOTE).toMatch(/wall-clock/);
     expect(CLI_TOTAL_NOTE).toMatch(/less than/);
+  });
+});
+
+describe("the CLI's speed profile", () => {
+  const full: BuildTimings = {
+    totalMs: 20_000,
+    captureWallMs: 4_200,
+    workers: { capture: 4, upload: 4 },
+    host: { cores: 16, loadStart: 3.2, loadEnd: 4.1 },
+    captureMs: 10_000,
+    setupMs: 500,
+    navigateMs: 1_000,
+    settleMs: 7_000,
+    storyMs: 600,
+    screenshotMs: 1_200,
+    measureMs: 300,
+    settle: { fontsMs: 100, imagesMs: 200, networkIdleMs: 5_500, framesMs: 30 },
+    upload: {
+      totalMs: 9_000,
+      batches: [
+        {
+          step: "upload",
+          count: 120,
+          ms: 20_000,
+          p50Ms: 180,
+          p90Ms: 420,
+          maxMs: 900,
+          wallMs: 3_200,
+        },
+        {
+          step: "finalize",
+          count: 1,
+          ms: 9_500,
+          p50Ms: 9_500,
+          p90Ms: 9_500,
+          maxMs: 9_500,
+          wallMs: 9_500,
+        },
+      ],
+    },
+    shots: [],
+  };
+
+  test("capture wall against worker time and the count, each part's share, network idle inside settle", () => {
+    const rows = Object.fromEntries(cliProfileRows(full).map((r) => [r.key, r.text]));
+    expect(rows["capture-wall"]).toMatch(/4\.2.s against 10.s of worker time, on 4 workers/);
+    expect(rows["capture-parts"]).toBe(
+      "setup 5%, navigate 10%, settle 70% (fonts 1%, images 2%, network idle 55%, frames <1%, story 6%), screenshot 12%, measure 3%, of worker time",
+    );
+  });
+
+  test("the idle wait shows inside settle when the CLI sent it", () => {
+    const timings: BuildTimings = {
+      ...full,
+      settle: { fontsMs: 100, imagesMs: 200, networkIdleMs: 5_500, framesMs: 30, idleMs: 300 },
+    };
+    const rows = Object.fromEntries(cliProfileRows(timings).map((r) => [r.key, r.text]));
+    expect(rows["capture-parts"]).toContain("frames <1%, idle 3%, story 6%");
+  });
+
+  test("each request kind has its p50, p90, max and wall; the host has its cores and load", () => {
+    const rows = Object.fromEntries(cliProfileRows(full).map((r) => [r.key, r.text]));
+    expect(rows["requests-upload"]).toMatch(
+      /^120 requests on 4 workers: p50 180.ms, p90 420.ms, max 900.ms, 3\.2.s wall$/,
+    );
+    expect(rows["requests-finalize"]).toMatch(/^1 request: p50 9\.5.s/);
+    expect(rows.host).toBe("16 cores, load 3.2 at the start and 4.1 at the end");
+  });
+
+  test("a request kind with a server split shows the server's time against the CLI's, then its parts biggest first", () => {
+    const timings: BuildTimings = {
+      ...full,
+      upload: {
+        totalMs: 9_000,
+        batches: [
+          {
+            step: "upload",
+            count: 120,
+            ms: 20_000,
+            server: { blob: 1_500, db: 8_000, total: 12_000, auth: 400 },
+          },
+          { step: "finalize", count: 1, ms: 9_500 },
+        ],
+      },
+    };
+    const rows = Object.fromEntries(cliProfileRows(timings).map((r) => [r.key, r.text]));
+    expect(rows["server-upload"]).toMatch(
+      /^12.s of 20.s request time: db 8\.0.s, blob 1\.5.s, auth 400.ms$/,
+    );
+    // A kind with no split, as from an older server, has no row.
+    expect(rows["server-finalize"]).toBeUndefined();
+  });
+
+  test("a build from an older CLI, or without timings, has no profile rows", () => {
+    expect(cliProfileRows(null)).toEqual([]);
+    const old: BuildTimings = {
+      totalMs: 900,
+      captureMs: 400,
+      upload: { totalMs: 300, batches: [{ step: "upload", count: 2, ms: 250 }] },
+      shots: [],
+    };
+    expect(cliProfileRows(old)).toEqual([]);
   });
 });
 

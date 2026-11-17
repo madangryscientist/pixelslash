@@ -71,7 +71,10 @@ export function flatten(raw: RawViolation[]): A11y {
  * the protocol, not injected as a script tag, so a page's Content-Security-Policy cannot block it.
  * Nothing leaves the machine: axe runs in the page and reports to this process.
  */
-export async function scanA11y(page: Page, timeoutMs = SCAN_TIMEOUT_MS): Promise<A11y> {
+export async function scanA11y(
+  page: Pick<Page, "evaluate">,
+  timeoutMs = SCAN_TIMEOUT_MS,
+): Promise<A11y> {
   try {
     const raw = await withTimeout(
       (async () => {
@@ -91,6 +94,8 @@ export async function scanA11y(page: Page, timeoutMs = SCAN_TIMEOUT_MS): Promise
       })(),
       timeoutMs,
       `accessibility scan exceeded ${timeoutMs}ms`,
+      // The scan has its own budget; a slow one is not a shot to retry alone.
+      (m) => new CaptureError(m),
     );
     return flatten(raw);
   } catch (e) {

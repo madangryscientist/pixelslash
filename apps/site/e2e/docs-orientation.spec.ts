@@ -5,7 +5,7 @@ import { DOC_PAGES } from "../src/content/docs-map.ts";
  * Where a reader is in the docs: the rail with the current page marked and only its group open,
  * breadcrumbs, a contents list that follows the headings, an index with one first step, and a phone
  * that folds the rail and the contents. Each runs on a desktop and a phone (playwright.config.ts).
- * PS-333 adds the sticky rail and contents: the kit's `SidebarLayout` and `DetailLayout stickyAside`.
+ * PS-333 adds the sticky rail and contents: the kit's `SidebarLayout` and, from PS-401, a site grid with the same sticky classes at xl.
  */
 
 // A page long enough to have several headings and a group other than the first.
@@ -15,9 +15,9 @@ const OTHER_GROUP = "docs-group-tutorials";
 
 const isPhone = (info: { project: { name: string } }): boolean => info.project.name === "mobile";
 
-/** On a phone the rail is folded under a "Docs" summary: open it, as a reader would. */
+/** On a phone the rail is folded under a "Docs" summary ("Docs: <page>" once hydrated): open it, as a reader would. */
 async function openRail(page: Page): Promise<void> {
-  const fold = page.locator("summary", { hasText: /^Docs$/ });
+  const fold = page.locator("summary", { hasText: /^Docs(: .+)?$/ });
   if (await fold.isVisible()) await fold.click();
 }
 
@@ -85,9 +85,11 @@ test("on a phone the rail and the contents are folded, and every page is still r
   test.skip(!isPhone(info), "the phone view");
   await page.goto(PAGE, { waitUntil: "networkidle" });
   const rail = page.locator("details", { has: page.getByTestId("docs-nav") });
-  const contents = page.locator("details", { hasText: "On this page" });
+  const contents = page
+    .getByTestId("docs-contents-fold")
+    .getByRole("button", { name: "On this page" });
   await expect(rail).not.toHaveAttribute("open", "");
-  await expect(contents.first()).not.toHaveAttribute("open", "");
+  await expect(contents).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByTestId("docs-nav")).toBeHidden();
   await expect(page.getByTestId("docs-contents")).toBeHidden();
   const overflow = await page.evaluate(
@@ -215,10 +217,13 @@ test("390 wide: no docs page scrolls sideways, and the fold opens to reach the r
 
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await expect(page.getByTestId("docs-contents")).toBeHidden();
-  const fold = page.locator("summary", { hasText: /^On this page$/ });
-  await fold.click();
-  const link = page.locator("details", { hasText: "On this page" }).locator("a").first();
-  await expect(link).toBeVisible();
+  // The fold is the kit's Disclosure, a button that works once the page has hydrated: press until it opens.
+  const fold = page.getByTestId("docs-contents-fold");
+  const link = fold.locator("a").first();
+  await expect(async () => {
+    await fold.getByRole("button", { name: "On this page" }).click();
+    await expect(link).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await openRail(page);
   await expect(page.getByTestId("docs-nav").locator('a[href="/docs/upload"]')).toBeVisible();
 });

@@ -4,12 +4,16 @@ Short answers to the questions that come up before and after a first run. Each o
 
 ## Does anything leave my machine?
 
-No, unless you ask it to. `capture`, `compare`, `check` and `dev` write files under `--out` and send nothing; `--upload` sends the shots to the one server you name, and nowhere else.
+No, unless you ask it to. `capture` and `compare` write files under `--out` and send nothing; `--upload` sends the shots to the one server you name, and nowhere else.
 
-There are two opt-in exceptions, both off by default:
+Each of these is opt-in and off by default. Everything else stays on the machine.
 
-- If a project on that server names an AI model, the server sends that endpoint the three crops of each `change` region (baseline, branch and diff, cut to the region's box plus 16 px on each side) and, for the build summary, text only. It never sends a whole shot.
-- If `PIXELSLASH_SENTRY_DSN` is set, a crash and an `UPLOAD FAILED` run are reported to that Sentry project. The report is a message, a stack, the release and the environment; shots, tokens, cookies and query strings are removed first.
+- **Upload.** `pixelslash upload` and `capture --upload` send the shots to the server you name, and to no other. In a project whose diff runs in CI they also send the diff results and the mask. `check` and `--against main` also talk to that server, but send git context and entries, no PNG.
+- **A hosted judge model.** With `PIXELSLASH_OPENCODE_MODEL` set, every judge call sends the images it is judging to that model's provider, instead of to the local mlx or ollama model. The DS judge sends the shot and the design-system raster; `dev --judge` sends the shot, the reference image and the spec text; `upload --judge` sends the main and branch shots for the one-sentence change note. Unset, nothing leaves the machine.
+- **The server's AI explanations.** After an upload, if a project (or its org) on that server names an AI model, the server sends that endpoint three crops of each `change` region (baseline, branch and diff, cut to the region's box plus 16 px on each side) and, for the build summary, text only (shot names, counts, those region notes and the brief, if you gave one with `upload --brief`). It never sends a whole shot.
+- **The error report.** With `PIXELSLASH_SENTRY_DSN` set, a crash and an `UPLOAD FAILED` run are reported to that Sentry project: a message, a stack, the release, the environment and the tags `kind`, `command` and `stage`. No shot is sent, and tokens, cookies and query strings are removed first.
+- **Figma.** A Figma fetch sends your Figma token and the file or node ids to Figma's API, and nothing from your pages.
+- **Your coding agent.** The MCP server (`pixelslash mcp`) returns shots, for example from `capture_local`, to the agent that called it, so where they go next is that agent's model.
 
 [The privacy rule](../cli.md#uploading-to-a-server) is the full statement.
 
@@ -69,7 +73,7 @@ That is also the path for shots from another tool. [PNGs you already have](../tu
 
 ## How do I shoot only one page?
 
-Use `--only NAME` on `capture`, `check` or `dev`, repeated for more than one. A name is a route's name or a story's id, and an unknown name is a usage error rather than a silent empty run.
+Use `--only NAME` on `capture` or `check`, repeated for more than one. A name is a route's name or a story's id, and an unknown name is a usage error rather than a silent empty run.
 
 `--only` is local only: it does not go with `--upload`. [Troubleshooting](../help/troubleshooting.md#--only-and---json-do-not-go-with---upload) has that message.
 

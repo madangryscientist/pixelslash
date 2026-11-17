@@ -1,10 +1,10 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { BlobStore } from "#/storage/blobs";
-import type { SnapshotKey } from "./baselines";
+import { type SnapshotKey, snapshotKeyOf } from "./baselines";
 import { type Db, NotFoundError } from "./db";
 import { getProject } from "./orgs";
-import { refreshBuildStatus } from "./review";
+import { refreshBuildStatus } from "./verdict";
 import {
   type DiffRegion,
   type FlakeEvidence,
@@ -107,6 +107,8 @@ export async function labelFlake(
     key: SnapshotKey;
     imageKey: string;
     stem: string;
+    /** The flake the stored row already carries (a re-upload keeps it); null for a new row. */
+    flakeId: string | null;
   },
   flake: SentFlake | null,
 ): Promise<void> {
@@ -132,14 +134,45 @@ export async function labelFlake(
   } else {
     flakeId = await openFlakeOf(db, shot.projectId, shot.key);
   }
-  await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
+  // A write only when the label changes: a shot with no flake, the common case, writes nothing.
+  if (flakeId !== shot.flakeId)
+    await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
+}
+
+/**
+ * `labelFlake` with no flake record, for many shots of one project at once: each takes its key's
+ * open flake, if any, in one read of the project's open flakes. A shot is written only when its
+ * label changes, as `labelFlake` writes, so the outcome is the same one shot at a time.
+ */
+export async function labelOpenFlakes(
+  db: Db,
+  projectId: string,
+  shots: { id: string; key: SnapshotKey; flakeId: string | null }[],
+): Promise<void> {
+  const open = await db
+    .select({
+      id: flakes.id,
+      name: flakes.name,
+      platform: flakes.platform,
+      browser: flakes.browser,
+      viewport: flakes.viewport,
+      theme: flakes.theme,
+    })
+    .from(flakes)
+    .where(and(eq(flakes.projectId, projectId), eq(flakes.status, "open")));
+  const byKey = new Map(open.map((f) => [snapshotKeyOf(f), f.id]));
+  for (const shot of shots) {
+    const flakeId = byKey.get(snapshotKeyOf(shot.key)) ?? null;
+    if (flakeId !== shot.flakeId)
+      await db.update(snapshots).set({ flakeId }).where(eq(snapshots.id, shot.id));
+  }
 }
 
 /**
  * A reviewer marks a shot flaky by hand: the key's flake opens (or reopens) with no CLI evidence,
  * and the shot is labelled with it. Its config's policy then applies, so the build's verdict is
  * read again. A member of the project's org only; anything else is the same 404. Returns the flake
- * and the shot's build, whose check run is synced (PS-23).
+ * and the shot's build, whose commit status is synced (PS-23).
  */
 export async function markFlaky(
   db: Db,
@@ -181,6 +214,18 @@ export async function flakeProjectId(db: Db, flakeId: string): Promise<string> {
 }
 
 /**
+ * A guarded status update changed no row: the flake is either already in the wanted state, which
+ * is a no-op (a second resolve keeps the first resolver, time and note), or not there (PS-398).
+ */
+async function mustExist(db: Db, input: { projectId: string; flakeId: string }): Promise<void> {
+  const [row] = await db
+    .select({ id: flakes.id })
+    .from(flakes)
+    .where(and(eq(flakes.id, input.flakeId), eq(flakes.projectId, input.projectId)));
+  if (!row) throw new NotFoundError("flake");
+}
+
+/**
  * Resolve a flake, with who and an optional note. The caller has checked the user may reach the
  * project. Shots already labelled keep their label, as history; later uploads are not labelled
  * until the key is detected or marked again.
@@ -198,9 +243,15 @@ export async function resolveFlake(
       resolutionNote: input.note,
       updatedAt: new Date(),
     })
-    .where(and(eq(flakes.id, input.flakeId), eq(flakes.projectId, input.projectId)))
+    .where(
+      and(
+        eq(flakes.id, input.flakeId),
+        eq(flakes.projectId, input.projectId),
+        eq(flakes.status, "open"),
+      ),
+    )
     .returning({ id: flakes.id });
-  if (done.length === 0) throw new NotFoundError("flake");
+  if (done.length === 0) await mustExist(db, input);
 }
 
 /** Reopen a resolved flake by hand from the Flakes list. */
@@ -211,9 +262,15 @@ export async function reopenFlake(
   const done = await db
     .update(flakes)
     .set({ ...REOPENED, updatedAt: new Date() })
-    .where(and(eq(flakes.id, input.flakeId), eq(flakes.projectId, input.projectId)))
+    .where(
+      and(
+        eq(flakes.id, input.flakeId),
+        eq(flakes.projectId, input.projectId),
+        eq(flakes.status, "resolved"),
+      ),
+    )
     .returning({ id: flakes.id });
-  if (done.length === 0) throw new NotFoundError("flake");
+  if (done.length === 0) await mustExist(db, input);
 }
 
 /** Resolve or reopen as a member of the project's org, from the web app. */

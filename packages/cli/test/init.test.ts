@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { loadConfig } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { SERVER, USER_TOKEN, fakeApi, home, login, project } from "./remote-support.ts";
-import { capture, cleanup, tmp } from "./support.ts";
+import { capture, cleanup, exitReport, tmp } from "./support.ts";
 
 afterAll(cleanup);
 
@@ -51,7 +51,7 @@ describe("pixelslash init", () => {
         new Response(proc.stderr).text(),
         proc.exited,
       ]);
-      expect({ code, stderr }).toMatchObject({ code: 0 });
+      expect(exitReport(code, stderr)).toBe("exit 0");
       expect(stderr).toContain("App URL (or a running Storybook) [http://localhost:3000]: ");
       expect(stdout).toContain("wrote pixelslash.config.ts");
       expect(stdout).toContain("pixelslash check");

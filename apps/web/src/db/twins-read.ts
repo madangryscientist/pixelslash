@@ -15,17 +15,43 @@ export type Shot = Omit<Twin, "source">;
 
 export type Held = Shot & { name: string; theme: string };
 
-/** Statement parameters besides the names in the baselines read: projects, statuses, platforms, build. */
-const OTHER_PARAMS = 10;
+/**
+ * Parameters `baselineWhere` binds that do not depend on its inputs: the status list (2), the
+ * accepted and passed groups (2 and 1), the removed marker (1) and the skipped flaky shot (2).
+ */
+const FIXED_PARAMS = 8;
+
+/** The android and ios values of the stored column, and the web side excluding them. */
+const NATIVE_VALUES = ["android", "ios"];
+
+/** Split `platforms` into the native values bound by `IN` and whether web (`NOT IN` both natives) is asked. */
+function platformSides(platforms: readonly Platform[]) {
+  return { natives: platforms.filter((p) => p !== "web"), web: platforms.includes("web") };
+}
 
 /** `platform` of the stored column, in SQL: android and ios are themselves, anything else is web. */
 function onPlatforms(platforms: readonly Platform[]) {
-  const natives = platforms.filter((p) => p !== "web");
-  const native = natives.length > 0 ? inArray(snapshots.platform, natives) : undefined;
-  const web = platforms.includes("web")
-    ? notInArray(snapshots.platform, ["android", "ios"])
-    : undefined;
-  return or(native, web);
+  const { natives, web } = platformSides(platforms);
+  return or(
+    natives.length > 0 ? inArray(snapshots.platform, natives) : undefined,
+    web ? notInArray(snapshots.platform, NATIVE_VALUES) : undefined,
+  );
+}
+
+/** The parameters the baselines read binds besides the names, counted from its inputs. */
+function otherParams(
+  projectIds: readonly string[],
+  platforms: readonly Platform[],
+  exceptBuild: string | undefined,
+): number {
+  const { natives, web } = platformSides(platforms);
+  return (
+    FIXED_PARAMS +
+    projectIds.length +
+    (exceptBuild === undefined ? 0 : 1) +
+    natives.length +
+    (web ? NATIVE_VALUES.length : 0)
+  );
 }
 
 const columns = {
@@ -129,7 +155,11 @@ export async function baselinesOf(
   const rows =
     input.names === undefined
       ? await read(undefined)
-      : await inChunks(input.names, OTHER_PARAMS + input.projectIds.length, read);
+      : await inChunks(
+          input.names,
+          otherParams(input.projectIds, input.platforms, input.exceptBuild),
+          read,
+        );
   const newest = new Map<string, Raw>();
   for (const row of rows.toSorted(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id),

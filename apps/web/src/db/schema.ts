@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import { uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import type {
   AiReview,
@@ -13,13 +14,11 @@ import type {
 } from "./diff-json";
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
+import { createdAt } from "./schema-columns";
 import { serverTimingColumns, snapshotTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
 
-export const createdAt = () =>
-  integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`);
+export { createdAt };
 
 /**
  * A user signs in with GitHub, Google or both (PS-274); each provider's subject is unique, and the
@@ -91,10 +90,10 @@ export const projects = sqliteTable(
      * a new one takes the deployment's `DEFAULT_DIFF_LOCATION`. Set on the settings page.
      */
     diffLocation: text("diff_location", { enum: DIFF_LOCATIONS }).notNull().default("server"),
-    /** The GitHub repo (`owner/name`) its builds' check runs go to (PS-23); null sends none. */
+    /** The GitHub repo (`owner/name`) its builds' commit statuses go to (PS-23); null sends none. */
     githubRepo: text("github_repo"),
     /**
-     * Whether a build with a PR posts the PR comment (PS-82); the check run is sent either way.
+     * Whether a build with a PR posts the PR comment (PS-82); the commit status is sent either way.
      * On by default, and for projects from before it.
      */
     githubComment: integer("github_comment", { mode: "boolean" }).notNull().default(true),
@@ -106,43 +105,25 @@ export const projects = sqliteTable(
     twinProjectId: text("twin_project_id").references((): AnySQLiteColumn => projects.id, {
       onDelete: "set null",
     }),
+    /**
+     * The project this one is a subproject of; null for a top-level project. Depth is two: a
+     * subproject has no subprojects. Its repo, comment switch, default branch, model and CI tokens
+     * are its parent's (`effectiveProject`); its builds, baselines and review are its own.
+     */
+    parentProjectId: text("parent_project_id").references((): AnySQLiteColumn => projects.id, {
+      onDelete: "cascade",
+    }),
     createdAt: createdAt(),
   },
-  (t) => [unique().on(t.orgId, t.name)],
+  // A top-level name is unique in its org, a subproject's under its parent.
+  (t) => [
+    uniqueIndex("projects_org_parent_name_unique").on(
+      t.orgId,
+      sql`coalesce(${t.parentProjectId}, '')`,
+      t.name,
+    ),
+  ],
 );
-
-/**
- * The project's own OpenAI-compatible vision model (ob 1473), which explains the changed regions.
- * No row, no model: shots go to no model the project did not name. A table of its own so the key
- * never rides along with a `projects` row to a page; only `src/db/models.ts` reads it.
- */
-export const projectModels = sqliteTable("project_models", {
-  projectId: text("project_id")
-    .primaryKey()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  baseUrl: text("base_url").notNull(),
-  model: text("model").notNull(),
-  apiKey: text("api_key").notNull(),
-  /** A shot whose every `change` region the model labels noise is accepted without a reviewer. */
-  autoPassNoise: integer("auto_pass_noise", { mode: "boolean" }).notNull().default(false),
-  createdAt: createdAt(),
-});
-
-/**
- * An org's own model (ob 1789): the same settings as `project_models`, used by every project of the
- * org that has no row of its own. The key is sealed exactly as the project's is (ob 1786), and only
- * `src/db/models.ts` reads it.
- */
-export const orgModels = sqliteTable("org_models", {
-  orgId: text("org_id")
-    .primaryKey()
-    .references(() => orgs.id, { onDelete: "cascade" }),
-  baseUrl: text("base_url").notNull(),
-  model: text("model").notNull(),
-  apiKey: text("api_key").notNull(),
-  autoPassNoise: integer("auto_pass_noise", { mode: "boolean" }).notNull().default(false),
-  createdAt: createdAt(),
-});
 
 /** A CI token is shown once at issue; only its SHA-256 and a display prefix are stored. */
 export const ciTokens = sqliteTable(
@@ -200,7 +181,9 @@ export type BuildStatus = (typeof BUILD_STATUSES)[number];
 
 /**
  * One upload for one project at one commit. `ancestorShas` feed the baseline pick.
- * `uploading` is the only mutable status: finalising moves it on, and nothing moves it back.
+ * Finalising moves `uploading` on and nothing moves it back. After that a diff, a re-diff and a
+ * recovery claim take `errored` and the verdicts back to `processing`; the status writes that end a
+ * run are fenced on the claim (`processingStartedAt`), so a run that lost its build writes nothing.
  */
 export const builds = sqliteTable(
   "builds",
@@ -227,7 +210,10 @@ export const builds = sqliteTable(
      * cannot write `errored`, so this is how a `processing` build is told from a dead one.
      */
     processingStartedAt: integer("processing_started_at", { mode: "timestamp_ms" }),
-    /** The build's "PixelSlash" check run on GitHub (PS-23), once one is created; updated in place. */
+    /**
+     * Legacy: the "PixelSlash" check run the App posted before it moved to a commit status (PS-23).
+     * The App's next sync of the build completes that run as `neutral` and clears this; nothing sets it.
+     */
     checkRunId: integer("check_run_id"),
     /** The project model's summary of what changed (ob 1668); null when none was made. Text only. */
     aiSummary: text("ai_summary", { mode: "json" }).$type<AiSummary>(),
@@ -236,7 +222,10 @@ export const builds = sqliteTable(
      * due, or once it is written or failed. Older than `EXPLAIN_STALE_MS` is given up.
      */
     aiSummaryQueuedAt: integer("ai_summary_queued_at", { mode: "timestamp_ms" }),
-    /** When a consumer took the queued summary to write (ob 1875); the summary stays pending meanwhile. */
+    /**
+     * When a consumer took the queued summary to write (ob 1875); the summary stays pending
+     * meanwhile. A claim older than `EXPLAIN_STALE_MS` may be taken over by a later call (PS-396).
+     */
     aiSummaryClaimedAt: integer("ai_summary_claimed_at", { mode: "timestamp_ms" }),
     /** The CLI's step timings, sent at finalize (ob 1791); null when the client sent none. */
     timings: text("timings", { mode: "json" }).$type<BuildTimings>(),
@@ -424,8 +413,8 @@ export const snapshots = sqliteTable(
   },
   (t) => [
     unique().on(t.buildId, t.name, t.platform, t.browser, t.viewport, t.theme),
-    index("snapshots_build_idx").on(t.buildId),
     index("snapshots_carried_idx").on(t.carriedFrom),
+    index("snapshots_image_sha_idx").on(t.imageSha256),
   ],
 );
 

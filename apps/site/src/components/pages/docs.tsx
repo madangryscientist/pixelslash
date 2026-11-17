@@ -4,12 +4,14 @@ import {
   Callout,
   Card,
   CardGrid,
-  DetailLayout,
   Disclosure,
+  Overline,
   PageHeader,
   ProseLayout,
   SidebarLayout,
+  Stack,
   Tabs,
+  Text,
   TextLink,
 } from "@hackcove/ui-react";
 import { type ReactNode, Suspense } from "react";
@@ -26,6 +28,7 @@ import {
 } from "../../content/docs-map.ts";
 import { REPO_PUBLIC, REPO_URL } from "../../content/links.ts";
 import { DocBody, type Heading } from "../../content/markdown.tsx";
+import { DocsGroupGrid } from "./docs-groups";
 import { DocsSearch } from "./docs-search";
 import { useActiveHeading } from "./use-active-heading";
 
@@ -59,38 +62,40 @@ function groupItems(groupId: string, current: string | undefined) {
  */
 export function DocsNav({ current }: { current?: string }): ReactNode {
   return (
-    <nav aria-label="Docs" data-testid="docs-nav" className="flex flex-col gap-4">
-      <DocsSearch />
-      <Tabs
-        variant="pill"
-        orientation="vertical"
-        size="sm"
-        label="Docs overview"
-        items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
-      />
-      <div className="flex flex-col">
-        {GROUPS.map((group) => {
-          const items = groupItems(group.id, current);
-          const open = items.some((item) => item.active);
-          return (
-            // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
-            <Disclosure
-              key={`${group.id}-${open}`}
-              summary={group.title}
-              defaultOpen={open}
-              data-testid={`docs-group-${group.id}`}
-            >
-              <Tabs
-                variant="pill"
-                orientation="vertical"
-                size="sm"
-                label={group.title}
-                items={items}
-              />
-            </Disclosure>
-          );
-        })}
-      </div>
+    <nav aria-label="Docs" data-testid="docs-nav">
+      <Stack gap="sm">
+        <DocsSearch />
+        <Tabs
+          variant="pill"
+          orientation="vertical"
+          size="sm"
+          label="Docs overview"
+          items={[{ label: "All docs", href: "/docs", active: current === undefined }]}
+        />
+        <div className="flex flex-col">
+          {GROUPS.map((group) => {
+            const items = groupItems(group.id, current);
+            const open = items.some((item) => item.active);
+            return (
+              // Keyed by `open`: a group the reader navigates into is rebuilt open, since the fold keeps its own state.
+              <Disclosure
+                key={`${group.id}-${open}`}
+                summary={group.title}
+                defaultOpen={open}
+                data-testid={`docs-group-${group.id}`}
+              >
+                <Tabs
+                  variant="pill"
+                  orientation="vertical"
+                  size="sm"
+                  label={group.title}
+                  items={items}
+                />
+              </Disclosure>
+            );
+          })}
+        </div>
+      </Stack>
     </nav>
   );
 }
@@ -106,6 +111,7 @@ function OnThisPage({
   const shown = headings.filter((heading) => heading.depth <= 3);
   const active = useActiveHeading(shown.map((heading) => heading.id).join("|"), track);
   return (
+    // A contents list of anchor links, its own size and line height: no kit part draws one (Tabs would make each a pill).
     <ul className="flex flex-col gap-1 text-sm/6">
       {shown.map((heading) => {
         const here = heading.id === active;
@@ -128,10 +134,10 @@ function OnThisPage({
 /** A page that can end a run non-zero says where the numbers are explained. */
 function ExitsLine(): ReactNode {
   return (
-    <p className="text-sm/6 text-slate-600" data-testid="docs-exits">
+    <Text as="p" data-testid="docs-exits">
       This command can end with a non-zero exit code.{" "}
       <TextLink href="/docs/exit-codes">Exit codes</TextLink> says what each number means.
-    </p>
+    </Text>
   );
 }
 
@@ -139,9 +145,9 @@ function ExitsLine(): ReactNode {
 export function EditLink({ source }: { source: string }): ReactNode {
   if (!REPO_PUBLIC) return null;
   return (
-    <p className="text-sm/6 text-slate-600" data-testid="docs-edit">
+    <Text as="p" data-testid="docs-edit">
       <TextLink href={`${REPO_URL}/edit/main/${source}`}>Edit this page on GitHub</TextLink>
-    </p>
+    </Text>
   );
 }
 
@@ -203,44 +209,43 @@ function DocArticle({ slug }: { slug: string }): ReactNode {
     <Breadcrumbs crumbs={[{ label: "Docs", href: "/docs" }, group?.title ?? "", page.title]} />
   );
   const article = (
-    <div className="flex flex-col gap-8">
+    <Stack gap="lg">
       {hasRail && (
-        <details className="rounded-md border border-slate-200 px-4 py-2 lg:hidden">
-          <summary className="cursor-pointer text-sm font-medium">On this page</summary>
-          <div className="py-2">
+        // From xl the contents list is the aside beside the text, so the fold steps out. The kit's
+        // Disclosure takes no class, so the breakpoint sits on a bare wrapper.
+        <div className="xl:hidden">
+          <Disclosure bordered summary="On this page" data-testid="docs-contents-fold">
             <OnThisPage headings={doc.headings} />
-          </div>
-        </details>
+          </Disclosure>
+        </div>
       )}
       <DocBody doc={doc} />
       {page.exits === true ? <ExitsLine /> : null}
       <EditLink source={doc.source} />
       <PrevNext slug={slug} />
-    </div>
+    </Stack>
   );
-  return hasRail ? (
-    // The kit sticks the contents under the header from `lg` and scrolls it itself when it is taller than the room left.
-    <DetailLayout
-      title={page.title}
-      breadcrumbs={breadcrumbs}
-      stickyAside
-      aside={
-        <nav aria-label="On this page" data-testid="docs-contents" className="hidden lg:block">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            On this page
-          </p>
-          <OnThisPage headings={doc.headings} track />
-        </nav>
-      }
-    >
-      {article}
-    </DetailLayout>
-  ) : (
+  return (
     <div>
       <PageHeader title={page.title} breadcrumbs={breadcrumbs} />
-      {/* Nothing to stick: the kit's DetailLayout without its aside, so no second unnamed aside beside the rail's. */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="min-w-0 lg:col-span-2">{article}</div>
+      {/* The columns are sized to their content: the text takes the room, the contents list is 12rem from xl. The kit's DetailLayout gives its aside a third, which suits a details panel and not a contents list. */}
+      <div className={hasRail ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_12rem]" : "grid gap-6"}>
+        <div className="min-w-0" data-testid="docs-article">
+          {article}
+        </div>
+        {hasRail && (
+          // The kit's own sticky classes (STICKY_ASIDE_LG, STICKY_SCROLL_LG) at xl, which it does not export: stuck under the header, scrolling itself when taller than the room left.
+          <aside className="hidden min-w-0 xl:sticky xl:top-[var(--app-header,0px)] xl:block xl:self-start">
+            <div className="xl:-m-1 xl:max-h-[calc(100dvh-var(--app-header,0px)-2rem)] xl:overflow-y-auto xl:p-1">
+              <nav aria-label="On this page" data-testid="docs-contents">
+                <Stack gap="xs">
+                  <Overline as="p">On this page</Overline>
+                  <OnThisPage headings={doc.headings} track />
+                </Stack>
+              </nav>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
@@ -252,24 +257,6 @@ const FIRST_STEP = {
   action: "Run a first compare",
   text: "Install PixelSlash, compare two versions of a page and read the report. About fifteen minutes, all on your machine.",
 } as const;
-
-/** The trailing mark on an index link. Decorative: the link's name is its title. */
-function LinkChevron(): ReactNode {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className="ml-1 inline-block h-3.5 w-3.5 align-[-0.1em]"
-    >
-      <path
-        fillRule="evenodd"
-        d="M7.2 4.8a.75.75 0 0 1 1.06 0l4.7 4.67a.75.75 0 0 1 0 1.06l-4.7 4.67a.75.75 0 1 1-1.06-1.06L11.37 10 7.2 5.86a.75.75 0 0 1 0-1.06Z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
 
 /** `/docs`: the search box, one first step, then every group. No rail: the cards run the full column. */
 export function DocsIndexPage(): ReactNode {
@@ -297,27 +284,11 @@ export function DocsIndexPage(): ReactNode {
         >
           {FIRST_STEP.text}
         </Callout>
-        <DocBody doc={CLI_INTRO_DOC} />
-        {/* Packed into columns, not a grid: a grid stretches a short group to its long neighbour's height. */}
-        <ul data-testid="docs-index" className="m-0 list-none columns-1 gap-x-6 p-0 md:columns-2">
-          {GROUPS.map((group) => (
-            <li key={group.id} className="mb-6 break-inside-avoid">
-              <Card title={group.title} titleStyle="name">
-                <p className="mb-3 text-sm text-slate-600">{group.summary}</p>
-                <ul className="flex flex-col gap-1">
-                  {LISTED_PAGES.filter((page) => page.group === group.id).map((page) => (
-                    <li key={page.slug}>
-                      <TextLink href={pageHref(page)}>
-                        {page.title}
-                        <LinkChevron />
-                      </TextLink>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </li>
-          ))}
-        </ul>
+        {/* Held to 75ch (docs-index-hierarchy.spec.ts): the kit's narrow Stack is 48rem, wider than that. */}
+        <div className="max-w-[75ch]" data-testid="docs-intro">
+          <DocBody doc={CLI_INTRO_DOC} />
+        </div>
+        <DocsGroupGrid />
       </ProseLayout>
     </>
   );

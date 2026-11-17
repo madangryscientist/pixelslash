@@ -3,10 +3,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devStore, latestIteration, liveSession } from "@hackcove/pixelslash-engine";
 import { afterAll, describe, expect, test } from "vitest";
-import type { KeyInput } from "../src/dev-loop.ts";
+import { parseDevArgs } from "../src/dev.ts";
+import { attachTo } from "../src/dev-attach.ts";
 import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng } from "./support.ts";
-import { FIGMA, featureProject, project, until } from "./dev-support.ts";
+import { FIGMA, featureProject, keyboard, project, stepLog, until } from "./dev-support.ts";
 import { gitRepo } from "./upload-support.ts";
 
 afterAll(cleanup);
@@ -44,18 +45,6 @@ function server() {
     return Response.json({ error: "not here" }, { status: 404 });
   };
   return { fetch, seen };
-}
-
-/** Keys a test presses. */
-function keyboard(): KeyInput & { press: (k: string) => void } {
-  const fns = new Set<(chunk: string) => void>();
-  return {
-    on: (_e, fn) => fns.add(fn),
-    off: (_e, fn) => fns.delete(fn),
-    press: (k) => {
-      for (const fn of fns) fn(k);
-    },
-  };
 }
 
 const base = { listFonts: async () => [], which: () => null };
@@ -137,59 +126,103 @@ describe("pixelslash dev --once", () => {
 });
 
 describe("pixelslash dev", () => {
-  // Not run on CI: it timed out at 90s there on PR #85 (a file-watch race) and passes locally. Run it on CI again once the cause is found.
-  test.runIf(!process.env["CI"])(
-    "re-runs on a save, and a second dev attaches to the live session",
-    async () => {
-      const { cwd, file } = await project();
-      const [keys, cap] = [keyboard(), capture()];
-      const store = devStore(cwd);
-      const first = run(["dev", "index"], cap.io, { ...base, cwd, env: pinned, keys });
-      try {
-        const owner = await until(async () =>
-          (await liveSession(store))?.url ? await liveSession(store) : undefined,
-        );
-        await until(async () => (cap.stdout.includes("#1 vs") ? true : undefined));
-        await writeFile(file, `<body style="margin:0;background:#fff"><h1>saved</h1></body>`);
-        await until(async () => (cap.stdout.includes("#2 vs #1") ? true : undefined));
-        expect(cap.stdout).toMatch(
-          /#2 vs #1: \d+ regions changed · \d+ px · ours \d+\.\d s · settle \d+\.\d s · http:\/\/127\.0\.0\.1:\d+/,
-        );
+  test("re-runs on a save, and a second dev attaches to the live session", async () => {
+    const { cwd, file } = await project();
+    const [keys, cap] = [keyboard(), capture()];
+    const { step, mark, show } = stepLog();
+    show("first dev", cap);
+    const store = devStore(cwd);
+    const first = run(["dev", "index"], cap.io, { ...base, cwd, env: pinned, keys });
+    try {
+      const owner = await step(
+        "session live",
+        until(async () => ((await liveSession(store))?.url ? await liveSession(store) : undefined)),
+      );
+      await step(
+        "run 1 printed",
+        until(async () => (cap.stdout.includes("#1 vs") ? true : undefined)),
+      );
+      await step(
+        "save written",
+        writeFile(file, `<body style="margin:0;background:#fff"><h1>saved</h1></body>`),
+      );
+      await step(
+        "run 2 printed",
+        until(async () => (cap.stdout.includes("#2 vs #1") ? true : undefined)),
+      );
+      expect(cap.stdout).toMatch(
+        /#2 vs #1: \d+ regions changed · \d+ px · ours \d+\.\d s · settle \d+\.\d s · http:\/\/127\.0\.0\.1:\d+/,
+      );
 
-        const once = capture();
-        const second = await run(["dev", "--once", "--json"], once.io, {
-          ...base,
-          cwd,
-          keys: keyboard(),
-        });
-        expect(second).toBe(0);
-        expect(JSON.parse(once.stdout)).toMatchObject({
-          page: owner?.url,
-          against: { kind: "previous" },
-        });
+      const once = capture();
+      show("dev --once", once);
+      const second = await step(
+        "--once returned",
+        run(["dev", "--once", "--json"], once.io, { ...base, cwd, keys: keyboard() }),
+      );
+      expect(second).toBe(0);
+      expect(JSON.parse(once.stdout)).toMatchObject({
+        page: owner?.url,
+        against: { kind: "previous" },
+      });
 
-        const elsewhere = capture();
-        expect(
-          await run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd }),
-        ).toBe(2);
-        expect(elsewhere.stderr).toMatch(/session is on index, not other/);
+      const elsewhere = capture();
+      show("dev other", elsewhere);
+      expect(
+        await step(
+          "other returned",
+          run(["dev", "other", "--once", "--json"], elsewhere.io, { ...base, cwd }),
+        ),
+      ).toBe(2);
+      expect(elsewhere.stderr).toMatch(/session is on index, not other/);
 
-        const otherKeys = keyboard();
-        const attached = capture();
-        const following = run(["dev"], attached.io, { ...base, cwd, keys: otherKeys });
-        await until(async () =>
+      const otherKeys = keyboard();
+      const attached = capture();
+      show("follower", attached);
+      const following = run(["dev"], attached.io, { ...base, cwd, keys: otherKeys });
+      await step(
+        "follower attached",
+        until(async () =>
           attached.stdout.includes("attached to the session on index") ? true : undefined,
-        );
-        otherKeys.press("q");
-        expect(await following).toBe(0);
-      } finally {
-        keys.press("q");
-      }
-      expect(await first).toBe(0);
-      expect(await liveSession(store)).toBeUndefined();
-    },
-    90_000,
-  );
+        ),
+      );
+      otherKeys.press("q");
+      expect(await step("follower ended", following)).toBe(0);
+    } finally {
+      mark("q sent");
+      keys.press("q");
+    }
+    expect(await step("first ended", first)).toBe(0);
+    expect(await liveSession(store)).toBeUndefined();
+  }, 90_000);
+
+  test("an attached dev takes a q pressed as soon as it says it is attached", async () => {
+    // The session's state is held open: a starved owner answering slowly. The q lands before the
+    // follower listens for keys; the keyboard used to drop it, and the follower polled on forever.
+    const held = Promise.withResolvers<void>();
+    const asked = Promise.withResolvers<void>();
+    const session = Bun.serve({
+      port: 0,
+      fetch: async () => {
+        asked.resolve();
+        await held.promise;
+        return Response.json({ latest: null });
+      },
+    });
+    try {
+      const [keys, cap] = [keyboard(), capture()];
+      const owner = { pid: 1, url: `http://127.0.0.1:${session.port}`, target: "index" };
+      const following = attachTo(owner, parseDevArgs([]), cap.io, { keys });
+      await asked.promise;
+      expect(cap.stdout).toContain("attached to the session on index");
+      keys.press("q");
+      held.resolve();
+      expect(await following).toBe(0);
+    } finally {
+      held.resolve();
+      await session.stop(true);
+    }
+  });
 
   test("SIGTERM ends it like q, and the next dev starts its own session (ob 1761)", async () => {
     const { cwd } = await project();

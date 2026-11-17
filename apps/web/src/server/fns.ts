@@ -1,6 +1,7 @@
 import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequestUrl } from "@tanstack/react-start/server";
+import { baselineBuildOf } from "#/db/baseline-build";
 import { snapshotDiffOptions } from "#/db/builds";
 import { listFlags, snapshotFlags } from "#/db/flags";
 import { projectFlake } from "#/db/flakes";
@@ -20,14 +21,15 @@ import {
   withdrawInvite,
 } from "#/db/orgs";
 import { listBuilds } from "#/db/build-list";
-import { NotReviewableError, buildView, decideAll, decideShot } from "#/db/review";
+import { NotReviewableError, afterDecision, buildView, decideAll, decideShot } from "#/db/review";
 import { flakeRecaptures } from "#/db/run-metrics";
 import { isFirstBuild } from "#/db/first-build";
 import { DIFF_LOCATIONS } from "#/db/schema";
 import { issueCiToken, listCiTokens, listOrgTokens, revokeCiToken } from "#/db/tokens";
 import { projectStale } from "#/db/stale";
 import { twinsOfBuild } from "#/db/twins";
-import { nextToReviewId } from "#/lib/build-tabs";
+import { warn } from "#/lib/log";
+import { walkAround } from "#/lib/review-walk";
 import { buildExpiry } from "#/lib/retention";
 import { holdsChange, reviewGroupOf } from "#/lib/snapshot-groups";
 import { twinEntryOf } from "#/lib/twins";
@@ -241,21 +243,28 @@ export const getSnapshotPage = createServerFn()
     const db = database();
     const { project, org } = await or404(getProjectWithOrg(db, user.id, data.projectId));
     const view = await or404(buildView(db, project.id, data.buildId));
-    const index = view.snapshots.findIndex((shot) => shot.id === data.snapshotId);
-    if (index === -1) throw notFound();
-    const snapshot = view.snapshots[index];
-    if (!snapshot) throw notFound();
+    const walk = walkAround(view.snapshots, data.snapshotId);
+    if (!walk) throw notFound();
+    const { shot: snapshot, position, total, previousId, nextId } = walk;
+    const index = position - 1;
     const twins = await twinsOfBuild(db, view.build.id);
     const images = await imageUrls(project.orgId, {
       main: snapshot.baselineKey,
       branch: isMarker(snapshot) ? null : snapshot.imageKey,
       diff: snapshot.diffKey,
+      mainBaseline: snapshot.mainBaselineKey,
     });
     return {
       org,
       project,
       build: view.build,
       snapshot,
+      /** The build behind the left pane's image, so the viewer names it and does not say "Main". */
+      baselineBuild: await baselineBuildOf(db, {
+        projectId: project.id,
+        snapshotId: snapshot.id,
+        defaultBranch: project.defaultBranch,
+      }),
       /** This shot's twins on the other platforms (PS-295); null when no other platform is in play. */
       twins: twinEntryOf(twins, snapshot.id),
       images,
@@ -279,12 +288,10 @@ export const getSnapshotPage = createServerFn()
         await projectFlake(db, project.id, snapshot.flakeId),
       ),
       /** The j/k order is the build's order, so a walk visits every shot once. */
-      position: index + 1,
-      total: view.snapshots.length,
-      previousId: index > 0 ? (view.snapshots[index - 1]?.id ?? null) : null,
-      nextId: view.snapshots[index + 1]?.id ?? null,
-      /** Where a decision on this shot moves the reviewer: the next shot still awaiting one. */
-      nextToReviewId: nextToReviewId(view.snapshots, snapshot.id),
+      position,
+      total,
+      previousId,
+      nextId,
       /** Every name in the build, so the label reads the same as on the build page. */
       names: view.snapshots.map((shot) => shot.name),
       /**
@@ -304,18 +311,30 @@ export const reviewShot = createServerFn({ method: "POST" })
   .validator((d: unknown) => {
     const state = typeof d === "object" && d !== null ? Reflect.get(d, "state") : null;
     if (state !== "accepted" && state !== "rejected") throw new Error("state is required");
-    return {
-      projectId: field(d, "projectId"),
-      snapshotId: field(d, "snapshotId"),
-      state,
-    };
+    const next = typeof d === "object" && d !== null && Reflect.get(d, "next") === true;
+    return { projectId: field(d, "projectId"), snapshotId: field(d, "snapshotId"), state, next };
   })
   .handler(async ({ data }) => {
     const user = await requireViewer();
     const db = database();
-    const decided = await orConflict(decideShot(db, { ...data, userId: user.id }));
+    const { next, ...decision } = data;
+    const decided = await orConflict(decideShot(db, { ...decision, userId: user.id }));
     await syncChecks(db, decided.buildIds);
-    return { status: decided.verdict };
+    // Nowhere to go next: the build page. That is also the answer when the read below fails, since the
+    // decision is already written and only the next shot is lost.
+    const toBuild = { buildStatus: decided.verdict, nextToReviewId: null };
+    if (!next) return { status: decided.verdict, ...toBuild };
+    // `next` asks where the reviewer goes, read after the write, so moving on takes no second round
+    // trip and another reviewer's reject in between shows in `buildStatus`.
+    const after = await afterDecision(db, {
+      projectId: data.projectId,
+      buildId: decided.buildId,
+      snapshotId: data.snapshotId,
+    }).catch((e: unknown) => {
+      warn(`reviewShot: next shot not read: ${e instanceof Error ? e.message : String(e)}`);
+      return toBuild;
+    });
+    return { status: decided.verdict, ...after };
   });
 
 export const acceptBuild = createServerFn({ method: "POST" })

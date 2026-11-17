@@ -44,7 +44,7 @@ export function DefaultBranch({ projectId, branch }: { projectId: string; branch
   );
 }
 
-/** The opt-out for the pull request comment (PS-82); the check run is sent either way. */
+/** The opt-out for the pull request comment (PS-82); the commit status is sent either way. */
 function CommentToggle({ projectId, comment }: { projectId: string; comment: boolean }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -60,12 +60,12 @@ function CommentToggle({ projectId, comment }: { projectId: string; comment: boo
       onChange={(e) => void set(e.target.checked)}
       data-testid="github-comment"
       label={<Text strong>Comment on pull requests</Text>}
-      description="Off, no comment is posted or edited; the check run is sent either way."
+      description="Off, no comment is posted or edited; the commit status is sent either way."
     />
   );
 }
 
-/** The project settings' GitHub repo card (PS-23): where each build's check run goes. */
+/** The project settings' GitHub repo card (PS-23): where each build's commit status goes. */
 export function GithubRepo({
   projectId,
   repo,
@@ -98,15 +98,18 @@ export function GithubRepo({
         <Stack gap="xs">
           <SectionHeading>GitHub repo</SectionHeading>
           <Text as="p">
-            Each build posts a PixelSlash check run on its commit: failing while changes wait for
-            review or one is rejected, passing once they are accepted. The check carries counts and
-            a link, never a screenshot. A pull request's builds also keep one comment, edited in
-            place, with the model's summary, the counts and the most changed shots as links.
+            Each build posts a PixelSlash commit status on its commit: pending while changes wait
+            for review, passing once they are accepted, failing when one is rejected. Its Details
+            link opens the build. A branch protection rule that requires PixelSlash keeps working by
+            name; pick it again if the rule was tied to the old check run. The status carries a
+            title and a link, never a screenshot. A pull request's builds also keep one comment,
+            edited in place, with the model's summary, the counts and the most changed shots as
+            links.
           </Text>
           {!configured && (
             <Text as="p">
-              This server has no GitHub App or token set up, so no check runs or comments are sent
-              yet.
+              This server has no GitHub App or token set up, so no commit statuses or comments are
+              sent yet.
             </Text>
           )}
         </Stack>
@@ -138,8 +141,14 @@ export function GithubRepo({
   );
 }
 
-/** The project settings' upload-command card. */
-export function UploadCommand({ serverUrl }: { serverUrl: string }) {
+/** The project settings' upload-command card; a subproject's names it, with its parent's token. */
+export function UploadCommand({
+  serverUrl,
+  subproject,
+}: {
+  serverUrl: string;
+  subproject?: string | undefined;
+}) {
   const hydrated = useHydrated();
   return (
     <Card>
@@ -151,7 +160,7 @@ export function UploadCommand({ serverUrl }: { serverUrl: string }) {
           </Text>
         </Stack>
         <CopyLine
-          text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`}
+          text={`PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}${subproject ? ` --subproject ${subproject}` : ""}`}
           disabled={!hydrated}
           data-testid="upload-command"
         />

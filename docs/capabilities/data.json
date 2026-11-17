@@ -151,8 +151,8 @@
       "label": "More than one browser engine",
       "ps": {
         "v": "y",
-        "note": "chromium, firefox and webkit: a variant names its browser (default chromium) and the capture image ships all three; a baseline is matched per browser, never across; the report and the review app show it; --browser on the local pair mode",
-        "commit": "2082085"
+        "note": "chromium, firefox and webkit: a variant names its browser (default chromium) and the capture image ships all three; a baseline is matched per browser, never across; the report and the review app show it; --browser on the local pair mode; our tests run chromium only, so firefox and webkit capture is not exercised in a real browser (unit tests cover the config and naming)",
+        "commit": "89d2ff9"
       },
       "t": {
         "argos": "y",
@@ -511,7 +511,7 @@
       "label": "PR status blocked on review",
       "ps": {
         "v": "y",
-        "note": "a PixelSlash check run on each build's commit in the project's connected repo: failure while changes await review or one is rejected, success once all are accepted or nothing changed, updated in place on each decision (needs the GitHub App registered, apps/web/github-app). A self-host without the App posts the same states as a `PixelSlash` commit status with a fine-grained token. A CI job can also block by exit code with `pixelslash status --wait`",
+        "note": "a PixelSlash commit status on each build's commit in the project's connected repo, whose Details link opens the build page: pending while changes await review, failure once one is rejected or the build errored, success once all are accepted or nothing changed, a new status on each decision (posted by the GitHub App, apps/web/github-app, or on a self-host without it by a fine-grained token). A CI job can also block by exit code with `pixelslash status --wait`",
         "commit": "cad8b76"
       },
       "t": {
@@ -529,7 +529,7 @@
       "label": "GitHub App integration",
       "ps": {
         "v": "p",
-        "note": "sign-in, and an outbound-only App that posts the check run and keeps one PR comment per pull request, edited in place on each build, with the model's summary, the counts and the most changed shots as links (a project can turn it off); no webhooks",
+        "note": "sign-in, and an outbound-only App that posts the commit status and keeps one PR comment per pull request, edited in place on each build, with the model's summary, the counts and the most changed shots as links (a project can turn it off); no webhooks",
         "commit": "cad8b76"
       },
       "t": {
@@ -540,7 +540,7 @@
         "lost": "y"
       },
       "plan": "",
-      "gap": "webhooks; the App is outbound only, so it posts the check run and the PR comment but reacts to nothing on GitHub"
+      "gap": "webhooks; the App is outbound only, so it posts the commit status and the PR comment but reacts to nothing on GitHub"
     },
     {
       "g": "flow",
@@ -584,7 +584,7 @@
       "label": "Documented upload API",
       "ps": {
         "v": "y",
-        "note": "upload and capture --upload; /api/v1, a stable additive-only contract: me, projects, builds, snapshots (with their images), baselines, detection flags, flakes, stale, twins, parity",
+        "note": "upload and capture --upload; /api/v1 (in alpha, so it may still change): me, projects, builds, snapshots (with their images), baselines, detection flags, flakes, stale, twins, parity",
         "commit": "cad8b76"
       },
       "t": {
@@ -620,8 +620,8 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; shots leave only through `upload` or `capture --upload`, or to the model's provider when `PIXELSLASH_OPENCODE_MODEL` names a hosted one (opt-in); `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake",
-        "commit": "cad8b76"
+        "note": "the default; shots leave only through `upload` or `capture --upload`, or to the model's provider when `PIXELSLASH_OPENCODE_MODEL` names a hosted one (opt-in); `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake and the review decisions a personal token makes",
+        "commit": "9c2cdfb"
       },
       "t": {
         "argos": "n",
@@ -711,7 +711,7 @@
       "label": "Free tier / OSS plan",
       "ps": {
         "v": "p",
-        "note": "MIT and free to self-host with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app is not live",
+        "note": "Free to self-host for your own use with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app is not live",
         "commit": "cad8b76"
       },
       "t": {
@@ -729,8 +729,8 @@
       "k": "open_source",
       "label": "Open source",
       "ps": {
-        "v": "y",
-        "note": "public repo under MIT, with NOTICE: the CLI, engine, Playwright helper, review app, site and self-host image are all in the tree; the name is not licensed",
+        "v": "n",
+        "note": "source available under the Elastic License 2.0, not an OSI open-source licence: all the code is in the public repo; offering it to others as a hosted service is not allowed; the name is not licensed",
         "commit": "cad8b76"
       },
       "t": {
@@ -740,7 +740,8 @@
         "applitools": "?",
         "lost": "y"
       },
-      "plan": ""
+      "plan": "",
+      "gap": "an open-source licence: the Elastic License 2.0 is source available, not open source"
     }
   ],
   "notes": {

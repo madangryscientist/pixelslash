@@ -1,8 +1,10 @@
 name: CI
 
-# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read, and the trigger is
-# `pull_request` (never `pull_request_target`), so a pull request from a fork runs with a read-only
-# token. Actions are pinned to a commit; the tag is in the comment.
+# The gate from AGENTS.md, on a GitHub-hosted runner. The only secrets read are the moon remote cache's
+# tokens: the read token on every run that gets secrets, and the write token on a push to main only
+# (see `gate`). The trigger is `pull_request` (never `pull_request_target`), so a pull request from a
+# fork runs with a read-only GitHub token and no secrets, and so with no remote cache. Actions are pinned
+# to a commit; the tag is in the comment.
 
 on:
   pull_request:
@@ -17,54 +19,47 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only a pull request run is cancelled by a newer push. A push to main writes the moon cache, so once
+  # it starts it runs to the end (a main run still waiting is replaced by a newer push).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # The Bun the repo is built and pinned against (docker/capture/Dockerfile, bench/PERF.md).
-  BUN_VERSION: "1.4.2"
+# Bun's version comes from .tool-versions (every setup-bun step reads it, and mise reads it locally).
+# The Dockerfiles (docker/capture, docker/self-host) pin the same version as an oven/bun image digest,
+# since an image tag cannot read a file: bump both together.
 
 jobs:
   gate:
-    name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Nx never talks to Nx Cloud from CI: NX_NO_CLOUD is on, so no run starts a pipeline execution
-    # (those are billed in credits). Nx's own local cache is kept between runs with actions/cache
-    # instead, which is free. Nx 24 indexes the cache in a database, so the cache directory alone is
-    # rejected on a fresh runner (0 hits); `.nx/cache` and `.nx/workspace-data` are saved together, and
-    # NX_CACHE_DIRECTORY keeps the cache in the checkout (Nx 24 defaults to ~/.nx). Nx still checks
-    # every entry by its hash. GitHub scopes a cache to the ref that saved it: a pull
-    # request reads and writes only its own, plus the base branch's, and `main` cannot read a PR's, so
-    # a branch can never poison main's cache. The key carries the ref and the sha, so every run saves a
-    # fresh entry; restore-keys fall back to the last entry of the same ref, then to main's.
-    # A tag (a release, which calls this workflow) never restores or saves the cache, so a release
-    # gate always runs uncached.
+    # The moon remote cache (.moon/workspace.yml `remote:`): moon sends MOON_REMOTE_TOKEN as a bearer
+    # token, and the cache answers no request without one. Only a push to main writes: the job then
+    # enters the `moon-cache-write` environment, which GitHub lets only `main` use, and that environment
+    # alone holds MOON_CACHE_WRITE_TOKEN. Every other run reads with MOON_CACHE_READ_TOKEN, and its
+    # uploads are refused (moon logs a WARN and carries on), so a pull request cannot poison the cache.
+    # The ref is checked as well as the event because a tag push is also a `push`: a release calls this
+    # workflow, and the environment would refuse a tag. A release passes no secrets, so its gate runs
+    # with no token and uncached, as does a fork's pull request. Never make the write token a plain
+    # repository secret, which a same-repo pull request could read.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
-      NX_NO_CLOUD: "true"
-      NX_CACHE_DIRECTORY: .nx/cache
+      # moon diffs the head against the base branch before any task runs, even for a plain `moon run`,
+      # and the checkout has no local `main`, so it names the remote ref. That needs the full history
+      # (fetch-depth: 0 below).
+      MOON_BASE: origin/main
+      MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       # global.json pins the SDK; engines/dotnet is part of the gate where an SDK exists.
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
       - run: bun install --frozen-lockfile
-      - name: Restore the Nx cache
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .nx/cache
-            .nx/workspace-data
-          key: nx-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
-          restore-keys: |
-            nx-${{ runner.os }}-${{ github.ref }}-
-            nx-${{ runner.os }}-refs/heads/main-
       # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
       - name: Install the Playwright browser
         working-directory: packages/engine
@@ -79,7 +74,6 @@ jobs:
   # installed from their tarballs into a copy of examples/playwright-node, its tests run with no `bun`
   # on PATH, and `pixelslash upload` takes the dir they wrote. Nothing is published.
   example:
-    name: Playwright example on Node (packed tarballs)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -88,7 +82,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
@@ -100,12 +94,12 @@ jobs:
       - run: bun run check:example
 
   changes:
-    name: Did the web app change?
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       web: ${{ steps.diff.outputs.web }}
       site: ${{ steps.diff.outputs.site }}
+      site_e2e: ${{ steps.diff.outputs.site_e2e }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,36 +116,56 @@ jobs:
             # A release calls this workflow on a tag and its publish needs the result; an npm publish of the
             # CLI does not ship the site, so a site failure must not stop one.
             case "$REF" in
-              refs/tags/*) echo "site=false" >> "$GITHUB_OUTPUT" ;;
-              *) echo "site=true" >> "$GITHUB_OUTPUT" ;;
+              refs/tags/*)
+                echo "site=false" >> "$GITHUB_OUTPUT"
+                echo "site_e2e=false" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                echo "site=true" >> "$GITHUB_OUTPUT"
+                echo "site_e2e=true" >> "$GITHUB_OUTPUT"
+                ;;
             esac
             exit 0
           fi
           # apps/web and packages (what it imports), plus what decides how they install and run.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
           fi
-          # The site's build inputs (apps/site/project.json: the docs it renders), its Playwright globalSetup,
+          # The site's build inputs (apps/site/moon.yml: the docs it renders), its Playwright globalSetup,
           # and what decides how it installs.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|nx\.json$|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
             echo "site=true" >> "$GITHUB_OUTPUT"
           else
             echo "site=false" >> "$GITHUB_OUTPUT"
           fi
+          # The e2e needs less than the build: the docs the site renders are checked by the build itself
+          # (a dead internal link or a missing cli.md anchor fails it) and by the site's unit tests, so a
+          # docs-only edit skips the browser run. A spec that quotes a docs sentence is only run on a site
+          # change or on main. Keep this list inside the one above.
+          if git diff --name-only "origin/$BASE_REF...HEAD" \
+            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
+            echo "site_e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "site_e2e=false" >> "$GITHUB_OUTPUT"
+          fi
 
   web:
-    name: Web gate (build, e2e, deploy dry run)
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache.
+    # The moon remote cache as in `gate`: a push to main writes (the `moon-cache-write` environment and
+    # its token), so main's build and e2e results reach the cache; every other run only reads. It does
+    # not use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # history: see `gate`.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
-      NX_NO_CLOUD: "true"
+      MOON_BASE: origin/main
+      MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -160,19 +174,34 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
+          bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
-      - run: bunx nx build web
-      - run: bunx nx test:e2e web
-      - name: e2e against vite dev
+      - run: bunx moon run web:build
+      - name: e2e (production build)
+        id: e2e
+        run: bunx moon run web:test-e2e
+      # Only the specs that make the server diff: the upload, and the review of its result. The dev run is
+      # there so the pngjs diff inside workerd stays under an e2e run (apps/web/playwright.config.ts); the
+      # production run above already covers every spec.
+      - name: e2e against vite dev (upload and review)
+        id: e2e_dev
         working-directory: apps/web
-        run: bun run test:e2e:dev
+        run: bun run test:e2e:dev -- e2e/upload.spec.ts e2e/review.spec.ts
+      # A failed e2e test leaves its trace and `error-context.md` (the page snapshot) in test-results
+      # (`trace: "retain-on-failure"`); without this the runner takes them away and a flake leaves no
+      # evidence. Open a trace with `npx playwright show-trace <trace.zip>`. The dev step only runs
+      # when the production one passed, so the two never overwrite each other's directory.
+      - name: Keep the e2e traces of a failure
+        if: failure() && (steps.e2e.outcome == 'failure' || steps.e2e_dev.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-e2e-test-results-${{ steps.e2e.outcome == 'failure' && 'production' || 'dev' }}
+          path: apps/web/test-results
+          retention-days: 7
+          if-no-files-found: warn
       - name: Deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry"
@@ -182,30 +211,89 @@ jobs:
           CLOUDFLARE_ENV=production bun run build
           bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry-production"
 
-  # apps/site's Playwright suite (desktop and phone) on the build. Not a required check and not run on a
-  # tag: a release publishes the CLI, which does not ship the site (PS-326).
+  # apps/site's build always (it fails on a dead internal link), and its Playwright suite (the desktop
+  # project) only when the site itself changed. Not a required check and not run on a tag: a release
+  # publishes the CLI, which does not ship the site.
   site:
-    name: Site gate (build, e2e)
     needs: changes
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # No Nx Cloud, as in `gate`; this job builds and runs e2e, so it keeps no Nx cache.
+    # The moon remote cache as in `gate`: a push to main writes (the `moon-cache-write` environment and
+    # its token), so main's build and e2e results reach the cache; every other run only reads. It does
+    # not use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # history: see `gate`.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
-      NX_NO_CLOUD: "true"
+      MOON_BASE: origin/main
+      MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
+          bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
+        if: needs.changes.outputs.site_e2e == 'true'
         working-directory: apps/site
         run: bunx playwright install --with-deps chromium-headless-shell
-      # Builds first, through dependsOn.
-      - run: bunx nx test:e2e site
+      # Prerenders every page with crawlLinks and failOnError, so a dead internal link or a missing
+      # cli.md anchor fails here.
+      - run: bunx moon run site:build
+      # Desktop project only: the phone (Pixel 7) project is not run in CI.
+      - name: e2e (desktop)
+        if: needs.changes.outputs.site_e2e == 'true'
+        run: bunx moon run site:test-e2e -- --project desktop
+
+  # The review app reviews itself: `bun run dogfood:upload` (apps/web) captures its project, build and
+  # snapshot pages, light and dark, from a local build over the fixed synthetic seed, and uploads them to
+  # app.pixelslash.dev. The PixelSlash check on a pull request is posted by that server's GitHub App from
+  # this build; main's builds are the baseline every pull request is compared with. Not a required check,
+  # and with no PIXELSLASH_TOKEN (a fork's pull request gets no secrets) it skips and passes. A release (a
+  # tag, through workflow_call) and a manual run do not upload. Its own runner, so the fixed ports and
+  # `.wrangler/e2e` it shares with the e2e never meet the `web` job's.
+  visual:
+    needs: changes
+    if: >-
+      needs.changes.outputs.web == 'true' &&
+      (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The upload sends HEAD's commit, so a pull request checks out its head, not the merge commit:
+          # the check is posted on the commit the build names. The full history is for the merge-base.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .tool-versions
+      - run: bun install --frozen-lockfile
+      - name: Install the Playwright browser
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium-headless-shell
+      - name: Capture and upload the dogfood shots
+        working-directory: apps/web
+        env:
+          PIXELSLASH_CI_TOKEN: ${{ secrets.PIXELSLASH_TOKEN }}
+          PIXELSLASH_SERVER: https://app.pixelslash.dev
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PIXELSLASH_CI_TOKEN" ]; then
+            echo "visual: no PIXELSLASH_TOKEN, skipping the upload"
+            exit 0
+          fi
+          export PIXELSLASH_TOKEN_FILE="$RUNNER_TEMP/pixelslash-token"
+          (umask 077 && printf '%s' "$PIXELSLASH_CI_TOKEN" > "$PIXELSLASH_TOKEN_FILE")
+          unset PIXELSLASH_CI_TOKEN
+          if [ "$EVENT" = "pull_request" ]; then
+            bun run dogfood:upload -- --branch "$GITHUB_HEAD_REF" --pr "$PR" --base "$GITHUB_BASE_REF"
+          else
+            bun run dogfood:upload -- --branch main
+          fi

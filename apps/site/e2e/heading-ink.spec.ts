@@ -5,26 +5,20 @@ import { contrastRatio } from "./support/contrast.ts";
 /*
  * Light-theme headings have their own, darker ink (PS-364). Latte's theme file maps the kit's
  * text-slate-900 to body grey, so without styles.css every heading in light reads as the body. The
- * first h1 on each page is measured at the deepest element that holds its text: on /pricing that is
- * the Display span inside the h1. Gradient text (.home-gradient-text) is transparent by design and
- * is skipped. The dark values were measured on main before this change and are pinned as they were.
+ * first h1 on each page is measured at the deepest element that holds its text: a Display span
+ * inside the h1, where there is one. The dark values were measured on main before this change and
+ * are pinned as they were. No page here has a muted card heading any more (the pricing page that
+ * had one moved to slashslash.build), so the muted slate is not measured.
  */
 
 const INK_RGB: [number, number, number] = [35, 38, 52]; // #232634, --ps-heading on .latte
 const INK = `rgb(${INK_RGB.join(", ")})`;
 const GROUND: [number, number, number] = [239, 241, 245]; // #eff1f5, the light page ground
-const LIGHT_MUTED = "rgb(100, 103, 125)"; // latte text-slate-400, measured on main
 const DARK_HEADING = "rgb(205, 214, 244)"; // mocha text, measured on main
-const DARK_MUTED = "rgb(150, 156, 181)"; // mocha text-slate-400, measured on main
 
-const PAGES = ["/", "/pricing", "/docs", "/docs/getting-started"] as const;
-// A plain h2 takes the new ink: no slate class, or the kit's own default text-slate-900. Muted
-// card headings (text-slate-400 and 500) keep their slate, as styles.css does.
+const PAGES = ["/security", "/docs", "/docs/getting-started"] as const;
+// A plain h2 takes the new ink: no slate class, or the kit's own default text-slate-900.
 const PLAIN_H2 = "h2:not([class*='text-slate-']), h2.text-slate-900";
-const MUTED_CARD_H2 = "h2:is(.text-slate-400, .text-slate-500)";
-// The /docs group cards were muted overlines until PS-365 made their titles real headings; the
-// pricing page still has a muted card heading.
-const MUTED_CARD_PATH = "/pricing";
 
 type Ink = { text: string; color: string };
 
@@ -35,7 +29,7 @@ function textInk(heading: Locator): Promise<Ink | null> {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!node.textContent?.trim()) continue;
       const el = node.parentElement;
-      if (!el || el.closest(".home-gradient-text")) continue;
+      if (!el) continue;
       return {
         text: (el.textContent ?? "").trim().slice(0, 60),
         color: getComputedStyle(el).color,
@@ -61,7 +55,7 @@ test.describe("at 1440 in light", () => {
   test.use({ viewport: { width: 1440, height: 900 }, colorScheme: "light" });
   test.skip(({ isMobile }) => isMobile, "the desktop project only");
 
-  test("h1 on each page is the darker ink, clear of the body; the first plain h2 on / is too; 12:1 on the ground; the muted card keeps its slate", async ({
+  test("h1 on each page is the darker ink, clear of the body; the first plain h2 on /security is too; 12:1 on the ground", async ({
     page,
   }) => {
     // The brief's bar, checked once on the pair it names.
@@ -76,20 +70,15 @@ test.describe("at 1440 in light", () => {
       expect(h1?.color, `${path} h1 against the body`).not.toBe(body);
     }
 
-    await open(page, "/");
+    await open(page, "/security");
     const h2 = await firstInk(page, PLAIN_H2);
-    expect(h2, "/: a plain h2 in main").not.toBeNull();
-    expect(h2?.color, `/ first plain h2 "${h2?.text}"`).toBe(INK);
+    expect(h2, "/security: a plain h2 in main").not.toBeNull();
+    expect(h2?.color, `/security first plain h2 "${h2?.text}"`).toBe(INK);
 
     await open(page, "/docs");
     const card = await firstInk(page, PLAIN_H2);
     expect(card, "/docs: a group card h2 in main").not.toBeNull();
     expect(card?.color, "/docs group card heading").toBe(INK);
-
-    await open(page, MUTED_CARD_PATH);
-    const muted = await firstInk(page, MUTED_CARD_H2);
-    expect(muted, `${MUTED_CARD_PATH}: a muted h2 in main`).not.toBeNull();
-    expect(muted?.color, `${MUTED_CARD_PATH} muted card heading`).toBe(LIGHT_MUTED);
   });
 });
 
@@ -97,23 +86,18 @@ test.describe("at 1440 in dark", () => {
   test.use({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
   test.skip(({ isMobile }) => isMobile, "the desktop project only");
 
-  test("dark headings and the muted card keep the values measured on main", async ({ page }) => {
-    await open(page, "/");
+  test("dark headings keep the values measured on main", async ({ page }) => {
+    await open(page, "/security");
     const h1 = await firstInk(page, "h1");
-    expect(h1, "/: an h1 in main").not.toBeNull();
-    expect(h1?.color, "/ h1").toBe(DARK_HEADING);
+    expect(h1, "/security: an h1 in main").not.toBeNull();
+    expect(h1?.color, "/security h1").toBe(DARK_HEADING);
     const h2 = await firstInk(page, PLAIN_H2);
-    expect(h2, "/: a plain h2 in main").not.toBeNull();
-    expect(h2?.color, "/ first plain h2").toBe(DARK_HEADING);
+    expect(h2, "/security: a plain h2 in main").not.toBeNull();
+    expect(h2?.color, "/security first plain h2").toBe(DARK_HEADING);
 
     await open(page, "/docs");
     const card = await firstInk(page, PLAIN_H2);
     expect(card, "/docs: a group card h2 in main").not.toBeNull();
     expect(card?.color, "/docs group card heading").toBe(DARK_HEADING);
-
-    await open(page, MUTED_CARD_PATH);
-    const muted = await firstInk(page, MUTED_CARD_H2);
-    expect(muted, `${MUTED_CARD_PATH}: a muted h2 in main`).not.toBeNull();
-    expect(muted?.color, `${MUTED_CARD_PATH} muted card heading`).toBe(DARK_MUTED);
   });
 });

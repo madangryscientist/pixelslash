@@ -6,14 +6,18 @@ cannot see.
 
 | Layer | Question | Runs against | Where | Command |
 | --- | --- | --- | --- | --- |
-| **Smoke** | Does the thing we ship start and do its one job? | the built artifact: the bundled CLI, a production build of the web app | `packages/cli/smoke`, `apps/web/smoke` | `bunx nx smoke cli`, `bunx nx smoke web` |
-| **E2E** | Does a user's happy path work through the real UI or CLI? | a real browser on a local build, local D1, GitHub stubbed | `apps/web/e2e`, `apps/site/e2e` | `bunx nx test:e2e web`, `bunx nx test:e2e site` |
-| **Integration** | Do the parts agree with each other and with the store? | real SQLite (D1's engine), real files, real HTTP on loopback, a real child process | `*/test`, `apps/web/src/{db,api,diff,github,storage,server}` | `bunx nx test <project>` |
-| **Unit** | Is this function right on the cases that are easy to get wrong? | one module, no I/O | the rest of `*/test` and `apps/web/src/{lib,auth,ai}` | `bunx nx test <project>` |
+| **Smoke** | Does the thing we ship start and do its one job? | the built artifact: the bundled CLI, a production build of the web app | `packages/cli/smoke`, `apps/web/smoke` | `bunx moon run cli:smoke`, `bunx moon run web:smoke` |
+| **E2E** | Does a user's happy path work through the real UI or CLI? | a real browser on a local build, local D1, GitHub stubbed | `apps/web/e2e`, `apps/site/e2e` | `bunx moon run web:test-e2e`, `bunx moon run site:test-e2e` |
+| **Integration** | Do the parts agree with each other and with the store? | real SQLite (D1's engine), real files, real HTTP on loopback, a real child process | `*/test`, `apps/web/src/{db,api,diff,github,storage,server}` | `bunx moon run <project>:test` |
+| **Unit** | Is this function right on the cases that are easy to get wrong? | one module, no I/O | the rest of `*/test` and `apps/web/src/{lib,auth,ai}` | `bunx moon run <project>:test` |
 
 Integration and unit share a runner (Vitest under Bun) and the `test` target, so the split between them
 is by what a test touches, not by a folder. A unit test is added only for a gap: logic with branches the
 layers above do not reach.
+
+Real-browser tests run on Chromium only; Firefox and WebKit are never used in testing, at any layer,
+local or CI. Every Playwright config's projects are Chromium devices (`Desktop Chrome`, `Pixel 7`), and a
+phone project that ever uses an iPhone device sets `browserName: "chromium"`.
 
 ## Smoke
 
@@ -21,19 +25,21 @@ A smoke test runs the **released shape**, not the source: the CLI smoke imports 
 the web smoke talks to the built server over HTTP (its one `src/` import is the `usageCounts` query, to
 read the numbers a dashboard would show). A failure means the artifact is broken, not that one function is.
 
-- **`cli`** (`packages/cli/smoke/cli.smoke.test.ts`, 4 tests, about 2 s). `nx smoke cli` builds
+- **`cli`** (`packages/cli/smoke/cli.smoke.test.ts`, 4 tests, about 2 s). `moon run cli:smoke` builds
   `packages/cli/dist/index.js` and runs it as a child process, as the npm package runs: a PNG pair with
   100 changed pixels (stdout, manifest, overlay, report), an identical pair, a pair of static pages
   captured in a real browser from a loopback server, and a page that is down (exit 1, no report). The
   child's environment has every `PIXELSLASH_*` variable removed, so no token, server or error sink can
   reach it from the shell.
-- **`web`** (`apps/web/smoke/web.smoke.test.ts`, 4 tests, about 17 s). `nx smoke web` builds the app,
+- **`web`** (`apps/web/smoke/web.smoke.test.ts`, 4 tests, about 17 s). `moon run web:smoke` builds the app,
   applies the migrations to a **fresh local D1** in `apps/web/.wrangler/smoke`, serves it with
   `vite preview`, and drives the `/api/v1` upload of a main build and a branch build over HTTP: the
   sign-in page serves, a bad token is refused, a token reads `/me`, the pair uploads and the branch build
   reads back `changes` with a `changed` snapshot, and another org's build is a 404.
 
-Neither smoke is cacheable (`cache: false`): a smoke that replays from cache proves nothing.
+Both smokes, and both e2e suites, are cached like any other test: a pass replays only while every input is
+the same (the whole repo minus build and test output, `bun.lock` for the Playwright build, and the env vars
+each `moon.yml` lists), and a failure is never cached. A change the run could see re-runs it.
 
 ### The isolation rule, and the test that proves it
 
@@ -76,15 +82,15 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | --- | --- | --- | --- |
 | `packages/cli/smoke` | 1 | smoke | new |
 | `apps/web/smoke` | 1 | smoke | new |
-| `apps/web/e2e` | 26 (was 25) | e2e | one happy path per feature, in a real browser (the operator health page's 404 for everyone else and the page for a listed login, `admin.spec.ts`; its empty state is a unit test, since the e2e database always has the stub's seed). `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
+| `apps/web/e2e` | 26 (was 34 before the cut below), 51 tests (was 68) | e2e | one happy path per feature, in a real browser (the operator health page's 404 for everyone else and the page for a listed login, `admin.spec.ts`; its empty state is a unit test, since the e2e database always has the stub's seed). Every spec starts signed in from one `setup` project and builds its org, project and CI token with `provision` (`e2e/fixtures.ts`), a write to the D1; `orgs.spec.ts` is the one test that makes them by clicking, and `admin.spec.ts`'s figures test is the one that reads the whole D1. `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
 | `apps/site/e2e` | 4 | e2e | nav, footer and dead links on the prerendered pages, desktop and phone (named `smoke.spec.ts`; it is an e2e); one header on every page and the theme toggle (`header.spec.ts`); the home page in both themes (`home.spec.ts`); the pricing page fills the column and its one action leads to the self-host guide (`pricing.spec.ts`) |
 | `packages/cli/test` | 30 | integration | the `pixelslash` commands run in-process or as a child, against a fake server and real temp dirs. The `*-support.ts` files are helpers |
 | `packages/engine/test` | 50 | integration + unit | store, upload, capture (real Chromium), report and DS judge are integration; `diff*`, `regions`, `fingerprint`, `sentry-scrub`, `route-names`, `change-note`, `config*` are unit |
-| `apps/web/src/db` | 20 | integration | every query against real SQLite with the real migrations (`test-db.ts`, `test-d1.ts`) |
+| `apps/web/src/db` | 29 | integration | every query against real SQLite with the real migrations (`test-db.ts`, `test-d1.ts`) |
 | `apps/web/src/api` | 15 | integration | the `/api/v1` handler over a real `Db` and blob store, including the `ENDPOINTS` / `docs/cli.md` agreement |
 | `apps/web/src/diff` | 21 | integration | `processBuild` end to end on a real `Db`: baselines, retries, resume, timings. `wasm`, `measure`, `identical-bytes` are unit |
 | `apps/web/src/github`, `storage`, `server`, `preview` | 11 | integration | the GitHub client against a local stand-in, R2-shaped blobs, the connection patch |
-| `apps/web/src/lib`, `auth`, `ai` | 29 | unit | pure helpers and the model client against a fake endpoint |
+| `apps/web/src/lib`, `auth`, `ai` | 36 | unit | pure helpers and the model client against a fake endpoint. `use-review-keys.hook.test.tsx` renders a hook in happy-dom (its `@vitest-environment` line) to type a key in the commit that shows another shot, which no pure function can reach; `use-decision.hook.test.tsx` does the same for the decide-then-move flow, with a stubbed server call |
 | `apps/web/deploy` | 7 | integration | the Docker and SSH scripts, run against temp dirs |
 | `apps/site/src/content` | 3 | integration | the pages are built from the repo's own docs, so a heading or a code block cannot drift |
 | `packages/playwright`, `examples/playwright-node` | 2 | integration | the Playwright integration against an upload stub |
@@ -102,11 +108,41 @@ Each cut names where the behaviour is still proved.
 | `apps/web/src/diff/process-recovery.test.ts` "a build the Worker ceiling stopped is resumed on retry, and the retry gives the verdict" | the resume path and the verdict-on-retry path are each tested alone | `process-resume.test.ts` (resume) and "a diff that errored is re-diffed to a real verdict" in the same file |
 | `apps/web/src/api/handler.test.ts`, the `GET /api/v1/nope` 404 line | the same refusal is asserted for the other unknown path and method in the same test | the remaining assertions of "unknown paths and methods are refused" |
 | `apps/web/e2e/deep-history.spec.ts` (the whole file, one test) | a browserless upload test dressed as an e2e; nothing it asserts is in the UI | `process-deep-history.test.ts` (a main build 150 commits back is the baseline, a newer one is not used, the nearest wins, past 200 ancestors the shot is new) and `packages/engine/test/upload.test.ts` (the CLI sends up to 200 first-parent ancestors) |
-| `apps/web/e2e/timings.spec.ts` "with several builds the Timings tab counts them and keeps the slowest as max" | the arithmetic is the stats module's, not the tab's | `timings-stats.test.ts` ("lists every project with p50/p95 of its builds"); the tab itself is still rendered by the first test in the file |
+| `apps/web/e2e/timings.spec.ts` "with several builds the Timings tab counts them and keeps the slowest as max" | the arithmetic is the stats module's, not the tab's | `timings-stats.test.ts` ("lists every project with p50/p95 of its builds"); the tab itself was rendered by the first test in that file, which is cut too (see "E2E specs cut" below) |
 | `apps/web/e2e/metrics.spec.ts` "a build older than the timings says so, and invents no zero" | it clears columns in D1 to test one rendering rule | `src/lib/run-card.test.ts` ("has no wall time, no compare time and no re-capture line", "never shows a time it did not record as 0") for the build card; `src/lib/run-metrics.test.ts` ("is absent for a shot never timed") and `src/lib/branch-metrics.test.ts` (an untimed shot is left out, not counted as 0) for the shot and branch pages |
 
 Nothing proved before is unproved now: each row above names a surviving test that fails if the behaviour
 breaks.
+
+### E2E specs cut
+
+Eight web specs and three tests in two others were each a data and logic check run through a browser.
+Every assertion moved to the lowest layer that can prove it, or is looks only (theme, phone width). The
+page wiring that a browser used to prove is now a render test: `renderToStaticMarkup` for components
+with no router, and `src/test/render-routed.tsx` (a memory-history router) for components with a link.
+The count goes from 34 spec files and 68 tests to 26 and 51 (`bunx playwright test --list` in `apps/web`).
+
+| Removed | Still proved by |
+| --- | --- |
+| `composition.spec.ts` (2 tests) | `components/composition.test.tsx` (the overlay, the findings line, the focus), `components/shot-card.test.tsx` (the card carries the line), `api/composition.test.ts` ("the build view hands stored findings to the screens") |
+| `carried-from-main.spec.ts` | `diff/process-open-vs-main.test.ts` and `process-open-vs-main-page.test.ts` (what is carried and how it is filed), `lib/summary-counts.test.ts` (the counts line), `lib/review-walk.test.ts` (the j/k walk) |
+| `metrics.spec.ts` | `components/run-metrics.test.tsx` (build card, shot and branch pages), plus the unit tests already named in the table above |
+| `timings.spec.ts` (4 tests) | `components/build-timings.test.tsx`, `components/org-timings.test.tsx`, `lib/timings.test.ts`, `db/timings-stats.test.ts`; theme and phone width are looks only, and the click that opens the Timings tab, its `?tab=timings` URL and the loader are walked by `orgs.spec.ts`, which gained a step for it |
+| `brief.spec.ts` | `components/build-brief.test.tsx`, `components/brief-summary.test.tsx` |
+| `native.spec.ts` | `diff/process-native.test.ts`, `components/snapshot-side-panel.test.tsx`, `api/native.test.ts`, `packages/cli/test/import-native.test.ts` |
+| `parity.spec.ts` (3 tests) | `components/parity-view.test.tsx`, `components/twins.test.tsx`, `api/parity.test.ts`, `api/twins.test.ts` |
+| `stale.spec.ts` | `components/stale.test.tsx`, `components/twins.test.tsx`, `db/stale.test.ts`, `db/stale-review.test.ts`, `api/stale.test.ts`, `diff/process-stale.test.ts`; accepting a stale shot is walked by `review.spec.ts` |
+| `ai-review.spec.ts` "a build with 10 changed shots gets no summary, says why, and offers no Regenerate" and "with no model a changed shot is reviewed as plain pixels" | `components/build-summary.test.tsx`, `components/ai-notes.test.tsx`, `diff/process.test.ts` |
+| `twins.spec.ts` "a build shows its twin and links to it" | `components/twins.test.tsx`, `db/twins.test.ts`, `api/twins.test.ts` |
+
+Kept, with the reason: the other two tests in `ai-review.spec.ts` (an opted-in project's model auto-passes a
+noise-only shot; a project without its own model uses the org's) and the project settings test in
+`twins.spec.ts` need the settings forms, their server functions and the stub model pipeline together, which
+no render test reaches.
+
+The two merges planned beside this cut: `admin-health-now.test.ts` is folded into `admin-health.test.ts`
+(its fixtures moved to `admin-health-kit.ts` so the file stays under the 300-line lint cap).
+`ai/summary-parse.test.ts` stays its own file: `summary.test.ts` is at the cap, and merging would break it.
 
 ### Gaps filled
 
@@ -146,11 +182,19 @@ gain 8 smoke tests.
 ## Running them
 
 ```bash
-bunx nx smoke cli          # builds the CLI first
-bunx nx smoke web          # builds the web app and starts it on a fresh local D1
-bunx nx test:e2e web       # the happy paths in a real browser
-bunx nx test <project>     # integration + unit
+bunx moon run cli:smoke        # builds the CLI first
+bunx moon run web:smoke        # builds the web app and starts it on a fresh local D1
+bunx moon run web:test-e2e     # the happy paths in a real browser
+bunx moon run <project>:test   # integration + unit
 ```
+
+In CI the web e2e runs every spec once on the production build (with the diff in the sidecar). A second run
+on `vite dev` is cut to `e2e/upload.spec.ts` and `e2e/review.spec.ts`: it exists so the pngjs diff inside
+workerd, as on Cloudflare, stays under an e2e run, and those two specs are the ones that make the server diff
+and read its result. The site's e2e runs the `desktop` project only (not the phone one), and only when the site
+itself changed (`apps/site/` or what decides how it installs) or on `main`; a docs-only edit is checked by
+`moon run site:build` (a dead internal link or a missing `cli.md` anchor fails the prerender) and the site's unit
+tests, and a spec that quotes a docs sentence waits for the next site change or the push to `main`.
 
 The smoke state is `apps/web/.wrangler/smoke` (gitignored), recreated on every run; its scratch is under
 `TMPDIR`, which `scripts/test-tmp-scope.ts` scopes and removes.

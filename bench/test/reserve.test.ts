@@ -3,15 +3,16 @@ import { formatCpus, parseCpus } from "../env/cpulist.ts";
 import {
   DEFAULT_CPUS,
   HELPER_VERSION,
-  HelperError,
+  MIN_HOST_CPUS,
   ON_FILE,
   parseRequest,
   runHelper,
-  SCOPE,
-  STATE_FILE,
-  type Host,
-  type Out,
 } from "../env/reserve.ts";
+import { HelperError } from "../env/error.ts";
+import { SCOPE } from "../env/machine.ts";
+import { STATE_FILE } from "../env/journal.ts";
+import { LAPSE_UNIT } from "../env/lapse.ts";
+import { fake, governor, ON, refusal } from "./reserve-fake.ts";
 
 describe("cpu lists", () => {
   test("ranges, commas and spaces parse to a sorted set, and format back short", () => {
@@ -58,88 +59,12 @@ describe("argument validation", () => {
     [["on", "--pid", "5", "--cpus", "4,x"]],
     [["on", "--pid", "5", "--shell", "sh"]],
     [["off", "now"]],
+    [["renew", "now"]],
     [["status", "--json"]],
   ])("refuses %j", (argv) => {
     expect(() => parseRequest(argv)).toThrow(/usage|takes|must|not a CPU|process id/);
   });
 });
-
-type Fake = Host & {
-  files: Map<string, string>;
-  calls: string[];
-  /** Commands (joined) that fail once, mapped to their stderr. */
-  failing: Map<string, string>;
-  allowed: Map<string, string>;
-  inside: boolean;
-};
-
-const SIBLINGS = new Map([
-  [0, "0,6"],
-  [1, "1,7"],
-  [2, "2,8"],
-  [3, "3,9"],
-  [4, "4,10"],
-  [5, "5,11"],
-  [6, "0,6"],
-  [7, "1,7"],
-  [8, "2,8"],
-  [9, "3,9"],
-  [10, "4,10"],
-  [11, "5,11"],
-]);
-
-function fake(overrides: { uid?: number | null; pidOwner?: number | null } = {}): Fake {
-  const files = new Map<string, string>([
-    ["/sys/devices/system/cpu/online", "0-11\n"],
-    ["/sys/devices/system/cpu/cpufreq/boost", "1\n"],
-    ["/proc/meminfo", "MemTotal:       16000000 kB\n"],
-  ]);
-  for (const [cpu, sib] of SIBLINGS) {
-    files.set(`/sys/devices/system/cpu/cpu${cpu}/topology/thread_siblings_list`, `${sib}\n`);
-    files.set(`/sys/devices/system/cpu/cpu${cpu}/cpufreq/scaling_governor`, "powersave\n");
-  }
-  const allowed = new Map<string, string>();
-  const state: Fake = {
-    files,
-    calls: [],
-    failing: new Map(),
-    allowed,
-    inside: false,
-    async exec(cmd): Promise<Out> {
-      const line = cmd.join(" ");
-      state.calls.push(line);
-      for (const [needle, err] of state.failing)
-        if (line.includes(needle)) {
-          state.failing.delete(needle);
-          return { code: 1, out: "", err };
-        }
-      const show = /^systemctl show -p AllowedCPUs --value (\S+)$/.exec(line);
-      if (show) return { code: 0, out: `${allowed.get(show[1] ?? "") ?? ""}\n`, err: "" };
-      const set =
-        /^systemctl set-property --runtime (\S+) AllowedCPUs=(.*?)(?: MemoryMin.*)?$/.exec(line);
-      if (set) allowed.set(set[1] ?? "", set[2] ?? "");
-      return { code: 0, out: "", err: "" };
-    },
-    read: (path) => files.get(path) ?? null,
-    write: (path, text) => void files.set(path, text),
-    create(path, text) {
-      if (files.has(path)) return false;
-      files.set(path, text);
-      return true;
-    },
-    remove: (path) => void files.delete(path),
-    mkdir: () => undefined,
-    procUid: () => (overrides.pidOwner === undefined ? 1000 : overrides.pidOwner),
-    self: 9000,
-    callerUid: overrides.uid === undefined ? 1000 : overrides.uid,
-    insideScope: () => state.inside,
-  };
-  return state;
-}
-
-const ON = ["on", "--cpus", "4,5,10,11", "--mem", "4G", "--pid", "4242"];
-const governor = (f: Fake, cpu: number) =>
-  f.files.get(`/sys/devices/system/cpu/cpu${cpu}/cpufreq/scaling_governor`);
 
 describe("on / off", () => {
   test("on reserves in order and off puts every value back", async () => {
@@ -180,7 +105,7 @@ describe("on / off", () => {
     await runHelper(inside, ON);
     inside.inside = true;
     await runHelper(inside, ["off"]);
-    expect(inside.calls.some((c) => c.startsWith("systemctl stop"))).toBe(false);
+    expect(inside.calls).not.toContain(`systemctl stop ${SCOPE}`);
 
     const outside = fake();
     await runHelper(outside, ON);
@@ -221,7 +146,7 @@ describe("on / off", () => {
     expect(f.files.has(STATE_FILE)).toBe(false);
   });
 
-  test("a restore step that fails does not stop the others, and the record is kept for a retry", async () => {
+  test("a restore step that fails does not stop the others, keeps the record and the lapse it had", async () => {
     const f = fake();
     await runHelper(f, ON);
     f.failing.set("set-property --runtime user.slice", "busy");
@@ -229,9 +154,12 @@ describe("on / off", () => {
     expect(f.files.get("/sys/devices/system/cpu/cpufreq/boost")).toBe("1");
     expect(governor(f, 4)).toBe("powersave");
     expect(f.files.has(STATE_FILE)).toBe(true);
+    // the timer is stopped only after the restore, so the bound survives the failure
+    expect(f.timers.has(LAPSE_UNIT)).toBe(true);
     f.failing.clear();
     expect(await runHelper(f, ["off"])).toBe("restored");
     expect(f.files.has(STATE_FILE)).toBe(false);
+    expect(f.timers.size).toBe(0);
   });
 
   test("off drops the empty placeholder but keeps, and never runs, a record it cannot read", async () => {
@@ -239,18 +167,18 @@ describe("on / off", () => {
     f.files.set(STATE_FILE, "{}\n");
     expect(await runHelper(f, ["off"])).toContain("nothing reserved");
     expect(f.files.has(STATE_FILE)).toBe(false);
-    const hostile = '{"version":1,"reserved":[],"allowed":{"user.slice":"x; reboot"}}';
+    const hostile = `{"version":2,"reserved":[],"allowed":{"system.slice":"","user.slice":"x; reboot","init.scope":""},"started":1,"lapses":2}`;
     f.files.set(STATE_FILE, hostile);
     await expect(runHelper(f, ["off"])).rejects.toThrow("leaving it");
     expect(f.files.get(STATE_FILE)).toBe(hostile);
     expect(f.calls.filter((c) => c.includes("reboot"))).toEqual([]);
   });
 
-  test("off refuses while another helper's on is running, and ignores a marker a killed one left", async () => {
+  test("off refuses while another helper's on or renew is running, and ignores a marker a killed one left", async () => {
     const f = fake();
     f.files.set(ON_FILE, "4242\n");
     f.files.set("/proc/4242/comm", "pixelslash-benc\n");
-    await expect(runHelper(f, ["off"])).rejects.toThrow("an `on` is still running");
+    await expect(runHelper(f, ["off"])).rejects.toThrow("another helper is running");
     f.files.set("/proc/4242/comm", "bash\n");
     expect(await runHelper(f, ["off"])).toContain("nothing reserved");
     await runHelper(f, ON);
@@ -260,9 +188,13 @@ describe("on / off", () => {
   test("status reports the live sets and whether a run is recorded", async () => {
     const f = fake();
     expect(JSON.parse(await runHelper(f, ["status"]))).toMatchObject({
-      version: HELPER_VERSION,
+      version: 3,
       active: false,
+      started: null,
+      lapses: null,
+      age_s: null,
     });
+    expect(HELPER_VERSION).toBe(3);
     await runHelper(f, ON);
     expect(JSON.parse(await runHelper(f, ["status"]))).toMatchObject({
       active: true,
@@ -271,16 +203,6 @@ describe("on / off", () => {
     });
   });
 });
-
-/** Run a request that must be refused; the message, and whether the machine was left alone. */
-async function refusal(f: Fake, argv: string[]): Promise<{ message: string; untouched: boolean }> {
-  const message = await runHelper(f, argv).then(
-    () => "",
-    (e: unknown) => (e instanceof Error ? e.message : String(e)),
-  );
-  const untouched = f.calls.every((c) => !c.includes("set-property")) && !f.files.has(STATE_FILE);
-  return { message, untouched };
-}
 
 describe("what on refuses before touching anything", () => {
   test("half a core", async () => {
@@ -300,8 +222,34 @@ describe("what on refuses before touching anything", () => {
 
   test("every CPU, which would leave the host none", async () => {
     const r = await refusal(fake(), ["on", "--cpus", "0-11", "--pid", "5"]);
-    expect(r).toEqual({ message: expect.stringContaining("at least two CPUs"), untouched: true });
+    expect(r).toEqual({
+      message: expect.stringContaining("at least 4 CPUs; --cpus 0-11 leaves 0"),
+      untouched: true,
+    });
   });
+
+  test("a list that leaves the host two CPUs, and nothing is run or written", async () => {
+    const f = fake();
+    const r = await refusal(f, ["on", "--cpus", "1-5,7-11", "--pid", "5"]);
+    expect(MIN_HOST_CPUS).toBe(4);
+    expect(r).toEqual({
+      message: "the host must keep at least 4 CPUs; --cpus 1-5,7-11 leaves 2",
+      untouched: true,
+    });
+    expect(f.calls).toEqual([]);
+    expect(f.files.has(STATE_FILE)).toBe(false);
+    expect(f.files.has(ON_FILE)).toBe(false);
+  });
+
+  test.each([["2-5,8-11"], ["4,5,10,11"]])(
+    "the host keeps four CPUs or more: %s is accepted",
+    async (cpus) => {
+      const f = fake();
+      await expect(runHelper(f, ["on", "--cpus", cpus, "--pid", "5"])).resolves.toContain(
+        "reserved",
+      );
+    },
+  );
 
   test("a pid that is not the caller's", async () => {
     for (const pidOwner of [0, null]) {

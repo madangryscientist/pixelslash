@@ -42,6 +42,15 @@ describe("search", () => {
     expect(urls.some((url) => url.startsWith("/docs/upload-flaky"))).toBe(true);
   });
 
+  test("a search for 'flaky' finds all three flaky-shot pages", () => {
+    // At the default limit of 8 the config page is not in the list: its only hit is a heading
+    // (rank 41 of 44 at this ranking). The limit is passed here rather than the ranking changed.
+    const pages = new Set(search(INDEX, "flaky", 50).map((hit) => hit.entry.url.split("#")[0]));
+    for (const url of ["/docs/flaky-shots", "/docs/capture-stabilise", "/docs/upload-flaky"]) {
+      expect(pages.has(url)).toBe(true);
+    }
+  });
+
   test("finds the self-host guide", () => {
     const urls = search(INDEX, "self-host").map((hit) => hit.entry.url);
     expect(urls.some((url) => url.startsWith("/self-host"))).toBe(true);

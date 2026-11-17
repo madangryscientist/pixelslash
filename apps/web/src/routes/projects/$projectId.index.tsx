@@ -2,44 +2,44 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   Breadcrumbs,
   Button,
-  Caption,
   Card,
-  Cluster,
   Code,
   CopyLine,
   EmptyState,
   ListLayout,
   Step,
   Steps,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
   TextLink,
   Text,
 } from "@hackcove/ui-react";
-import { MixBar, ToReview, stripeToneOf } from "#/components/build-mix";
-import { orgCrumb } from "#/components/crumbs";
+import { orgCrumb, projectCrumb } from "#/components/crumbs";
+import { SubprojectList } from "#/components/subprojects";
 import { ProjectFlags } from "#/components/detection-flag";
+import { BuildsList } from "#/components/builds-list";
 import { StaleList } from "#/components/stale";
-import { Page, StatusBadge, useHydrated } from "#/components/ui";
-import type { BuildSummary } from "#/db/build-list";
-import { formatRelative } from "#/lib/format";
+import { Page, useHydrated } from "#/components/ui";
 import { getProjectPage } from "#/server/fns";
+import { getSubprojects } from "#/server/subprojects";
 
 export const Route = createFileRoute("/projects/$projectId/")({
-  loader: ({ params }) => getProjectPage({ data: { projectId: params.projectId } }),
+  loader: async ({ params }) => {
+    const data = { projectId: params.projectId };
+    const [page, subprojects] = await Promise.all([
+      getProjectPage({ data }),
+      getSubprojects({ data }),
+    ]);
+    return { ...page, subprojects };
+  },
   component: ProjectPage,
 });
 
 function ProjectPage() {
-  const { project, org, builds, flags, stale, now, serverUrl } = Route.useLoaderData();
+  const { project, org, builds, flags, stale, now, serverUrl, subprojects } = Route.useLoaderData();
+  const parentCrumbs = project.parent ? [projectCrumb(project.parent)] : [];
   return (
     <Page>
       <ListLayout
-        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), project.name]} />}
+        breadcrumbs={<Breadcrumbs crumbs={[orgCrumb(org), ...parentCrumbs, project.name]} />}
         title={project.name}
         subtitle={
           builds.length === 0
@@ -75,31 +75,16 @@ function ProjectPage() {
           </>
         }
       >
+        <SubprojectList subprojects={subprojects} defaultBranch={project.defaultBranch} />
         {builds.length === 0 ? (
-          <EmptyProject projectId={project.id} serverUrl={serverUrl} />
+          <EmptyProject project={project} serverUrl={serverUrl} />
         ) : (
-          <Table caption="Builds">
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Branch</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Snapshots</TableHeaderCell>
-                <TableHeaderCell>Review</TableHeaderCell>
-                <TableHeaderCell>When</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {builds.map((build) => (
-                <BuildRow
-                  key={build.id}
-                  projectId={project.id}
-                  defaultBranch={project.defaultBranch}
-                  build={build}
-                  now={now}
-                />
-              ))}
-            </TableBody>
-          </Table>
+          <BuildsList
+            projectId={project.id}
+            defaultBranch={project.defaultBranch}
+            builds={builds}
+            now={now}
+          />
         )}
         <StaleList items={stale} />
         <ProjectFlags projectId={project.id} flags={flags} />
@@ -108,78 +93,21 @@ function ProjectPage() {
   );
 }
 
-function BuildRow({
-  projectId,
-  defaultBranch,
-  build,
-  now,
+/**
+ * A project with no builds: where the token comes from and the exact command that uploads. A
+ * subproject's token is its parent's, so the link goes there and the command names the subproject.
+ */
+function EmptyProject({
+  project,
+  serverUrl,
 }: {
-  projectId: string;
-  defaultBranch: string;
-  build: BuildSummary;
-  now: Date;
+  project: { id: string; name: string; parent: { id: string; name: string } | null };
+  serverUrl: string;
 }) {
-  return (
-    <TableRow data-testid="build-row" stripe={stripeToneOf(build)}>
-      <TableCell
-        secondary={
-          <Cluster gap="xs" wrap>
-            <Caption mono>{build.commitSha.slice(0, 7)}</Caption>
-            {build.prNumber !== null && <Caption>PR #{build.prNumber}</Caption>}
-            {build.branch !== defaultBranch && (
-              <TextLink
-                size="sm"
-                tone="muted"
-                data-testid="branch-link"
-                render={(props) => (
-                  <Link
-                    to="/projects/$projectId/branches/$branch"
-                    params={{ projectId, branch: build.branch }}
-                    {...props}
-                  />
-                )}
-              >
-                whole branch
-              </TextLink>
-            )}
-          </Cluster>
-        }
-      >
-        <TextLink
-          stretch
-          render={(props) => (
-            <Link
-              to="/projects/$projectId/builds/$buildId"
-              params={{ projectId, buildId: build.id }}
-              {...props}
-            />
-          )}
-        >
-          {build.branch}
-        </TextLink>
-      </TableCell>
-      <TableCell>
-        <StatusBadge status={build.status} />
-      </TableCell>
-      <TableCell>
-        <MixBar counts={build.counts} />
-      </TableCell>
-      <TableCell>
-        <ToReview build={build} defaultBranch={defaultBranch} />
-      </TableCell>
-      <TableCell tone="muted">
-        <span data-testid="rel-time" title={build.createdAt.toISOString()}>
-          {formatRelative(build.createdAt, now)}
-        </span>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-/** A project with no builds: where the token comes from and the exact command that uploads. */
-function EmptyProject({ projectId, serverUrl }: { projectId: string; serverUrl: string }) {
   const hydrated = useHydrated();
-  const command = `PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}`;
+  const flag = project.parent ? ` --subproject ${project.name}` : "";
+  const command = `PIXELSLASH_TOKEN=… pixelslash upload DIR --server ${serverUrl}${flag}`;
+  const tokenOwner = project.parent ?? project;
   return (
     <Card as="div" dashed="filled" data-testid="empty-project">
       <EmptyState title="No builds yet">
@@ -194,10 +122,14 @@ function EmptyProject({ projectId, serverUrl }: { projectId: string; serverUrl: 
                 Issue a CI token in{" "}
                 <TextLink
                   render={(props) => (
-                    <Link to="/projects/$projectId/settings" params={{ projectId }} {...props} />
+                    <Link
+                      to="/projects/$projectId/settings"
+                      params={{ projectId: tokenOwner.id }}
+                      {...props}
+                    />
                   )}
                 >
-                  Settings
+                  {project.parent ? `${project.parent.name}'s settings` : "Settings"}
                 </TextLink>
                 .
               </>

@@ -16,7 +16,7 @@ bun run bench:perf                 # speed, before vs after on this machine (see
 bun run bench:perf:check           # the same comparison; exits 1 when a step is over 25% slower
 bun run bench:perf -- --impl "<cmd>" --impl "<cmd>"   # time implementations against each other
 bun run bench:native               # diff.wasm's steps in wasm and natively (needs cargo; PS-212)
-bunx nx run bench:corpus           # re-render the main corpus (needs chromium-headless-shell)
+bunx moon run bench:corpus         # re-render the main corpus (needs chromium-headless-shell)
 bun bench/src/generate.ts --set holdout   # re-render the held-out corpus
 ```
 
@@ -71,7 +71,7 @@ image. Each page is captured in pairs with `pixelslash capture` and each pair di
 | bare | the same CLI on this machine | what the same stabilisation does outside the image |
 | control | bare, with animations, caret and clock left alone | proof the page flickers at all: a clean image row means nothing if the control is clean too |
 
-The settle (fonts, images, network idle, two frames) runs in every arm: it is not optional, so a
+The settle (fonts, images, the network, two frames) runs in every arm: it is not optional, so a
 page it alone makes stable (`lazy-image`) cannot flicker in the control. `caret` did not flicker in it
 either, which fits headless Chromium painting no caret (above), though three pairs do not prove that.
 The results say which pages the control did not flag. The
@@ -124,7 +124,7 @@ directory, and the next run removes it.
 median is more than 25% above the base median *in that run*. It never reads an earlier run. With no
 `--base` and neither `origin/main` nor `main` available it prints the head timings alone, says no
 comparison was made, and exits 0. An unknown `--base` ref is a usage error (exit 2). Both root scripts
-run `bun bench/src/perf/run.ts` directly, so those exit codes reach the caller (through `nx run` every
+run `bun bench/src/perf/run.ts` directly, so those exit codes reach the caller (through `moon run` every
 failure would read as 1). The head side times the working tree; the head SHA in the report and the
 results file carries `+dirty` when the tree has uncommitted changes.
 
@@ -332,23 +332,38 @@ bun run bench:perf -- --env dedicated --impl "bun bench/src/impl/ts-diff.ts" --i
 
 The desktop is shared with a browser and an editor, so a shared-run spread (p95 over the median, the
 `p95/med` column) can be large. `--env dedicated` reserves whole cores for the run: CPUs 4,5,10,11 by
-default (`--env-cpus`; a core and its SMT sibling go together, and the host keeps at least two CPUs),
+default (`--env-cpus`; a core and its SMT sibling go together, and the helper keeps at least four CPUs, two whole cores, for the host: it refuses a list that leaves fewer),
 and 4G of memory (`--env-mem`, at most half the machine's; set as both `MemoryMin` and `MemoryMax`, no swap). The default is
 `--env none`, which measures the machine as it is. It needs `--impl` (the ref comparison builds the web
 app and is not timed this way).
 
-What the runner does, through the one root helper `pixelslash-bench-reserve on|off|status`:
+**Short timing runs only.** The dedicated env squeezes every other process on the machine (the
+desktop, the browser, every other capture) onto the cores left. Use it for a timing run and nothing
+else: never for repro loops, test loops or anything left running, because whatever shares the
+machine then competes for a few cores and times out. The helper bounds this itself. It keeps at
+least four CPUs for the host (`--cpus 1-5,7-11` on a 12-CPU machine leaves two and is refused;
+`--cpus 2-5,8-11` is the largest list), and `on` arms a systemd timer (`pixelslash-bench-lapse`)
+that runs `off` 30 minutes later unless `pixelslash-bench-reserve renew` is run, which starts the 30
+minutes again. A lapse is the ordinary `off`, so it also stops whatever is still in
+`pixelslash-bench.scope`: that is the bound working. A hand-run `off` stops the timer only once the
+machine is back, so a restore that fails keeps the timer it had and `off` can be run again. A lapse's
+own `off` has no timer left to keep, so a restore that fails there needs a hand-run `off`. `status`
+reports `started`, `lapses` and `age_s`.
+
+What the runner does, through the one root helper `pixelslash-bench-reserve on|off|renew|status`:
 
 - sets `AllowedCPUs` on `system.slice`, `user.slice` and `init.scope` to the other CPUs (`--runtime`,
   so a reboot also undoes it) and moves the runner itself into `pixelslash-bench.scope`, limited to
   the reserved CPUs, so every child it starts runs there;
 - turns boost off (`/sys/devices/system/cpu/cpufreq/boost`) and keeps the performance governor;
+- arms the 30-minute lapse timer (the runner never renews: a timing run is short);
 - restores all of it at the end, on SIGINT or SIGTERM and after a failure. The helper writes its
   prior values to `/run/pixelslash-bench/state.json` before changing anything, and `off` is a full,
   repeatable restore from that.
 
 If a run was killed so hard that nothing could restore (`kill -9`), the reservation stays until a
-reboot (`--runtime`) or an `off`: the next `--env dedicated` refuses to start and says so. Restore with
+reboot (`--runtime`), the lapse timer or an `off`: the next `--env dedicated` refuses to start and says so. A run
+killed before `on` armed the timer (a fraction of a second) has only `off` and the reboot. Restore with
 `sudo -n /usr/local/sbin/pixelslash-bench-reserve off`.
 
 **The helper.** `bench/env/install.sh` builds it (`bun build --compile`, as you), prints what it will
@@ -399,11 +414,11 @@ contract: the same YIQ threshold, anti-alias test, 24 px region grouping, speck,
 rules, and the same overlap-only rule for shots of different sizes. PNGs are decoded with
 SkiaSharp (MIT, Skia BSD-3), base and head at once, since PS-168; `--decoder stb --decode
 sequential` is the StbImageSharp (Unlicense or MIT) path it had before. See "Decoders and encoders". `engines/dotnet/PixelSlash.Diff.Tests` holds its xunit tests on
-tiny rasters. Both are Nx projects through `@nx/dotnet`, named after their `.csproj`, so
+tiny rasters. Both are the one moon project `dotnet` (`engines/dotnet/moon.yml`), so
 `bun run test` builds and runs them. It needs the .NET SDK that `global.json` pins (see AGENTS.md).
 
 ```bash
-bunx nx build PixelSlash.Diff --configuration release   # or: dotnet build engines/dotnet/PixelSlash.Diff -c Release
+dotnet build engines/dotnet/PixelSlash.Diff -c Release
 bun run bench -- --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
 bun run bench:perf -- --impl "bun bench/src/impl/ts-diff.ts" \
   --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
@@ -477,17 +492,18 @@ kernel's rusage for a child carries the parent's high-water mark through fork an
 
 ## The regression guard
 
-`bun run bench:check` (an Nx target, `bench:check`) runs PixelSlash on both corpora, reads the
+`bun run bench:check` (a moon task, `bench:check`) runs PixelSlash on both corpora, reads the
 committed `bench/results/<date>.json` at git HEAD, and exits 1 when, on either corpus, real changes
 caught fall, or noise or identical pairs flagged rise. Fractions are compared exactly (a corpus that
 grew compares by rate). It prints every number before and after, and the cases whose verdict moved.
 It needs no VM and no browser.
 
-It is in the gate: `bench:test` depends on `bench:check`, so `bun run test` (and `nx run-many -t test`)
+It is in the gate: `bench:test` depends on `bench:check`, so `bun run test` (and `moon run :test`)
 runs it and fails on a regression. The check is cacheable. Its inputs are `bench/src`, the committed
 corpora, `bench/results/*.json`, `bench/package.json`, `bun.lock` and the engine's diff sources
-(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`); an edit to any of them re-runs it,
-and an edit anywhere else (`apps/web`, the CLI) replays it from cache.
+(`index.ts`, `diff.ts`, `diff-options.ts`, `regions.ts`, `shift.ts`), plus what every TypeScript task
+inherits (all of `packages/**` and the root files in `.moon/tasks/all.yml`); an edit to any of them
+re-runs it, and an edit anywhere else (`apps/web`, the docs) replays it from cache.
 
 When a score moves on purpose (a threshold you meant to change, a new case): run `bun run bench:check`,
 read the before and after numbers, then run `bun run bench` to write a new `bench/results/<date>.json`

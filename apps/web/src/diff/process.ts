@@ -10,10 +10,11 @@ import {
 } from "#/db/baselines";
 import type { Db } from "#/db/db";
 import { type Build, getBuild } from "#/db/builds";
-import { refreshBuildStatus } from "#/db/review";
 import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
-import { recordRun, runFields } from "#/db/server-timings";
+import { SnapshotWrites } from "#/db/snapshot-writes";
+import { written } from "./written";
+import { type PartTimer, timeIf } from "#/server/server-timing";
 import type { BlobStore } from "#/storage/blobs";
 import { CiResultError } from "./ci-result";
 import { NoRecoveryError, claim, dead } from "./claim";
@@ -28,6 +29,7 @@ import {
   serverComparer,
   timedComparer,
 } from "./compare";
+import { snapshotStem } from "#/db/stem";
 import { measureAgainstMain } from "./against-main";
 import { Budget, DiffCeilingError } from "./budget";
 import {
@@ -40,9 +42,10 @@ import {
   projectOf,
 } from "./build-writes";
 import { ShotsUnmeasuredError, UnmeasuredError, assertMeasured } from "./measured";
+import { currentResult, endErrored, endRun } from "./run-end";
 import { carryOpenFromMain } from "./open-vs-main";
 import { withOverrides } from "./with-overrides";
-import { type ExplainQueue, queueExplain } from "#/ai/explain-queue";
+import type { ExplainQueue } from "#/ai/explain-queue";
 import { reportError } from "#/server/sentry";
 
 export { NoRecoveryError, STALE_PROCESSING_MS } from "./claim";
@@ -75,15 +78,12 @@ export type ProcessDeps = {
   explainQueue?: ExplainQueue | undefined;
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
   modelKeySecret?: string | undefined;
+  /** Counts the run's baseline pick, measuring and removed markers into the request's `Server-Timing`. */
+  timer?: PartTimer | undefined;
 };
 
-async function storeSnapshot(
-  db: Db,
-  id: string,
-  fields: Partial<typeof snapshots.$inferInsert>,
-): Promise<void> {
-  await db.update(snapshots).set(fields).where(eq(snapshots.id, id));
-}
+/** A run's deps, with the batch its row writes queue in (`SnapshotWrites`). */
+type RunDeps = ProcessDeps & { writes: SnapshotWrites };
 
 /**
  * A shot with nothing to compare against. No baseline is `new`; a baseline rendered by a
@@ -91,16 +91,15 @@ async function storeSnapshot(
  * a wall of false diffs. On the default branch it is accepted as the new baseline; a branch build
  * holding one has no verdict (`assertMeasured`, PS-282).
  */
-async function storeUncompared(
-  deps: ProcessDeps,
+function storeUncompared(
+  deps: RunDeps,
   shot: SnapshotRow,
   baseline: BaselineSnapshot | undefined,
-): Promise<void> {
+): void {
   // A shot measured again against another baseline may have had an overlay; one that now has no
   // overlay to write drops it.
-  await storeSnapshot(
-    deps.db,
-    shot.id,
+  deps.writes.update(
+    shot,
     baseline
       ? {
           ...UNCOMPARED,
@@ -114,26 +113,35 @@ async function storeUncompared(
           baselineKey: null,
           baselineSnapshotId: null,
         },
+    () => dropOwnOverlay(deps, shot),
   );
-  await dropOwnOverlay(deps, shot);
 }
 
-/** Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot. */
+/**
+ * Only the server's own overlay goes; a mask a CI run uploaded is part of the upload, like the shot.
+ * It runs after the batch that stopped the row naming it, so a delete that fails leaves a stray blob,
+ * not a wrong result: it is reported, and the batch's other shots still drop theirs.
+ */
 async function dropOwnOverlay(deps: ProcessDeps, shot: SnapshotRow): Promise<void> {
-  if (shot.diffKey && shot.diffKey === diffKeyOf(shot.imageKey))
-    await deps.blobs.delete(shot.diffKey);
+  if (!shot.diffKey || shot.diffKey !== diffKeyOf(await snapshotStem(shot))) return;
+  await deps.blobs
+    .delete(shot.diffKey)
+    .catch((e: unknown) => reportError(e, { area: "diff", step: "overlay" }));
 }
 
 /** Store a comparison: the shot it was against, and the open change it carries, if any (ob 1712). */
 async function storeDiff(
-  deps: ProcessDeps,
+  deps: RunDeps,
   shot: SnapshotRow,
   measured: Measured,
   against: { baseline: BaselineSnapshot; carriedFrom: string | null },
 ): Promise<void> {
   const { baseline, carriedFrom } = against;
   const diffKey = await measured.diffKey();
-  await storeSnapshot(deps.db, shot.id, {
+  // A shot measured again may have had an overlay (against another baseline) that this one, the
+  // same bytes, no longer needs (ob 1948).
+  const then = diffKey ? undefined : () => dropOwnOverlay(deps, shot);
+  const fields = {
     diffMs: measured.compareMs?.() ?? null,
     baselineKey: baseline.imageKey,
     baselineSnapshotId: baseline.id,
@@ -147,14 +155,12 @@ async function storeDiff(
     diffError: null,
     // An explanation was of the result this one replaces (ob 1473).
     aiReview: null,
-  });
-  // A shot measured again may have had an overlay (against another baseline) that this one, the
-  // same bytes, no longer needs (ob 1948).
-  if (!diffKey) await dropOwnOverlay(deps, shot);
+  } as const;
+  deps.writes.update(shot, fields, then);
 }
 
 async function measureAgainst(
-  deps: ProcessDeps,
+  deps: RunDeps,
   compare: Comparer,
   shot: SnapshotRow,
   baseline: BaselineSnapshot | undefined,
@@ -170,7 +176,7 @@ async function measureAgainst(
  * so a reviewer is always shown the change against an image someone accepted.
  */
 async function diffOne(
-  deps: ProcessDeps,
+  deps: RunDeps,
   compare: Comparer,
   shot: SnapshotRow,
   baseline: Baseline | undefined,
@@ -222,12 +228,7 @@ function measuredPastCarry(shot: SnapshotRow, baseline: Baseline | undefined): b
  * Measure the shots whose stored result no longer stands, under this run's budget. Throws
  * `DiffCeilingError` when the budget stops it with shots left; what it measured stays stored.
  */
-async function measure(
-  deps: ProcessDeps,
-  rows: SnapshotRow[],
-  baselines: Baselines,
-  budget: Budget,
-) {
+async function measure(deps: RunDeps, rows: SnapshotRow[], baselines: Baselines, budget: Budget) {
   const compare = serverComparer(deps);
   const failed: FailedShot[] = [];
   let done = 0;
@@ -241,6 +242,8 @@ async function measure(
         const failure = await diffOrRecord(deps, timed, shot, baseline);
         if (failure) failed.push(failure);
       });
+      // Outside the shot's spend: a batch is the run's write, not one shot's compare.
+      if (deps.writes.full) await deps.writes.flush();
     }
     done++;
   }
@@ -262,7 +265,7 @@ const shotLabel = (shot: SnapshotRow) => `${shot.name} (${shot.viewport}, ${shot
  * still measured (ob 1738). The build errors naming it, and a re-run measures only what is left.
  */
 async function diffOrRecord(
-  deps: ProcessDeps,
+  deps: RunDeps,
   compare: Comparer,
   shot: SnapshotRow,
   baseline: Baseline | undefined,
@@ -274,7 +277,7 @@ async function diffOrRecord(
     const reason = e instanceof Error ? e.message : String(e);
     const refused = e instanceof DiffRefusedError;
     if (!refused) reportError(e, { area: "diff", step: "shot" });
-    await storeSnapshot(deps.db, shot.id, {
+    deps.writes.update(shot, {
       diffStatus: null,
       diffResult: null,
       rebaselineNeeded: false,
@@ -290,7 +293,7 @@ async function diffOrRecord(
  * check of some JSON. A shot whose result is refused keeps the reason in `diff_error` and is left
  * unmeasured; the others are stored, and the build errors naming every refused shot.
  */
-async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: Baselines) {
+async function measureFromCi(deps: RunDeps, rows: SnapshotRow[], baselines: Baselines) {
   const refused: string[] = [];
   for (const shot of rows) {
     // The pick `POST /baselines` told the CLI, which knows no fingerprint: not `baselineFor`.
@@ -300,9 +303,10 @@ async function measureFromCi(deps: ProcessDeps, rows: SnapshotRow[], baselines: 
       await diffOne(deps, ciComparer(deps.blobs), shot, baseline);
     } catch (e) {
       if (!(e instanceof CiResultError)) throw e;
-      await storeSnapshot(deps.db, shot.id, { diffStatus: null, diffError: e.message });
+      deps.writes.update(shot, { diffStatus: null, diffError: e.message });
       refused.push(`${shotLabel(shot)}: ${e.message}`);
     }
+    if (deps.writes.full) await deps.writes.flush();
   }
   if (refused.length > 0)
     throw new Error(
@@ -324,11 +328,17 @@ export async function measureAll(
   baselines: Baselines,
 ) {
   const budget = project.diffLocation === "ci" ? null : new Budget(deps.now ?? Date.now);
-  if (budget)
-    await measure(deps, await withOverrides(deps.db, build.projectId, rows), baselines, budget);
-  else await measureFromCi(deps, rows, baselines);
+  const run: RunDeps = { ...deps, writes: new SnapshotWrites(deps.db) };
+  await written(run.writes, async () => {
+    if (!budget) return measureFromCi(run, rows, baselines);
+    const resolved = await withOverrides(deps.db, run.writes, build.projectId, rows);
+    await measure(run, resolved, baselines, budget);
+  });
   if (build.branch === project.defaultBranch) return;
-  await measureAgainstMain(deps, { buildId: build.id, only }, baselines, budget);
+  // Reads the rows back, so after the writes above are in.
+  await written(run.writes, () =>
+    measureAgainstMain(run, { buildId: build.id, only }, baselines, budget),
+  );
   await carryOpenFromMain(deps.db, build);
 }
 
@@ -338,9 +348,12 @@ export async function measureAll(
  */
 async function heldElsewhere(db: Db, build: Build, ci: boolean): Promise<ProcessResult> {
   const current = await getBuild(db, build.projectId, build.id);
-  if (ci && dead(current)) {
+  const startedAt = current.processingStartedAt;
+  if (ci && startedAt && dead(current)) {
     const died = "the run measuring this build died; re-run the CI job";
-    await markErrored(db, current, new Error(died));
+    // The dead run's claim: a run started since holds a newer one, and its build is not ended here.
+    const ended = await markErrored(db, current, new Error(died), { startedAt });
+    if (ended === null) return currentResult(db, current);
     return { status: "errored", error: died, unmeasured: 0 };
   }
   return { status: current.status, error: current.error, unmeasured: 0 };
@@ -393,27 +406,24 @@ export async function processBuild(deps: ProcessDeps, build: Build): Promise<Pro
   try {
     await clearMarkers(deps, build);
     const rows = await deps.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
-    const baselines: Baselines = await selectBaselines(
-      deps.db,
-      build,
-      new Set(rows.map(snapshotKeyOf)),
+    const baselines: Baselines = await timeIf(deps.timer, "baselines", () =>
+      selectBaselines(deps.db, build, new Set(rows.map(snapshotKeyOf))),
     );
-    await timer.diff(() => measureAll(deps, { build, project }, rows, baselines));
-    await markRemoved(deps, build, baselines.removed);
+    await timeIf(deps.timer, "measure", () =>
+      timer.diff(() => measureAll(deps, { build, project }, rows, baselines)),
+    );
+    await timeIf(deps.timer, "removed", () => markRemoved(deps, build, baselines.removed));
     await assertMeasured(deps.db, build, project);
     // Before the default branch accepts: a native shot of a stale key is left for a person (PS-297).
     await markStale(deps.db, build.id);
     await acceptDefaultBranchBuild(deps.db, build, project);
-    const status = await refreshBuildStatus(deps.db, build.id);
-    await recordRun(deps.db, build.id, timer.ended());
-    // After the verdict, and off the request (ob 1875): the model explains each shot, then writes
-    // the summary (ob 1668), from the queue. It never throws, so it cannot mark the build errored.
-    await queueExplain(deps, build);
-    return { status, error: null, unmeasured: 0 };
+    // Awaited: a verdict write that throws is this catch's to end at errored (ob 1561).
+    return await endRun(deps, build, timer);
   } catch (e) {
     reportBuildFailure(e);
-    const error = await markErrored(deps.db, build, e, runFields(timer.ended()));
-    const unmeasured = e instanceof DiffCeilingError ? e.unmeasured : 0;
-    return { status: "errored", error, unmeasured };
+    const ended = await endErrored(deps.db, build, e, timer);
+    return e instanceof DiffCeilingError && ended.status === "errored"
+      ? { ...ended, unmeasured: e.unmeasured }
+      : ended;
   }
 }

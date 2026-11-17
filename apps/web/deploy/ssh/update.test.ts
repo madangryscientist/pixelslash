@@ -19,6 +19,7 @@ import {
   deploy,
   pack,
   releaseNames,
+  serve,
   setup,
   varsOf,
 } from "./update-harness";
@@ -81,7 +82,7 @@ describe("update.sh", () => {
 
   test("a rollback to a release with the watchdog turns it back on", () => {
     const s = setup();
-    expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+    serve(s, "aaaaaaa");
     const { status, commands } = deploy(s, pack("bbbbbbb", { broken: true }));
     expect(status).toBe(1);
     expect(commands.at(-1)).toMatch(/^systemctl enable --now --quiet pixelslash-watchdog\.timer/);
@@ -89,7 +90,7 @@ describe("update.sh", () => {
 
   test("a release that does not come up goes back to the previous one", () => {
     const s = setup();
-    expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+    serve(s, "aaaaaaa");
 
     const { status, stderr, commands } = deploy(s, pack("bbbbbbb", { broken: true }));
 
@@ -174,7 +175,7 @@ describe("update.sh", () => {
 
   test("a release that fails to install is deleted and the old one never stops", () => {
     const s = setup();
-    expect(deploy(s, pack("aaaaaaa")).status).toBe(0);
+    serve(s, "aaaaaaa");
     writeFileSync(join(s.stubs, "bun"), "#!/usr/bin/env bash\nexit 1\n");
 
     const { status, commands } = deploy(s, pack("bbbbbbb"));

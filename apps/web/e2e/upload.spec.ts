@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { type Locator, type Page, expect, test } from "@playwright/test";
-import { createOrg, createProject, openSettings } from "./orgs-page";
+import { expect, open, test } from "./fixtures";
 import { SERVER } from "./ports";
 
 const run = promisify(execFile);
@@ -17,34 +16,6 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
   "base64",
 );
-
-/** Fill a form and submit it. The controls stay disabled until hydrated, so fill and click wait for it. */
-async function submit(input: Locator, value: string, button: Locator) {
-  await input.fill(value);
-  await button.click();
-}
-
-/** Make an org, a project and a CI token, signing in through the stub first when `signIn`. */
-async function provision(page: Page, org: string, project: string, signIn: boolean) {
-  if (signIn) {
-    await page.goto("/");
-    await page.getByRole("link", { name: "Sign in with GitHub" }).click();
-  } else {
-    await page.goto("/orgs");
-  }
-  await expect(page).toHaveURL(/\/orgs$/);
-  await createOrg(page, org);
-  await createProject(page, project);
-  await openSettings(page, project);
-  await submit(
-    page.getByLabel("Token name, e.g. github-actions"),
-    "ci",
-    page.getByRole("button", { name: "Issue token" }),
-  );
-  const token = (await page.getByTestId("issued-token").locator("code").textContent()) ?? "";
-  expect(token).toMatch(/^psci_/);
-  return token;
-}
 
 const temps: string[] = [];
 
@@ -140,9 +111,11 @@ async function checkServerDiff(
 
 test("the CLI uploads a snapshot dir; rows and R2 objects land under the right org", async ({
   page,
+  provision,
 }) => {
-  const acme = await provision(page, "Upload Co", "ship", true);
-  const rival = await provision(page, "Rival Co", "other", false);
+  const ship = await provision({ org: "Upload Co", project: "ship" });
+  const acme = ship.token;
+  const rival = (await provision({ org: "Rival Co", project: "other" })).token;
   const dir = await snapshotDir();
 
   const bad = upload(dir, "psci_not-a-real-token");
@@ -166,7 +139,7 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
     viewport: "1x1",
     status: "changes", // a new shot on a branch waits for review (PS-284)
     branch: "e2e",
-    org: "Upload Co",
+    org: ship.orgName,
     project: "ship",
   });
 
@@ -214,12 +187,7 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
   expect(after?.n).toBe(1);
 
   // A revoked token is refused.
-  await page.goto("/orgs");
-  await page
-    .getByRole("navigation", { name: "Organizations" })
-    .getByRole("link", { name: /^Upload Co \d+$/ })
-    .click();
-  await openSettings(page, "ship");
+  await open(page, `/projects/${ship.projectId}/settings`);
   await page.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByRole("row", { name: /ci/ })).toContainText("revoked");
   const revoked = upload(dir, acme);
@@ -228,9 +196,9 @@ test("the CLI uploads a snapshot dir; rows and R2 objects land under the right o
 });
 
 test("a dir of loose PNGs goes through `import` and `upload`, and the server diffs it", async ({
-  page,
+  provision,
 }) => {
-  const token = await provision(page, "Import Co", "shots", true);
+  const { token } = await provision({ org: "Import Co", project: "shots" });
   const pngs = await tempDir("ps-e2e-pngs-");
   await mkdir(join(pngs, "billing"));
   await writeFile(join(pngs, "billing/invoice.png"), PNG);
@@ -265,8 +233,10 @@ test("a dir of loose PNGs goes through `import` and `upload`, and the server dif
 
 test("a project switched to CI diffs in the CLI: the server stores what it measured (ob 1727)", async ({
   page,
+  provision,
 }) => {
-  const token = await provision(page, "Ci Co", "ci-shots", true);
+  const { token, projectId } = await provision({ org: "Ci Co", project: "ci-shots" });
+  await open(page, `/projects/${projectId}/settings`);
   await page.getByText("In CI", { exact: true }).click();
   const saved = page.waitForResponse(
     (res) => res.request().method() === "POST" && !!res.request().postData()?.includes('"ci"'),

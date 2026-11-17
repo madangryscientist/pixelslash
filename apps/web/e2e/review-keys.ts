@@ -12,7 +12,7 @@ export async function rejectThenWalkFailedBuild(page: Page, buildUrl: string) {
   await page.getByTestId("group-changed").getByRole("link", { name: /hero/i }).click();
   await expect(page.getByTestId("review-state")).toHaveText("rejected by e2e-octocat");
   await page.keyboard.press("j");
-  await expect(page.getByTestId("position")).toHaveText("3 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 3 of 5");
   await page.keyboard.press("k");
-  await expect(page.getByTestId("position")).toHaveText("2 of 5");
+  await expect(page.getByTestId("position")).toHaveText("shot 2 of 5");
 }

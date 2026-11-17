@@ -158,9 +158,14 @@ To run it from your clone instead, replace the `npx` line with
 `bun /path/to/pixelslash/packages/cli/src/index.ts capture --upload …`, and install the browser with
 `bunx playwright install chromium-headless-shell`.
 
-### 10. Optional: GitHub check runs
+### 10. Optional: the GitHub commit status
 
-A second, separate GitHub **App** (not the OAuth app) posts a `PixelSlash` check run on each build's commit and keeps one comment on its pull request.
+A second, separate GitHub **App** (not the OAuth app) posts a `PixelSlash` commit status on each build's commit and keeps one comment on its pull request.
+The status's **Details** link opens the build page in one click.
+It stays pending while changes wait for review and turns green once they are accepted (red only when a shot is rejected or the build errored), so a branch protection rule that requires `PixelSlash` blocks the merge until the review is done.
+When several projects of one org are connected to one repo, each project's status is named `PixelSlash / <project name>` instead, so a branch protection rule that requires `PixelSlash` must then name those.
+An App registered before it posted statuses lacks **Commit statuses: Read and write**: grant it in the App's settings (Permissions) and accept the request on each installation, or the status calls get a 403 (logged).
+A branch protection rule that required the old `PixelSlash` check run keeps working by name; if it was tied to the App's check, pick `PixelSlash` from the list again.
 It is outbound only. Skip it if you do not want it.
 
 ```bash
@@ -211,10 +216,10 @@ are needed.
 | `GITHUB_OAUTH_BASE`, `GITHUB_API_BASE` | var | no | Leave as shipped (`https://github.com`, `https://api.github.com`). Anything else stops a production build. |
 | `DEFAULT_DIFF_LOCATION` | var | no | Where a new project diffs. Shipped as `ci` (the CLI measures in the job). Anything else is `server`. |
 | `MIN_CLI_VERSION` | var | no | The oldest CLI the API takes (`x.y.z`). Empty takes any. |
-| `GITHUB_APP_ID` | var | no | Check runs: the App's id. With the key, below. |
-| `GITHUB_APP_PRIVATE_KEY` | secret | no | Check runs: the App's PEM. Both App values must be set or nothing calls GitHub. |
+| `GITHUB_APP_ID` | var | no | The commit status: the App's id. With the key, below. |
+| `GITHUB_APP_PRIVATE_KEY` | secret | no | The commit status: the App's PEM. Both App values must be set or nothing calls GitHub. |
 | `GITHUB_STATUS_TOKEN` | secret | no | Without the App: a fine-grained token (commit statuses and pull requests: write) posts the build verdict as a `PixelSlash` commit status. Ignored when the App is set. See `README.md`. |
-| `PIXELSLASH_PUBLIC_URL` | var | no | Your server's URL, no trailing slash. A check run's "Details" link. |
+| `PIXELSLASH_PUBLIC_URL` | var | no | Your server's URL, no trailing slash. The commit status's "Details" link. |
 | `PIXELSLASH_ADMIN_LOGINS` | var | no | Comma-separated GitHub logins who can open `/_admin`, a read-only page of what the deployment is doing and how long it takes. Empty, or a login not listed, gets a 404. Not linked from anywhere. |
 | `SENTRY_DSN` | secret | no | Error reporting; off while empty. |
 | `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | var | no | Labels on those reports. |

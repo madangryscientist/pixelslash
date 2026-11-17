@@ -1,8 +1,17 @@
-import { Input } from "@hackcove/ui-react";
-import { type ReactNode, useRef, useState } from "react";
+import { Icon, Input, ListRow, Stack, Text } from "@hackcove/ui-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type SearchEntry, type SearchHit, search } from "../../content/search.ts";
 
 const INDEX_URL = "/search-index.json";
+const HINT = "Search the docs (press /)";
+
+/** A key that types a character: a text field, a select or a contenteditable area (the rule `apps/web` uses too). */
+function isTextEntry(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest("input, textarea, select, [contenteditable]") !== null
+  );
+}
 
 function isEntries(value: unknown): value is SearchEntry[] {
   return (
@@ -35,6 +44,22 @@ export function DocsSearch(): ReactNode {
   const [entries, setEntries] = useState<SearchEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const asked = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // `/` focuses this box when it is the one on screen. A box that is folded away (the rail on a
+  // phone) is not visible, so the key does nothing for it.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== "/" || event.ctrlKey || event.altKey || event.metaKey) return;
+      if (isTextEntry(event.target)) return;
+      const field = rootRef.current?.querySelector("input");
+      if (!field || !field.checkVisibility()) return;
+      event.preventDefault();
+      field.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const load = (): void => {
     if (asked.current) return;
@@ -48,45 +73,55 @@ export function DocsSearch(): ReactNode {
   const searching = query.trim() !== "";
 
   return (
-    <div role="search" className="flex flex-col gap-2">
-      <Input
-        type="search"
-        aria-label="Search the docs"
-        placeholder="Search the docs"
-        data-testid="docs-search"
-        value={query}
-        onFocus={load}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          load();
-        }}
-      />
-      {searching && failed ? (
-        <p className="px-1 text-sm text-slate-600" data-testid="docs-search-status">
-          The search index did not load. Reload the page to try again.
-        </p>
-      ) : null}
-      {searching && entries && hits.length === 0 ? (
-        <p className="px-1 text-sm text-slate-600" data-testid="docs-search-status">
-          Nothing matches "{query.trim()}".
-        </p>
-      ) : null}
-      {hits.length > 0 ? (
-        <ul className="flex flex-col gap-2" data-testid="docs-search-results">
-          {hits.map((hit) => (
-            <li key={hit.entry.url} className="text-sm/5">
-              <a
-                href={hit.entry.url}
-                className="font-medium text-slate-900 hover:text-violet-700 hover:underline"
-              >
-                {hit.entry.heading}
-              </a>
-              <span className="block text-xs text-slate-500">{hit.entry.page}</span>
-              <span className="block text-xs text-slate-600">{hit.snippet}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+    // The role and the ref sit on a bare wrapper: the kit's Stack takes neither.
+    <div role="search" ref={rootRef}>
+      <Stack gap="xs">
+        <Input
+          type="search"
+          icon={<Icon name="search" />}
+          aria-label="Search the docs"
+          placeholder={query === "" ? HINT : undefined}
+          data-testid="docs-search"
+          value={query}
+          onFocus={load}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            load();
+          }}
+        />
+        {searching && failed ? (
+          <Text as="p" data-testid="docs-search-status">
+            The search index did not load. Reload the page to try again.
+          </Text>
+        ) : null}
+        {searching && entries && hits.length === 0 ? (
+          <Text as="p" data-testid="docs-search-status">
+            Nothing matches "{query.trim()}".
+          </Text>
+        ) : null}
+        {hits.length > 0 ? (
+          <Stack as="ul" gap="xs" data-testid="docs-search-results">
+            {hits.map((hit) => (
+              <li key={hit.entry.url}>
+                <ListRow
+                  href={hit.entry.url}
+                  // Named by the heading alone, as the plain link was; the row would read its snippet too.
+                  aria-label={hit.entry.heading}
+                  size="sm"
+                  secondary={
+                    <>
+                      <div>{hit.entry.page}</div>
+                      <div>{hit.snippet}</div>
+                    </>
+                  }
+                >
+                  {hit.entry.heading}
+                </ListRow>
+              </li>
+            ))}
+          </Stack>
+        ) : null}
+      </Stack>
     </div>
   );
 }

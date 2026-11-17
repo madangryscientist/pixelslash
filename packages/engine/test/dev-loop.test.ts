@@ -1,11 +1,12 @@
+import { rmSync, writeFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
-import { claimSession, liveSession } from "../src/dev-lock.ts";
+import { claimSession, liveSession, readLock } from "../src/dev-lock.ts";
 import { DEV_HEADER, type DevState, serveDevPage } from "../src/dev-page.ts";
 import { devController } from "../src/dev-session.ts";
 import { debounce, notIgnored, watchTree } from "../src/dev-watch.ts";
-import { UsageError } from "../src/errors.ts";
+import { DevLockError, UsageError } from "../src/errors.ts";
 import { cleanupDev, fakeSession, tmpDir, tmpStore } from "./dev-fixtures.ts";
 
 afterAll(cleanupDev);
@@ -105,6 +106,61 @@ describe("dev session", () => {
     const third = await claimSession(store, { pid: 303, url: null, target: "index" }, dead);
     expect(third.held).toBe(true);
     await page.stop(true);
+  });
+
+  test("a live owner whose page is only slow keeps its lock (PS-393)", async () => {
+    const store = await tmpStore();
+    const url = "http://127.0.0.1:1";
+    await claimSession(store, { pid: 101, url, target: "index" });
+    const slow = {
+      pidAlive: () => true,
+      fetch: async () => {
+        throw new DOMException("timed out", "TimeoutError");
+      },
+    };
+    const second = await claimSession(store, { pid: 202, url: null, target: "x" }, slow);
+    expect(second).toEqual({ held: false, owner: { pid: 101, url, target: "index" } });
+    expect(await readLock(store)).toMatchObject({ pid: 101 });
+  });
+
+  test("a live pid with nothing listening at its url is dead and the lock is taken over (PS-393)", async () => {
+    const store = await tmpStore();
+    await claimSession(store, { pid: 101, url: "http://127.0.0.1:1", target: "index" });
+    const refused = {
+      pidAlive: () => true,
+      fetch: async () => {
+        throw new TypeError("Unable to connect");
+      },
+    };
+    const second = await claimSession(store, { pid: 202, url: null, target: "x" }, refused);
+    expect(second.held).toBe(true);
+    expect(await readLock(store)).toMatchObject({ pid: 202 });
+  });
+
+  test("a claim that loses the race on both attempts throws instead of naming itself (PS-393)", async () => {
+    for (const second of ["gone", "ours"] as const) {
+      const store = await tmpStore();
+      const lockPath = join(store.root, "session.json");
+      await claimSession(store, { pid: 101, url: null, target: "x" });
+      let calls = 0;
+      const racing = {
+        pidAlive: () => {
+          calls += 1;
+          if (calls === 1) {
+            // Another claimant replaces the stale lock between our read and our remove.
+            writeFileSync(lockPath, JSON.stringify({ pid: 102, url: null, target: "x" }));
+          } else if (second === "gone") {
+            rmSync(lockPath);
+          } else {
+            writeFileSync(lockPath, JSON.stringify({ pid: 202, url: null, target: "x" }));
+          }
+          return false;
+        },
+      };
+      await expect(
+        claimSession(store, { pid: 202, url: null, target: "x" }, racing),
+      ).rejects.toThrow(DevLockError);
+    }
   });
 
   test("a save shows its pixel result on the live page within 2 s of the page settling", async () => {

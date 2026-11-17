@@ -104,6 +104,7 @@ describe("step timings (ob 1791)", () => {
       imagesMs: expect.any(Number),
       networkIdleMs: expect.any(Number),
       framesMs: expect.any(Number),
+      idleMs: expect.any(Number),
     },
   };
 

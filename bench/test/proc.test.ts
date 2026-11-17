@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SCOPE } from "../env/reserve.ts";
+import { SCOPE } from "../env/machine.ts";
 import { spread } from "../src/perf/impl.ts";
 import { Aggregate, type ProcIo, parseStat, scanForeign } from "../src/perf/proc.ts";
 

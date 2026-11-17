@@ -1,0 +1,71 @@
+{
+  "groups": {
+    "team": "Product team",
+    "platform": "Platform or monorepo",
+    "regulated": "Privacy-bound",
+    "solo": "Solo or agency"
+  },
+  "models": ["sonnet", "opus"],
+  "personas": [
+    {
+      "id": "priya",
+      "name": "Priya",
+      "group": "team",
+      "model": "sonnet",
+      "profile": "Frontend lead of six engineers on one React app with a half kept up Storybook, on Chromatic today. She uploads each build from GitHub Actions and accepts or rejects each change on the build page; her goal is that every pull request shows what changed visually and nothing merges until someone has looked.",
+      "focus": {
+        "review": "One click from the pull request to the change, never two clicks to review.",
+        "docs": "An answer to why a baseline moved, so baselines never drift without anyone knowing why.",
+        "cli": "Few false alarms, with anti-aliasing and font hinting absorbed, so not every pull request shows a red X."
+      }
+    },
+    {
+      "id": "marcus",
+      "name": "Marcus",
+      "group": "platform",
+      "model": "opus",
+      "profile": "Platform engineer on a monorepo of about twenty packages (a design system, three apps and the docs) built under a task runner whose cache skips unchanged packages. His goal is one visual check per pull request across every package, without spending CI minutes on packages that did not change.",
+      "focus": {
+        "review": "Twenty subprojects with one change each shown as twenty changes in one place, not as twenty checks on the pull request.",
+        "docs": "A setup that fits the task runner he already has, without each package needing its own configuration.",
+        "cli": "A package the cache skipped never leaves a required check waiting forever."
+      }
+    },
+    {
+      "id": "lena",
+      "name": "Lena",
+      "group": "team",
+      "model": "sonnet",
+      "profile": "Design-system maintainer who owns the component library and its tokens, which product teams consume, so one change ripples into every app. Her goal is to catch a token or spacing regression before a consumer ships it, and to know which stories the change touched.",
+      "focus": {
+        "review": "A diff measured at the level of a region that comes with a note, and a way to accept a library-wide change in one step.",
+        "docs": "How to keep an intended change from producing noise on every story.",
+        "cli": "A violation flagged without a screenshot leaving her machine."
+      }
+    },
+    {
+      "id": "tomas",
+      "name": "Tomás",
+      "group": "regulated",
+      "model": "opus",
+      "profile": "Engineer at a fintech or health company whose screenshots can show data that looks like customer data, where nothing leaves the network without security sign-off. His goal is visual review with every screenshot kept in-house, self-hosted with Docker or on a box inside the LAN.",
+      "focus": {
+        "review": "A self-hosted app with all of the hosted features, and no feature that works only on the hosted app.",
+        "docs": "Every outbound call listed and off by default, and a data flow written down that says plainly where data goes.",
+        "cli": "No SaaS call that is required to run it."
+      }
+    },
+    {
+      "id": "sam",
+      "name": "Sam",
+      "group": "solo",
+      "model": "sonnet",
+      "profile": "Solo developer or small agency building client sites, often without Storybook, sometimes with Playwright tests and sometimes with only a URL. Sam wants to know in a minute whether a CSS change broke the other pages.",
+      "focus": {
+        "review": "A report that never claims more than it measured.",
+        "docs": "No sign-up wall and no heavy configuration between Sam and the first answer.",
+        "cli": "No setup, no account and no Storybook, and exit codes that CI can read."
+      }
+    }
+  ]
+}

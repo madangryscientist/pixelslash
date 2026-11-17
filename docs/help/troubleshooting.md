@@ -54,7 +54,7 @@ Keep one tag. `review` makes the shot wait for a person; `skip` keeps it out of 
 
 ## capture settle exceeded `<n>ms`
 
-The page did not settle within `timeoutMs` (8 seconds by default). Capture waits for web fonts, every image, network idle and two animation frames; one of those never finished.
+The page did not settle within `timeoutMs` (8 seconds by default). Capture waits for web fonts, every image, the network (no request in flight) and two animation frames; one of those never finished.
 
 Open the page with the network panel: a request that never ends, an image that never loads, or a page that keeps scheduling work will all do it. Raise `timeoutMs` only after you know which one it is. [Flaky shots](../concepts/flaky-shots.md#what-a-shot-waits-for) lists what the settle waits for.
 

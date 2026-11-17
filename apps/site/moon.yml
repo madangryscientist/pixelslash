@@ -1,0 +1,62 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+# Their tools (tsr, vite, playwright) live in the app's own node_modules/.bin, which moon does not
+# put on PATH, so `bun run` finds them from the app's directory.
+tasks:
+  typecheck:
+    script: "bun run tsr generate && tsc --noEmit"
+  lint:
+    script: "oxlint --type-aware --deny-warnings apps/site && bun scripts/check-slop.ts apps/site"
+    options:
+      runFromWorkspaceRoot: true
+  test:
+    command: "bun --bun vitest run"
+    inputs:
+      - "**/*"
+      - "/README.md"
+      - "/SECURITY.md"
+      - "/apps/web/SELF-HOST.md"
+      - "/docs/cli.md"
+      - "/docs/getting-started.md"
+      - "/docs/tutorials/**/*"
+      - "/docs/ci/**/*"
+      - "/apps/web/github-app/manifest.json"
+      - "/docs/metrics.md"
+      - "/docs/concepts/**/*"
+      - "/docs/help/**/*"
+      - "/apps/web/src/**/*"
+  build:
+    command: "bun run vite build"
+    inputs:
+      - "**/*"
+      - "/README.md"
+      - "/SECURITY.md"
+      - "/apps/web/SELF-HOST.md"
+      - "/docs/cli.md"
+      - "/docs/getting-started.md"
+      - "/docs/tutorials/**/*"
+      - "/docs/ci/**/*"
+      - "/apps/web/github-app/manifest.json"
+      - "/docs/metrics.md"
+      - "/docs/concepts/**/*"
+      - "/docs/help/**/*"
+    # .wrangler/deploy/config.json is written by @cloudflare/vite-plugin and read by `vite preview`
+    # and `wrangler`, so a cache hit must restore it with dist.
+    outputs:
+      - "dist"
+      - ".wrangler/deploy"
+  # Against the build, served by `vite preview` on loopback. The specs only assert https:// URLs as
+  # strings (metadata.spec.ts, smoke.spec.ts) and search.spec.ts fails if any request leaves the origin,
+  # so nothing is fetched off the machine and a pass can be cached. A failed run is never cached.
+  test-e2e:
+    command: "bun run playwright test"
+    # The rest of the repo comes from .moon/tasks/ts.yml.
+    inputs:
+      # `forbidOnly` in playwright.config.ts.
+      - "$CI"
+      # Where smoke.spec.ts writes a screenshot of every page: a new dir must get them.
+      - "$SITE_SHOTS_DIR"
+    deps:
+      - "~:build"

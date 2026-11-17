@@ -1,7 +1,7 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { diffA11y } from "./a11y-entry.ts";
-import { diffPngs } from "./diff.ts";
+import { mapInOrder, poolCores, pooledDiff, withDiffPool } from "./diff-pool.ts";
 import { UsageError } from "./errors.ts";
 import { FINGERPRINT_KEYS, type Fingerprint } from "./fingerprint.ts";
 import { renderCompareIndex, rowLabel, type CompareRow } from "./compare-report.ts";
@@ -126,7 +126,7 @@ async function diffMatch(
   let diff;
   const started = performance.now();
   try {
-    diff = diffPngs(mainPng, branchPng, branch.diff, {
+    diff = await pooledDiff(mainPng, branchPng, branch.diff, {
       main: main.ignore,
       branch: branch.ignore,
     });
@@ -195,9 +195,21 @@ function refuseOverlap(out: string, dirs: string[]): void {
  * the engine's `diffPngs` with the same inputs the server gives it, and a changed one gets a
  * `report.html`. Different fingerprints are warned about by name and still diffed.
  */
-export async function compareSnapshots(
+export function compareSnapshots(
   opts: SnapshotCompareOptions,
   deps: SnapshotCompareDeps = {},
+): Promise<SnapshotCompareResult> {
+  return withDiffPool(() => compareIn(opts, deps));
+}
+
+/**
+ * `compareSnapshots` inside its diff pool. The matched pairs are diffed as many at a time as the
+ * pool has cores, and their rows are taken in Branch's order, so the result, the files and the
+ * report are the same as one at a time.
+ */
+async function compareIn(
+  opts: SnapshotCompareOptions,
+  deps: SnapshotCompareDeps,
 ): Promise<SnapshotCompareResult> {
   const started = performance.now();
   const out = resolve(opts.out);
@@ -221,14 +233,22 @@ export async function compareSnapshots(
   const shots: ShotTiming[] = [];
   const taken = new Set<string>();
   await mkdir(out, { recursive: true });
-  for (const e of branch.snapshots) {
+  const paths = { main: opts.mainDir, branch: opts.branchDir, out, varied };
+  // Each matched pair's dir is named in Branch's order before any diff starts, as one at a time did.
+  const pairs = branch.snapshots.map((e) => {
     const before = mainBy.get(identity(e));
-    if (!before) {
+    return { e, before, dir: before ? dirFor(e, taken) : "" };
+  });
+  const diffed = await mapInOrder(pairs, poolCores(), ({ e, before, dir }) =>
+    before ? diffMatch(paths, before, e, dir) : Promise.resolve(undefined),
+  );
+  for (const [i, { e }] of pairs.entries()) {
+    const match = diffed[i];
+    if (!match) {
       result.added.push(withA11y(rowOf(e, varied), undefined, e));
       continue;
     }
-    const paths = { main: opts.mainDir, branch: opts.branchDir, out, varied };
-    const { row, changed, diffMs } = await diffMatch(paths, before, e, dirFor(e, taken));
+    const { row, changed, diffMs } = match;
     if (row.error !== undefined) {
       result.failed.push(row);
       continue;

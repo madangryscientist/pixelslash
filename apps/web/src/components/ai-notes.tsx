@@ -27,8 +27,14 @@ export function useRegionNote(region: DiffRegion): AiRegionNote | undefined {
   );
 }
 
+/** What the judge's section reads of a snapshot; a test builds just these. */
+export type JudgedShot = Pick<
+  SnapshotView,
+  "aiReview" | "aiPending" | "aiError" | "diffStatus" | "reviewState" | "reviewedBy"
+>;
+
 /** Accepted because the model called every changed region noise, not by a person (ob 1473). */
-export function aiFiltered(shot: SnapshotView): boolean {
+export function aiFiltered(shot: JudgedShot): boolean {
   return (
     shot.aiReview?.autoPassed === true &&
     shot.reviewState === "accepted" &&
@@ -44,11 +50,32 @@ export function labelSummary(notes: AiRegionNote[]): string {
 }
 
 /**
+ * Why a changed shot has no explanation. A failed call says so and why (its stored reason may end in
+ * a full stop already, so that one is not doubled); "no judge" is only for a
+ * shot nothing tried to explain, so a model that is set but down is never reported as absent
+ * (invariant 1).
+ */
+function JudgeStatus({ aiError }: { aiError: string | null }) {
+  if (aiError) {
+    return (
+      <Text as="p" tone="muted" data-testid="ai-failed">
+        {`judge failed: ${aiError.replace(/[.\s]+$/, "")}. Review the pixels.`}
+      </Text>
+    );
+  }
+  return (
+    <Text as="p" tone="muted" data-testid="ai-skip">
+      skip: no judge. Review the pixels.
+    </Text>
+  );
+}
+
+/**
  * The side panel's section: each changed region's label and sentence; "explaining…" while the shot
  * waits on the explain queue (ob 1875); or, for a changed shot the model did not explain (no model,
  * or the calls failed, and why), that it is reviewed as plain pixels.
  */
-export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
+export function AiExplanation({ snapshot }: { snapshot: JudgedShot }) {
   const review = snapshot.aiReview;
   if (!review) {
     if (snapshot.diffStatus !== "changed") return null;
@@ -62,16 +89,7 @@ export function AiExplanation({ snapshot }: { snapshot: SnapshotView }) {
             explaining…
           </Text>
         ) : (
-          <>
-            <Text as="p" tone="muted" data-testid="ai-skip">
-              skip: no judge. Review the pixels.
-            </Text>
-            {snapshot.aiError && (
-              <Caption as="p" tone="muted" data-testid="ai-error">
-                {snapshot.aiError}
-              </Caption>
-            )}
-          </>
+          <JudgeStatus aiError={snapshot.aiError} />
         )}
       </Stack>
     );

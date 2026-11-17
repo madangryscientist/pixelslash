@@ -1,4 +1,5 @@
-import { ENGINE_VERSION, diffPngs } from "./diff.ts";
+import { ENGINE_VERSION } from "./diff.ts";
+import { pooledDiff, withDiffPool } from "./diff-pool.ts";
 import type { FlakyPolicy } from "./config.ts";
 import type { Region } from "./regions.ts";
 import type { Shoot, SnapshotEntry } from "./snapshot.ts";
@@ -33,20 +34,31 @@ export type FlakeRecord = {
 
 export type FlakeCheck = { flaky: boolean; record: FlakeRecord; retries: FlakeRun[] };
 
-/** Capture the shot `retries` more times and compare each capture with the first. */
+/**
+ * Capture the shot `retries` more times and compare each capture with the first. The captures
+ * start together (each `again` call is the caller's to bound), and all of them have finished
+ * before this returns or throws, so nothing is still shooting when the caller closes its browser.
+ */
 export async function checkFlake(
   shot: Pick<SnapshotEntry, "diff" | "ignore" | "flaky">,
   first: Buffer,
   retries: number,
   again: () => Promise<Shoot>,
 ): Promise<FlakeCheck> {
-  const runs: FlakeRun[] = [];
-  for (let run = 2; run <= retries + 1; run++) {
-    const { png, ignore } = await again();
-    const diff = diffPngs(first, png, shot.diff, { main: shot.ignore, branch: ignore });
-    const regions = diff.changed ? diff.regions.filter((r) => r.kind === "change") : [];
-    runs.push({ run, png, differed: diff.changed, regions });
-  }
+  const shots = await Promise.allSettled(Array.from({ length: retries }, () => again()));
+  const taken = shots.map((settled) => {
+    if (settled.status === "rejected") throw settled.reason;
+    return settled.value;
+  });
+  const runs: FlakeRun[] = await withDiffPool(() =>
+    Promise.all(
+      taken.map(async ({ png, ignore }, i) => {
+        const diff = await pooledDiff(first, png, shot.diff, { main: shot.ignore, branch: ignore });
+        const regions = diff.changed ? diff.regions.filter((r) => r.kind === "change") : [];
+        return { run: i + 2, png, differed: diff.changed, regions };
+      }),
+    ),
+  );
   const differed = runs.filter((r) => r.differed);
   return {
     flaky: differed.length > 0,

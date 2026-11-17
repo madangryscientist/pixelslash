@@ -19,9 +19,11 @@ export {
   keepNativeRaf,
   playwrightCli,
   settleCapture,
+  trackInflight,
   type CapturePage,
+  type Inflight,
 } from "./capture.ts";
-export { CaptureError, FigmaError, UploadError, UsageError } from "./errors.ts";
+export { CaptureError, DevLockError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { BRIEF_LIMIT, briefTooLong, trimBrief } from "./brief.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
 export {
@@ -65,12 +67,14 @@ export {
 } from "./composition.ts";
 export { gapsList, type GapGroup, type GapsList } from "./composition-report.ts";
 export { parseDiffOption } from "./diff-options.ts";
+export { parseConcurrency } from "./config-concurrency.ts";
 export type { Fingerprint } from "./fingerprint.ts";
 export { fontSetHash, imageId } from "./fingerprint.ts";
 export { identity, pngPath, readManifest } from "./manifest.ts";
 export {
   MASK_COLOR,
   captureInto,
+  defaultConcurrency,
   captureSnapshots,
   openCaptureSession,
   recapture,
@@ -109,6 +113,7 @@ export {
   type UploadProgress,
   type UploadResult,
 } from "./upload.ts";
+export { uploadSkipped, type SkippedOptions } from "./upload-skipped.ts";
 export type { FlakyShot, SkippedShot } from "./flake-upload.ts";
 export type { FlakeRecord } from "./flake.ts";
 export {
@@ -122,7 +127,7 @@ export {
   type Suggestion,
 } from "./flake-repro.ts";
 export type { Region, RegionKind, Specks } from "./regions.ts";
-export { buildTimings, timingLine, type Timings } from "./timings.ts";
+export { buildTimings, captureFacts, loadNow, timingLine, type Timings } from "./timings.ts";
 export { CLIENT_VERSION, USER_AGENT } from "./version.ts";
 export {
   DEFAULT_MAX_BYTES,
@@ -165,3 +170,4 @@ export {
 } from "./dev-lock.ts";
 export { DEV_HEADER, serveDevPage, type DevState } from "./dev-page.ts";
 export { devController, type DevController } from "./dev-session.ts";
+export { diffCores } from "./diff-cores.ts";

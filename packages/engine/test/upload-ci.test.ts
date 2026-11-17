@@ -113,6 +113,7 @@ describe("uploadSnapshots to a project that diffs in CI (ob 1727)", () => {
     expect(calls.map((c) => `${c.method} ${new URL(c.url).pathname}`)).toEqual([
       "POST /api/v1/builds",
       "POST /api/v1/builds/b1/baselines",
+      "POST /api/v1/builds/b1/known",
       "GET /images/orgs/o/s0.png",
       "PUT /api/v1/builds/b1/snapshots",
       "POST /api/v1/builds/b1/finalize",

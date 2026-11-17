@@ -1,16 +1,20 @@
 import type { A11yDiff } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { and, eq, ne } from "drizzle-orm";
-import { SNAPSHOT_GROUPS, awaitsDecision, reviewGroupOf } from "#/lib/snapshot-groups";
+import { nextToReviewId } from "#/lib/build-tabs";
+import { SNAPSHOT_GROUPS, reviewGroupOf } from "#/lib/snapshot-groups";
 import { STALE_FAILURE, explaining } from "#/ai/explain-pending";
 import { type ApprovedEarlier, approvedEarlier } from "./approved-earlier";
 import { cacheHit } from "./cache-hit";
 import { notSkippedFlaky } from "./markers";
 import { a11yDiffsOf } from "./review-a11y";
+import { type Verdict, VERDICT_STATUSES, refreshBuildStatus, verdictOf } from "./verdict";
 import { carriedRootBuilds, decideGroup, groupOfShot, groupsOfBuild } from "./carried";
 import { type Db, NotFoundError } from "./db";
+import { getProject } from "./orgs";
 import {
   type AiReview,
+  type BuildStatus,
   type DiffLocation,
   type DiffOptions,
   type DiffResult,
@@ -23,45 +27,24 @@ import {
   users,
 } from "./schema";
 
-/**
- * Build status after the diff (ob 1470, review model 1422). A changed shot blocks until it is
- * accepted or rejected, and so does an unchanged one that carries a change still open on the
- * branch's previous build (ob 1712) or one that differs from main and was never accepted (PS-284). A
- * new shot waits like a change (PS-284); removed shots never block; any rejection fails the build
- * until a new build arrives. `passed` therefore means "nothing left to decide", not "no
- * differences".
- */
-export type Verdict = "changes" | "passed" | "failed";
-
-export function verdictOf(rows: Parameters<typeof awaitsDecision>[0][]): Verdict {
-  if (rows.some((row) => row.reviewState === "rejected")) return "failed";
-  if (rows.some(awaitsDecision)) return "changes";
-  return "passed";
-}
-
-export async function refreshBuildStatus(db: Db, buildId: string): Promise<Verdict> {
-  const rows = await db
-    .select({
-      diffStatus: snapshots.diffStatus,
-      reviewState: snapshots.reviewState,
-      carriedFrom: snapshots.carriedFrom,
-      staleOf: snapshots.staleOf,
-      flakeId: snapshots.flakeId,
-      flakyPolicy: snapshots.flakyPolicy,
-    })
-    .from(snapshots)
-    .where(eq(snapshots.buildId, buildId));
-  const status = verdictOf(rows);
-  await db.update(builds).set({ status }).where(eq(builds.id, buildId));
-  return status;
-}
-
+/** The builds a decision moved besides the decided one: one that is not at a verdict is left as it is. */
 async function refreshBuilds(db: Db, buildIds: string[]): Promise<void> {
   for (const buildId of buildIds) await refreshBuildStatus(db, buildId);
 }
 
-/** A decision's outcome: the decided build's verdict, and every build whose status it refreshed. */
-export type Decided = { verdict: Verdict; buildIds: string[] };
+/** The decided build's verdict. A build that left its verdict since the decision began is not reviewable. */
+async function refreshDecided(db: Db, buildId: string): Promise<Verdict> {
+  const verdict = await refreshBuildStatus(db, buildId);
+  if (verdict !== null) return verdict;
+  const [row] = await db
+    .select({ status: builds.status })
+    .from(builds)
+    .where(eq(builds.id, buildId));
+  throw new NotReviewableError(row?.status ?? "missing");
+}
+
+/** A decision's outcome: the decided build, its verdict, and every build whose status it refreshed. */
+export type Decided = { buildId: string; verdict: Verdict; buildIds: string[] };
 
 /** A build still uploading, processing or errored has no verdict to review. */
 export class NotReviewableError extends Error {
@@ -305,16 +288,40 @@ export async function reviewSnapshot(db: Db, input: ShotDecision): Promise<Verdi
   return (await decideShot(db, input)).verdict;
 }
 
-/** `reviewSnapshot`, also naming the builds it moved: the carried shots' builds as well (PS-23). */
+/**
+ * `reviewSnapshot`, also naming the builds it moved: the carried shots' builds as well (PS-23).
+ * Only a member of the project's org may decide; anyone else gets the not-found of a missing project.
+ */
 export async function decideShot(db: Db, input: ShotDecision): Promise<Decided> {
+  await getProject(db, input.userId, input.projectId);
   const shot = await reviewableSnapshot(db, input.projectId, input.snapshotId);
   const decision = { reviewState: input.state, reviewedBy: input.userId, reviewedAt: new Date() };
   await db.update(snapshots).set(decision).where(eq(snapshots.id, input.snapshotId));
   const group = groupOfShot(shot.carriedFrom ?? input.snapshotId);
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
-  const verdict = await refreshBuildStatus(db, shot.buildId);
-  return { verdict, buildIds: [shot.buildId, ...moved] };
+  const verdict = await refreshDecided(db, shot.buildId);
+  return { buildId: shot.buildId, verdict, buildIds: [shot.buildId, ...moved] };
+}
+
+/**
+ * What the reviewer needs once a decision on `snapshotId` is written: the build's status as it is
+ * now (another reviewer's reject may have failed it since) and the next shot still awaiting a
+ * decision, both read after the write, so the client moves on without a second round trip.
+ */
+export async function afterDecision(
+  db: Db,
+  input: { projectId: string; buildId: string; snapshotId: string },
+): Promise<{ buildStatus: BuildStatus; nextToReviewId: string | null }> {
+  const { build, snapshots: shots } = await buildView(db, input.projectId, input.buildId);
+  // A build at a verdict takes it from the same shots the next one is picked from, so the two
+  // cannot disagree: another reviewer's reject shows once its shot is written, before its build
+  // status is refreshed. A build that left its verdict (a re-run) keeps that status.
+  const atVerdict = VERDICT_STATUSES.some((status) => status === build.status);
+  return {
+    buildStatus: atVerdict ? verdictOf(shots) : build.status,
+    nextToReviewId: nextToReviewId(shots, input.snapshotId),
+  };
 }
 
 /**
@@ -329,8 +336,12 @@ export async function acceptAllSnapshots(db: Db, input: BuildDecision): Promise<
 
 type BuildDecision = { projectId: string; buildId: string; userId: string };
 
-/** `acceptAllSnapshots`, also naming the builds it moved (PS-23). */
+/**
+ * `acceptAllSnapshots`, also naming the builds it moved (PS-23). Only a member of the project's
+ * org may decide; anyone else gets the not-found of a missing project.
+ */
 export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> {
+  await getProject(db, input.userId, input.projectId);
   const buildId = await reviewableBuildId(db, input.projectId, input.buildId);
   const decision = {
     reviewState: "accepted",
@@ -347,5 +358,5 @@ export async function decideAll(db: Db, input: BuildDecision): Promise<Decided> 
   const group = groupsOfBuild(db, buildId);
   const moved = await decideGroup(db, input.projectId, group, decision);
   await refreshBuilds(db, moved);
-  return { verdict: await refreshBuildStatus(db, buildId), buildIds: [buildId, ...moved] };
+  return { buildId, verdict: await refreshDecided(db, buildId), buildIds: [buildId, ...moved] };
 }

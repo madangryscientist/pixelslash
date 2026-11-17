@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import { parseConfig } from "../src/config.ts";
-import { captureSnapshots } from "../src/snapshot.ts";
+import { captureInto } from "../src/capture-into.ts";
+import { captureSnapshots, openCaptureSession } from "../src/snapshot.ts";
 import { storybookRoutes } from "../src/storybook.ts";
 
 const entry = (id: string, title: string, name: string, type = "story") => [
@@ -270,6 +271,23 @@ describe("captureSnapshots with a storybook", { timeout: 60_000 }, () => {
       "iframe.html-id-ui-button--primary-viewMode-story",
       "forms-input-empty",
     ]);
+  });
+
+  test("a story's shot times its render wait inside the settle, beside setup and measure", async () => {
+    const config = sb({ globals: { theme: THEMES }, include: ["ui-button--primary"] });
+    const session = await openCaptureSession(config, pinned);
+    try {
+      const result = await captureInto(session, await out(), 2);
+      expect(result.captureWorkers).toBe(2);
+      for (const shot of result.shots) {
+        expect(shot.storyMs).toBeGreaterThanOrEqual(0);
+        expect(shot.storyMs).toBeLessThanOrEqual(shot.settleMs ?? 0);
+        expect(shot.setupMs).toBeGreaterThan(0);
+        expect(shot.measureMs).toBeGreaterThanOrEqual(0);
+      }
+    } finally {
+      await session.close();
+    }
   });
 
   test("a story that errors fails the capture by name, with Storybook's message", async () => {

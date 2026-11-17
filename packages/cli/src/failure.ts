@@ -40,7 +40,7 @@ export const ESCALATE = `Exit ${INTERNAL_EXIT} is a bug in pixelslash (a crash, 
 /** What reached the server: `nothing was uploaded`, or how far an upload got. Never claims more. */
 export function uploadLine(p: UploadProgress): string {
   if (!p.opened) return "nothing was uploaded";
-  if (p.finalised) return `the upload had finished: ${p.sent}/${p.total} shots sent`;
+  if (p.finalised) return `${p.sent}/${p.total} shots sent and finalised; the failure came after`;
   return `upload incomplete: ${p.sent}/${p.total} shots sent`;
 }
 

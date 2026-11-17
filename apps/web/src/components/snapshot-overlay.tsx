@@ -1,4 +1,14 @@
-import { Card, Checkbox, Cluster, Legend, type LegendItem, Stack } from "@hackcove/ui-react";
+import {
+  Caption,
+  Card,
+  Checkbox,
+  Cluster,
+  EmptyState,
+  Legend,
+  type LegendItem,
+  RegionFrame,
+  Stack,
+} from "@hackcove/ui-react";
 import { useState } from "react";
 import type { Crop } from "../../../../packages/engine/src/report-crop.ts";
 import { RegionBoxes, type Scale, Viewport } from "#/components/snapshot-frame";
@@ -12,32 +22,67 @@ const KINDS = [
   { kind: "shift", tone: "info" },
 ] as const;
 
+/** The top layer's opacity, 0 to 100: held by the viewer so the toolbar's range and the image share it. */
+export type OverlayState = { opacity: number; setOpacity: (opacity: number) => void };
+
+export function useOverlay(): OverlayState {
+  const [opacity, setOpacity] = useState(50);
+  return { opacity, setOpacity };
+}
+
+/** The toolbar's half of the overlay: how strongly the top layer (the diff image) covers Branch. */
+export function OverlayControls({
+  overlay,
+  diffUrl,
+}: {
+  overlay: OverlayState;
+  diffUrl: string | null;
+}) {
+  const hydrated = useHydrated();
+  return (
+    <label className="flex items-center gap-2">
+      <Caption>Opacity</Caption>
+      <input
+        type="range"
+        aria-label="Overlay opacity"
+        title={`Top layer at ${overlay.opacity}% opacity`}
+        min={0}
+        max={100}
+        value={overlay.opacity}
+        disabled={!hydrated || !diffUrl}
+        onChange={(e) => overlay.setOpacity(Number(e.target.value))}
+        className="w-32"
+      />
+      <Caption numeric>{overlay.opacity}%</Caption>
+    </label>
+  );
+}
+
 function ShotStack({
   name,
   shown,
   diffUrl,
   showDiff,
+  opacity,
   boxes,
 }: {
   name: string;
   shown: string | null;
   diffUrl: string | null;
   showDiff: boolean;
+  opacity: number;
   boxes: { result: DiffResult; regions: DiffRegion[] } | null;
 }) {
+  if (!shown) return <EmptyState title="No image to show." />;
   return (
-    <div className="relative">
-      {shown ? (
-        <img src={shown} alt={`${name} with measured regions`} className="block w-full" />
-      ) : (
-        <p className="py-16 text-center text-sm">No image to show.</p>
-      )}
+    <RegionFrame src={shown} alt={`${name} with measured regions`}>
       {diffUrl && showDiff && (
         <img
           src={diffUrl}
           alt=""
+          data-testid="overlay-top"
           className="pointer-events-none absolute inset-0 w-full"
-          style={{ opacity: 0.85 }}
+          style={{ opacity: opacity / 100 }}
         />
       )}
       {boxes && (
@@ -47,7 +92,7 @@ function ShotStack({
           regions={boxes.regions}
         />
       )}
-    </div>
+    </RegionFrame>
   );
 }
 
@@ -77,6 +122,9 @@ function Controls({
         onChange={(e) => onShowDiff(e.target.checked)}
       />
       <Legend items={items} />
+      {!diffUrl && regions.length > 0 && (
+        <Caption>No diff image for this comparison; the boxes are the measured regions.</Caption>
+      )}
     </Cluster>
   );
 }
@@ -91,6 +139,7 @@ export function SnapshotOverlay({
   highlight,
   scale,
   crop,
+  overlay,
 }: {
   name: string;
   mainUrl: string | null;
@@ -100,6 +149,7 @@ export function SnapshotOverlay({
   highlight: boolean;
   scale: Scale;
   crop: Crop | null;
+  overlay: OverlayState;
 }) {
   const [showDiff, setShowDiff] = useState(true);
   const regions = result?.regions ?? [];
@@ -114,6 +164,7 @@ export function SnapshotOverlay({
             shown={branchUrl ?? mainUrl}
             diffUrl={diffUrl}
             showDiff={showDiff}
+            opacity={overlay.opacity}
             boxes={boxes}
           />
         </Card>

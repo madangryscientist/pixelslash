@@ -1,11 +1,19 @@
 import type { diffPngs } from "@hackcove/pixelslash-engine/diff";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { setup } from "#/api/test-support";
-import { type Build, createBuild, finaliseBuild, getBuild, putSnapshot } from "#/db/builds";
+import {
+  type Build,
+  type SnapshotInput,
+  createBuild,
+  finaliseBuild,
+  getBuild,
+  putSnapshot,
+} from "#/db/builds";
 import type { Db } from "#/db/db";
 import type { SentFlake } from "#/db/flakes";
 import { type FlakyPolicy, snapshots } from "#/db/schema";
 import { TEST_MODEL_KEY_SECRET } from "#/db/test-db";
+import { sha256Bytes } from "#/lib/crypto";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import type { ConsumerDeps } from "#/ai/explain-queue";
 import { type MemoryQueue, memoryQueue } from "#/ai/explain-queue-kit";
@@ -22,11 +30,15 @@ export const sha = (n: number) => n.toString(16).padStart(40, "0");
 export type Shot = {
   name?: string;
   png: Uint8Array<ArrayBuffer>;
-  fingerprint?: { image: string; browser: string; fonts: string };
+  /** What rendered it, when not Linux Chromium: a native shot's platform and its device label. */
+  renderer?: { platform: string; browser: string };
+  fingerprint?: SnapshotInput["fingerprint"];
   diff?: object;
   ignore?: Array<{ x: number; y: number; width: number; height: number }>;
   flaky?: FlakyPolicy | null;
   flake?: SentFlake | null;
+  /** Send the shot by its hash alone, as a CLI does for an image the project holds (PS-424). */
+  byHash?: boolean;
 };
 
 export type Ctx = Awaited<ReturnType<typeof setup>> & {
@@ -39,8 +51,8 @@ export type Ctx = Awaited<ReturnType<typeof setup>> & {
 /** What uploading a build needs: a store, a project and its blobs, on any database (ob 1773: a local D1 too). */
 export type Uploads = Pick<Ctx, "projectId" | "scoped"> & { db: Db };
 
-export async function context(): Promise<Ctx> {
-  const held = await setup();
+export async function context(beforeQuery?: Parameters<typeof setup>[0]): Promise<Ctx> {
+  const held = await setup(beforeQuery);
   return {
     ...held,
     projectId: held.acme.project.id,
@@ -77,8 +89,7 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
     await putSnapshot({ db: ctx.db, blobs: ctx.scoped }, build, {
       input: {
         name: s.name ?? "pricing",
-        platform: "linux",
-        browser: "chromium",
+        ...(s.renderer ?? { platform: "linux", browser: "chromium" }),
         viewport: "1280x720",
         theme: "light",
         tags: [],
@@ -87,7 +98,7 @@ async function open(ctx: Uploads, spec: BuildSpec): Promise<Build> {
         fingerprint: s.fingerprint ?? FINGERPRINT,
         flaky: s.flaky ?? null,
       },
-      png: s.png.buffer,
+      png: s.byHash ? { sha256: await sha256Bytes(s.png.buffer) } : s.png.buffer,
       flake: s.flake ?? null,
     });
   }
@@ -130,6 +141,53 @@ export async function explaining<T>(
   return result;
 }
 
+/** What diffing a build may stand in for; see `upload`. */
+type RunOptions = {
+  now?: () => number;
+  db?: Db;
+  blobs?: BlobStore;
+  diff?: typeof diffPngs | undefined;
+  diffSidecar?: string | undefined;
+  modelFetch?: ModelFetch | undefined;
+  /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
+  modelKeySecret?: string | null;
+  queue?: MemoryQueue;
+};
+
+/** Create, fill and finalise one build, not yet diffed: a test's setup, for `diffFinalised` later. */
+export async function finalised(ctx: Uploads, spec: BuildSpec): Promise<Build> {
+  return finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
+}
+
+/**
+ * Diff a build `finalised` returned, as `upload` does; returns it as the database holds it afterwards.
+ * For a test that times only the diff, with the upload in its setup.
+ */
+export async function diffFinalised(
+  ctx: Uploads,
+  done: Build,
+  {
+    now,
+    db = ctx.db,
+    blobs = ctx.scoped,
+    diff,
+    diffSidecar,
+    modelFetch,
+    modelKeySecret = TEST_MODEL_KEY_SECRET,
+    queue,
+  }: RunOptions = {},
+): Promise<Build> {
+  const explain = queue ?? memoryQueue();
+  const secret = modelKeySecret ?? undefined;
+  await processBuild(
+    { db, blobs, now, diff, diffSidecar, explainQueue: explain.queue, modelKeySecret: secret },
+    done,
+  );
+  if (!queue)
+    await explain.drain(consumerDeps({ db, blobs, now, modelFetch, modelKeySecret: secret }));
+  return getBuild(ctx.db, ctx.projectId, done.id);
+}
+
 /**
  * Create, fill, finalise and diff one build; returns it as the database holds it afterwards.
  * `now` is the clock the diff measures its budget with; `db` puts a store of the test's own in
@@ -142,41 +200,18 @@ export async function explaining<T>(
 export async function upload(
   ctx: Uploads,
   spec: BuildSpec,
-  {
-    now,
-    db = ctx.db,
-    blobs = ctx.scoped,
-    diff,
-    diffSidecar,
-    modelFetch,
-    modelKeySecret = TEST_MODEL_KEY_SECRET,
-    queue,
-  }: {
-    now?: () => number;
-    db?: Db;
-    blobs?: BlobStore;
-    diff?: typeof diffPngs | undefined;
-    diffSidecar?: string | undefined;
-    modelFetch?: ModelFetch | undefined;
-    /** What opens the project's model key; `null` runs the server without `MODEL_KEY_SECRET`. */
-    modelKeySecret?: string | null;
-    queue?: MemoryQueue;
-  } = {},
+  options: RunOptions = {},
 ): Promise<Build> {
-  const done = await finaliseBuild(ctx.db, await open(ctx, spec), spec.shots.length);
-  const explain = queue ?? memoryQueue();
-  const secret = modelKeySecret ?? undefined;
-  await processBuild(
-    { db, blobs, now, diff, diffSidecar, explainQueue: explain.queue, modelKeySecret: secret },
-    done,
-  );
-  if (!queue)
-    await explain.drain(consumerDeps({ db, blobs, now, modelFetch, modelKeySecret: secret }));
-  return getBuild(ctx.db, ctx.projectId, done.id);
+  return diffFinalised(ctx, await finalised(ctx, spec), options);
 }
 
 export async function rows(ctx: Uploads, build: Build) {
-  return ctx.db.select().from(snapshots).where(eq(snapshots.buildId, build.id));
+  // In the order they were sent, which the tests read by position.
+  return ctx.db
+    .select()
+    .from(snapshots)
+    .where(eq(snapshots.buildId, build.id))
+    .orderBy(sql`rowid`);
 }
 
 /** The one shot a single-shot build holds. */

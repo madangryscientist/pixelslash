@@ -13,6 +13,7 @@ import { release } from "@hackcove/pixelslash-engine/release";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
 import { msBetween } from "#/db/server-timings";
+import { snapshotStem } from "#/db/stem";
 import type { BlobStore } from "#/storage/blobs";
 import { checkCiResult } from "./ci-result";
 import {
@@ -36,9 +37,14 @@ async function readBlob(blobs: BlobStore, key: string): Promise<Buffer> {
   return Buffer.from(await new Response(stream).arrayBuffer());
 }
 
-/** The diff image's key sits beside the shot it belongs to. */
-export function diffKeyOf(imageKey: string): string {
-  return `${imageKey.replace(/\.png$/, "")}.diff.png`;
+/**
+ * The diff image's key sits beside the shot it belongs to: under the shot's own stem
+ * (`snapshotStem`), never its `imageKey`. A shot stored by hash (PS-424) shares another build's
+ * `imageKey`, so a key derived from that would make two builds write one overlay. For a shot that
+ * sent its PNG the stem and the `imageKey` agree, so its key is what it always was.
+ */
+export function diffKeyOf(stem: string): string {
+  return `${stem}.diff.png`;
 }
 
 /** One comparison of a shot with one baseline, before it is stored. */
@@ -217,7 +223,7 @@ export function serverComparer(deps: {
       diffKey: async () => {
         // `diff` may itself settle on the bytes (the engine's shortcut): no overlay then either.
         if (!result.overlay) return null;
-        const key = diffKeyOf(shot.imageKey);
+        const key = diffKeyOf(await snapshotStem(shot));
         // One bulk copy, not a view: a blob store takes an ArrayBuffer, and a Buffer may be a view
         // into a pooled one. The overlay of a full-page shot is ~20 MB against a Worker's 128 MB.
         const png = new Uint8Array(result.overlay);

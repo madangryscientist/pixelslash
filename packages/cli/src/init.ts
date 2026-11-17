@@ -122,7 +122,9 @@ async function projectsOn(
     return [];
   }
   try {
-    return await listProjects(apiClient(server, token, fetch));
+    // `upload.project` names a top-level project; a subproject goes in `upload.subproject`.
+    const projects = await listProjects(apiClient(server, token, fetch));
+    return projects.filter((p) => p.parentId === null);
   } catch (e) {
     if (!(e instanceof RemoteError)) throw e;
     io.stderr.write(`could not read the projects on ${server} (${e.message})\n`);
@@ -261,7 +263,7 @@ in CI (plain shell steps; the job needs full git history):
   export PIXELSLASH_TOKEN="$PIXELSLASH_CI_TOKEN"   # the CI's secret store, never git
   pixelslash capture --config ${CONFIG}
   pixelslash upload pixelslash-snapshots --wait --timeout 30m
-  # exit 0 accepted or unchanged · 4 rejected · 5 still waiting · 3 server or build error · 2 usage
+  # exit 0 accepted or unchanged · 1 capture or upload failed · 2 usage · 3 server or build error · 4 rejected · 5 still waiting · 7 a pixelslash bug, escalate
 `;
 
 /** `pixelslash init`: a config, the snapshot dirs ignored, and the commands to run next. */

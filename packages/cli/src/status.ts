@@ -12,7 +12,7 @@ export const WAITING_EXIT = 5;
 
 export const STATUS_USAGE = `pixelslash status [--build ID | --commit SHA | --branch NAME] [--dir DIR] [--wait [--timeout DURATION] [--interval DURATION]] [--server URL] [--token-path PATH] [--project ID|NAME] [--config FILE] [--json]
 Default build: the one \`upload\` recorded in DIR (default pixelslash-snapshots), else the current commit's newest.
-Exit 0 accepted or nothing changed, ${REJECTED_EXIT} rejected, ${WAITING_EXIT} still waiting, ${REMOTE_EXIT} the server did not answer or the build errored, 2 usage.`;
+Exit 0 accepted or nothing changed, ${REJECTED_EXIT} rejected, ${WAITING_EXIT} still waiting, ${REMOTE_EXIT} the server did not answer, the build errored or its status is unknown to this pixelslash, 2 usage.`;
 
 /** What `upload` leaves in the snapshot dir, so `status` finds the build it made. */
 export const BUILD_FILE = "build.json";
@@ -82,20 +82,38 @@ async function headSha(cwd: string): Promise<string> {
 
 type Pick = { commit?: string; branch?: string };
 
+/** Builds per page, and how many pages `findBuild` reads: the newest 1000 in all. */
+const PAGE_SIZE = 100;
+const MAX_PAGES = 10;
+
 /**
  * The newest build of the project that matches: on `branch`, or at a commit `commit` starts.
- * One page of the newest 100: a commit older than that is named with `--build`.
+ * Pages through the builds (100 a page) and stops at the first hit, the last page, or after 10
+ * pages (the newest 1000): a commit older than that is named with `--build`.
  */
 async function findBuild(remote: Remote, project: string | undefined, pick: Pick): Promise<string> {
   const p = await resolveProject(remote, project);
   const path = `/api/v1/projects/${encodeURIComponent(p.id)}/builds`;
-  const { body } = await remote.client.get(path, { branch: pick.branch, limit: "100" });
-  const hit = objects(body.builds).find(
-    (b) => pick.commit === undefined || str(b.commit_sha).startsWith(pick.commit),
-  );
-  if (hit) return str(hit.id);
   const what = pick.commit ? `at commit ${pick.commit.slice(0, 12)}` : `on ${pick.branch}`;
-  throw new RemoteError(`no build in ${p.name} ${what}`);
+  let cursor: string | undefined;
+  for (let page = 1; ; page++) {
+    const { body } = await remote.client.get(path, {
+      branch: pick.branch,
+      limit: String(PAGE_SIZE),
+      cursor,
+    });
+    const hit = objects(body.builds).find(
+      (b) => pick.commit === undefined || str(b.commit_sha).startsWith(pick.commit),
+    );
+    if (hit) return str(hit.id);
+    const next = str(body.next_cursor);
+    if (!next) throw new RemoteError(`no build in ${p.name} ${what}`);
+    if (page >= MAX_PAGES)
+      throw new RemoteError(
+        `no build in ${p.name} ${what} among its newest ${PAGE_SIZE * MAX_PAGES} builds; name an older one with --build`,
+      );
+    cursor = next;
+  }
 }
 
 type StatusFlags = Partial<Record<"build" | "commit" | "branch" | "dir" | "project", string>>;
@@ -112,7 +130,7 @@ async function buildId(remote: Remote, flags: StatusFlags, cwd: string): Promise
   return findBuild(remote, flags.project, { commit: head });
 }
 
-type Outcome = "processing" | "waiting" | "accepted" | "rejected" | "errored";
+type Outcome = "processing" | "waiting" | "accepted" | "rejected" | "errored" | "unknown";
 
 /** Where the build stands. A flaky shot under `skip` is not in `to_review`, so it never waits. */
 export function outcomeOf(b: Record<string, unknown>): Outcome {
@@ -125,8 +143,13 @@ export function outcomeOf(b: Record<string, unknown>): Outcome {
       return "errored";
     case "changes":
       return "waiting";
-    default:
+    case "uploading":
+    case "processing":
       return "processing";
+    default:
+      // A status this CLI does not know settles at once: reading it as processing would make
+      // `--wait` spin to its deadline on a build that may never change.
+      return "unknown";
   }
 }
 
@@ -136,6 +159,7 @@ const EXIT: Record<Outcome, number> = {
   errored: REMOTE_EXIT,
   waiting: WAITING_EXIT,
   processing: WAITING_EXIT,
+  unknown: REMOTE_EXIT,
 };
 
 const num = (counts: unknown, key: string): number =>
@@ -227,6 +251,10 @@ export async function follow(watch: Watch, io: Io, deps: StatusDeps): Promise<nu
   io.stdout.write(watch.json ? `${end.text}\n` : describe(end.build, watch.remote.client.server));
   if (watch.wait && !settled(outcome))
     io.stderr.write(`still ${outcome} after ${watch.wait.timeoutMs / 1000}s\n`);
+  if (outcome === "unknown")
+    io.stderr.write(
+      `build ${str(end.build.id)} has status "${str(end.build.status)}", which this pixelslash does not know; update pixelslash\n`,
+    );
   return EXIT[outcome];
 }
 

@@ -3,10 +3,13 @@ import { pathToFileURL } from "node:url";
 import {
   UsageError,
   buildTimings,
+  captureFacts,
   captureInto,
+  defaultConcurrency,
   findConfig,
   identity,
   loadConfig,
+  loadNow,
   onlyRoutes,
   openCaptureSession,
   recapture,
@@ -17,7 +20,7 @@ import {
   type DevJudgeDeps,
 } from "@hackcove/pixelslash-engine";
 import type { Io } from "./run.ts";
-import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
+import { concurrencyFlag, readFlagPairs, takeJson, takeOnly, withConcurrency } from "./args.ts";
 import { UPLOAD_FLAGS, type UploadFlags, uploadDir } from "./upload.ts";
 import { type Watch, watched } from "./watch.ts";
 
@@ -27,13 +30,14 @@ type SnapshotResult = Awaited<ReturnType<typeof captureInto>>;
 type TimedSnapshotResult = SnapshotResult & { timings: Timings };
 
 export const CAPTURE_USAGE =
-  "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--json] | [--upload [--server URL] [--token-path PATH] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
+  "pixelslash capture [--config FILE] [--out DIR] [--only NAME]... [--concurrency N] [--json] | [--upload [--server URL] [--token-path PATH] [--project ID|NAME] [--subproject NAME] [--base BRANCH] [--branch NAME] [--pr N] [--flake-retries N] [--judge]]";
 
 type CaptureFlags = {
   out: string;
   upload: boolean;
   uploadFlags: UploadFlags;
   only: string[] | undefined;
+  concurrency: number | undefined;
   json: boolean;
 };
 
@@ -44,18 +48,29 @@ function captureFlags(argv: string[], cwd: string): CaptureFlags {
   const { only, rest } = takeOnly(pairs);
   const upload = rest.includes("--upload");
   const judge = rest.includes("--judge");
-  const { out = "pixelslash-snapshots", ...uploadFlags } = readFlagPairs(
+  const {
+    out = "pixelslash-snapshots",
+    concurrency,
+    ...uploadFlags
+  } = readFlagPairs(
     rest.filter((a) => !SWITCHES.has(a)),
-    [...UPLOAD_FLAGS, "out"],
+    [...UPLOAD_FLAGS, "out", "concurrency"],
   );
   const { config: _config, ...uploadOnly } = uploadFlags;
   if (!upload && (judge || Object.keys(uploadOnly).length > 0))
     throw new UsageError(
-      "--server, --token-path, --base, --branch, --pr, --flake-retries and --judge need --upload",
+      "--server, --token-path, --project, --subproject, --base, --branch, --pr, --flake-retries and --judge need --upload",
     );
   // A partial build would tell the server the other routes were removed.
   if (upload && (only || json)) throw new UsageError("--only and --json do not go with --upload");
-  return { out: resolve(cwd, out), upload, uploadFlags: { ...uploadFlags, judge }, only, json };
+  return {
+    out: resolve(cwd, out),
+    upload,
+    uploadFlags: { ...uploadFlags, judge },
+    only,
+    concurrency: concurrencyFlag(concurrency),
+    json,
+  };
 }
 
 /** `--json` and `capture_local`: every shot taken, with its PNG's absolute path. */
@@ -84,20 +99,40 @@ export function captureJson(
 
 /** The routes `only` names (all when absent) into `out`, nothing uploaded; `capture_local`'s run. */
 export async function captureLocal(
-  flags: { config?: string | undefined; out: string; only: string[] | undefined },
+  flags: {
+    config?: string | undefined;
+    out: string;
+    only: string[] | undefined;
+    /** `--concurrency`: over the config's own. */
+    concurrency?: number | undefined;
+  },
   deps: SnapshotDeps & { cwd?: string },
   watch: Watch = {},
 ): Promise<TimedSnapshotResult> {
   const started = performance.now();
-  const config = await loadConfig(findConfig(flags.config, deps.cwd ?? process.cwd()));
+  const loadStart = loadNow();
+  const config = withConcurrency(
+    await loadConfig(findConfig(flags.config, deps.cwd ?? process.cwd())),
+    flags.concurrency,
+  );
   const session = await openCaptureSession(config, deps);
   try {
     const shooting = onlyRoutes(session, flags.only);
     const total = shooting.routes.length * config.variants.length;
-    const result = await captureInto(watched(shooting, watch, total), flags.out);
+    const result = await captureInto(
+      watched(shooting, watch, total),
+      flags.out,
+      undefined,
+      deps.warn ? { warn: deps.warn } : {},
+    );
     return {
       ...result,
-      timings: buildTimings(started, result.shots, session.browserLaunchMs),
+      timings: buildTimings(
+        started,
+        result.shots,
+        session.browserLaunchMs,
+        captureFacts(result, loadStart),
+      ),
     };
   } finally {
     await session.close();
@@ -124,7 +159,8 @@ function gapsLine({ manifest, gapsPath = "" }: SnapshotResult): string {
 /**
  * `pixelslash capture`: every route × variant in the config into a snapshot dir + manifest. Exit 0.
  * With `--upload` the browser stays open through the upload, so a shot that differs from its
- * baseline is captured again the same way (ob 1737), and closes after it.
+ * baseline is captured again the same way (ob 1737), and closes after it. Only there may a story be
+ * shot on a reused preview page (PS-445).
  */
 export async function runCapture(
   argv: string[],
@@ -137,7 +173,7 @@ export async function runCapture(
   if (!flags.upload) {
     const config = flags.uploadFlags.config;
     const result = await captureLocal(
-      { config, out: flags.out, only: flags.only },
+      { config, out: flags.out, only: flags.only, concurrency: flags.concurrency },
       {
         ...deps,
         cwd,
@@ -150,20 +186,35 @@ export async function runCapture(
     return 0;
   }
   const started = performance.now();
-  const config = await loadConfig(findConfig(flags.uploadFlags.config, cwd));
+  const loadStart = loadNow();
+  const config = withConcurrency(
+    await loadConfig(findConfig(flags.uploadFlags.config, cwd)),
+    flags.concurrency,
+  );
   const session = await openCaptureSession(config, {
     ...deps,
     warn,
   });
+  // Read before the run: its own workers raise the load average, and the re-captures should not give way to that.
+  const recaptureConcurrency = config.concurrency ?? defaultConcurrency();
   try {
-    const result = await captureInto(session, flags.out);
-    const timings = buildTimings(started, result.shots, session.browserLaunchMs);
+    // Stories may be shot on a reused preview page here, and only here: each shot meets its
+    // baseline in the upload, and one that is not byte for byte its baseline is shot again fresh.
+    const result = await captureInto(session, flags.out, undefined, { reuse: true, warn });
+    const timings = buildTimings(
+      started,
+      result.shots,
+      session.browserLaunchMs,
+      captureFacts(result, loadStart),
+    );
     printCaptured(result, io);
     // The config's retries unless the flag says otherwise; the shots were just shot here.
     const retries = flags.uploadFlags["flake-retries"] ?? String(config.flake.retries);
     return await uploadDir(flags.out, { ...flags.uploadFlags, "flake-retries": retries }, io, {
       ...deps,
       recapture: (e) => recapture(session, e),
+      recaptureConcurrency,
+      reused: result.reused,
       timings,
     });
   } finally {

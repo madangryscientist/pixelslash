@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { BaselinePick } from "@hackcove/pixelslash-engine/ci-diff";
 import { describe, expect, test } from "vitest";
 import { createProject, diffLocationOf } from "#/db/orgs";
@@ -39,6 +40,10 @@ describe("the baselines endpoints", () => {
     const built = await run(held, held.acme.token, branch(2, red), deps);
     expect(body.baselines[0]?.baseline?.id).toBe(built.pick.baseline?.id);
     expect(body.baselines[0]?.baseline?.fingerprint).toEqual(META.fingerprint);
+    // The pick carries the baseline PNG's hash, so a CLI with the same bytes need not fetch it.
+    expect(body.baselines[0]?.baseline?.sha256).toBe(
+      createHash("sha256").update(white).digest("hex"),
+    );
   });
 
   test("the preview names the baseline build's shots no key asked about as removed", async () => {

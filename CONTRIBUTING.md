@@ -5,7 +5,7 @@ operating agreement for people and coding agents working here. Read it before a 
 
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). A security problem goes to
 [`SECURITY.md`](SECURITY.md), not to a public issue. Your contribution is licensed under
-MIT, as the rest of the repo is (see [`LICENSE`](LICENSE)); there is no CLA.
+the Elastic License 2.0, as the rest of the repo is (see [`LICENSE`](LICENSE)); there is no CLA.
 
 ## Start with an issue
 
@@ -13,6 +13,7 @@ For a bug, open an issue with the version, the command and the `report.html` it 
 anything bigger than a fix, open an issue first so we can agree on it before you build it. The
 [capability matrix](docs/capabilities/matrix.html) and the [CLI reference](docs/cli.md) say what
 PixelSlash does today; a change that moves either updates it in the same pull request.
+A feature issue can name the [persona](docs/personas/README.md) it is for.
 
 ## The gate
 
@@ -26,20 +27,20 @@ bun run format:check    # oxfmt; `bun run format` fixes it
 bun run test            # Vitest under Bun, and xunit for engines/dotnet
 ```
 
-- **Each script runs through Nx** (`nx run-many -t typecheck`, `lint`, `test`), one project at a time
-  with `bunx nx <target> <project>`. `docs/cli.md` points here for them.
-- **CI keeps Nx's local cache with `actions/cache`** (`.nx/cache` and `.nx/workspace-data`, scoped to the PR) and does not
-  use Nx Cloud, so a local run prints no connection message. `NX_NO_CLOUD=true` is set in CI.
+- **Each script runs through moon** (`moon run :typecheck`, `:lint`, `:test`), one project at a time
+  with `bunx moon run <project>:<task>`, such as `bunx moon run engine:test`. `docs/cli.md` points here for them.
+- **CI shares moon's cache through a remote cache.** A push to `main` writes it; a pull request only
+  reads it, so a task whose inputs did not change replays from `main`'s run, e2e suites included.
 - **Lint rules are errors.** Fix the code; do not disable a rule.
 - **Tests** live in `packages/*/test/`. A test that makes a temp dir removes it, and a new
   project's `vitest.config.ts` lists the `globalSetup` in `scripts/test-tmp-scope.ts` so a run
   cannot fill `/tmp`.
 - **The .NET SDK is optional.** `engines/dotnet` is a C# port of the diff that the benchmark
-  scores. Without a working `dotnet` the root scripts skip it and say so (`bun scripts/nx.ts` does
+  scores. Without a working `dotnet` the root scripts skip it and say so (`bun scripts/moon.ts` does
   the check); a change to `engines/dotnet` needs the SDK, pinned in `global.json` and `.tool-versions`.
 - **The benchmark guard** (`bench:check`) is part of `test`. If a score moves on purpose, commit
   a new `bench/results/<date>.json` in the same change; see `bench/README.md`.
-- **A change to `apps/web`** also runs `bunx nx build web` and `bunx nx test:e2e web`
+- **A change to `apps/web`** also runs `bunx moon run web:build` and `bunx moon run web:test-e2e`
   (Playwright, on a local D1 with GitHub stubbed).
 - **A change to capture, the diff or the report** also gets a real run, and you open the
   `report.html` it writes and look at it. A green test run does not render a report:
@@ -67,8 +68,9 @@ needs its own issue first.
 4. **Local unless told to upload.** Without `--upload`, page shots never leave the machine. See
    invariant 4 in `AGENTS.md` for the two opt-in exceptions and the error sink.
 5. **The local pair mode does not start a dev server.**
-6. **`/api/v1` is a stable contract.** Changes are additive only; a breaking change is
-   `/api/v2`. Every endpoint is in `ENDPOINTS` (`apps/web/src/api/handler.ts`) and in the API
+6. **`/api/v1` follows the project's stage.** PixelSlash is in alpha, so `/api/v1` may change
+   in any way and keeps its name until a real V2 release; a breaking change is marked with `!` on
+   its commit subject. Every endpoint is in `ENDPOINTS` (`apps/web/src/api/handler.ts`) and in the API
    table of [`docs/cli.md`](docs/cli.md), and a test fails when the two differ.
 
 The CLI reference, [`docs/cli.md`](docs/cli.md), is the contract for every flag: do not drop one,

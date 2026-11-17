@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "vitest";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { run } from "../src/run.ts";
-import { capture, cleanup, servePaths, tmp } from "./support.ts";
+import { capture, cleanup, exitReport, servePaths, tmp } from "./support.ts";
 import { fakeUploadApi, gitRepo, snapshotDir } from "./upload-support.ts";
 
 afterAll(cleanup);
@@ -21,6 +21,7 @@ describe("pixelslash upload", () => {
     expect(cap.stdout).toMatch(/uploaded 1 snapshots\nbuild: build-1 \([0-9a-f]{7} on feat\)/);
     expect(api.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       "POST /api/v1/builds",
+      "POST /api/v1/builds/build-1/known",
       "PUT /api/v1/builds/build-1/snapshots",
       "POST /api/v1/builds/build-1/finalize",
     ]);
@@ -150,15 +151,28 @@ describe("pixelslash upload", () => {
     });
     expect(code).toBe(0);
     expect(cap.stdout).toMatch(/^skip: no judge\n[\s\S]*uploaded 1 snapshots/);
-    expect(api.calls.map((c) => c.method)).toEqual(["POST", "PUT", "POST"]);
+    expect(api.calls.map((c) => c.method)).toEqual(["POST", "POST", "PUT", "POST"]);
   });
 });
 
-async function captureConfig() {
+async function captureConfig(extra: Record<string, unknown> = {}) {
   const origin = servePaths({ "/": "live.html" });
   const config = join(await tmp(), "c.json");
-  await Bun.write(config, JSON.stringify({ baseUrl: origin, routes: ["/"] }));
+  await Bun.write(config, JSON.stringify({ baseUrl: origin, routes: ["/"], ...extra }));
   return config;
+}
+
+/** A real server that answers every request with a 500 and counts them: a request that should not happen is seen. */
+function countingServer() {
+  const seen: string[] = [];
+  const server = Bun.serve({
+    port: 0,
+    fetch: (req) => {
+      seen.push(`${req.method} ${new URL(req.url).pathname}`);
+      return Response.json({ error: "no" }, { status: 500 });
+    },
+  });
+  return { url: `http://127.0.0.1:${server.port}`, seen, stop: () => void server.stop(true) };
 }
 
 /** Answers "open build" (unless `stallOpen`), then never answers the first shot's upload. */
@@ -262,7 +276,7 @@ describe("capture --upload", () => {
     );
     expect(code).toBe(0);
     expect(cap.stdout).toMatch(/pixelslash: 1 snapshots[\s\S]*uploaded 1 snapshots/);
-    expect(api.calls.map((c) => c.method)).toEqual(["POST", "PUT", "POST"]);
+    expect(api.calls.map((c) => c.method)).toEqual(["POST", "POST", "PUT", "POST"]);
   }, 60_000);
 
   test("without --upload nothing is sent, and upload-only flags are refused", async () => {
@@ -283,5 +297,25 @@ describe("capture --upload", () => {
     );
     expect(await run(["capture", "--config", config, "--judge"], cap.io, deps)).toBe(2);
     expect(api.calls).toHaveLength(0);
+  }, 60_000);
+
+  test("a config that names upload.server and upload.project sends nothing without --upload", async () => {
+    const counter = countingServer();
+    try {
+      const config = await captureConfig({ upload: { server: counter.url, project: "p1" } });
+      const [cwd, cap] = [await gitRepo(), capture()];
+      const out = join(await tmp(), "out");
+      // No injected fetch: a request the CLI made would reach the real server above.
+      const code = await run(["capture", "--config", config, "--out", out], cap.io, {
+        ...pinned,
+        cwd,
+      });
+      expect(exitReport(code, cap.stderr)).toBe("exit 0");
+      expect(cap.stdout).toMatch(/pixelslash: 1 snapshots/);
+      expect(cap.stdout).not.toContain("uploaded");
+      expect(counter.seen).toEqual([]);
+    } finally {
+      counter.stop();
+    }
   }, 60_000);
 });

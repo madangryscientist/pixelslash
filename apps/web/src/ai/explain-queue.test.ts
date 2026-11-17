@@ -186,6 +186,30 @@ describe("the explain queue (ob 1875)", () => {
     expect(sent).toHaveLength(0);
     expect(await onlyShot(ctx, build)).toMatchObject({ aiQueuedAt: again, aiError: null });
   });
+  test.each([
+    { status: "errored", error: "R2 missed a read" },
+    { status: "processing", error: null },
+  ] as const)(
+    "an explain that settles on a $status build leaves it as it is (PS-392)",
+    async ({ status, error }) => {
+      const ctx = await context();
+      await withModel(ctx, true);
+      await upload(ctx, { branch: "main", commit: sha(1), shots: [{ png: white }] });
+      const queue = memoryQueue();
+      const { modelFetch } = stubModel();
+      const build = await upload(
+        ctx,
+        { branch: "feat/x", commit: sha(2), mergeBase: sha(1), shots: [{ png: twoChanges }] },
+        { modelFetch, queue },
+      );
+      // The build went back to a run (or ended in an error) while the explanations were queued.
+      await ctx.db.update(builds).set({ status, error }).where(eq(builds.id, build.id));
+      await queue.drain(consumerDeps({ db: ctx.db, blobs: ctx.scoped, modelFetch }));
+      // Noise was passed on its shots, which would give a verdict: the build is not given one.
+      expect(await getBuild(ctx.db, ctx.projectId, build.id)).toMatchObject({ status, error });
+    },
+  );
+
   test("the PR comment carries the summary once it is written (PS-82)", async () => {
     const ctx = await context();
     await withModel(ctx, false);

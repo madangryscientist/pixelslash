@@ -1,5 +1,6 @@
-import { type Page, expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import type { Page } from "@playwright/test";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
 
 /**
  * The review bar keeps Accept in one place as j walks shots (PS-264): the title line never pushes
@@ -24,7 +25,7 @@ async function walk(page: Page) {
   const seen: { accept: { x: number; y: number }; title: { y: number; height: number } }[] = [];
   for (let step = 0; step < NAMES.length; step += 1) await page.keyboard.press("k");
   for (let step = 0; step < NAMES.length; step += 1) {
-    await expect(position).toHaveText(`${step + 1} of ${NAMES.length}`);
+    await expect(position).toHaveText(`shot ${step + 1} of ${NAMES.length}`);
     await expect(accept).toBeVisible();
     const actionBox = await accept.boundingBox();
     const titleBox = await title.boundingBox();
@@ -41,10 +42,11 @@ async function walk(page: Page) {
 
 test("the action row keeps its place as j walks shots with short and long titles", async ({
   page,
+  provision,
 }) => {
   // Two full walks of the shots, one per width, on top of the upload and the sign-in.
   test.setTimeout(90_000);
-  const { token, projectId } = await provision(page, "Walk Co", "walk");
+  const { token, projectId } = await provision({ org: "Walk Co", project: "walk" });
   await uploadBuild(
     token,
     { branch: "main", commitSha: SHA_MAIN },
@@ -67,7 +69,7 @@ test("the action row keeps its place as j walks shots with short and long titles
   // Accept the opened shot, so the walk meets a reviewed shot: its chip and date sit on the title line.
   await page.locator("h1").click();
   await page.keyboard.press("a");
-  await expect(page.getByTestId("position")).toHaveText(`2 of ${NAMES.length}`);
+  await expect(page.getByTestId("position")).toHaveText(`shot 2 of ${NAMES.length}`);
   await page.keyboard.press("k");
   await expect(page.getByTestId("review-state").first()).toHaveText(/accepted by/);
 

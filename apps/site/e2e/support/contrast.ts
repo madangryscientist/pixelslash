@@ -62,7 +62,7 @@ function chains(els: Element[]): Link[][] {
       chain.push({
         background: style.backgroundColor,
         gradient: style.backgroundImage !== "none",
-        picture: up.tagName === "IMG" || up.classList.contains("home-demo"),
+        picture: up.tagName === "IMG",
       });
     }
     return chain;

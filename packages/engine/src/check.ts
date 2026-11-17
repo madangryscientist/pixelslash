@@ -1,7 +1,8 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { type BaselinesReply, baselinePng, fetchBaselines } from "./baselines-client.ts";
-import { type BaselinePick, type PickedShot, measureShot } from "./ci-diff.ts";
+import { type BaselinePick, type PickedShot, measureShotWith } from "./ci-diff.ts";
+import { pooledMeasure, withDiffPool } from "./diff-pool.ts";
 import { type CheckShot, addRemoved, shotsOf } from "./check-rows.ts";
 import { renderCompareIndex } from "./compare-report.ts";
 import {
@@ -18,8 +19,11 @@ import { identity, pngPath } from "./manifest.ts";
 import { isHttpUrl } from "./routes.ts";
 import { type CaptureSession, type SnapshotEntry, captureInto, recapture } from "./snapshot.ts";
 import { withTimings } from "./report-timings.ts";
-import { buildTimings, mergeShots } from "./timings.ts";
+import { buildTimings, captureFacts, mergeShots } from "./timings.ts";
 import { type Client, isObj } from "./upload-client.ts";
+
+/** `measureShot` in the run's diff pool. */
+const measurePooled = measureShotWith(pooledMeasure);
 
 /**
  * `pixelslash check` (ob 1732): capture here, measure against the baselines the server would pick
@@ -49,6 +53,8 @@ export type CheckDeps = {
   sleep?: (ms: number) => Promise<void>;
   /** A `performance.now()` reading the run's total counts from; default: when the check begins. */
   started?: number;
+  /** `loadNow()` read when the run began, for the host in the timings. */
+  startLoad?: number;
 };
 
 export type { CheckShot } from "./check-rows.ts";
@@ -109,7 +115,7 @@ async function settle(
   if (!baseline || !pick.carry) return baseline;
   const same = fingerprintOf(baseline.fingerprint, identity(e));
   if (FINGERPRINT_KEYS.every((k) => same[k] === e.fingerprint[k])) {
-    const [measured] = await measureShot(e, png, { ...pick, accepted: null }, fetchPng);
+    const [measured] = await measurePooled(e, png, { ...pick, accepted: null }, fetchPng);
     if (measured?.status === "unchanged") return baseline;
   }
   return pick.accepted;
@@ -129,21 +135,24 @@ async function writeBaselines(
     return got;
   };
   const snapshots: SnapshotEntry[] = [];
-  for (const [i, e] of entries.entries()) {
-    const pick = picks[i];
-    if (!pick) continue;
-    const png = Buffer.from(await Bun.file(pngPath(dirs.branch, e)).arrayBuffer());
-    const chosen = await settle(e, png, pick, fetchPng);
-    if (!chosen) continue;
-    const dest = join(dirs.main, e.file);
-    await mkdir(dirname(dest), { recursive: true });
-    await Bun.write(dest, await fetchPng(chosen));
-    snapshots.push({
-      ...e,
-      ignore: chosen.ignore,
-      fingerprint: fingerprintOf(chosen.fingerprint, identity(e)),
-    });
-  }
+  // One diff pool for every settle, rather than one per shot.
+  await withDiffPool(async () => {
+    for (const [i, e] of entries.entries()) {
+      const pick = picks[i];
+      if (!pick) continue;
+      const png = Buffer.from(await Bun.file(pngPath(dirs.branch, e)).arrayBuffer());
+      const chosen = await settle(e, png, pick, fetchPng);
+      if (!chosen) continue;
+      const dest = join(dirs.main, e.file);
+      await mkdir(dirname(dest), { recursive: true });
+      await Bun.write(dest, await fetchPng(chosen));
+      snapshots.push({
+        ...e,
+        ignore: chosen.ignore,
+        fingerprint: fingerprintOf(chosen.fingerprint, identity(e)),
+      });
+    }
+  });
   const manifest = { version: 1, snapshots };
   await Bun.write(join(dirs.main, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
@@ -254,7 +263,13 @@ export async function checkAgainstServer(
   };
   await rm(dirs.main, { recursive: true, force: true });
   await rm(dirs.report, { recursive: true, force: true });
-  const { manifest, shots: captured, media } = await captureInto(shooting, dirs.branch);
+  const capture = await captureInto(
+    shooting,
+    dirs.branch,
+    undefined,
+    deps.warn ? { warn: deps.warn } : {},
+  );
+  const { manifest, shots: captured, media } = capture;
   const client = clientOf(opts, deps);
   const { picks, removed } = await preview(client, ctx, opts.projectId, manifest.snapshots);
   await writeBaselines(client, dirs, manifest.snapshots, picks);
@@ -274,6 +289,7 @@ export async function checkAgainstServer(
     started,
     mergeShots(captured, result.timings.shots),
     session.browserLaunchMs,
+    captureFacts(capture, deps.startLoad),
   );
   await Bun.write(
     result.indexPath,

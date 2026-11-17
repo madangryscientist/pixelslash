@@ -1,3 +1,6 @@
+import type { BuildTimings } from "#/db/diff-json";
+import { formatDuration } from "#/lib/format";
+
 /**
  * The arithmetic of a build's server timings (ob 1792), free of the database so the build page and
  * the org's Timings page share it.
@@ -171,4 +174,150 @@ export function cliStepRows(timings: CliTimings | null): StepRow[] {
     ["total", "total", timings.totalMs],
   ];
   return all.flatMap(([key, label, ms]) => (ms === undefined ? [] : [{ key, label, ms }]));
+}
+
+/** One line of the CLI's speed profile on the build page: a label and the sentence under it. */
+type ProfileRow = { key: string; label: string; text: string };
+
+const dur = (ms: number) => formatDuration(ms, { exact: true });
+
+/** A part's share of the workers' capture time, in whole percent; "<1%" where it rounds to 0. */
+function share(part: number, whole: number): string {
+  const pct = (part / whole) * 100;
+  return pct > 0 && pct < 1 ? "<1%" : `${Math.round(pct)}%`;
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+function captureWallRow(t: BuildTimings): ProfileRow[] {
+  if (t.captureWallMs === undefined) return [];
+  const worker = t.captureMs === undefined ? "" : ` against ${dur(t.captureMs)} of worker time`;
+  const n = t.workers?.capture;
+  const on = n === undefined ? "" : `, on ${plural(n, "worker", "workers")}`;
+  return [
+    { key: "capture-wall", label: "Capture wall", text: `${dur(t.captureWallMs)}${worker}${on}` },
+  ];
+}
+
+const PART_LABELS = [
+  ["setupMs", "setup"],
+  ["navigateMs", "navigate"],
+  ["settleMs", "settle"],
+  ["screenshotMs", "screenshot"],
+  ["measureMs", "measure"],
+] as const;
+
+const SETTLE_LABELS = [
+  ["fontsMs", "fonts"],
+  ["imagesMs", "images"],
+  ["networkIdleMs", "network idle"],
+  ["framesMs", "frames"],
+  ["idleMs", "idle"],
+] as const;
+
+function capturePartsRow(t: BuildTimings): ProfileRow[] {
+  const whole = t.captureMs;
+  if (!whole) return [];
+  const parts = PART_LABELS.flatMap(([key, label]) => {
+    const ms = t[key];
+    if (ms === undefined) return [];
+    if (key !== "settleMs") return [`${label} ${share(ms, whole)}`];
+    // The settle wait split by condition, and the story's own render wait, are inside it.
+    const inside = [
+      ...(t.settle
+        ? SETTLE_LABELS.flatMap(([k, name]) => {
+            // An older CLI sent no idle wait: leave it out rather than show it as 0.
+            const part = t.settle?.[k];
+            return part === undefined ? [] : [`${name} ${share(part, whole)}`];
+          })
+        : []),
+      ...(t.storyMs === undefined ? [] : [`story ${share(t.storyMs, whole)}`]),
+    ];
+    return [
+      inside.length > 0
+        ? `settle ${share(ms, whole)} (${inside.join(", ")})`
+        : `settle ${share(ms, whole)}`,
+    ];
+  });
+  if (parts.length === 0) return [];
+  return [
+    {
+      key: "capture-parts",
+      label: "Capture parts",
+      text: `${parts.join(", ")}, of worker time`,
+    },
+  ];
+}
+
+function requestRows(t: BuildTimings): ProfileRow[] {
+  return (t.upload?.batches ?? []).flatMap((b) => {
+    if (b.p50Ms === undefined || b.p90Ms === undefined) return [];
+    const max = b.maxMs === undefined ? "" : `, max ${dur(b.maxMs)}`;
+    const wall = b.wallMs === undefined ? "" : `, ${dur(b.wallMs)} wall`;
+    const workers =
+      b.step === "upload" && t.workers?.upload
+        ? ` on ${plural(t.workers.upload, "worker", "workers")}`
+        : "";
+    return [
+      {
+        key: `requests-${b.step.replaceAll(/\W+/g, "-")}`,
+        label: `${b.step.charAt(0).toUpperCase()}${b.step.slice(1)} requests`,
+        text: `${plural(b.count, "request", "requests")}${workers}: p50 ${dur(b.p50Ms)}, p90 ${dur(b.p90Ms)}${max}${wall}`,
+      },
+    ];
+  });
+}
+
+/**
+ * The server's split of each request kind that carried one: its own time against the CLI's (the
+ * gap is the wait before the handler, the network and the retries), then its parts, biggest first.
+ * The parts are summed over the kind's requests, like the batch's `ms`.
+ */
+function serverRows(t: BuildTimings): ProfileRow[] {
+  return (t.upload?.batches ?? []).flatMap((b) => {
+    if (!b.server) return [];
+    const { total, ...parts } = b.server;
+    const split = Object.entries(parts)
+      .toSorted(([, x], [, y]) => y - x)
+      .map(([name, ms]) => `${name} ${dur(ms)}`);
+    const lead = total === undefined ? "" : `${dur(total)} of ${dur(b.ms)} request time`;
+    const text = [lead, split.join(", ")].filter((x) => x !== "").join(": ");
+    if (!text) return [];
+    return [
+      {
+        key: `server-${b.step.replaceAll(/\W+/g, "-")}`,
+        label: `${b.step.charAt(0).toUpperCase()}${b.step.slice(1)} on the server`,
+        text,
+      },
+    ];
+  });
+}
+
+function hostRow(t: BuildTimings): ProfileRow[] {
+  if (!t.host) return [];
+  const { cores, loadStart, loadEnd } = t.host;
+  return [
+    {
+      key: "host",
+      label: "Host",
+      text: `${plural(cores, "core", "cores")}, load ${loadStart} at the start and ${loadEnd} at the end`,
+    },
+  ];
+}
+
+/**
+ * What the CLI's timings say beyond its step totals: the capture's wall clock against the
+ * workers' time, where that time went, how long each kind of request took, and the machine's cores
+ * and load. A row whose figures the CLI did not send is left out, so a build from an older CLI
+ * shows none.
+ */
+export function cliProfileRows(timings: BuildTimings | null): ProfileRow[] {
+  if (!timings) return [];
+  return [
+    ...captureWallRow(timings),
+    ...capturePartsRow(timings),
+    ...requestRows(timings),
+    ...serverRows(timings),
+    ...hostRow(timings),
+  ];
 }

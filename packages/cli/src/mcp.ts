@@ -1,10 +1,17 @@
-import { CLIENT_VERSION, CaptureError, FigmaError, UsageError } from "@hackcove/pixelslash-engine";
+import {
+  CLIENT_VERSION,
+  CaptureError,
+  DevLockError,
+  FigmaError,
+  UsageError,
+} from "@hackcove/pixelslash-engine";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
+  type ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 import { RemoteError, fetchBlob, isObj, str, type Reply } from "./api.ts";
 import { readFlagPairs } from "./args.ts";
@@ -12,6 +19,7 @@ import type { DevDeps } from "./dev.ts";
 import { MCP_FLAGS, arg, devTools, pretty, text } from "./mcp-dev.ts";
 import { localTools, watchOf } from "./mcp-local.ts";
 import { servePrompts } from "./mcp-prompts.ts";
+import { REVIEW_TOOLS } from "./mcp-review.ts";
 import { loadManifest, parityReport } from "./parity.ts";
 import { connect, resolveProject, type Remote } from "./remote.ts";
 import type { Io } from "./run.ts";
@@ -24,8 +32,23 @@ type Tool = {
   description: string;
   properties: Record<string, { type: string; description: string; enum?: string[] }>;
   required?: string[];
+  /** Read-only unless it says otherwise: only the review tools write. */
+  annotations?: ToolAnnotations;
   call: (ctx: Ctx, args: Args) => Promise<CallToolResult>;
 };
+
+type Listed = Pick<Tool, "description" | "required" | "annotations"> & {
+  properties: Record<string, object>;
+};
+
+/** Each tool as `tools/list` names it; a server tool that sets no annotations is read-only. */
+const listed = (tools: Record<string, Listed>) =>
+  Object.entries(tools).map(([name, t]) => ({
+    name,
+    description: t.description,
+    inputSchema: { type: "object" as const, properties: t.properties, required: t.required },
+    annotations: t.annotations ?? { readOnlyHint: true, openWorldHint: false },
+  }));
 
 const PROJECT = {
   type: "string",
@@ -235,11 +258,13 @@ const TOOLS: Record<string, Tool> = {
       );
     },
   },
+  ...REVIEW_TOOLS,
 };
 
+const KNOWN_ERRORS = [UsageError, RemoteError, CaptureError, DevLockError, FigmaError];
 /** A tool's error the agent reads; anything else is a bug and throws. */
 function failed(e: unknown): CallToolResult {
-  const known = [UsageError, RemoteError, CaptureError, FigmaError].some((c) => e instanceof c);
+  const known = KNOWN_ERRORS.some((c) => e instanceof c);
   if (known && e instanceof Error) return { ...text(e.message), isError: true };
   throw e;
 }
@@ -262,26 +287,7 @@ export function mcpServer(
     { capabilities: { tools: {}, prompts: {} } },
   );
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: [
-      ...Object.entries(TOOLS).map(([name, t]) => ({
-        name,
-        description: t.description,
-        inputSchema: { type: "object" as const, properties: t.properties, required: t.required },
-        annotations: { readOnlyHint: true, openWorldHint: false },
-      })),
-      ...Object.entries(local).map(([name, t]) => ({
-        name,
-        description: t.description,
-        inputSchema: { type: "object" as const, properties: t.properties, required: t.required },
-        annotations: t.annotations,
-      })),
-      ...Object.entries(dev.tools).map(([name, t]) => ({
-        name,
-        description: t.description,
-        inputSchema: { type: "object" as const, properties: t.properties },
-        annotations: t.annotations,
-      })),
-    ],
+    tools: [...listed(TOOLS), ...listed(local), ...listed(dev.tools)],
   }));
   server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const args = req.params.arguments ?? {};

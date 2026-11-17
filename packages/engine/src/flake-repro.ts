@@ -1,4 +1,5 @@
-import { type DiffOptions, type IgnoreRect, diffPngs } from "./diff.ts";
+import type { DiffOptions, IgnoreRect } from "./diff.ts";
+import { pooledDiff, withDiffPool } from "./diff-pool.ts";
 import type { CaptureConfig, Route, Variant } from "./config.ts";
 import type { Region, RegionKind } from "./regions.ts";
 import { esc } from "./report.ts";
@@ -61,29 +62,34 @@ function bounds(regions: Region[]): IgnoreRect | undefined {
 /** A PNG's size, from its IHDR. */
 const sizeOf = (png: Buffer) => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
 
-/** Diff every capture against the first, as the upload's flake pass does. */
-export function measureRepro(shots: Shoot[], options: DiffOptions): Repro {
+/** Diff every capture against the first, as the upload's flake pass does; the diffs run in the diff pool, in step. */
+export async function measureRepro(shots: Shoot[], options: DiffOptions): Promise<Repro> {
   const [first, ...rest] = shots;
   if (!first) throw new Error("measureRepro needs at least one capture");
+  const measured = await withDiffPool(() =>
+    Promise.all(
+      rest.map(async (shot, i): Promise<ReproRun> => {
+        const diff = await pooledDiff(first.png, shot.png, options, {
+          main: first.ignore,
+          branch: shot.ignore,
+        });
+        const sized = diff.mainWidth !== diff.branchWidth || diff.mainHeight !== diff.branchHeight;
+        return {
+          run: i + 2,
+          differed: diff.changed,
+          causes: causesOf(sized, diff.regions),
+          regions: diff.regions,
+          width: diff.branchWidth,
+          height: diff.branchHeight,
+          ...(diff.overlay && { overlay: diff.overlay }),
+        };
+      }),
+    ),
+  );
   const runs: ReproRun[] = [
     { run: 1, differed: false, causes: [], regions: [], ...sizeOf(first.png) },
+    ...measured,
   ];
-  for (const [i, shot] of rest.entries()) {
-    const diff = diffPngs(first.png, shot.png, options, {
-      main: first.ignore,
-      branch: shot.ignore,
-    });
-    const sized = diff.mainWidth !== diff.branchWidth || diff.mainHeight !== diff.branchHeight;
-    runs.push({
-      run: i + 2,
-      differed: diff.changed,
-      causes: causesOf(sized, diff.regions),
-      regions: diff.regions,
-      width: diff.branchWidth,
-      height: diff.branchHeight,
-      ...(diff.overlay && { overlay: diff.overlay }),
-    });
-  }
   const differing = runs.filter((r) => r.differed);
   return {
     runs,
@@ -187,7 +193,7 @@ export function suggestFixes(
   if (differing.some((r) => r.causes.includes("size"))) {
     const heights = [...new Set(repro.runs.map((r) => `${r.width}x${r.height}`))].join(", ");
     out.push({
-      text: `The page's size changed between runs (${heights}): something arrives or grows after the page settles. Give it a fixed size (a min-height, an aspect ratio on images), or make it load before network idle.`,
+      text: `The page's size changed between runs (${heights}): something arrives or grows after the page settles. Give it a fixed size (a min-height, an aspect ratio on images), or make it load before the network goes quiet.`,
     });
   }
   out.push(...stabilisation(config));

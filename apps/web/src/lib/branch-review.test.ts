@@ -82,6 +82,7 @@ const shots = [
       reviewedBy: "jacobus",
       reviewedAt: new Date(0),
       defaultBranch: "main",
+      mainChangedSince: false,
     },
   }),
   view("hero", {

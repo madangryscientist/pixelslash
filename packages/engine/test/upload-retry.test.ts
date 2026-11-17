@@ -46,7 +46,7 @@ describe("uploadSnapshots retries what the API never answered", () => {
       "upload: open build: POST /api/v1/builds -> 500 TypeError: fetch failed; trying again (2/6)",
     ]);
     expect(waits).toEqual([1000]);
-    expect(server.calls.map((c) => c.method)).toEqual(["POST", "POST", "PUT", "POST"]);
+    expect(server.calls.map((c) => c.method)).toEqual(["POST", "POST", "POST", "PUT", "POST"]);
   });
 
   test("a retried finalise that meets a run still going is a failure, not a pass", async () => {

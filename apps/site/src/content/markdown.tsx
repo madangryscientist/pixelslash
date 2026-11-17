@@ -5,7 +5,10 @@ import {
   CodeBlock,
   type CodeLanguage,
   Divider,
+  Image,
+  Prose,
   SectionHeading,
+  Stack,
   SubsectionHeading,
   Table,
   TableBody,
@@ -80,7 +83,7 @@ function InlineLink({ token, doc }: { token: Tokens.Link; doc: Doc }): ReactNode
 function InlineImage({ token, doc }: { token: Tokens.Image; doc: Doc }): ReactNode {
   const src = resolveImageSrc(token.href, doc.source);
   if (src === null) return token.text;
-  return <img src={src} alt={token.text} className="block h-auto max-w-full rounded" />;
+  return <Image src={src} alt={token.text} width="full" aspect="natural" />;
 }
 
 function InlineToken({ token, doc }: { token: MarkedToken; doc: Doc }): ReactNode {
@@ -143,7 +146,7 @@ function HeadingBlock({ token, doc }: { token: Tokens.Heading; doc: Doc }): Reac
 
 function ListBlock({ token, doc }: { token: Tokens.List; doc: Doc }): ReactNode {
   const items = token.items.map((item, index) => (
-    <li key={index} className="text-sm/6">
+    <li key={index}>
       <Blocks tokens={marked(item.tokens)} doc={doc} />
     </li>
   ));
@@ -185,7 +188,7 @@ const BLOCKS: Partial<Record<MarkedToken["type"], BlockRenderer>> = {
   heading: (token, doc) => token.type === "heading" && <HeadingBlock token={token} doc={doc} />,
   paragraph: (token, doc) =>
     token.type === "paragraph" && (
-      <p className="text-sm/6">
+      <p>
         <Inline tokens={token.tokens} doc={doc} />
       </p>
     ),
@@ -218,11 +221,16 @@ function Blocks({ tokens, doc }: { tokens: MarkedToken[]; doc: Doc }): ReactNode
   });
 }
 
-/** A whole document's body, its blocks a steady gap apart. */
+/**
+ * A whole document's body, its blocks a steady gap apart, on the kit's reading scale (PS-403): the
+ * body, headings and callouts inside a `Prose` take the long-form sizes, so no size is set here.
+ */
 export function DocBody({ doc }: { doc: Doc }): ReactNode {
   return (
-    <div className="flex min-w-0 flex-col gap-4" data-doc={doc.source}>
-      <Blocks tokens={doc.tokens} doc={doc} />
-    </div>
+    <Prose data-doc={doc.source}>
+      <Stack gap="sm">
+        <Blocks tokens={doc.tokens} doc={doc} />
+      </Stack>
+    </Prose>
   );
 }

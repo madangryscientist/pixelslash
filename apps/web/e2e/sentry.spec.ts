@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, open, test } from "./fixtures";
 import { SENTRY_INGEST, SERVER } from "./ports";
 
 // The run's Worker has a DSN pointing at e2e/sentry-ingest.ts (vite.config.ts), so the review app
@@ -20,7 +20,7 @@ test("a browser error reaches Sentry with release and environment, and no cookie
   context,
 }) => {
   await context.addCookies([{ name: "ps_session", value: COOKIE_SECRET, url: SERVER }]);
-  await page.goto("/");
+  await open(page, "/");
 
   // The reporter loads after hydration, so throw until it is listening; each message differs, so
   // none is dropped as a repeat.

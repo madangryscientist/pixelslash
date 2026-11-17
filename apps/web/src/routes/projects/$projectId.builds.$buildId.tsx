@@ -6,7 +6,7 @@ import { BuildHeader } from "#/components/build-header";
 import { BuildTimings } from "#/components/build-timings";
 import { BuildSummary } from "#/components/build-summary";
 import { BuildTabs, TabBody } from "#/components/build-shots";
-import { buildCrumbLabel, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { buildCrumbLabel, orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { BuildOverrideChanges } from "#/components/override-trail";
 import { RerunErrored } from "#/components/rerun";
 import { UnlinkedShots } from "#/components/twins";
@@ -99,7 +99,6 @@ function BuildNotices({
 }: Pick<Loaded, "project" | "build"> & { error: string | null }) {
   return (
     <>
-      <RunCard />
       <BuildError project={project} build={build} />
       {error && (
         <Callout tone="danger" role="alert">
@@ -136,7 +135,9 @@ function BuildPage() {
     <Page>
       <ListLayout
         breadcrumbs={
-          <Breadcrumbs crumbs={[orgCrumb(org), projectCrumb(project), buildCrumbLabel(build)]} />
+          <Breadcrumbs
+            crumbs={[orgCrumb(org), ...projectCrumbs(project), buildCrumbLabel(build)]}
+          />
         }
         title={`${project.name} · ${build.branch}`}
       >
@@ -184,6 +185,8 @@ function BuildPage() {
         <UnlinkedShots projectId={project.id} buildId={build.id} twins={twins} />
         <RejectionNote />
         <BuildOverrideChanges changes={thresholdChanges} />
+        {/* Diagnostics, not review: folded, and below everything a reviewer acts on (PS-419). */}
+        <RunCard />
       </ListLayout>
     </Page>
   );

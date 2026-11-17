@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { HELPER_VERSION, SCOPE } from "../env/reserve.ts";
+import { HELPER_VERSION } from "../env/reserve.ts";
+import { SCOPE } from "../env/machine.ts";
 import {
   type EnvDeps,
   type EnvHeader,

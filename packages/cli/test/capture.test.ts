@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { libraryProject, PAGES } from "../../engine/test/composition-fixtures.ts";
 import { run } from "../src/run.ts";
-import { FIXTURES, capture, cleanup, tmp } from "./support.ts";
+import { FIXTURES, capture, cleanup, exitReport, freePort, tmp } from "./support.ts";
 
 afterAll(cleanup);
 
@@ -13,7 +13,7 @@ describe("pixelslash capture", () => {
   test("starts the app from the config, captures every route × variant, stops it", async () => {
     const dir = await tmp();
     const config = join(dir, "pixelslash.config.json");
-    const port = 4800 + Math.floor(Math.random() * 500);
+    const port = freePort();
     const serve = join(FIXTURES, "..", "scripts", "serve-capture-fixture.ts");
     await Bun.write(
       config,
@@ -33,7 +33,7 @@ describe("pixelslash capture", () => {
       cap.io,
       pinned,
     );
-    expect(code).toBe(0);
+    expect(exitReport(code, cap.stderr)).toBe("exit 0");
     expect(cap.stdout).toMatch(/pixelslash: 4 snapshots/);
     expect(cap.stdout).toContain('"image":"version:test"');
     expect(cap.stdout).toContain(join(dir, "out", "manifest.json"));
@@ -105,6 +105,25 @@ describe("pixelslash capture", () => {
     expect(await run(["capture", "--config", config], bad.io, pinned)).toBe(2);
     expect(bad.stderr).toMatch(/variants\[0\]\.browser/);
   });
+
+  test.each([
+    [{ threshold: 2 }, /diff\.threshold must be a number from 0 to 1/],
+    [{ minChangedPixels: 1.5 }, /diff\.minChangedPixels must be a non-negative integer/],
+    [{ thresold: 0.1 }, /diff\.thresold is not a diff option/],
+  ])(
+    "a bad `diff` in the config, %j, is a usage error naming the key, exit 2",
+    async (diff, message) => {
+      const dir = await tmp();
+      const config = join(dir, "pixelslash.config.json");
+      await Bun.write(config, JSON.stringify({ baseUrl: "http://x", routes: ["/"], diff }));
+      const cap = capture();
+      expect(
+        await run(["capture", "--config", config, "--out", join(dir, "out")], cap.io, pinned),
+      ).toBe(2);
+      expect(cap.stderr).toMatch(message);
+      expect(cap.stderr).toContain("pixelslash capture [--config FILE]");
+    },
+  );
 });
 
 describe("pixelslash capture, media (PS-230)", () => {

@@ -29,6 +29,7 @@ export const DEV_PAGE_HTML = `<!doctype html>
     ol { display: flex; gap: 6px; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
     ol li { border: 1px solid #333; border-radius: 4px; padding: 4px 8px; font-variant-numeric: tabular-nums; }
     ol li.changed { border-color: #f66; }
+    ol li.failed { border-color: #f66; border-style: dashed; }
     ol li.pin { box-shadow: inset 0 -2px 0 #9cf; }
     ol li.current { background: #223; }
     a { color: #9cf; }
@@ -203,7 +204,9 @@ function draw(s) {
   $("title").textContent = "pixelslash dev · " + s.target;
   $("against").textContent = s.against === "main" ? "Against previous (m)" : "Against main (m)";
   const it = s.latest;
-  $("line").textContent = s.running ? "running…" : it ? line(it) : "waiting for the first run…";
+  const newest = s.timeline[0];
+  const failedNewest = !s.running && newest && newest.error !== undefined ? newest : null;
+  $("line").textContent = s.running ? "running…" : failedNewest ? "#" + Number(failedNewest.id) + " failed: " + failedNewest.error : it ? line(it) : "waiting for the first run…";
   const note = it && it.note ? it.note : s.note;
   $("note").hidden = !note;
   $("note").textContent = note || "";
@@ -212,10 +215,11 @@ function draw(s) {
   const tl = $("timeline");
   tl.replaceChildren();
   for (const t of s.timeline) {
+    const failed = t.error !== undefined;
     const changed = t.counts.changed + t.counts.new + t.counts.removed > 0;
-    const li = el("li", "#" + Number(t.id) + " " + (changed ? t.changedPixels + " px" : "same"));
-    li.className = [changed && "changed", s.pins.includes(t.id) && "pin", it && t.id === it.id && "current"].filter(Boolean).join(" ");
-    li.title = new Date(t.at).toLocaleTimeString() + " · vs " + label(t.against);
+    const li = el("li", "#" + Number(t.id) + " " + (failed ? "failed" : changed ? t.changedPixels + " px" : "same"));
+    li.className = [failed && "failed", changed && "changed", s.pins.includes(t.id) && "pin", it && t.id === it.id && "current"].filter(Boolean).join(" ");
+    li.title = new Date(t.at).toLocaleTimeString() + " · vs " + label(t.against) + (failed ? " · " + t.error : "");
     tl.append(li);
   }
   if (it) drawShots(it); else $("shots").replaceChildren();
@@ -225,7 +229,7 @@ function draw(s) {
 async function tick() {
   try {
     const s = await (await fetch("/api/state", { cache: "no-store" })).json();
-    const key = JSON.stringify([s.running, s.against, s.note, s.pins, s.latest && s.latest.id, s.latest && s.latest.judge, s.latest && s.latest.differences, s.feature]);
+    const key = JSON.stringify([s.running, s.against, s.note, s.pins, s.latest && s.latest.id, s.timeline[0] && s.timeline[0].id, s.timeline[0] && s.timeline[0].error, s.latest && s.latest.judge, s.latest && s.latest.differences, s.feature]);
     if (key !== seen) { seen = key; draw(s); }
   } catch { $("line").textContent = "the dev session has stopped"; }
 }

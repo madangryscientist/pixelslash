@@ -3,8 +3,10 @@ import {
   AppShellBrand,
   Button,
   Caption,
+  Cluster,
   ColourSchemeToggle,
   Container,
+  Stack,
   Tabs,
   TextLink,
 } from "@hackcove/ui-react";
@@ -12,7 +14,9 @@ import type { ReactNode } from "react";
 import { useKeyboardScrollers } from "#/components/keyboard-scrollers";
 import { TRADEMARK } from "#/content/trademark";
 import { APP_LIVE, APP_URL, CONTACT, REPO_PUBLIC, REPO_URL } from "#/content/links";
-import { PAGES } from "#/content/pages";
+import { SLASHSLASH } from "#/content/moved";
+import { NAV } from "#/content/nav";
+import { STAGE_LINE } from "#/content/stage";
 import { Wordmark } from "#/components/logo";
 
 /** The class each scheme puts on <html>: Latte's scope for light, Mocha's for dark. */
@@ -44,26 +48,27 @@ function Controls(): ReactNode {
   );
 }
 
-/** The footer every page shares: the wordmark, the licence and contact lines, then the trademark line. */
-function Footer(): ReactNode {
+/** The footer every page shares: the wordmark, the stage, the licence and contact lines, then the trademark line. */
+export function Footer(): ReactNode {
   return (
-    <div data-testid="footer" className="home-footer flex flex-col gap-4 py-6">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <a href="/" className="flex items-center" aria-label="PixelSlash home">
+    <Stack gap="sm" data-testid="footer">
+      <Cluster wrap gap="md">
+        <TextLink href={SLASHSLASH} aria-label="PixelSlash home">
           <Wordmark />
-        </a>
-        <span>MIT licence</span>
+        </TextLink>
+        <Caption data-testid="stage-footer">{STAGE_LINE}</Caption>
+        <span>Elastic License 2.0</span>
         <TextLink href={`mailto:${CONTACT}`}>{CONTACT}</TextLink>
         <SourceLink />
-      </div>
+      </Cluster>
       <span data-testid="trademark">{TRADEMARK}</span>
-    </div>
+    </Stack>
   );
 }
 
 /**
- * An inner page's ground: the home's canvas with the same aurora and grid fading out over the top
- * of the page, so stepping from the home to any page keeps the look. The page itself sits in the
+ * A page's ground: the aurora and grid of the PixelSlash home fading out over the top of the page,
+ * so stepping from the home on slashslash.build to a docs page keeps the look. The page itself sits in the
  * shell's own Container, over it.
  */
 function PageArt({ children }: { children: ReactNode }): ReactNode {
@@ -85,9 +90,9 @@ function PageArt({ children }: { children: ReactNode }): ReactNode {
 }
 
 /**
- * The frame every page sits in: the brand, the nav, the page, the footer. The homepage's sections
- * run the full width. Every other page is drawn over the same ground (PageArt), and the shell
- * paints that ground under the footer too. The footer is the same on every page.
+ * The frame every page sits in: the brand, the nav, the page, the footer. Every page is drawn over
+ * the same ground (PageArt), and the shell paints that ground under the footer too. The footer is
+ * the same on every page.
  */
 export function Shell({
   pathname,
@@ -96,26 +101,25 @@ export function Shell({
   pathname: string;
   children: ReactNode;
 }): ReactNode {
-  const isHome = pathname === "/";
   useKeyboardScrollers();
-  const items = PAGES.map((page) => ({
-    label: page.label,
-    href: page.to,
+  const items = NAV.map((item) => ({
+    label: item.label,
+    href: item.href,
     // A docs page (`/docs/upload`) keeps Docs marked in the nav.
-    active: page.to === pathname || (page.to !== "/" && pathname.startsWith(`${page.to}/`)),
+    active: item.local && (item.href === pathname || pathname.startsWith(`${item.href}/`)),
   }));
   return (
     <AppShell
-      brand={<AppShellBrand href="/" label={<Wordmark />} />}
+      brand={<AppShellBrand href={SLASHSLASH} label={<Wordmark />} />}
       controls={<Controls />}
       // One row from md: the nav sits between the brand and the controls. On a phone AppShell folds it
       // behind its Menu button; the controls stay in the header.
-      nav={<Tabs variant="pill" items={items} label="Site" size="sm" data-testid="site-nav" />}
+      nav={<Tabs variant="pill" items={items} label="Site" size="md" data-testid="site-nav" />}
       footer={<Footer />}
       bleed
       data-art=""
     >
-      {isHome ? children : <PageArt>{children}</PageArt>}
+      <PageArt>{children}</PageArt>
     </AppShell>
   );
 }

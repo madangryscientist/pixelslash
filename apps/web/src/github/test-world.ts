@@ -1,14 +1,15 @@
 import { eq } from "drizzle-orm";
 import type { ApiDeps } from "#/api/handler";
 import { META, call, idOf, newBuild, setup, snapshotForm } from "#/api/test-support";
-import { setGithubRepo } from "#/db/orgs";
+import { createProject, ensureProject, setGithubRepo } from "#/db/orgs";
 import { decideShot } from "#/db/review";
 import { builds, snapshots } from "#/db/schema";
+import { issueCiToken } from "#/db/tokens";
 import { RED, shot } from "#/diff/test-shots";
 import { syncCheckRuns } from "./check-run";
 import { fakeGithub } from "./test-github";
 
-/** A server, a project on `acme/web` and a stand-in GitHub, for the check run and status tests. Tests only. */
+/** A server, a project on `acme/web` and a stand-in GitHub, for the commit status and PR comment tests. Tests only. */
 
 const PUBLIC_URL = "https://pixelslash.test/";
 export const PLAIN = shot({});
@@ -36,32 +37,52 @@ export async function world({
     commit: string;
     branch: string;
     mergeBase?: string;
+    /** The merge-base's ancestors, nearest first. */
+    ancestors?: string[];
     /** The pull request the build is of (PS-82). */
     pr?: number;
     png: Uint8Array<ArrayBuffer>;
+    /** The CI token to upload with; acme's project by default. */
+    token?: string;
+    /** The subproject of the token's project to upload to; none uploads to the project itself. */
+    subproject?: string;
   }) {
+    const uploadToken = spec.token ?? held.acme.token;
     const opened = await call(
       deps,
       "POST /api/v1/builds",
-      held.acme.token,
+      uploadToken,
       newBuild({
         commitSha: spec.commit,
         branch: spec.branch,
         mergeBaseSha: spec.mergeBase ?? null,
+        ...(spec.ancestors === undefined ? {} : { ancestorShas: spec.ancestors }),
         ...(spec.pr === undefined ? {} : { prNumber: spec.pr }),
+        ...(spec.subproject === undefined ? {} : { subproject: spec.subproject }),
       }),
     );
     const id = await idOf(opened);
     const form = snapshotForm({ ...META, ignore: [] }, spec.png);
-    await call(deps, `PUT /api/v1/builds/${id}/snapshots`, held.acme.token, form);
+    await call(deps, `PUT /api/v1/builds/${id}/snapshots`, uploadToken, form);
     const res = await call(
       deps,
       `POST /api/v1/builds/${id}/finalize`,
-      held.acme.token,
+      uploadToken,
       JSON.stringify({ snapshots: 1 }),
     );
     const body: { status: string; error: string | null } = await res.json();
     return { id, status: res.status, body };
+  }
+
+  /** A subproject of acme's project; returns it. */
+  const addSubproject = async (name: string) =>
+    (await ensureProject(held.db, held.acme.org.id, { name, parentId: project.id })).project;
+
+  /** Another project in acme's org, linked to `repo`; returns its CI token. */
+  async function linkProject(name: string, linkedRepo: string) {
+    const made = await createProject(held.db, user.id, held.acme.org.id, name);
+    await setGithubRepo(held.db, user.id, made.id, linkedRepo);
+    return (await issueCiToken(held.db, user.id, made.id, "ci")).token;
   }
 
   const shotOf = async (buildId: string) => {
@@ -71,15 +92,15 @@ export async function world({
   };
   const buildRow = async (id: string) =>
     (await held.db.select().from(builds).where(eq(builds.id, id)))[0];
-  const decide = async (buildId: string, state: "accepted" | "rejected") =>
+  const decide = async (buildId: string, state: "accepted" | "rejected", projectId = project.id) =>
     (
       await decideShot(held.db, {
-        projectId: project.id,
+        projectId,
         snapshotId: (await shotOf(buildId)).id,
         state,
         userId: user.id,
       })
     ).buildIds;
 
-  return { ...held, github, deps, sync, finalise, decide, buildRow };
+  return { ...held, github, deps, sync, finalise, linkProject, addSubproject, decide, buildRow };
 }

@@ -6,11 +6,13 @@ import {
   INSTALL_NAMES,
   IMAGE_BROWSERS,
   CaptureError,
+  DevLockError,
   FigmaError,
   UploadError,
   UsageError,
   compare,
   compareRoutes,
+  diffCores,
   fetchFigmaRasters,
   isBrowserName,
   loadRoutes,
@@ -57,7 +59,7 @@ import { IMPORT_USAGE, runImport } from "./import.ts";
 import { INIT_USAGE, runInit } from "./init.ts";
 import { MCP_USAGE } from "./mcp-usage.ts";
 import { STATUS_USAGE, runStatus } from "./status.ts";
-import { UPLOAD_USAGE, runUpload } from "./upload.ts";
+import { UPLOAD_USAGE, isUploadFailure, runUpload } from "./upload.ts";
 
 export type Io = { stdout: { write(s: string): void }; stderr: { write(s: string): void } };
 
@@ -90,6 +92,18 @@ function report(cli: Cli, result: CompareResult, io: Io): number {
   return code;
 }
 
+/**
+ * The skip lines of a run. Every route skipped for one shared reason (or a single-route run) is the
+ * one bare `skip: <reason>` line; otherwise one `skip: <route>: <reason>` line per skipped route,
+ * so no route's skip is hidden behind another's verdict.
+ */
+function skipLines(result: CompareResult): string {
+  const skips = result.skippedRoutes ?? [];
+  const shared = new Set(skips.map((s) => s.reason)).size <= 1;
+  if (result.skipped && shared) return `skip: ${result.skipReason ?? "no judge"}\n`;
+  return skips.map((s) => `skip: ${s.route}: ${s.reason}\n`).join("");
+}
+
 function summary(cli: Cli, result: CompareResult, io: Io): number {
   const link = `report: ${fileUrl(result.reportPath)}\n`;
   if (!cli.ds) {
@@ -97,8 +111,9 @@ function summary(cli: Cli, result: CompareResult, io: Io): number {
     io.stdout.write(`pixelslash: ${px} changed pixels\n${link}`);
     return 0;
   }
+  io.stdout.write(skipLines(result));
   if (result.skipped) {
-    io.stdout.write(`skip: ${result.skipReason ?? "no judge"}\n${link}`);
+    io.stdout.write(link);
     return 0;
   }
   const n = result.fresh.length;
@@ -201,14 +216,26 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
     return 0;
   }
   const command = COMMANDS[argv[0] ?? ""];
+  // A bad PIXELSLASH_DIFF_CORES is a usage error (exit 2) before any command starts work.
+  const checked =
+    <T>(work: () => Promise<T>) =>
+    () => {
+      diffCores(deps.env ?? process.env);
+      return work();
+    };
   if (command)
-    return guarded(() => command.run(argv.slice(1), io, deps), io, command.usage, {
-      name: argv[0] ?? "",
-      stage: command.stage,
-      env: deps.env ?? process.env,
-    });
+    return guarded(
+      checked(() => command.run(argv.slice(1), io, deps)),
+      io,
+      command.usage,
+      {
+        name: argv[0] ?? "",
+        stage: command.stage,
+        env: deps.env ?? process.env,
+      },
+    );
   return guarded(
-    async () => {
+    checked(async () => {
       const cli = parseArgs(argv);
       if (cli.routesFile) cli.routes = await loadRoutes(cli.routesFile);
       const figma = cli.file ? await figmaDs(cli, cli.file, deps) : undefined;
@@ -220,20 +247,20 @@ export async function run(argv: string[], io: Io = process, deps: CliDeps = {}):
         // `compare` has already copied the rasters into `--out/ds`, so the temp dir is spent.
         if (figma) await rm(figma, { recursive: true, force: true });
       }
-    },
+    }),
     io,
     USAGE,
     { name: "compare", stage: "compare", env: deps.env ?? process.env },
   );
 }
 
-/** Only the `UPLOAD FAILED` runs of the known errors are Sentry's: a refused argument or a page that would not settle is the user's. */
+/** Only the errors `failedUpload` made (an `UPLOAD FAILED` run, by identity) are Sentry's: a refused argument or a page that would not settle is the user's. */
 async function reportUploadFailure(
   e: Error,
   command: { name: string; env: Record<string, string | undefined> },
   state: RunState,
 ): Promise<void> {
-  if (!e.message.includes("UPLOAD FAILED:")) return;
+  if (!isUploadFailure(e)) return;
   await reportToSentry(command.env, e, {
     kind: "upload",
     command: command.name,
@@ -267,7 +294,12 @@ async function guarded(
       await reportUploadFailure(e, command, state);
       return REMOTE_EXIT;
     }
-    if (e instanceof CaptureError || e instanceof FigmaError || e instanceof UploadError) {
+    if (
+      e instanceof CaptureError ||
+      e instanceof DevLockError ||
+      e instanceof FigmaError ||
+      e instanceof UploadError
+    ) {
       io.stderr.write(`${e.message}\n`);
       await reportUploadFailure(e, command, state);
       return 1;

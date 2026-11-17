@@ -33,7 +33,7 @@ export type DevActions = {
 /** A timeline entry: enough to draw the strip without every shot. */
 type Step = Pick<
   DevIteration,
-  "id" | "at" | "against" | "counts" | "regions" | "changedPixels" | "timings"
+  "id" | "at" | "against" | "counts" | "regions" | "changedPixels" | "timings" | "error"
 >;
 
 export type DevState = DevMode & {
@@ -60,8 +60,8 @@ async function timeline(
     if (steps.length >= limit && !pins.includes(id)) continue;
     const it = await readIteration(store, id);
     if (!it || it.target !== target) continue;
-    const { at, against, counts, regions, changedPixels, timings } = it;
-    steps.push({ id, at, against, counts, regions, changedPixels, timings });
+    const { at, against, counts, regions, changedPixels, timings, error } = it;
+    steps.push({ id, at, against, counts, regions, changedPixels, timings, error });
   }
   return steps;
 }

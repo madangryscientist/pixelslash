@@ -90,7 +90,7 @@ a runner seeing exit 7 must escalate to the PixelSlash planner: this is a bug in
 ```
 
 - The first line is one plain line to grep for. `<stage>` is the step that was running: `capture`, `compare` or `upload`. `check` and `dev` have no stage, so their line has no stage either.
-- The second line says what reached the server. Before the build opened it is `nothing was uploaded`; after some PNGs went it is `upload incomplete: 2/5 shots sent`; after the server finalised the build it is `the upload had finished: 5/5 shots sent`.
+- The second line says what reached the server. Before the build opened it is `nothing was uploaded`; after some PNGs went it is `upload incomplete: 2/5 shots sent`; after the server finalised the build it is `5/5 shots sent and finalised; the failure came after`.
 - The third line is the instruction: this is a bug, so escalate.
 
 An `upload` that fails ends differently. The last two lines of stderr are the upload line and `UPLOAD FAILED: <reason>`, no build link is printed, and the exit is 1: whoever refused the upload and whatever the answer, an upload that did not finish is not a verdict. The one exception is `upload --wait`, which exits as `status` does once the build has been sent. A build the server could not measure is an upload failure too, and also exits 1.

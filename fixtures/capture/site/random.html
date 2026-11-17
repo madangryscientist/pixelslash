@@ -13,8 +13,13 @@
   <div id="box"></div>
   <script>
     // Not the page clock: a pinned clock does not pin this, so no two loads agree.
-    const [r] = crypto.getRandomValues(new Uint32Array(1));
-    document.getElementById("box").style.left = `${24 + (r % 600)}px`;
+    // A driver that wants a guaranteed new position per load (the flake test's site server)
+    // names the left on <html data-left>; a draw on its own can land on the same x twice, so
+    // it is only the fallback for a server that hands out no position.
+    const handed = document.documentElement.dataset.left;
+    const [drawn] = crypto.getRandomValues(new Uint32Array(1));
+    const left = handed === undefined ? 24 + (drawn % 600) : Number(handed);
+    document.getElementById("box").style.left = `${left}px`;
   </script>
 </body>
 </html>

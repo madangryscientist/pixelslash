@@ -5,17 +5,15 @@ import type { Db } from "#/db/db";
 import type { Build } from "#/db/builds";
 import { ABANDONED_REASON } from "#/db/abandoned";
 import { isMarker } from "#/db/markers";
-import { refreshBuildStatus } from "#/db/review";
 import { markStale } from "#/db/stale-apply";
 import { snapshots } from "#/db/schema";
-import { recordRun, runFields } from "#/db/server-timings";
 import { NoRecoveryError, claimForRerun } from "./claim";
 import type { SnapshotRow } from "./compare";
-import { type ProjectOfBuild, markErrored, projectOf } from "./build-writes";
+import { type ProjectOfBuild, projectOf } from "./build-writes";
+import { endErrored, endRun } from "./run-end";
 import { assertMeasured } from "./measured";
 import { type ProcessDeps, type ProcessResult, measureAll, processBuild } from "./process";
 import { RunTimer } from "./run-timer";
-import { queueExplain } from "#/ai/explain-queue";
 
 /**
  * Partial re-runs (ob 1738): measure again only the shots of a build that errored, or one shot
@@ -55,26 +53,26 @@ const resultOf = (row: SnapshotRow) =>
  * status). The main fields are cleared too, so the shot is measured against main again; the
  * overlay keys stay, so the run can drop an overlay it no longer writes.
  */
+/** What a re-diff clears before it measures. */
+const CLEARED = {
+  diffStatus: null,
+  diffResult: null,
+  rebaselineNeeded: false,
+  diffError: null,
+  mainBaselineKey: null,
+  mainDiffStatus: null,
+  aiReview: null,
+  aiQueuedAt: null,
+  aiError: null,
+} as const;
+
 async function clearResults(db: Db, targets: SnapshotRow[]): Promise<void> {
   // The nine cleared fields are bound beside the ids.
   for (const part of chunk(
     targets.map((t) => t.id),
-    9,
+    Object.keys(CLEARED).length,
   ))
-    await db
-      .update(snapshots)
-      .set({
-        diffStatus: null,
-        diffResult: null,
-        rebaselineNeeded: false,
-        diffError: null,
-        mainBaselineKey: null,
-        mainDiffStatus: null,
-        aiReview: null,
-        aiQueuedAt: null,
-        aiError: null,
-      })
-      .where(inArray(snapshots.id, part));
+    await db.update(snapshots).set(CLEARED).where(inArray(snapshots.id, part));
 }
 
 /** Send a shot's review back to pending: three fields bound beside the ids. */
@@ -173,22 +171,18 @@ export async function rediffShots(
     await clearResults(deps.db, targets);
     const held = rows.filter((row) => !isMarker(row));
     const baselines = await selectBaselines(deps.db, build, new Set(held.map(snapshotKeyOf)));
-    const cleared = targets.map((t) => ({ ...t, diffStatus: null, rebaselineNeeded: false }));
+    // As the rows now are: a write sets only what differs from the row it is given (`SnapshotWrites`).
+    const cleared = targets.map((t) => ({ ...t, ...CLEARED }));
     await timer.diff(() =>
       measureAll(deps, { build, project, only: new Set(ids) }, cleared, baselines),
     );
     await markStale(deps.db, build.id);
     await settleReviews(deps.db, { build, project }, targets);
     await assertMeasured(deps.db, build, project);
-    const status = await refreshBuildStatus(deps.db, build.id);
-    await recordRun(deps.db, build.id, timer.ended());
-    // The moved shots are explained again, and the summary written, off the request (ob 1875).
-    await queueExplain(deps, build, { only: ids });
-    return { status, error: null, unmeasured: 0 };
+    return await endRun(deps, build, timer, ids);
   } catch (e) {
     // The review was on a result the shot no longer has: it is decided again once it is measured.
     await reopenReviews(deps.db, ids);
-    const error = await markErrored(deps.db, build, e, runFields(timer.ended()));
-    return { status: "errored", error, unmeasured: 0 };
+    return endErrored(deps.db, build, e, timer);
   }
 }

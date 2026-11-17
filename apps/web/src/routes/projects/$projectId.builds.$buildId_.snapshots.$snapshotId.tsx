@@ -9,16 +9,23 @@ import { FlagPanel, useFlagDraft } from "#/components/detection-flag";
 import { FlakePanel } from "#/components/flake";
 import { EdgeWarning, IgnoreBoxes, useIgnoreDraft } from "#/components/ignore-boxes";
 import { RerunShot } from "#/components/rerun";
-import { ShortcutHelp, ViewerBar } from "#/components/snapshot-panels";
+import type { PanelToggle } from "#/components/snapshot-controls";
+import { ShortcutHelp, StickyRail, ViewerBar } from "#/components/snapshot-panels";
+import { linkToBuild } from "#/components/snapshot-base-link";
 import { SidePanel } from "#/components/snapshot-side-panel";
-import { SnapshotViewer } from "#/components/snapshot-viewer";
-import { buildCrumb, orgCrumb, projectCrumb } from "#/components/crumbs";
+import { SnapshotViewer, useViewState, type ViewState } from "#/components/snapshot-viewer";
+import { buildCrumb, orgCrumb, projectCrumbs } from "#/components/crumbs";
 import { Page } from "#/components/ui";
+import { formatNumber, formatPercent } from "#/lib/format";
 import { ignoreAreas } from "#/lib/ignore-areas";
 import { shotLabeller } from "#/lib/shot-label";
 import { skippedFlaky } from "#/lib/snapshot-groups";
+import { type DecisionState, useDecision } from "#/lib/use-decision";
 import { useRefreshWhile } from "#/lib/use-refresh-while";
 import { useReviewKeys } from "#/lib/use-review-keys";
+import { useWalk } from "#/lib/use-walk";
+import { usePanelFold } from "#/lib/use-panel-fold";
+import { basesOf } from "#/lib/viewer-bases";
 import { getSnapshotPage, reviewShot } from "#/server/fns";
 
 export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snapshots/$snapshotId")(
@@ -35,67 +42,28 @@ export const Route = createFileRoute("/projects/$projectId/builds/$buildId_/snap
   },
 );
 
-/**
- * Accept or reject the shot on screen. An accept that lands moves the reviewer on to the next shot
- * still awaiting one, or to the build page when none is left; the next shot is read after the
- * decision, because this shot's loaded data predates decisions made on the others since it was
- * opened. A reject always goes to the build page: it fails the build, and a failed build takes no
- * more decisions, so the next shot would be a dead screen. Only a refused decision is an error.
- */
-function useDecision(data: ReturnType<typeof Route.useLoaderData>, reviewable: boolean) {
-  const { project, build, snapshot } = data;
-  const projectId = project.id;
-  const buildId = build.id;
-  const snapshotId = snapshot.id;
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/** The decision hook, wired to this shot's server call and routes. */
+function useShotDecision(data: ReturnType<typeof Route.useLoaderData>, reviewable: boolean) {
+  const projectId = data.project.id;
+  const buildId = data.build.id;
+  const snapshotId = data.snapshot.id;
   const go = useWalk(projectId, buildId);
   const navigate = useNavigate();
-  const decide = useCallback(
-    (state: "accepted" | "rejected") => {
-      if (!reviewable) return;
-      setBusy(true);
-      setError(null);
-      const toBuild = () =>
-        void navigate({
-          to: "/projects/$projectId/builds/$buildId",
-          params: { projectId, buildId },
-        });
-      const advance = () =>
-        getSnapshotPage({ data: { projectId, buildId, snapshotId } }).then(
-          ({ build: fresh, nextToReviewId }) => {
-            // Another reviewer's reject can land between this accept and the read: the build is failed then.
-            const stillDecidable = fresh.status === "changes" || fresh.status === "passed";
-            if (nextToReviewId && stillDecidable) go(nextToReviewId);
-            else toBuild();
-          },
-          toBuild,
-        );
-      reviewShot({ data: { projectId, snapshotId, state } })
-        .then(
-          () => (state === "rejected" ? toBuild() : advance()),
-          (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
-        )
-        .finally(() => setBusy(false));
-    },
-    [reviewable, projectId, buildId, snapshotId, go, navigate],
+  const review = useCallback(
+    (state: DecisionState) =>
+      // Only an accept moves on to another shot, so only an accept asks where to.
+      reviewShot({ data: { projectId, snapshotId, state, next: state === "accepted" } }),
+    [projectId, snapshotId],
   );
-  return { busy, error, decide };
-}
-
-/** Go to another shot of the same build; null (the end of the walk) goes nowhere. */
-function useWalk(projectId: string, buildId: string) {
-  const navigate = useNavigate();
-  return useCallback(
-    (id: string | null) => {
-      if (!id) return;
+  const toBuild = useCallback(
+    () =>
       void navigate({
-        to: "/projects/$projectId/builds/$buildId/snapshots/$snapshotId",
-        params: { projectId, buildId, snapshotId: id },
-      });
-    },
+        to: "/projects/$projectId/builds/$buildId",
+        params: { projectId, buildId },
+      }),
     [navigate, projectId, buildId],
   );
+  return useDecision({ reviewable, review, go, toBuild });
 }
 
 function DecisionError({ error }: { error: string | null }) {
@@ -158,20 +126,27 @@ function SideColumn({
 }) {
   const { project, build, snapshot } = data;
   return (
-    <SidePanel
-      projectId={project.id}
-      buildId={build.id}
-      snapshot={snapshot}
-      options={data.diffOptions}
-      reviewable={reviewable}
-      status={build.status}
-      metrics={data.metrics}
-      twins={data.twins}
-      tools={hasTools(data) ? <ShotTools data={data} ignore={ignore} /> : null}
-    >
-      <FlagPanel projectId={project.id} snapshotId={snapshot.id} flags={data.flags} draft={flag} />
-      {data.flake && <Flake data={data} />}
-    </SidePanel>
+    <StickyRail>
+      <SidePanel
+        projectId={project.id}
+        buildId={build.id}
+        snapshot={snapshot}
+        options={data.diffOptions}
+        reviewable={reviewable}
+        status={build.status}
+        metrics={data.metrics}
+        twins={data.twins}
+        tools={hasTools(data) ? <ShotTools data={data} ignore={ignore} /> : null}
+      >
+        <FlagPanel
+          projectId={project.id}
+          snapshotId={snapshot.id}
+          flags={data.flags}
+          draft={flag}
+        />
+        {data.flake && <Flake data={data} />}
+      </SidePanel>
+    </StickyRail>
   );
 }
 
@@ -179,20 +154,85 @@ function ShotCrumbs({ data }: { data: ReturnType<typeof Route.useLoaderData> }) 
   const { org, project, build, snapshot } = data;
   return (
     <Breadcrumbs
-      crumbs={[orgCrumb(org), projectCrumb(project), buildCrumb(project.id, build), snapshot.name]}
+      crumbs={[
+        orgCrumb(org),
+        ...projectCrumbs(project),
+        buildCrumb(project.id, build),
+        snapshot.name,
+      ]}
     />
+  );
+}
+
+/** The centre column: the viewer, and the composition and accessibility findings under it. */
+function ViewerStage({
+  data,
+  error,
+  flag,
+  ignore,
+  ignored,
+  view,
+  panel,
+}: {
+  data: ReturnType<typeof Route.useLoaderData>;
+  error: string | null;
+  flag: ReturnType<typeof useFlagDraft>;
+  ignore: ReturnType<typeof useIgnoreDraft>;
+  ignored: ReturnType<typeof ignoreAreas>;
+  view: ViewState;
+  panel: PanelToggle | null;
+}) {
+  const { snapshot, images, project, build } = data;
+  const bases = basesOf(
+    { branch: build.branch, baselineBuild: data.baselineBuild, snapshot, images },
+    { number: formatNumber, percent: formatPercent },
+    linkToBuild(project.id),
+  );
+  return (
+    <Stack gap="sm">
+      <DecisionError error={error} />
+      <EdgeWarning result={snapshot.diffResult} />
+      <CompositionFocus>
+        <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
+          <SnapshotViewer
+            snapshotId={snapshot.id}
+            bases={bases}
+            name={snapshot.name}
+            mainUrl={images.main}
+            branchUrl={images.branch}
+            diffUrl={images.diff}
+            result={snapshot.diffResult}
+            removed={snapshot.diffStatus === "removed"}
+            composition={snapshot.composition}
+            marks={flag.marks}
+            onDraw={flag.onDraw ?? ignore.onDraw}
+            ignored={ignored}
+            view={view}
+            panel={panel}
+          />
+        </RegionNotesProvider>
+        <CompositionPanel composition={snapshot.composition} />
+        <A11yPanel diff={snapshot.a11yDiff} />
+      </CompositionFocus>
+    </Stack>
   );
 }
 
 function SnapshotPage() {
   const data = Route.useLoaderData();
-  const { project, build, snapshot, images, previousId, nextId, names } = data;
+  const { project, build, snapshot, previousId, nextId, names } = data;
   const reviewable = build.status === "changes" || build.status === "passed";
-  const { busy, error, decide } = useDecision(data, reviewable);
+  const { busy, error, decide } = useShotDecision(data, reviewable);
   const [help, setHelp] = useState(false);
   const flag = useFlagDraft(snapshot.id, data.flags, snapshot.diffResult !== null);
   const ignore = useIgnoreDraft(snapshot.id);
   const ignored = ignoreAreas(snapshot, data.uploadedIgnore, ignore.rect);
+  const view = useViewState();
+  // The flag form and the ignore tools live in the panel, so it stays while they are in use.
+  const { folded, toggle } = usePanelFold(
+    view,
+    flag.open || ignore.drawing || ignore.rect !== null,
+  );
   const label = useMemo(() => shotLabeller(names)(snapshot.name), [names, snapshot.name]);
   useRefreshWhile(snapshot.aiPending);
 
@@ -208,14 +248,17 @@ function SnapshotPage() {
     helpOpen: help,
   });
 
+  const crumbs = <ShotCrumbs data={data} />;
   return (
     <Page bleed>
+      {/* On a phone the breadcrumbs scroll away above the bar; from sm they sit in it. */}
+      <div className="px-4 pt-2 sm:hidden">{crumbs}</div>
       <FullBleedLayout
         padded
         bar={
           <ViewerBar
             {...data}
-            breadcrumbs={<ShotCrumbs data={data} />}
+            breadcrumbs={crumbs}
             label={label}
             reviewable={reviewable}
             busy={busy}
@@ -230,30 +273,22 @@ function SnapshotPage() {
             }}
           />
         }
-        panel={<SideColumn data={data} flag={flag} ignore={ignore} reviewable={reviewable} />}
+        panelLabel="Review panel"
+        panel={
+          folded ? null : (
+            <SideColumn data={data} flag={flag} ignore={ignore} reviewable={reviewable} />
+          )
+        }
       >
-        <Stack gap="sm">
-          <DecisionError error={error} />
-          <EdgeWarning result={snapshot.diffResult} />
-          <CompositionFocus>
-            <RegionNotesProvider notes={snapshot.aiReview?.regions ?? []}>
-              <SnapshotViewer
-                name={snapshot.name}
-                mainUrl={images.main}
-                branchUrl={images.branch}
-                diffUrl={images.diff}
-                result={snapshot.diffResult}
-                removed={snapshot.diffStatus === "removed"}
-                composition={snapshot.composition}
-                marks={flag.marks}
-                onDraw={flag.onDraw ?? ignore.onDraw}
-                ignored={ignored}
-              />
-            </RegionNotesProvider>
-            <CompositionPanel composition={snapshot.composition} />
-            <A11yPanel diff={snapshot.a11yDiff} />
-          </CompositionFocus>
-        </Stack>
+        <ViewerStage
+          data={data}
+          error={error}
+          flag={flag}
+          ignore={ignore}
+          ignored={ignored}
+          view={view}
+          panel={toggle}
+        />
       </FullBleedLayout>
       {help && <ShortcutHelp onClose={() => setHelp(false)} />}
     </Page>

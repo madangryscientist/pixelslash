@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
+import { buildView } from "#/db/review";
 import { snapshots } from "#/db/schema";
 import { MAX_FINDINGS } from "./validate-composition";
 import { META, call, openBuild, setup, snapshotForm } from "./test-support";
@@ -33,6 +34,18 @@ describe("a shot's composition findings (ob 1850)", () => {
     ).toBe(200);
     const rows = await db.select().from(snapshots).where(eq(snapshots.buildId, id));
     const by = new Map(rows.map((r) => [r.name, r.composition]));
+    expect(by.get("pricing")).toEqual(FOUND);
+    expect(by.get("plain")).toBeNull();
+  });
+
+  test("the build view hands the stored findings to the screens, and a shot without them gets null", async () => {
+    const { db, deps, acme } = await setup();
+    const id = await openBuild(deps, acme.token);
+    const path = `PUT /api/v1/builds/${id}/snapshots`;
+    await call(deps, path, acme.token, snapshotForm({ ...META, composition: FOUND }));
+    await call(deps, path, acme.token, snapshotForm({ ...META, name: "plain" }));
+    const view = await buildView(db, acme.project.id, id);
+    const by = new Map(view.snapshots.map((s) => [s.name, s.composition]));
     expect(by.get("pricing")).toEqual(FOUND);
     expect(by.get("plain")).toBeNull();
   });

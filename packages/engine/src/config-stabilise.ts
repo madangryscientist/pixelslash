@@ -13,7 +13,7 @@ export type Stabilise = {
    */
   timers: boolean;
   deviceScaleFactor: number;
-  /** Bounds navigation and the settle (fonts, images, network idle, two frames). The settle itself is not optional. */
+  /** Bounds navigation and the settle (fonts, images, the network, two frames). The settle itself is not optional. */
   timeoutMs: number;
 };
 

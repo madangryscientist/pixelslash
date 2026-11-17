@@ -10,19 +10,26 @@ import {
   checkAgainstServer,
   findConfig,
   loadConfig,
+  loadNow,
   onlyRoutes,
   openCaptureSession,
   timingLine,
 } from "@hackcove/pixelslash-engine";
 import { RemoteError } from "./api.ts";
-import { readFlagPairs, takeJson, takeOnly } from "./args.ts";
+import {
+  concurrencyFlag,
+  flakeRetries,
+  readFlagPairs,
+  takeJson,
+  takeOnly,
+  withConcurrency,
+} from "./args.ts";
 import { type Remote, connect, namesProject, resolveProject } from "./remote.ts";
 import type { Io } from "./run.ts";
-import { flakeRetries } from "./upload.ts";
 import { type Watch, watched } from "./watch.ts";
 
 export const CHECK_USAGE =
-  "pixelslash check [--config FILE] [--out DIR] [--base BRANCH] [--only NAME]... [--server URL] [--token-path PATH] [--project ID|NAME] [--flake-retries N] [--json]\nCaptures the config's routes (the app must already be up), fetches the baselines the server would pick for this commit, and writes the same report `compare` does into DIR/report. Nothing is uploaded. Exit 0 whether or not anything changed; 3 when the server refuses or cannot be reached.";
+  "pixelslash check [--config FILE] [--out DIR] [--base BRANCH] [--only NAME]... [--server URL] [--token-path PATH] [--project ID|NAME] [--flake-retries N] [--concurrency N] [--json]\nCaptures the config's routes (the app must already be up), fetches the baselines the server would pick for this commit, and writes the same report `compare` does into DIR/report. Nothing is uploaded. Exit 0 whether or not anything changed; 3 when the server refuses or cannot be reached.";
 
 const CHECK_FLAGS = [
   "config",
@@ -32,6 +39,7 @@ const CHECK_FLAGS = [
   "token-path",
   "project",
   "flake-retries",
+  "concurrency",
 ] as const;
 
 function summary(result: CheckResult): string {
@@ -113,9 +121,11 @@ export async function checkLocal(
   watch: Watch = {},
 ): Promise<CheckResult> {
   const started = performance.now();
+  const startLoad = loadNow();
   const retries = flakeRetries(flags["flake-retries"]);
+  const concurrency = concurrencyFlag(flags.concurrency);
   const cwd = deps.cwd ?? process.cwd();
-  const config = await loadConfig(findConfig(flags.config, cwd));
+  const config = withConcurrency(await loadConfig(findConfig(flags.config, cwd)), concurrency);
   const remote = await connect(flags, { ...deps, cwd });
   const opts = await optionsOf(flags, remote, cwd);
   opts.only = only;
@@ -124,7 +134,11 @@ export async function checkLocal(
   try {
     const total = onlyRoutes(session, only).routes.length * config.variants.length;
     // The total counts from the command's start, the browser launch included.
-    return await checkAgainstServer(watched(session, watch, total), opts, { ...deps, started });
+    return await checkAgainstServer(watched(session, watch, total), opts, {
+      ...deps,
+      started,
+      startLoad,
+    });
   } catch (e) {
     if (e instanceof UploadError) throw new RemoteError(e.message);
     throw e;

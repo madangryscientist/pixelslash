@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { BRIEF_LIMIT } from "@hackcove/pixelslash-engine/brief";
 import type { Build } from "#/db/builds";
 import type { Db } from "#/db/db";
@@ -251,7 +251,10 @@ async function ask(deps: SummaryDeps, build: Build): Promise<AiSummary | null> {
       aiReview: snapshots.aiReview,
     })
     .from(snapshots)
-    .where(eq(snapshots.buildId, build.id));
+    .where(eq(snapshots.buildId, build.id))
+    // The order the shots were sent in, so the prompt reads as the upload did. No index gives it
+    // since the shots' build index went (a lookup by build reads the unique index, in name order).
+    .orderBy(sql`rowid`);
   // A build with many changes gets no summary and no call (ob 1833); its region labels are separate.
   if (tooManyChanges(rows.filter((row) => row.diffStatus === "changed").length)) return null;
   const input = summaryInput(rows, build.brief);

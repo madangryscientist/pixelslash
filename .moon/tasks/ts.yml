@@ -1,0 +1,42 @@
+# Inherited by the projects tagged `ts`: every TypeScript project. Every task hashes the whole repo,
+# not its own project plus a list: the projects import files outside their roots (the site renders
+# docs/ and root *.md, the web app's perf script imports bench/src, the vitest configs load
+# scripts/*), and a list that misses one serves a stale green. moon has no `^default` either, so
+# this also covers the engine every project imports. A docs-only change re-runs every TS task; a
+# stale green is worse than a slower run.
+$schema: "../cache/schemas/tasks.json"
+
+inheritedBy:
+  tags: ["ts"]
+
+implicitInputs:
+  - "/**/*"
+  # moon's input globs do not read .gitignore, so what a build or a test run leaves behind is listed
+  # here: moon's own cache, node_modules (a workspace package's holds symlinks the glob still walks),
+  # dist, the licence files and tarballs the package builds copy in, the CLI's wasm copy, .wrangler,
+  # the Playwright output and snapshots, the pack output, a local run's .pixelslash/, and the dotnet
+  # and cargo build output (present after a local build, so listed even where nothing matches today).
+  - "!/.moon/cache/**"
+  - "!/**/.pixelslash/**"
+  - "!/packs/**"
+  - "!/**/pixelslash-snapshots/**"
+  - "!/**/node_modules/**"
+  - "!/**/dist/**"
+  - "!/**/.wrangler/**"
+  - "!/**/.tanstack/**"
+  - "!/**/test-results/**"
+  - "!/**/playwright-report/**"
+  - "!/packages/cli/wasm/**"
+  - "!/packages/*/LICENSE"
+  - "!/packages/*/NOTICE"
+  - "!/packages/*/*.tgz"
+  - "!/bench/imported/**"
+  - "!/bench/perf-results/**"
+  - "!/**/bin/**"
+  - "!/**/obj/**"
+  - "!/**/TestResults/**"
+  - "!/engines/dotnet/native/out/**"
+  - "!/engines/wasm/target/**"
+  - "!/engines/wasm/native/target/**"
+  # routeTree.gen.ts is left in: `tsr generate` rewrites it to the same bytes, so the hash holds, and
+  # the tests import it through src/router.tsx.

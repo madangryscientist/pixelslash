@@ -1,9 +1,9 @@
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { type Build, getBuild } from "#/db/builds";
 import { chunk } from "#/db/chunks";
 import type { Db } from "#/db/db";
 import { projectModelFor } from "#/db/models";
-import { refreshBuildStatus } from "#/db/review";
+import { refreshBuildStatus } from "#/db/verdict";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { builds, projects, snapshots } from "#/db/schema";
 import { finishedAfter, msBetween, recordExplained } from "#/db/server-timings";
@@ -11,6 +11,7 @@ import { projectOf } from "#/diff/build-writes";
 import { warn } from "#/lib/log";
 import type { BlobStore } from "#/storage/blobs";
 import { type ExplainDeps, type Shot, messageOf, shotsToExplain, storeShot } from "./explain";
+import { EXPLAIN_STALE_MS } from "./explain-pending";
 import type { ModelFetch } from "./model";
 import { summarizeBuild } from "./summary";
 
@@ -154,7 +155,7 @@ export type ConsumerDeps = {
   /** The model's transport; a test passes a stub. Never a real endpoint in tests. */
   modelFetch?: ModelFetch | undefined;
   modelKeySecret?: string | undefined;
-  /** The GitHub App a build's check run is synced with when a shot's notes pass it (PS-23). */
+  /** The GitHub App a build's commit status is synced with when a shot's notes pass it (PS-23). */
   checkRuns?: Omit<CheckRunDeps, "db"> | undefined;
 };
 
@@ -250,8 +251,10 @@ async function explainJob(
     .returning({ id: snapshots.id });
   if (settled.length > 0) await recordSettled(deps, job);
   if (outcome.passed) {
-    await refreshBuildStatus(deps.db, job.buildId);
-    if (deps.checkRuns) await syncCheckRuns({ db: deps.db, ...deps.checkRuns }, [job.buildId]);
+    // A build a run holds again (or that errored) is not given a verdict by a late explain (PS-392).
+    const verdict = await refreshBuildStatus(deps.db, job.buildId);
+    if (verdict !== null && deps.checkRuns)
+      await syncCheckRuns({ db: deps.db, ...deps.checkRuns }, [job.buildId]);
   }
   return "done";
 }
@@ -308,6 +311,12 @@ async function answerShot(
  * fails, so the page keeps waiting for it. A re-run that queues the build again while the call is
  * out wins: the late answer is stored only against the queueing it claimed. A shot whose consumer
  * died holds the summary back until it is stale; then the page offers Regenerate.
+ *
+ * A claim older than `EXPLAIN_STALE_MS` (strictly) may be taken over by this call (PS-396): its
+ * claimer died mid-call, and the taker-over writes the summary as a first claimer would. A claimer
+ * that was only slow and finishes later writes a summary of the same queueing too; the later write
+ * stands. Only a later call wakes the takeover (a redelivered or later job for the build): a
+ * claimer that dies with no later call for the build leaves the summary to Regenerate.
  */
 async function summarizeWhenExplained(deps: ConsumerDeps, buildId: string): Promise<void> {
   const [waiting] = await deps.db
@@ -316,14 +325,18 @@ async function summarizeWhenExplained(deps: ConsumerDeps, buildId: string): Prom
     .where(and(eq(snapshots.buildId, buildId), isNotNull(snapshots.aiQueuedAt)))
     .limit(1);
   if (waiting) return;
+  const claimedAt = (deps.now ?? Date.now)();
   const [held] = await deps.db
     .update(builds)
-    .set({ aiSummaryClaimedAt: new Date((deps.now ?? Date.now)()) })
+    .set({ aiSummaryClaimedAt: new Date(claimedAt) })
     .where(
       and(
         eq(builds.id, buildId),
         isNotNull(builds.aiSummaryQueuedAt),
-        isNull(builds.aiSummaryClaimedAt),
+        or(
+          isNull(builds.aiSummaryClaimedAt),
+          lt(builds.aiSummaryClaimedAt, new Date(claimedAt - EXPLAIN_STALE_MS)),
+        ),
       ),
     )
     .returning({ projectId: builds.projectId, queuedAt: builds.aiSummaryQueuedAt });

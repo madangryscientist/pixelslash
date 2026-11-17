@@ -21,27 +21,47 @@ export interface SweepBlobStore extends BlobStore {
 /** R2 deletes at most this many keys in one call. */
 const R2_DELETE_BATCH = 1000;
 
-export function r2SweepStore(bucket: R2Bucket): SweepBlobStore {
+/** The part of an R2 bucket the stores use, so a test can hand in a recording view of one. */
+type R2Store = Pick<R2Bucket, "put" | "get" | "delete">;
+
+/**
+ * Both default to R2's own limits: a list page is 1000 keys (no `limit` is passed) and a delete
+ * takes at most `R2_DELETE_BATCH` keys. A test passes small numbers to cross a page or a batch
+ * without writing a thousand objects.
+ */
+export interface R2SweepOptions {
+  pageSize?: number;
+  deleteBatch?: number;
+}
+
+export function r2SweepStore(
+  bucket: R2Store & Pick<R2Bucket, "list">,
+  { pageSize, deleteBatch = R2_DELETE_BATCH }: R2SweepOptions = {},
+): SweepBlobStore {
   return {
     ...r2BlobStore(bucket),
     async list(dir) {
       const found: { key: string; size: number }[] = [];
       let cursor: string | undefined;
       do {
-        const page = await bucket.list({ prefix: `${dir}/`, ...(cursor && { cursor }) });
+        const page = await bucket.list({
+          prefix: `${dir}/`,
+          ...(pageSize && { limit: pageSize }),
+          ...(cursor && { cursor }),
+        });
         found.push(...page.objects.map((o) => ({ key: o.key, size: o.size })));
         cursor = page.truncated ? page.cursor : undefined;
       } while (cursor);
       return found;
     },
     async deleteMany(keys) {
-      for (let at = 0; at < keys.length; at += R2_DELETE_BATCH)
-        await bucket.delete(keys.slice(at, at + R2_DELETE_BATCH));
+      for (let at = 0; at < keys.length; at += deleteBatch)
+        await bucket.delete(keys.slice(at, at + deleteBatch));
     },
   };
 }
 
-export function r2BlobStore(bucket: R2Bucket): BlobStore {
+export function r2BlobStore(bucket: R2Store): BlobStore {
   return {
     async put(key, body, contentType) {
       await bucket.put(key, body, { httpMetadata: { contentType } });

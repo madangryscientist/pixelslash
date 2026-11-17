@@ -21,8 +21,8 @@ import { BadRequest, Forbidden } from "./validate";
 /**
  * The read API (ob 1729): what the CLI and the MCP server read builds and shots with. Every
  * handler reaches rows through `db/actor.ts` and shapes them from the `db/*` read models; none
- * queries by itself. Keys are snake_case and every reply carries `api_version`. `/api/v1` is a
- * stable contract: a field may be added, never renamed, retyped or removed (AGENTS.md).
+ * queries by itself. Keys are snake_case and every reply carries `api_version`. `/api/v1` follows the
+ * project's stage (AGENTS.md, invariant 7): in alpha a field may be renamed, retyped or removed.
  */
 export const API_VERSION = 1;
 
@@ -106,6 +106,9 @@ export function counts(c: BuildCounts) {
     rejected: c.rejected,
     to_review: c.toReview,
     skipped_flaky: c.skippedFlaky,
+    // What the branch changes against main, as the build page's Changed and New tabs count it:
+    // the carried shots are in here, which `changed` and `new` above leave out (PS-429).
+    against_main: { changed: c.changed, new: c.new },
   };
 }
 
@@ -216,6 +219,8 @@ export function projectOf(ctx: ReadCtx, p: Awaited<ReturnType<typeof actorProjec
     default_branch: p.defaultBranch,
     // The project whose shots this one's are paired with (PS-295); null when none is linked.
     twin_project_id: p.twinProjectId,
+    // The top-level project this one is a subproject of; null for a top-level project.
+    parent_project_id: p.parentId,
     created_at: iso(p.createdAt),
     web_url: `${ctx.origin}/projects/${p.id}`,
   };

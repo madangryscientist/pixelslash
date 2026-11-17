@@ -27,9 +27,10 @@ const RETRIED = new Set<string | symbol>(["run", "all", "raw", "first"]);
 
 /**
  * The binding with every statement tried again while the database is locked. Wrap it where the
- * `Db` is made, so every query, the diff and finalize path included, rides out a short lock. Only
- * single statements are retried: nothing here uses `batch` or `exec`, and replaying a multi-statement
- * `exec` after a busy partway through would run its first statements twice.
+ * `Db` is made, so every query, the diff and finalize path included, rides out a short lock. A
+ * statement and a `batch` are retried: a batch is one transaction, so a busy one ran none of its
+ * statements. `exec` is not: replaying a multi-statement `exec` after a busy partway through would
+ * run its first statements twice.
  */
 export function retryBusy(d1: D1Database): D1Database {
   const wrap = (statement: D1PreparedStatement): D1PreparedStatement =>
@@ -46,6 +47,8 @@ export function retryBusy(d1: D1Database): D1Database {
   return new Proxy(d1, {
     get(target, prop) {
       if (prop === "prepare") return (query: string) => wrap(target.prepare(query));
+      if (prop === "batch")
+        return (statements: D1PreparedStatement[]) => whileBusy(() => target.batch(statements));
       const member = Reflect.get(target, prop, target);
       return typeof member === "function" ? member.bind(target) : member;
     },

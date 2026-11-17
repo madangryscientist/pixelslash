@@ -10,7 +10,11 @@ type Slice = StackedSegment & { key: string };
 /**
  * What a build's shots came to, in the order a reviewer cares about. Only what was measured is
  * painted as unchanged: a shot the server never compared, or could not compare against another
- * environment's baseline, is its own grey (`neutral`, apart from the `muted` unchanged) and its own words.
+ * environment's baseline, is its own grey (`muted`, apart from the `neutral` unchanged) and its own words.
+ *
+ * Unchanged is the quiet slice: `neutral`, the dimmest of the kit's `VizTone`s (overlay1 in the dark
+ * theme, against subtext0 for `muted`). In the light theme it is about as light as `muted`, and the
+ * kit has no paler tone, so there the changed, new and removed hues set it apart, not its weight.
  */
 function slicesOf(counts: BuildCounts): Slice[] {
   const slices: Slice[] = [
@@ -21,9 +25,9 @@ function slicesOf(counts: BuildCounts): Slice[] {
       key: "unmeasured",
       label: "not measured",
       value: counts.unmeasured + counts.rebaseline,
-      tone: "neutral",
+      tone: "muted",
     },
-    { key: "unchanged", label: "unchanged", value: counts.unchanged, tone: "muted" },
+    { key: "unchanged", label: "unchanged", value: counts.unchanged, tone: "neutral" },
   ];
   return slices.filter((slice) => slice.value > 0);
 }

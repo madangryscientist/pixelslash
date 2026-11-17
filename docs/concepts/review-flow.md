@@ -8,7 +8,7 @@ Everything on this page runs on a server you run yourself. [Self-hosting](../../
 
 1. **Upload.** CI captures the shots and sends them to the server, which opens a build.
 2. **Wait.** CI waits on the build. Shots that changed wait for a person.
-3. **Decide.** Someone accepts or rejects each change in the server's web app.
+3. **Decide.** Someone accepts or rejects each change in the server's web app, or has their coding agent do it for them.
 4. **Exit.** The waiting job exits with the result, and CI passes or fails on it.
 
 ## Upload
@@ -52,7 +52,7 @@ The build's page in the web app shows the change. Each decision records who made
 - **Accept** means the change was meant. `a` accepts a shot, and **Accept all** takes every change in the build.
 - **Reject** means it wasn't. `r` rejects a shot.
 
-The CLI has no command for this, and neither does the API or the agent tools. A review decision is a person's.
+The CLI has no command for this. A coding agent can decide for you through [`pixelslash mcp`](../cli.md#your-coding-agent-pixelslash-mcp) (`review_snapshot`, `accept_build`), or a script through the [API](../cli.md#api), with the same effect as the buttons. A review decision is still a person's: it needs your personal token, not a CI token, and is recorded under your name.
 
 Accepting all skips a flaky shot under the `skip` policy, so a shot nobody could judge isn't approved by accident.
 

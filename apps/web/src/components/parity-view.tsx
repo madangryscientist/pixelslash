@@ -1,4 +1,19 @@
-import { Caption, Callout, Card, Overline, Stack, Text, TextLink } from "@hackcove/ui-react";
+import {
+  Caption,
+  Callout,
+  Card,
+  Overline,
+  ScrollStrip,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  Text,
+  TextLink,
+} from "@hackcove/ui-react";
 import { Link } from "@tanstack/react-router";
 import { StaleBadge } from "#/components/stale";
 import {
@@ -95,7 +110,7 @@ function ShotColumn({ column }: { column: ParityShotColumn }) {
 
 function Columns({ columns }: { columns: ParityView["columns"] }) {
   return (
-    <div className="flex items-start gap-6 overflow-x-auto pb-2" data-testid="parity-columns">
+    <ScrollStrip label="Shots by platform" gap="md" data-testid="parity-columns">
       {columns.map((c) =>
         c.kind === "missing" ? (
           <Stack
@@ -118,7 +133,7 @@ function Columns({ columns }: { columns: ParityView["columns"] }) {
           <ShotColumn key={c.snapshotId} column={c} />
         ),
       )}
-    </div>
+    </ScrollStrip>
   );
 }
 
@@ -163,39 +178,40 @@ function Pair({ pair }: { pair: ParityPairView }) {
 
 function RawNumbers({ metrics }: { metrics: ParityMetricsView }) {
   if (metrics.raw.length === 0) return null;
+  const caption = "The numbers each shot measured";
   return (
-    <div className="overflow-x-auto">
-      <table className="text-sm" data-testid="parity-raw">
-        <caption className="pb-1 text-left">
-          <Caption tone="muted">The numbers each shot measured</Caption>
-        </caption>
-        <thead>
-          <tr>
-            <th className="pr-4 text-left">Part</th>
-            <th className="pr-4 text-left">Field</th>
+    <Stack gap="xs">
+      <Caption as="p" tone="muted">
+        {caption}
+      </Caption>
+      <Table variant="plain" caption={caption} data-testid="parity-raw">
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Part</TableHeaderCell>
+            <TableHeaderCell>Field</TableHeaderCell>
             {metrics.rawColumns.map((c) => (
-              <th key={c.snapshotId} className="pr-4 text-left">
+              <TableHeaderCell key={c.snapshotId}>
                 {c.label}
                 {!c.measured && <> ({NOT_MEASURED})</>}
-              </th>
+              </TableHeaderCell>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHead>
+        <TableBody>
           {metrics.raw.map((r) => (
-            <tr key={`${r.part}:${r.field}`}>
-              <td className="pr-4">{r.part}</td>
-              <td className="pr-4">{r.field}</td>
+            <TableRow key={`${r.part}:${r.field}`}>
+              <TableCell>{r.part}</TableCell>
+              <TableCell>{r.field}</TableCell>
               {r.values.map((v, i) => (
-                <td key={metrics.rawColumns[i]?.snapshotId ?? i} className="pr-4">
+                <TableCell key={metrics.rawColumns[i]?.snapshotId ?? i} mono>
                   {v ?? "n/a"}
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </Stack>
   );
 }
 

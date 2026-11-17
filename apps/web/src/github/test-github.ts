@@ -54,13 +54,12 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
   const calls: Call[] = [];
   let mode: Mode = "ok";
   let minted = 0;
-  let nextRun = 100;
-  let nextStatus = 500;
   let nextComment = 900;
   /** The PR comments that exist, by id: a PATCH or DELETE of another id is GitHub's 404. */
   const comments = new Map<number, string>();
-  /** A status the comment endpoints fail with, the rest of the API still answering. */
+  /** What the comment and commit-status endpoints fail with, the rest of the API still answering. */
   let commentFailure: number | null = null;
+  let statusFailure: number | null = null;
 
   /** GitHub's answer to a call that gets one. */
   function route(method: string, path: string, body: string): Response {
@@ -102,12 +101,11 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
     return null;
   }
 
-  /** The check-run and commit-status endpoints. */
+  /** The check-run PATCH (a legacy run being completed) and the commit-status endpoint. */
   function routeChecks(method: string, path: string): Response {
-    if (method === "POST" && path.endsWith("/check-runs")) return reply(201, { id: nextRun++ });
     if (method === "PATCH" && /\/check-runs\/\d+$/.test(path)) return reply(200, {});
     if (method === "POST" && /^\/repos\/[^/]+\/[^/]+\/statuses\/[0-9a-f]+$/.test(path))
-      return reply(201, { id: nextStatus++ });
+      return reply(statusFailure ?? 201, {});
     return reply(404, { message: "Not Found" });
   }
 
@@ -125,7 +123,11 @@ export function fakeGithub({ now = Date.now }: { now?: () => number } = {}) {
     setMode: (next: Mode) => {
       mode = next;
     },
-    /** The calls on check runs, without the token traffic. */
+    /** From now on only the commit-status endpoint fails, with this status. */
+    failStatuses: (status: number | null) => {
+      statusFailure = status;
+    },
+    /** The calls on check runs, without the token traffic: only the legacy run's PATCH now. */
     checkRunCalls: () => calls.filter((c) => c.path.includes("/check-runs")),
     /** The calls on PR comments (PS-82). */
     commentCalls: () => calls.filter((c) => c.path.includes("/comments")),

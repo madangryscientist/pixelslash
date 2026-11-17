@@ -1,10 +1,11 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { Build } from "#/db/builds";
 import type { runFields } from "#/db/server-timings";
 import type { Db } from "#/db/db";
 import { type DiffLocation, builds, projects, snapshots } from "#/db/schema";
 import type { ProcessDeps } from "./process";
+import { effectiveDefaultBranch, parentJoin, parentProjects } from "#/db/effective";
 
 /**
  * What a diff run writes on a build as a whole, beside each shot's result: its removed markers, the
@@ -39,8 +40,10 @@ export type ProjectOfBuild = { defaultBranch: string; diffLocation: DiffLocation
 
 export async function projectOf(db: Db, build: Build): Promise<ProjectOfBuild> {
   const [project] = await db
-    .select({ defaultBranch: projects.defaultBranch, diffLocation: projects.diffLocation })
+    // A subproject's default branch is its parent's; its diff location is its own.
+    .select({ defaultBranch: effectiveDefaultBranch(), diffLocation: projects.diffLocation })
     .from(projects)
+    .leftJoin(parentProjects, parentJoin)
     .where(eq(projects.id, build.projectId));
   if (!project) throw new Error("the build's project is gone");
   return project;
@@ -55,11 +58,17 @@ export async function acceptDefaultBranchBuild(
   if (build.branch !== project.defaultBranch) return;
   // A flaky shot is never auto-accepted (ob 1724): under `review` it waits, under `skip` it is left.
   // Nor is a native shot of a stale twin key (PS-297): only a person's accept makes it fresh.
+  // A shot already accepted (a re-run of the build) is left as it is: no row written to change nothing.
   await db
     .update(snapshots)
     .set({ reviewState: "accepted", reviewedAt: new Date() })
     .where(
-      and(eq(snapshots.buildId, build.id), isNull(snapshots.flakeId), isNull(snapshots.staleOf)),
+      and(
+        eq(snapshots.buildId, build.id),
+        isNull(snapshots.flakeId),
+        isNull(snapshots.staleOf),
+        ne(snapshots.reviewState, "accepted"),
+      ),
     );
 }
 
@@ -75,20 +84,30 @@ export function reasonOf(e: unknown): string {
 
 /**
  * `timings`: the server timings (ob 1792) the end of the run writes with its error, if it has any.
- * Returns the reason it stored, for a reply that must say the same.
+ * `startedAt` is the claim the run holds (`processingStartedAt`): the write lands only on a build
+ * still `processing` under that claim, so a run that lost its build to a successor, or whose
+ * build already has a verdict, writes nothing (PS-392). Returns the reason it stored, for a reply
+ * that must say the same, or null when nothing was written.
  */
 export async function markErrored(
   db: Db,
   build: Build,
   e: unknown,
-  timings: Partial<ReturnType<typeof runFields>> = {},
-): Promise<string> {
+  { startedAt, timings = {} }: { startedAt: Date; timings?: Partial<ReturnType<typeof runFields>> },
+): Promise<string | null> {
   const error = reasonOf(e);
-  await db
+  const written = await db
     .update(builds)
     .set({ ...timings, status: "errored", error })
-    .where(eq(builds.id, build.id));
-  return error;
+    .where(
+      and(
+        eq(builds.id, build.id),
+        eq(builds.status, "processing"),
+        eq(builds.processingStartedAt, startedAt),
+      ),
+    )
+    .returning({ id: builds.id });
+  return written.length > 0 ? error : null;
 }
 
 /**

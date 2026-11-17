@@ -1,13 +1,16 @@
 import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
 import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
 import { readPngSize } from "@hackcove/pixelslash-engine/diff";
-import { and, count, eq } from "drizzle-orm";
+import { Param, SQL, and, count, eq, getTableColumns, is, sql } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
-import { sha256Bytes, sha256Hex } from "#/lib/crypto";
+import { sha256Bytes } from "#/lib/crypto";
+import { type PartTimer, timeIf, timedBlobs } from "#/server/server-timing";
 import type { BlobStore } from "#/storage/blobs";
 import { type Db, NotFoundError } from "./db";
 import { type SentFlake, labelFlake } from "./flakes";
+import { type Held, type HeldImage, heldImages } from "./held-images";
 import { heldShot } from "./markers";
+import { snapshotStem } from "./stem";
 import {
   type BuildTimings,
   type DiffOptions,
@@ -66,6 +69,19 @@ export class BuildFinalisedError extends Error {
   }
 }
 
+/**
+ * A shot was sent by hash and the project holds no image with that hash (PS-424): a 409 with the
+ * code `image_unknown`. The CLI then sends that shot with its file.
+ */
+export class ImageUnknownError extends Error {
+  static readonly CODE = "image_unknown";
+  readonly code = ImageUnknownError.CODE;
+  constructor() {
+    super("no image with that sha256 is held by this project: send the PNG");
+    this.name = "ImageUnknownError";
+  }
+}
+
 /** Finalise named a snapshot count the build does not hold. */
 export class SnapshotCountError extends Error {
   constructor(expected: number, actual: number) {
@@ -74,9 +90,14 @@ export class SnapshotCountError extends Error {
   }
 }
 
-export async function createBuild(db: Db, projectId: string, input: NewBuild): Promise<string> {
+export async function createBuild(
+  db: Db,
+  projectId: string,
+  input: NewBuild,
+  status: "uploading" | "passed" = "uploading",
+): Promise<string> {
   const id = crypto.randomUUID();
-  await db.insert(builds).values({ id, projectId, ...input });
+  await db.insert(builds).values({ id, projectId, ...input, status });
   return id;
 }
 
@@ -96,13 +117,17 @@ export async function getBuild(db: Db, projectId: string, buildId: string): Prom
  */
 export type CiShot = {
   engineVersion: string;
-  /** The shot's size, from its PNG header. */
-  image: { width: number; height: number };
+  /** The shot's size, from its PNG header; null on a shot sent by hash, which takes the held image's. */
+  image: { width: number; height: number } | null;
   results: { baselineId: string; status: unknown; diffResult: unknown; mask: ArrayBuffer }[];
 };
 
 /** Store each CI mask beside the shot, one per baseline, and return what `ci_results` holds. */
-async function putMasks(blobs: BlobStore, stem: string, ci: CiShot): Promise<CiUpload> {
+async function putMasks(
+  blobs: BlobStore,
+  stem: string,
+  ci: CiShot & { image: CiUpload["image"] },
+): Promise<CiUpload> {
   const results = await Promise.all(
     ci.results.map(async ({ mask, ...result }) => {
       const diffKey = `${stem}.vs-${result.baselineId}.diff.png`;
@@ -129,10 +154,10 @@ async function putMetrics(
   return key;
 }
 
-/** One upload: the shot's meta, its PNG and, from a CI project's CLI, what it measured (ob 1727). */
+/** One upload: the shot's meta, its PNG (or the hash of one the project holds) and, from a CI project's CLI, what it measured (ob 1727). */
 export type SentSnapshot = {
   input: SnapshotInput;
-  png: ArrayBuffer;
+  png: ArrayBuffer | HeldImage;
   /** The layout metrics file's bytes (PS-294), already checked; absent or null is none. */
   metrics?: ArrayBuffer | null;
   ci?: CiShot | null;
@@ -147,68 +172,184 @@ const shown = (input: SnapshotInput) => ({
   a11y: input.a11y ?? null,
 });
 
-/**
- * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
- * the blob key comes from that identity, so the second PNG overwrites the first in place.
- * The blob goes first, so a failed put leaves no row to count.
- */
-export async function putSnapshot(
-  { db, blobs }: { db: Db; blobs: BlobStore },
+/** The shot's image: stored under its own stem when it came with its bytes, else the one a hash names. */
+async function imageOf(
+  { db, blobs, timer }: { db: Db; blobs: BlobStore; timer?: PartTimer | undefined },
   build: Build,
-  { input, png, metrics = null, ci = null, flake = null }: SentSnapshot,
-): Promise<{ id: string }> {
-  if (build.status !== "uploading") throw new BuildFinalisedError();
-  const { name, platform, browser, viewport, theme } = input;
-  const identity = await sha256Hex(JSON.stringify([name, platform, browser, viewport, theme]));
-  const stem = `builds/${build.id}/${identity.slice(0, 32)}`;
+  stem: string,
+  png: ArrayBuffer | HeldImage,
+): Promise<Held> {
+  if (!(png instanceof ArrayBuffer)) {
+    const held = (
+      await timeIf(timer, "db", () => heldImages(db, build.projectId, [png.sha256]))
+    ).get(png.sha256);
+    if (!held) throw new ImageUnknownError();
+    return held;
+  }
   const imageKey = `${stem}.png`;
-  const metricsKey = await putMetrics(blobs, stem, metrics);
   await blobs.put(imageKey, png, "image/png");
-  const fields = {
+  return {
+    imageKey,
+    imageSha256: await timeIf(timer, "digest", () => sha256Bytes(png)),
+    imageSize: readPngSize(new Uint8Array(png)),
+  };
+}
+
+/**
+ * What `putSnapshot` writes besides the shot's identity. The image comes first: a hash the project
+ * does not hold is refused before anything is written (PS-424).
+ */
+async function rowFields(
+  { db, blobs, timer }: { db: Db; blobs: BlobStore; timer?: PartTimer | undefined },
+  build: Build,
+  stem: string,
+  { input, png, metrics = null, ci = null, flake = null }: SentSnapshot,
+) {
+  const image = await imageOf({ db, blobs, timer }, build, stem, png);
+  const ciResults = await putCiResults(blobs, stem, ci, image);
+  return fieldsOf(input, image, {
+    metricsKey: await putMetrics(blobs, stem, metrics),
+    ciResults,
+    flake,
+  });
+}
+
+/** A shot's row values besides its identity: what `rowFields` writes, from parts already stored. */
+export function fieldsOf(
+  input: SnapshotInput,
+  image: Held,
+  parts: { metricsKey: string | null; ciResults: CiUpload | null; flake: SentFlake | null },
+) {
+  return {
     tags: input.tags,
     diffOptions: input.diff,
     ignore: input.ignore,
     envFingerprint: JSON.stringify(input.fingerprint),
-    imageKey,
-    metricsKey,
-    imageSha256: await sha256Bytes(png),
-    imageSize: readPngSize(new Uint8Array(png)),
-    ciResults: ci && (await putMasks(blobs, stem, ci)),
-    flakyPolicy: input.flaky ?? flake?.record.policy ?? null,
+    ...image,
+    metricsKey: parts.metricsKey,
+    ciResults: parts.ciResults,
+    flakyPolicy: input.flaky ?? parts.flake?.record.policy ?? null,
     ...shown(input),
   };
-  const [row] = await db
-    .insert(snapshots)
-    .values({
-      id: crypto.randomUUID(),
-      buildId: build.id,
-      name,
-      platform,
-      browser,
-      viewport,
-      theme,
-      ...fields,
-    })
-    .onConflictDoUpdate({
-      target: [
-        snapshots.buildId,
-        snapshots.name,
-        snapshots.platform,
-        snapshots.browser,
-        snapshots.viewport,
-        snapshots.theme,
-      ],
-      set: fields,
-    })
-    .returning({ id: snapshots.id });
-  if (!row) throw new Error("snapshot upsert returned nothing");
-  const key = { name, platform, browser, viewport, theme };
-  await labelFlake(
-    { db, blobs },
-    { id: row.id, buildId: build.id, projectId: build.projectId, key, imageKey, stem },
-    flake,
+}
+
+/**
+ * A CI project's results with their masks stored, sized by the CLI's image or, for a shot sent by
+ * hash, by the held image. A held image with no recorded size cannot be checked against its masks:
+ * the shot is refused so the client sends the PNG.
+ */
+async function putCiResults(
+  blobs: BlobStore,
+  stem: string,
+  ci: CiShot | null,
+  image: Held,
+): Promise<CiUpload | null> {
+  if (!ci) return null;
+  const size = ci.image ?? image.imageSize;
+  if (!size) throw new ImageUnknownError();
+  return putMasks(blobs, stem, { ...ci, image: size });
+}
+
+/**
+ * A row's cells for `insert ... select`, in table order: `select` cannot fill a column from its
+ * default as `insert().values()` does, so every column is listed, from the value or else the
+ * default. A null is written as a literal, not a bound parameter, so a row binds only what it holds.
+ */
+export function cellsOf(row: typeof snapshots.$inferInsert): (SQL | Param)[] {
+  const given: Record<string, unknown> = row;
+  return Object.entries(getTableColumns(snapshots)).map(([key, col]) => {
+    const value = given[key];
+    if (value === null) return sql`null`;
+    if (value !== undefined) return sql.param(value, col);
+    if (col.default !== undefined && col.default !== null)
+      return is(col.default, SQL) ? col.default : sql.param(col.default, col);
+    return sql`null`;
+  });
+}
+
+/** `where` clause shared by every insert-select: the build is still uploading. */
+export const stillUploading = (buildId: string): SQL =>
+  sql`where exists (select 1 from ${builds} where ${builds.id} = ${buildId} and ${builds.status} = 'uploading')`;
+
+/**
+ * `select <the row's values> where the build is still uploading`, for `insert ... select`: no row
+ * comes out once the build has left `uploading`, so the insert (and its upsert) writes nothing.
+ */
+function whileUploading(buildId: string, row: typeof snapshots.$inferInsert): SQL {
+  return sql`select ${sql.join(cellsOf(row), sql`, `)} ${stillUploading(buildId)}`;
+}
+
+/**
+ * Store a snapshot's PNG and its row. Sending the same name + variant again replaces it:
+ * the blob key comes from that identity, so the second PNG overwrites the first in place.
+ * The blob goes first, so a failed put leaves no row to count.
+ *
+ * A shot sent by hash (PS-424) has no PNG: its row takes `imageKey`, `imageSha256` and `imageSize`
+ * from a finished build of the same project that holds that hash, and everything else (masks,
+ * metrics, flake captures) is stored under the shot's own stem as for any shot. With no such
+ * build it throws `ImageUnknownError` before anything is written. A hash is never trusted for
+ * bytes the server received: a shot sent with its PNG is hashed here.
+ */
+export async function putSnapshot(
+  { db, blobs, timer }: { db: Db; blobs: BlobStore; timer?: PartTimer | undefined },
+  build: Build,
+  sent: SentSnapshot,
+): Promise<{ id: string }> {
+  if (build.status !== "uploading") throw new BuildFinalisedError();
+  const { name, platform, browser, viewport, theme } = sent.input;
+  const stem = await timeIf(timer, "digest", () =>
+    snapshotStem({ buildId: build.id, name, platform, browser, viewport, theme }),
   );
-  return row;
+  const fields = await rowFields({ db, blobs: timedBlobs(blobs, timer), timer }, build, stem, sent);
+  const { flake = null } = sent;
+  // The row is written only while the build is still `uploading`, in the same statement: a
+  // finalise between the check above and here (PS-398) leaves no row and no change to one.
+  const [row] = await timeIf(timer, "db", () =>
+    db
+      .insert(snapshots)
+      .select(
+        whileUploading(build.id, {
+          id: crypto.randomUUID(),
+          buildId: build.id,
+          name,
+          platform,
+          browser,
+          viewport,
+          theme,
+          ...fields,
+        }),
+      )
+      .onConflictDoUpdate({
+        target: [
+          snapshots.buildId,
+          snapshots.name,
+          snapshots.platform,
+          snapshots.browser,
+          snapshots.viewport,
+          snapshots.theme,
+        ],
+        set: fields,
+      })
+      .returning({ id: snapshots.id, flakeId: snapshots.flakeId }),
+  );
+  if (!row) throw new BuildFinalisedError();
+  const key = { name, platform, browser, viewport, theme };
+  await timeIf(timer, "flake", () =>
+    labelFlake(
+      { db, blobs },
+      {
+        id: row.id,
+        buildId: build.id,
+        projectId: build.projectId,
+        key,
+        imageKey: fields.imageKey,
+        stem,
+        flakeId: row.flakeId,
+      },
+      flake,
+    ),
+  );
+  return { id: row.id };
 }
 
 /**

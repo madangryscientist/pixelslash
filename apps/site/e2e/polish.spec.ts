@@ -2,11 +2,11 @@ import { expect, test } from "@playwright/test";
 import { DOC_PAGES } from "../src/content/docs-map.ts";
 import { PAGES } from "../src/content/pages.ts";
 import { textBelowAA, worstOverArt } from "./support/contrast.ts";
+import { hydrated } from "./support/header.ts";
 
 /*
- * The home polish (PS-312): text that passes AA in both themes, copy buttons that copy, no dead zone
- * under the demo, the hackcove icons in place of local glyphs, and one ground from the home to every
- * other page.
+ * The polish (PS-312): text that passes AA in both themes, copy buttons that copy, and one ground
+ * under every page. The home's own checks left with it for slashslash.build.
  */
 
 const PATHS = [
@@ -25,25 +25,14 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-test('home: "Read more" clears 7:1 in both themes', async ({ page }) => {
-  for (const scheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
-    await page.goto("/", { waitUntil: "networkidle" });
-    // The lifted link: 4.5 plus 2.5 of margin.
-    const low = (await textBelowAA(page, 2.5)).filter((item) =>
-      item.text.startsWith("Read more →"),
-    );
-    expect(low, scheme).toEqual([]);
-  }
-});
-
-test("every copy button on the site copies its block", async ({ page, context }) => {
-  test.slow();
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  let buttons = 0;
-  for (const path of PATHS) {
+// One test per path, each on its own budget, so the check does not grow with the page count (PS-382).
+for (const path of PATHS) {
+  test(`${path}: every copy button copies its block`, async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto(path, { waitUntil: "networkidle" });
-    // By position, not by name: a copied button is named "copied" and would drop out of a name match.
+    // The site has no inline copy script: before hydration a click copies nothing.
+    await hydrated(page);
+    // By position: each button is named "copy", and the status region after it announces "copied".
     const all = page.locator("figure:has(pre) button");
     const count = await all.count();
     for (let index = 0; index < count; index += 1) {
@@ -51,59 +40,40 @@ test("every copy button on the site copies its block", async ({ page, context })
       await button.scrollIntoViewIfNeeded();
       const block = button.locator("xpath=ancestor::figure[1]");
       await button.click();
-      await expect(button, `${path} #${index}`).toHaveText("copied");
+      const status = button.locator("xpath=following-sibling::*[@role='status'][1]");
+      await expect(status, `${path} #${index}`).toHaveText("copied");
       const copied = await page.evaluate(() => navigator.clipboard.readText());
       const shown = (await block.locator("pre").first().innerText()).replace(/\s+/g, " ").trim();
       expect(copied.replace(/\s+/g, " ").trim(), `${path} #${index}`).toBe(shown);
-      buttons += 1;
     }
-  }
-  expect(buttons).toBeGreaterThan(20);
-  // The pages that carry their own blocks have one.
-  for (const path of ["/", "/how-it-works"]) {
-    await page.goto(path, { waitUntil: "networkidle" });
-    await expect(page.getByRole("button", { name: "copy", exact: true })).not.toHaveCount(0);
-  }
-});
+  });
+}
 
-test("home: no dead zone under the demo", async ({ page }, info) => {
-  test.skip(info.project.name !== "desktop", "the desktop width is the one asked for");
-  for (const scheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
-    await page.goto("/", { waitUntil: "networkidle" });
-    const demo = await page.locator("figure.home-demo-wrap").boundingBox();
-    const next = await page.locator(".home-step").first().boundingBox();
-    if (!demo || !next) throw new Error("home has no demo or steps");
-    const gap = next.y - (demo.y + demo.height);
-    expect(gap, `${scheme}: gap between the demo's caption and the steps, px`).toBeLessThan(130);
-    // Between the sections that follow: the step's text to the next heading.
-    const steps = await page.locator(".home-steps").boundingBox();
-    const heading = await page.getByRole("heading", { name: "What it does" }).boundingBox();
-    if (!steps || !heading) throw new Error("home has no steps or features");
-    expect(heading.y - (steps.y + steps.height), `${scheme}: steps to features, px`).toBeLessThan(
-      130,
-    );
-  }
-});
-
-test("home: the feature cards carry the library's icons", async ({ page }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.locator(".home-cards svg")).toHaveCount(6);
-  await page.goto("/pricing", { waitUntil: "networkidle" });
-  await expect(page.getByTestId("pricing-facts").locator("svg")).toHaveCount(3);
+test("the site carries more than 20 copy buttons in total", async ({ context }) => {
+  // Counted without clicking, a page at a time in parallel, so it stays well inside the default budget.
+  const counts = await Promise.all(
+    PATHS.map(async (path) => {
+      const tab = await context.newPage();
+      await tab.goto(path, { waitUntil: "networkidle" });
+      const count = await tab.locator("figure:has(pre) button").count();
+      await tab.close();
+      return count;
+    }),
+  );
+  expect(counts.reduce((sum, count) => sum + count, 0)).toBeGreaterThan(20);
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`${scheme}: an inner page stands on the home's ground`, async ({ page }) => {
+  test(`${scheme}: every page stands on the same ground`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
     const ground = async (path: string): Promise<string> => {
       await page.goto(path, { waitUntil: "networkidle" });
       return page.locator("[data-art]").evaluate((el) => getComputedStyle(el).backgroundColor);
     };
-    const home = await ground("/");
-    for (const path of ["/pricing", "/how-it-works", "/docs", "/security"])
-      expect(await ground(path), path).toBe(home);
-    await page.goto("/pricing", { waitUntil: "networkidle" });
+    const docs = await ground("/docs");
+    for (const path of ["/docs/cli", "/self-host", "/security"])
+      expect(await ground(path), path).toBe(docs);
+    await page.goto("/security", { waitUntil: "networkidle" });
     await expect(page.locator(".page-art-bg .home-aurora")).toHaveCount(1);
   });
 }
@@ -113,7 +83,7 @@ for (const scheme of ["light", "dark"] as const) {
     page,
   }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
-    for (const path of ["/how-it-works", "/pricing", "/docs", "/security"]) {
+    for (const path of ["/self-host", "/docs", "/security"]) {
       await page.goto(path, { waitUntil: "networkidle" });
       // The h1 is large text (3); the first paragraph under it needs 4.5.
       const [h1] = await worstOverArt(page, "main h1");
@@ -123,36 +93,4 @@ for (const scheme of ["light", "dark"] as const) {
       expect(lead, `${path} lead`).toBeGreaterThanOrEqual(4.5);
     }
   });
-}
-
-/*
- * The home install block shows every command whole (PS-371). It was a scroll box, so the second
- * command was cut at 1440 with nothing to show it scrolled. Now no element in the block scrolls
- * sideways, at each width, in both themes. The light and dark runs are kept because the ticket asks
- * for both, though colour cannot change where a line wraps.
- */
-
-for (const width of [1440, 1024, 390] as const) {
-  for (const scheme of ["light", "dark"] as const) {
-    test.describe(`install block at ${width}px, ${scheme}`, () => {
-      test.use({ viewport: { width, height: 900 }, colorScheme: scheme });
-      test.skip(({ isMobile }) => isMobile, "the desktop project runs every width");
-
-      test("no command is cut or scrolls sideways", async ({ page }) => {
-        await page.emulateMedia({ reducedMotion: "reduce" });
-        await page.goto("/", { waitUntil: "networkidle" });
-        const pre = page.locator("pre", { hasText: "npm i -D @hackcove/pixelslash" });
-        await pre.scrollIntoViewIfNeeded();
-        const measure = await pre.evaluate((el) => {
-          const block = el.closest("figure");
-          if (!block) throw new Error("the install command has no figure");
-          const scrolled = [block, ...Array.from(block.querySelectorAll("*"))].filter(
-            (node) => node.scrollWidth > node.clientWidth + 1,
-          ).length;
-          return { scrolled };
-        });
-        expect(measure.scrolled, `${width} ${scheme}: elements that scroll sideways`).toBe(0);
-      });
-    });
-  }
 }

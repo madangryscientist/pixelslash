@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatDay, formatDuration, formatRelative } from "./format";
+import { formatDay, formatDuration, formatPercent, formatRelative } from "./format";
 
 const now = new Date("2026-10-21T12:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -62,4 +62,13 @@ describe("formatDuration past a minute", () => {
     expect(formatDuration(18_909 * MIN + 4 * S, { exact: true })).toBe(nb("18909 min 4 s"));
     expect(formatDuration(61 * MIN, { exact: true })).toBe(nb("61 min 0 s"));
   });
+});
+
+test("formatPercent is one decimal of the compared area, and never reads a real change as none", () => {
+  expect(formatPercent(687_515, 1280 * 1504)).toBe("35.7%");
+  expect(formatPercent(100, 1600)).toBe("6.3%");
+  expect(formatPercent(1, 1_000_000)).toBe("<0.1%");
+  expect(formatPercent(0, 1_000_000)).toBe("0.0%");
+  expect(formatPercent(5, 0)).toBe("0.0%");
+  expect(formatPercent(1_600, 1_600)).toBe("100.0%");
 });

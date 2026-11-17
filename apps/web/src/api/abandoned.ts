@@ -10,9 +10,9 @@ import { warn } from "#/lib/log";
 const SWEEP_ON_CREATE = 20;
 
 /**
- * Sync the check runs of ended builds, but only a commit's newest build: an older build of the
- * same commit would otherwise put a stale red over the newer build's status (token mode keeps
- * the newest commit status written).
+ * Sync the commit statuses of ended builds, but only a commit's newest build: an older build of
+ * the same commit would otherwise put a stale red over the newer build's status (GitHub keeps the
+ * newest commit status written, from the App and the token alike).
  */
 export async function syncEnded(deps: CheckRunDeps, ids: string[]): Promise<void> {
   if (ids.length === 0) return;

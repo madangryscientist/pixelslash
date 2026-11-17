@@ -10,6 +10,7 @@ export default defineConfig({
     "./src/db/schema-invites.ts",
     "./src/db/schema-timings.ts",
     "./src/db/schema-pr-comments.ts",
+    "./src/db/schema-models.ts",
   ],
   out: "./drizzle",
 });

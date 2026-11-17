@@ -2,8 +2,8 @@ import { afterAll, describe, expect, test } from "vitest";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { SpawnProc } from "@hackcove/pixelslash-engine";
+import { basename, join } from "node:path";
+import { OPENCODE_MODEL_ENV, type SpawnProc } from "@hackcove/pixelslash-engine";
 import { run } from "../src/run.ts";
 import {
   DS,
@@ -220,5 +220,82 @@ describe("routes", () => {
     expect(existsSync(join(out, "index/report.html"))).toBe(true);
     expect(existsSync(join(out, "index.html-2/report.html"))).toBe(true);
     expect(existsSync(join(out, "index-2/report.html"))).toBe(true);
+  });
+});
+
+/** A violation on the Branch shot of `button` only: new on branch, since Main is clean. */
+const newOnBranch = (cmd: string[]) =>
+  fakeProc(
+    cmd.at(-1)!.includes('"button"') && cmd.some((a) => a.endsWith("local.png"))
+      ? "VIOLATION fill is red"
+      : "OK",
+  );
+const exit = () => fakeProc("", "ProviderError", 1);
+const timeout = () => fakeProc("", "", null);
+
+describe("routes: a skipped route does not hide another's verdict (PS-391)", () => {
+  const MODEL = "opencode-go/some-vision-model";
+
+  /** Two routes, `/` and `/pricing`, judged by an opencode fake that answers per route out dir. */
+  async function twoRoutes(
+    answer: (route: "index" | "pricing", cmd: string[]) => ReturnType<SpawnProc>,
+  ) {
+    const dir = await tmp();
+    const out = join(dir, "out");
+    const liveDir = join(dir, "live");
+    const localDir = join(dir, "local");
+    for (const name of ["index", "pricing"]) {
+      await Bun.write(join(liveDir, `${name}.png`), Bun.file(join(DS, "button.png")));
+      await Bun.write(join(localDir, `${name}.png`), Bun.file(join(DS, "card.png")));
+    }
+    const routes = join(dir, "routes.txt");
+    await Bun.write(routes, "/\n/pricing\n");
+    const spawn: SpawnProc = (cmd, opts) =>
+      answer(basename(opts?.cwd ?? "") === "index" ? "index" : "pricing", cmd);
+    const cap = capture();
+    const code = await run(
+      ["--live-png-dir", liveDir, "--local-png-dir", localDir, "--routes", routes].concat([
+        "--ds",
+        DS,
+        "--out",
+        out,
+      ]),
+      cap.io,
+      { spawn, env: { [OPENCODE_MODEL_ENV]: MODEL } },
+    );
+    return { code, stdout: cap.stdout };
+  }
+
+  test("route one has a new violation, route two is skipped: exit 1, both said", async () => {
+    const { code, stdout } = await twoRoutes((route, cmd) =>
+      route === "index" ? newOnBranch(cmd) : exit(),
+    );
+    expect(code).toBe(1);
+    expect(stdout).toContain("skip: /pricing: judge exit");
+    expect(stdout).toMatch(/1 new on branch \(button\)/);
+  });
+
+  test("route one is skipped, route two is judged clean: exit 0, the skip and 0 new", async () => {
+    const { code, stdout } = await twoRoutes((route) =>
+      route === "index" ? exit() : fakeProc("OK"),
+    );
+    expect(code).toBe(0);
+    expect(stdout).toContain("skip: /: judge exit");
+    expect(stdout).toContain("0 new");
+  });
+
+  test("every route skipped for different reasons: exit 0, one line per route", async () => {
+    const { code, stdout } = await twoRoutes((route) => (route === "index" ? exit() : timeout()));
+    expect(code).toBe(0);
+    expect(stdout).toContain("skip: /: judge exit\n");
+    expect(stdout).toContain("skip: /pricing: judge timeout\n");
+    expect(stdout).not.toContain("already on main");
+  });
+
+  test("every route skipped for one reason: the single bare line, exit 0", async () => {
+    const { code, stdout } = await twoRoutes(() => exit());
+    expect(code).toBe(0);
+    expect(stdout).toContain("skip: judge exit\n");
+    expect(stdout).not.toContain("skip: /");
   });
 });

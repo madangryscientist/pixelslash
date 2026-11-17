@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
+import { showPanel } from "./snapshot-viewer";
 
 /**
  * Flakes on the server (ob 1724): a flaky shot under each policy, uploaded as the CLI sends it,
@@ -11,9 +12,10 @@ import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from
 test("a flaky shot under each policy: badge, summary line, config line, resolve and reopen", async ({
   page,
   context,
+  provision,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  const { token, projectId } = await provision(page);
+  const { token, projectId } = await provision();
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "hero", png: WHITE },
     { name: "ticker", png: WHITE },
@@ -51,6 +53,7 @@ test("a flaky shot under each policy: badge, summary line, config line, resolve 
     .click();
   await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  await showPanel(page);
   const panel = page.getByTestId("flake-panel");
   await expect(panel.getByTestId("flaky-badge")).toHaveText("skipped: flaky");
   await expect(panel.getByTestId("flake-differed")).toHaveText("1 of 3 runs differed (run 2)");
@@ -68,7 +71,8 @@ test("a flaky shot under each policy: badge, summary line, config line, resolve 
   );
   await expect(control).toContainText("takes effect from the next build");
   await control.getByRole("button", { name: "copy" }).first().click();
-  await expect(control.getByRole("button", { name: "copied" })).toBeVisible();
+  // The button keeps its name; the status region beside it announces the copy.
+  await expect(control.getByRole("status").first()).toHaveText("copied");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('"flaky": "review"');
 
   // The Flakes list: both open; resolve one with a note, then reopen it.

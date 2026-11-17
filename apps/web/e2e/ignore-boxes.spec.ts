@@ -1,5 +1,7 @@
-import { type Page, expect, test } from "@playwright/test";
-import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, open, provision, uploadBuild } from "./api-upload";
+import type { Browser, Page, Request } from "@playwright/test";
+import { expect, open, test } from "./fixtures";
+import { CHANGED, SHA_MAIN, SHA_WORK, WHITE, uploadBuild } from "./api-upload";
+import { dragOver } from "./draw";
 import { openSection } from "./snapshot-viewer";
 import { rivalContext, rivalSession } from "./rival";
 
@@ -10,26 +12,44 @@ import { rivalContext, rivalSession } from "./rival";
 
 /** Drag over the 40px Branch shot from image px `from` to `to`, at whatever size it is drawn. */
 async function drag(page: Page, from: number, to: number) {
-  const layer = page.getByTestId("flag-draw").nth(1);
-  // The side panel's button scrolled the page down; the shot is back up top.
-  await layer.scrollIntoViewIfNeeded();
-  const box = await layer.boundingBox();
-  if (!box) throw new Error("no draw layer");
-  const at = (px: number) =>
-    [box.x + (px * box.width) / 40, box.y + (px * box.height) / 40] as const;
-  await page.mouse.move(...at(from));
-  await page.mouse.down();
-  await page.mouse.move(...at(to), { steps: 4 });
-  await page.mouse.up();
+  await dragOver(
+    page,
+    page.getByTestId("flag-draw").nth(1),
+    [from / 40, from / 40],
+    [to / 40, to / 40],
+  );
 }
 
 const isAdd = (url: string, method: string) => method === "POST" && url.includes("/_serverFn/");
 
+/**
+ * Another org: the screens are not found, and the owner's write, replayed, adds nothing. The rival
+ * is one per repeat (`n`), since `--repeat-each` shares one D1.
+ */
+async function rivalIsRefused(browser: Browser, n: number, urls: string[], request: Request) {
+  const rival = await rivalContext(
+    browser,
+    await rivalSession(`ignore-rival-${n}`, 90000 + n, `Ignore Rival ${n}`),
+  );
+  const other = await rival.newPage();
+  for (const url of urls) expect((await open(other, url))?.status()).toBe(404);
+  // The captured headers carry the owner's cookie; the rival's own comes from its context.
+  const { cookie: _owner, ...headers } = await request.allHeaders();
+  const replay = await rival.request.post(request.url(), {
+    headers,
+    data: request.postDataBuffer() ?? undefined,
+  });
+  // A server fn answers 200 with its error serialized: the project is not found for the rival.
+  expect(await replay.text()).toContain("isNotFound");
+  await rival.close();
+}
+
 test("a box drawn over the change flips the verdict, exports as config, and stays in its org", async ({
   page,
   browser,
-}) => {
-  const { token, projectId } = await provision(page, "Ignore Co", "ignores");
+  provision,
+}, testInfo) => {
+  const { token, projectId } = await provision({ org: "Ignore Co", project: "ignores" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
   // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
   await page.waitForTimeout(1100);
@@ -42,6 +62,7 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await expect(page.getByTestId("build-status")).toHaveText("changes");
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
   await openSection(page, "Tools");
   await expect(page.getByTestId("ignore-boxes")).toBeVisible();
@@ -94,24 +115,12 @@ test("a box drawn over the change flips the verdict, exports as config, and stay
     ],
   });
 
-  // Another org: the screens are not found, and the same write, replayed, adds nothing.
-  const rival = await rivalContext(
+  await rivalIsRefused(
     browser,
-    await rivalSession("ignore-rival", 9998, "Ignore Rival"),
+    testInfo.repeatEachIndex,
+    [`/projects/${projectId}/settings`, snapshotPath],
+    request,
   );
-  const other = await rival.newPage();
-  for (const url of [`/projects/${projectId}/settings`, snapshotPath]) {
-    expect((await other.goto(url))?.status()).toBe(404);
-  }
-  // The captured headers carry the owner's cookie; the rival's own comes from its context.
-  const { cookie: _owner, ...headers } = await request.allHeaders();
-  const replay = await rival.request.post(request.url(), {
-    headers,
-    data: request.postDataBuffer() ?? undefined,
-  });
-  // A server fn answers 200 with its error serialized: the project is not found for the rival.
-  expect(await replay.text()).toContain("isNotFound");
-  await rival.close();
   await open(page, `/projects/${projectId}/settings`);
   await expect(page.getByTestId("ignore-row")).toHaveCount(1);
 });

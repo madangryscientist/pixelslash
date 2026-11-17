@@ -30,7 +30,8 @@ export type Remote = {
   upload: UploadConfig | undefined;
 };
 
-export type Project = { id: string; name: string; org: string };
+/** A project the token reaches; `parentId` is set for a subproject, null for a top-level project. */
+export type Project = { id: string; name: string; org: string; parentId: string | null };
 
 /** The config's `upload` block, when there is a config (`--config`, or one in the working dir). */
 export async function uploadConfig(
@@ -88,12 +89,27 @@ export async function listProjects(client: ApiClient): Promise<Project[]> {
   const { body } = await client.get("/api/v1/projects");
   return objects(body.projects).map((p) => {
     const org = objects([p.org])[0];
-    return { id: str(p.id), name: str(p.name), org: str(org?.name) };
+    const parent = p.parent_project_id;
+    return {
+      id: str(p.id),
+      name: str(p.name),
+      org: str(org?.name),
+      parentId: typeof parent === "string" ? parent : null,
+    };
   });
 }
 
 const listed = (projects: Project[]) =>
   projects.map((p) => `  ${p.name} (${p.org}) ${p.id}`).join("\n");
+
+/** A subproject named by `--project`: refused, with how an upload names it. */
+function notASubproject(project: Project, projects: Project[]): Project {
+  if (project.parentId === null) return project;
+  const parent = projects.find((p) => p.id === project.parentId);
+  throw new UsageError(
+    `"${project.name}" is a subproject: --project names a top-level project; upload names this one with --project ${parent?.name ?? project.parentId} --subproject ${project.name}`,
+  );
+}
 
 function onlyProject(projects: Project[], server: string): Project {
   const [only, ...more] = projects;
@@ -133,7 +149,17 @@ export async function resolveProject(remote: Remote, flag: string | undefined): 
     throw new UsageError(
       "an org token reaches every project of its org: pass --project NAME, or set upload.project in the config",
     );
-  const projects = await listProjects(remote.client);
+  const all = await listProjects(remote.client);
+  // `--project` names a top-level project; a subproject is named only by `--subproject`.
+  const projects = all.filter((p) => p.parentId === null);
   if (wanted === undefined) return onlyProject(projects, remote.client.server);
-  return namedProject(projects, wanted, isOrgToken(remote.token));
+  const subproject = all.find((p) => p.parentId !== null && p.id === wanted);
+  if (subproject) return notASubproject(subproject, all);
+  try {
+    return namedProject(projects, wanted, isOrgToken(remote.token));
+  } catch (e) {
+    const named = all.find((p) => p.parentId !== null && p.name === wanted);
+    if (named) return notASubproject(named, all);
+    throw e;
+  }
 }

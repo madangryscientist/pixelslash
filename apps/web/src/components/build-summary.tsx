@@ -4,47 +4,11 @@ import { Button, Caption, Cluster, Divider, Overline, Pill, Stack, Text } from "
 import { useHydrated } from "#/components/ui";
 import type { AiSummarySentence } from "#/db/diff-json";
 import type { BuildView, SnapshotView } from "#/db/review";
-import { tabCounts } from "#/lib/build-tabs";
-import { reviewGroupOf } from "#/lib/snapshot-groups";
 import { formatDateTime } from "#/lib/format";
 import { noSummaryReason, tooManyChanges } from "#/lib/summary-limit";
+import { isDescribable, summaryCounts } from "#/lib/summary-counts";
 import { type ShotLabel, shotChips, shotLabeller } from "#/lib/shot-label";
 import { regenerateBuildSummary } from "#/server/model";
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/**
- * What the page states from the measurements, beside the model's sentences: the model is never
- * asked about these, so a shot that was not measured is never read as unchanged.
- */
-function measuredCounts(snapshots: SnapshotView[]): string[] {
-  const counts = tabCounts(snapshots);
-  const carried = carriedFromMain(snapshots);
-  const noise = snapshots
-    .flatMap((shot) => shot.aiReview?.regions ?? [])
-    .filter((note) => note.label === "noise").length;
-  const parts = [`${counts.unchanged} unchanged`];
-  if (carried.changed + carried.new > 0)
-    parts.unshift(
-      `${carried.changed} changed and ${carried.new} new carried from main: no change since the previous build, but they still differ from main`,
-    );
-  if (counts.unmeasured > 0)
-    parts.push(
-      `${plural(counts.unmeasured, "shot")} not measured: not compared, so not known to be unchanged`,
-    );
-  if (noise > 0) parts.push(`${plural(noise, "region")} labelled likely noise`);
-  return parts;
-}
-
-/** Shots filed under changed or new only because they differ from main (PS-285), not because this build changed them. */
-function carriedFromMain(snapshots: SnapshotView[]): { changed: number; new: number } {
-  const held = { changed: 0, new: 0 };
-  for (const shot of snapshots) {
-    const group = reviewGroupOf(shot);
-    if (shot.carriedFrom !== null && (group === "changed" || group === "new")) held[group]++;
-  }
-  return held;
-}
 
 const story = (name: string) => name.split("@")[0] ?? name;
 
@@ -59,6 +23,12 @@ function linkText(shot: SnapshotView, label: ShotLabel, variantOnly: boolean): s
 }
 
 type Build = BuildView["build"];
+
+/** Links shown after a sentence before "+N more" (PS-419): a wall of them hides the sentence. */
+const LINKS_SHOWN = 8;
+
+/** Sentences shown before "Show all" (PS-419): the summary is a lead, not the page. */
+const SENTENCES_SHOWN = 3;
 
 /** One stored sentence, followed by links to the shots it names. */
 function Sentence({
@@ -78,31 +48,48 @@ function Sentence({
   testId: string;
   lead?: string;
 }) {
+  const [all, setAll] = useState(false);
+  const named = sentence.shots.filter((id) => byId.has(id));
+  const shown = all ? named : named.slice(0, LINKS_SHOWN);
+  const hidden = named.length - shown.length;
   return (
     <Text as="p" data-testid={testId}>
       {lead && <Text strong>{lead} </Text>}
       {sentence.text}{" "}
-      {sentence.shots.flatMap((id, _, ids) => {
+      {shown.flatMap((id) => {
         const shot = byId.get(id);
         if (!shot) return [];
         return [
-          <Pill
-            key={id}
-            tone="violet"
-            data-testid="summary-shot-link"
-            render={(props) => (
-              <Link
-                to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
-                params={{ projectId, buildId, snapshotId: id }}
-                {...props}
-              />
-            )}
-          >
-            {linkText(shot, label(shot.name), oneStory(ids, byId))}
-          </Pill>,
+          // The wrapper, because a pill takes no class: a label stays on one line (truncate is
+          // nowrap), and a very long one is cut at the column's width rather than widening the page.
+          <span key={id} className="inline-block max-w-full truncate align-bottom">
+            <Pill
+              tone="violet"
+              data-testid="summary-shot-link"
+              render={(props) => (
+                <Link
+                  to="/projects/$projectId/builds/$buildId/snapshots/$snapshotId"
+                  params={{ projectId, buildId, snapshotId: id }}
+                  {...props}
+                />
+              )}
+            >
+              {linkText(shot, label(shot.name), oneStory(named, byId))}
+            </Pill>
+          </span>,
           " ",
         ];
       })}
+      {hidden > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAll(true)}
+          data-testid="summary-more-links"
+        >
+          +{hidden} more
+        </Button>
+      )}
     </Text>
   );
 }
@@ -124,11 +111,26 @@ function Sentences({
   const byId = new Map(snapshots.map((shot) => [shot.id, shot]));
   const summary = build.aiSummary;
   const shared = { projectId, buildId: build.id, byId, label };
+  const [all, setAll] = useState(false);
+  const sentences = summary?.sentences ?? [];
+  const shown = all ? sentences : sentences.slice(0, SENTENCES_SHOWN);
   return (
     <Stack gap="xs" data-testid="summary-text">
-      {summary?.sentences.map((sentence, i) => (
+      {shown.map((sentence, i) => (
         <Sentence key={i} {...shared} sentence={sentence} testId="summary-sentence" />
       ))}
+      {shown.length < sentences.length && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAll(true)}
+            data-testid="summary-show-all"
+          >
+            Show all {sentences.length} sentences
+          </Button>
+        </div>
+      )}
       {summary?.match && (
         <Sentence
           {...shared}
@@ -238,11 +240,6 @@ function SummaryBody({
   );
 }
 
-/** With a brief, nothing changed is still not a match: there was nothing to read against it. */
-const nothingChanged = (brief: string | null) =>
-  brief ? "Nothing changed, so there is nothing to read against the brief. " : "Nothing changed. ";
-
-const DESCRIBED = new Set(["changed", "new", "removed"]);
 const VERDICTS = new Set(["changes", "passed", "failed"]);
 
 /**
@@ -267,9 +264,8 @@ export function BuildSummary({
   // A build still measuring, or one that stopped, has no verdict to summarise: what it held
   // before is not shown, and the run that finishes it writes the summary again.
   if (!VERDICTS.has(build.status)) return null;
-  const describable = snapshots.some((shot) => DESCRIBED.has(shot.diffStatus ?? ""));
+  const describable = isDescribable(snapshots);
   const changed = snapshots.filter((shot) => shot.diffStatus === "changed").length;
-  const carried = carriedFromMain(snapshots);
   return (
     <Stack as="section" gap="xs" data-testid="build-summary">
       <Divider />
@@ -284,8 +280,7 @@ export function BuildSummary({
         pending={pending}
       />
       <Text as="p" tone="muted" data-testid="summary-counts">
-        {describable || carried.changed + carried.new > 0 ? "" : nothingChanged(build.brief)}
-        {measuredCounts(snapshots).join(" · ")}.
+        {summaryCounts(snapshots, build.brief)}
       </Text>
       <Footer
         projectId={projectId}

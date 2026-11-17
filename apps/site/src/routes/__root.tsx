@@ -24,7 +24,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "PixelSlash diffs two versions of a page and shows what changed. Open source, MIT, self-hostable.",
+          "PixelSlash diffs two versions of a page and shows what changed. Source available under the Elastic License 2.0, self-hostable.",
       },
     ],
     links: [
@@ -64,7 +64,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="antialiased">
+      <body>
         {children}
         <Scripts />
       </body>

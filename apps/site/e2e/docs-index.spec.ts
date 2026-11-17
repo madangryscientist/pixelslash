@@ -82,7 +82,7 @@ for (const scheme of ["light", "dark"] as const) {
 
       await page.mouse.move(0, 0);
       await expect.poll(colour, { message: "at rest" }).toBe(body);
-      await expect(link.locator("svg[aria-hidden='true']")).toHaveCount(1);
+      await expect(link.locator("[aria-hidden='true'] > svg")).toHaveCount(1);
 
       // The kit's links transition their colour, so wait for it to settle off the body ink.
       await link.hover();

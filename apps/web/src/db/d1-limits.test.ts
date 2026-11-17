@@ -3,8 +3,10 @@ import { memoryStore } from "#/api/test-support";
 import { rediffShots } from "#/diff/rerun";
 import { type Uploads, rows, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
+import { sha256Bytes } from "#/lib/crypto";
 import { orgBlobs } from "#/storage/blobs";
 import { snapshotDiffOptions } from "./builds";
+import { heldImages } from "./held-images";
 import { listBuilds } from "./build-list";
 import type { Db } from "./db";
 import { snapshotIgnoreBoxes, snapshotOverrides } from "./override-export";
@@ -12,6 +14,8 @@ import { overrideChanges } from "./overrides";
 import { createOrg, createProject, listOrgs } from "./orgs";
 import { acceptAllSnapshots, buildView } from "./review";
 import { d1Db } from "./test-d1";
+import { twinsOfBuild } from "./twins";
+import { baselinesOf } from "./twins-read";
 import { signInGithubUser } from "./users";
 
 /**
@@ -80,6 +84,18 @@ describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
     const shotNames = [...new Set(view.snapshots.map((s) => s.name))];
     expect(await overrideChanges(ctx.db, ctx.userId, ctx.projectId, shotNames)).toEqual([]);
 
+    // The build page's twin read: a web build, so the android and ios baselines are read under every
+    // name (PS-406: the baselines read bound more than it counted, and 89 names broke it).
+    await twinsOfBuild(ctx.db, second.id);
+    // The widest form of that read: all three platforms and the excluded build.
+    const wide = await baselinesOf(ctx.db, {
+      projectIds: [ctx.projectId],
+      platforms: ["web", "android", "ios"],
+      names,
+      exceptBuild: second.id,
+    });
+    expect(wide.length).toBeGreaterThan(0);
+
     // The snapshot pages: the first, a middle and the last shot.
     for (const snapshot of [view.snapshots[0], view.snapshots[SHOTS >> 1], view.snapshots.at(-1)]) {
       if (!snapshot) throw new Error("no shot");
@@ -114,5 +130,13 @@ describe(`a build of ${SHOTS} shots on a local D1 (ob 1773)`, () => {
       diffStatus: "changed",
       baselineKey: (await rows(ctx, old))[0]?.imageKey,
     });
+  }, 60_000);
+
+  test("150 hashes are looked up in parts, the held one found (PS-424)", async () => {
+    await upload(ctx, { branch: "main", commit: sha(7001), shots: [{ png: white }] });
+    const real = await sha256Bytes(white.buffer);
+    const absent = Array.from({ length: 150 }, (_, i) => i.toString(16).padStart(64, "0"));
+    const found = await heldImages(ctx.db, ctx.projectId, [...absent, real]);
+    expect([...found.keys()]).toEqual([real]);
   }, 60_000);
 });

@@ -1,4 +1,5 @@
-import { expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, open } from "./fixtures";
 
 /** What the stub judge says of every changed shot; `upload --judge` puts it on PATH. */
 export const JUDGE_SAYS = "A red block appeared on the page";
@@ -74,6 +75,6 @@ export async function expectBranchPage(
   await expect(page).toHaveURL(new RegExp(`/branches/${branch}$`));
 
   // The default branch has no branch page: it is the project page.
-  await page.goto(`/projects/${projectId}/branches/main`);
+  await open(page, `/projects/${projectId}/branches/main`);
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
 }

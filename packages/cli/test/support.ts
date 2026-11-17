@@ -18,6 +18,26 @@ export async function cleanup(): Promise<void> {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 }
 
+/**
+ * A free loopback port from the OS: bind port 0, read the port, close it. The OS hands out
+ * ephemeral ports (32768 and up on Linux), which hold none of the ports Chromium refuses to
+ * navigate to (`net::ERR_UNSAFE_PORT`, e.g. 5060 and 5061), unlike a port picked from a fixed range.
+ */
+export function freePort(): number {
+  const probe = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } });
+  const { port } = probe;
+  probe.stop(true);
+  return port;
+}
+
+/**
+ * `exit 0` on success, otherwise the code and stderr. Assert `expect(exitReport(code, stderr)).toBe("exit 0")`
+ * so a failing exit prints its reason: `toMatchObject({ code: 0 })` drops every key it was not given.
+ */
+export function exitReport(code: number, stderr: string): string {
+  return code === 0 ? "exit 0" : `exit ${code}: ${stderr}`;
+}
+
 export async function tmp(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "visual-compare-"));
   temps.push(dir);

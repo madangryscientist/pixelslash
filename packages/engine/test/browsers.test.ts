@@ -2,13 +2,18 @@ import { afterAll, describe, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { launchBrowser } from "../src/capture.ts";
-import { captureInto } from "../src/capture-into.ts";
+import { captureInto, RETRIED_ALONE } from "../src/capture-into.ts";
+import { CaptureError } from "../src/errors.ts";
 import { IMAGE_BROWSERS, parseConfig, type BrowserName } from "../src/config.ts";
 import { compareSnapshots } from "../src/compare-snapshots.ts";
 import { readManifest } from "../src/manifest.ts";
 import { renderPixelReport } from "../src/report.ts";
-import { captureSnapshots, recapture, type CaptureSession } from "../src/snapshot.ts";
+import {
+  captureSnapshots,
+  openCaptureSession,
+  recapture,
+  type CaptureSession,
+} from "../src/snapshot.ts";
 import { cleanupDev, png, tmpDir } from "./dev-fixtures.ts";
 
 const dirs: string[] = [];
@@ -40,19 +45,9 @@ async function out(): Promise<string> {
   return dir;
 }
 
-/** Whether this machine can launch `name`: WebKit needs system libraries a dev box may lack. */
-async function launches(name: BrowserName): Promise<boolean> {
-  try {
-    await (await launchBrowser(name)).close();
-    return true;
-  } catch {
-    return false;
-  }
-}
-const launchable = new Set<BrowserName>();
-for (const b of IMAGE_BROWSERS) if (await launches(b)) launchable.add(b);
-
 const pinned = { env: { PIXELSLASH_IMAGE_VERSION: "test" }, listFonts: async () => [] };
+/** The settle timeout the never-settling page is given. */
+const SETTLE_MS = 1_500;
 const base = { baseUrl: `http://127.0.0.1:${server.port}` };
 
 describe("a variant's browser", { timeout: 60_000 }, () => {
@@ -171,46 +166,55 @@ describe("one page × three browsers", { timeout: 60_000 }, () => {
   });
 });
 
-describe.each(IMAGE_BROWSERS)("a real %s", (name) => {
-  test.skipIf(!launchable.has(name))(
-    "captures a page, fingerprints itself, and writes the same bytes twice",
-    async () => {
-      const config = parseConfig({
-        ...base,
-        routes: ["/"],
-        variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
-      });
-      const [a, b] = [await out(), await out()];
-      const first = await captureSnapshots(config, a, pinned);
-      await captureSnapshots(config, b, pinned);
-      expect(first.manifest.snapshots[0]?.variant.browser).toBe(name);
-      expect(first.manifest.snapshots[0]?.fingerprint.browser).toMatch(
-        new RegExp(`^${name} \\d+\\.`),
-      );
-      const [left, right] = await Promise.all(
-        [a, b].map((d) => Bun.file(join(d, "index/small.png")).bytes()),
-      );
-      expect(Buffer.compare(left ?? new Uint8Array(), right ?? new Uint8Array())).toBe(0);
-      expect(left?.length).toBeGreaterThan(0);
-    },
-    60_000,
-  );
+// Real-browser tests run on Chromium only; Firefox and WebKit are never used in testing.
+describe("a real chromium", () => {
+  const name = "chromium";
+  test("captures a page, fingerprints itself, and writes the same bytes twice", async () => {
+    const config = parseConfig({
+      ...base,
+      routes: ["/"],
+      variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
+    });
+    const [a, b] = [await out(), await out()];
+    const first = await captureSnapshots(config, a, pinned);
+    await captureSnapshots(config, b, pinned);
+    expect(first.manifest.snapshots[0]?.variant.browser).toBe(name);
+    expect(first.manifest.snapshots[0]?.fingerprint.browser).toMatch(
+      new RegExp(`^${name} \\d+\\.`),
+    );
+    const [left, right] = await Promise.all(
+      [a, b].map((d) => Bun.file(join(d, "index/small.png")).bytes()),
+    );
+    expect(Buffer.compare(left ?? new Uint8Array(), right ?? new Uint8Array())).toBe(0);
+    expect(left?.length).toBeGreaterThan(0);
+  }, 60_000);
 
-  test.skipIf(!launchable.has(name))(
-    "fails a page that never settles, inside the timeout",
-    async () => {
-      const config = parseConfig({
-        ...base,
-        routes: ["/hangs"],
-        variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
-        stabilise: { timeoutMs: 1_500 },
-      });
-      const began = Date.now();
-      await expect(captureSnapshots(config, await out(), pinned)).rejects.toThrow(
-        /capture settle exceeded|Timeout/,
+  test("fails a page that never settles with the settle timeout, not Playwright's", async () => {
+    const config = parseConfig({
+      ...base,
+      routes: ["/hangs"],
+      variants: [{ name: "small", browser: name, viewport: { width: 320, height: 200 } }],
+      stabilise: { timeoutMs: SETTLE_MS },
+    });
+    // Proved from the error, not the clock. The settle gives up with `capture settle exceeded
+    // <n>ms`; Playwright's own 30 s timeout would reject as `page.waitForFunction: Timeout
+    // 30000ms exceeded`, so the message says which one ended the capture, however slow the host
+    // is. The hang is paid twice (a shot that times out is retried alone once the run has
+    // drained), so the second timeout carries `RETRIED_ALONE`.
+    const session = await openCaptureSession(config, pinned);
+    const dir = await out();
+    let failure: unknown;
+    try {
+      failure = await captureInto(session, dir, undefined, { warn() {} }).then(
+        () => undefined,
+        (e: unknown) => e,
       );
-      expect(Date.now() - began).toBeLessThan(15_000);
-    },
-    60_000,
-  );
+    } finally {
+      await session.close();
+    }
+    if (!(failure instanceof CaptureError))
+      throw new Error(`expected the capture to reject with a CaptureError, got ${String(failure)}`);
+    expect(failure.message).toMatch(/^capture settle exceeded \d+ms/);
+    expect(failure.message.endsWith(RETRIED_ALONE)).toBe(true);
+  }, 60_000);
 });

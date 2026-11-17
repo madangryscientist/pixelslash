@@ -1,11 +1,11 @@
 import { execFile, spawnSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { expect, test } from "@playwright/test";
-import { open, provision } from "./api-upload";
+import { expect, open, test } from "./fixtures";
+import { showPanel } from "./snapshot-viewer";
 import { png } from "./png";
 import { SERVER } from "./ports";
 
@@ -109,8 +109,9 @@ async function imported(from: string, ...flags: string[]) {
 test("metrics beside imported PNGs are uploaded, shown in the side panel and given by the API read", async ({
   page,
   request,
+  provision,
 }) => {
-  const { token, projectId } = await provision(page, "Metrics Co", "parts");
+  const { token, projectId } = await provision({ org: "Metrics Co", project: "parts" });
   const droid = await imported(
     await pngs("ps-e2e-droid-", { login: BUTTON, plain: null }),
     "--platform",
@@ -132,7 +133,6 @@ test("metrics beside imported PNGs are uploaded, shown in the side panel and giv
     ),
   );
   for (const d of [droid.out, web.out]) await cp(d, dir, { recursive: true, force: true });
-  await mkdir(dir, { recursive: true });
   await writeFile(
     join(dir, "manifest.json"),
     JSON.stringify({ version: 1, snapshots: manifests.flatMap((m) => m.snapshots) }),
@@ -172,6 +172,7 @@ test("metrics beside imported PNGs are uploaded, shown in the side panel and giv
   const shotUrl = (name: string) =>
     `/projects/${projectId}/builds/${buildId}/snapshots/${by.get(name)?.id}`;
   await open(page, shotUrl("login"));
+  await showPanel(page);
   await page.getByTestId("metrics-summary").click();
   await expect(page.getByTestId("metrics-summary")).toHaveText("Layout metrics (2 parts)");
   const parts = page.getByTestId("metrics-part");
@@ -184,11 +185,13 @@ test("metrics beside imported PNGs are uploaded, shown in the side panel and giv
   await expect(parts.nth(1)).toContainText("fg #ffffff");
 
   await open(page, shotUrl("home"));
+  await showPanel(page);
   await page.getByTestId("metrics-summary").click();
   await expect(page.getByTestId("metrics-part")).toHaveCount(1);
   await expect(page.getByTestId("metrics-part")).toContainText("320×180");
 
   await open(page, shotUrl("plain"));
+  await showPanel(page);
   await expect(page.getByTestId("metrics")).toHaveCount(0);
   await expect(page.getByTestId("metrics-summary")).toHaveCount(0);
 });

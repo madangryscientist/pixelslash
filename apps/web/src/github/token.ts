@@ -4,7 +4,7 @@ import { GithubError, type GithubApp, type GithubAppDeps } from "./app";
  * The GitHub token transport (PS-235), outbound only: a self-host without the App posts the
  * build verdict as a commit status with a fine-grained token (commit statuses: write). The token
  * is the deployment's secret and acts on every repo it can reach, so unlike the App there is no
- * per-repo minting. The client has the App client's shape, so the check-run code takes either.
+ * per-repo minting. The client has the App client's shape, so the commit-status code takes either.
  */
 
 /** The deployment's token and the API base (a stub in tests). */

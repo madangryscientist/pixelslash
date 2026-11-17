@@ -243,7 +243,7 @@ export async function reproduceFlake(
     warn: deps.warn,
     watch,
   });
-  const repro = measureRepro(shots, resolveDiff(config, route, variant));
+  const repro = await measureRepro(shots, resolveDiff(config, route, variant));
   const media = mediaOfShots(shots);
   const fixes = suggestFixes(repro, config, { route, variant, media });
   const out = resolve(cwd, flags.out ?? "pixelslash-flake");

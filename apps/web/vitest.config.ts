@@ -8,5 +8,7 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}", "deploy/**/*.test.ts"],
     globalSetup: ["../../scripts/test-tmp-scope.ts"],
+    // moon runs up to three test projects at once (`--concurrency 3`), so each takes a third of the cores.
+    maxWorkers: "33%",
   },
 });

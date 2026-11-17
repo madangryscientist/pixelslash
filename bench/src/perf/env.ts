@@ -9,7 +9,8 @@
  * `off`, which the runner always calls on the way out.
  */
 import { formatCpus, parseCpus } from "../../env/cpulist.ts";
-import { DEFAULT_CPUS, DEFAULT_MEM, HELPER_VERSION, SCOPE } from "../../env/reserve.ts";
+import { DEFAULT_CPUS, DEFAULT_MEM, HELPER_VERSION } from "../../env/reserve.ts";
+import { SCOPE } from "../../env/machine.ts";
 import type { SamplerResult } from "./proc.ts";
 
 export const HELPER_PATH = "/usr/local/sbin/pixelslash-bench-reserve";

@@ -1,29 +1,24 @@
-import { type Actor, actorBuild, actorProject, actorUser } from "#/db/actor";
-import {
-  type Build,
-  BuildFinalisedError,
-  SnapshotCountError,
-  createBuild,
-  finaliseBuild,
-  putSnapshot,
-} from "#/db/builds";
-import { type Db, NotFoundError } from "#/db/db";
-import { NoRecoveryError, type ProcessDeps, processBuild } from "#/diff/process";
+import { type Actor, actorBuild, actorUser } from "#/db/actor";
+import { buildProject, projectIdOf, skippedBuild } from "./build-target";
+import { type Build, createBuild, finaliseBuild, putSnapshot } from "#/db/builds";
+import { putHeldSnapshots } from "#/db/held-snapshots";
+import type { Db } from "#/db/db";
+import { type ProcessDeps, processBuild } from "#/diff/process";
 import type { DiffLocation } from "#/db/schema";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { type RateLimiter, overApiLimit, retryAfter } from "#/server/rate-limit";
-import { reportError } from "#/server/sentry";
+import { ServerTimer, withServerTiming } from "#/server/server-timing";
 import { type BlobStore, orgBlobs } from "#/storage/blobs";
 import { endAbandoned } from "./abandoned";
 import { authorize, bearer } from "./authorize";
-import { MAX_PNG_BYTES, TooLarge, snapshotForm } from "./snapshot-form";
+import { snapshotForm } from "./snapshot-form";
+import { parseBatch } from "./validate-batch";
 import { createProjectByName } from "./project-create";
 import { listFlakes, resolveProjectFlake } from "./flakes";
 import { getParity } from "./parity";
 import { listStale } from "./stale";
 import { type BaselinesCtx, buildBaselines, previewBaselines } from "./baselines";
 import {
-  API_VERSION,
   type ReadCtx,
   buildUrl,
   getBuild,
@@ -34,8 +29,12 @@ import {
   markDetectionFlagExported,
 } from "./read";
 import { putProjectTwin } from "./twins-link";
-import { BadRequest, Forbidden, object, parseFinalise, parseNewBuild } from "./validate";
-import { Unprocessable } from "./errors";
+import { acceptBuild, reviewShot } from "./review";
+import { jsonBody } from "./json-body";
+import { BadRequest, object, parseFinalise, parseNewBuild } from "./validate";
+import { knownImages } from "./known";
+import { belowMinimum } from "./cli-version";
+import { errorOf, failWith } from "./api-error";
 
 export type ApiDeps = {
   db: Db;
@@ -54,7 +53,7 @@ export type ApiDeps = {
   modelKeySecret?: ProcessDeps["modelKeySecret"];
   /** Where a project made through the API diffs (ob 1787). */
   defaultDiffLocation: () => DiffLocation;
-  /** The GitHub App and public URL a finalised build's check run is synced with (PS-23); unset syncs none. */
+  /** The GitHub App and public URL a finalised build's commit status is synced with (PS-23); unset syncs none. */
   checkRuns?: Omit<CheckRunDeps, "db">;
   /** Counts requests per token, or per client IP when the token is refused (PS-250); unset counts none. */
   rateLimit?: RateLimiter | undefined;
@@ -63,30 +62,14 @@ export type ApiDeps = {
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 
-async function jsonBody(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new BadRequest("body must be JSON");
-  }
-}
+type Ctx = ApiDeps & { actor: Actor; request: Request; timer: ServerTimer };
 
-type Ctx = ApiDeps & { actor: Actor; request: Request };
-
-/**
- * A CI token's build goes to its project; a personal or org token names one it can see in
- * `projectId`.
- */
-function projectIdOf(body: unknown, actor: Actor): string {
-  const named = object(body, "body").projectId;
-  if (named !== undefined && typeof named !== "string")
-    throw new BadRequest("projectId must be a string");
-  if (actor.kind === "ci") return named ?? actor.projectId;
-  if (!named)
-    throw new BadRequest(
-      `projectId is required with ${actor.kind === "org-ci" ? "an org" : "a personal"} token`,
-    );
-  return named;
+/** `skipped: true`: the build stands for a run that captured nothing on purpose. */
+function skippedOf(body: unknown): boolean {
+  const skipped = object(body, "body").skipped;
+  if (skipped !== undefined && typeof skipped !== "boolean")
+    throw new BadRequest("skipped must be a boolean");
+  return skipped === true;
 }
 
 /**
@@ -97,7 +80,13 @@ function projectIdOf(body: unknown, actor: Actor): string {
 async function startBuild(ctx: Ctx): Promise<Response> {
   const body = await jsonBody(ctx.request);
   const input = parseNewBuild(body);
-  const project = await actorProject(ctx.db, ctx.actor, projectIdOf(body, ctx.actor));
+  const project = await buildProject(ctx.db, ctx.actor, body);
+  if (skippedOf(body)) {
+    const made = await skippedBuild(ctx.db, project.id, input);
+    if (made.skipped && ctx.checkRuns)
+      await syncCheckRuns({ db: ctx.db, ...ctx.checkRuns }, [made.id]);
+    return json({ ...made, diffLocation: project.diffLocation }, made.skipped ? 201 : 200);
+  }
   if (project.diffLocation === "ci" && object(body, "body").clientDiff !== true)
     return fail(426, "this project diffs in CI; upgrade the CLI");
   const id = await createBuild(ctx.db, project.id, input);
@@ -106,14 +95,22 @@ async function startBuild(ctx: Ctx): Promise<Response> {
 }
 
 async function addSnapshot(ctx: Ctx, build: Build, owner: BuildOwner): Promise<Response> {
-  const sent = await snapshotForm(ctx.request, owner);
+  const sent = await ctx.timer.time("form", () => snapshotForm(ctx.request, owner));
   const blobs = orgBlobs(ctx.store, owner.orgId);
-  return json(await putSnapshot({ db: ctx.db, blobs }, build, sent));
+  return json(await putSnapshot({ db: ctx.db, blobs, timer: ctx.timer }, build, sent));
+}
+
+/** Shots whose PNGs the project holds, registered together (many in one request); see `putHeldSnapshots`. */
+async function addHeldSnapshots(ctx: Ctx, build: Build): Promise<Response> {
+  const sent = parseBatch(await jsonBody(ctx.request));
+  return json(await putHeldSnapshots({ db: ctx.db, timer: ctx.timer }, build, sent));
 }
 
 async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promise<Response> {
   const { snapshots, timings } = parseFinalise(await jsonBody(ctx.request));
-  const done = await finaliseBuild(ctx.db, build, snapshots, timings);
+  const done = await ctx.timer.time("finalise", () =>
+    finaliseBuild(ctx.db, build, snapshots, timings),
+  );
   // The diff runs here, in the request: inline for beta, no Queue (the map's server diff). One
   // whole-page change at 1280x4000 fits the 30 s CPU limit; several do not, and processBuild stops
   // before the limit and ends the build `errored` with a reason that names it, so the reply carries
@@ -125,12 +122,15 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // The model's explanations are not in it: they are queued once the verdict is written (ob 1875).
   const blobs = orgBlobs(ctx.store, orgId);
   const { db, diff, diffSidecar, explainQueue, modelKeySecret } = ctx;
-  // The check run says `in_progress` while the diff runs, then the verdict (PS-23); neither call
+  // The commit status says `pending` while the diff runs, then the verdict (PS-23); neither call
   // can fail the finalise.
-  const sync = () => (ctx.checkRuns ? syncCheckRuns({ db, ...ctx.checkRuns }, [done.id]) : null);
+  const sync = () =>
+    ctx.timer.time("sync", async () => {
+      if (ctx.checkRuns) await syncCheckRuns({ db, ...ctx.checkRuns }, [done.id]);
+    });
   await sync();
   const result = await processBuild(
-    { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret },
+    { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret, timer: ctx.timer },
     done,
   );
   await sync();
@@ -201,7 +201,9 @@ async function withBuild(
   buildId: string,
   run: (build: Build, owner: BuildOwner) => Promise<Response>,
 ): Promise<Response> {
-  const { build, ...owner } = await actorBuild(ctx.db, ctx.actor, buildId);
+  const { build, ...owner } = await ctx.timer.time("build", () =>
+    actorBuild(ctx.db, ctx.actor, buildId),
+  );
   return run(build, owner);
 }
 
@@ -214,6 +216,21 @@ export const ENDPOINTS: readonly Endpoint[] = [
     path: "/api/v1/builds/:id/snapshots",
     upload: true,
     run: (ctx, p) => withBuild(ctx, at(p, 0), (build, owner) => addSnapshot(ctx, build, owner)),
+  },
+  {
+    method: "POST",
+    path: "/api/v1/builds/:id/snapshots/batch",
+    upload: true,
+    run: (ctx, p) => withBuild(ctx, at(p, 0), (build) => addHeldSnapshots(ctx, build)),
+  },
+  {
+    method: "POST",
+    path: "/api/v1/builds/:id/known",
+    upload: true,
+    run: (ctx, p) =>
+      withBuild(ctx, at(p, 0), async (build) =>
+        json(await knownImages(ctx.db, build.projectId, await jsonBody(ctx.request))),
+      ),
   },
   {
     method: "POST",
@@ -259,6 +276,8 @@ export const ENDPOINTS: readonly Endpoint[] = [
   { method: "GET", path: "/api/v1/builds/:id", run: byId(getBuild) },
   { method: "GET", path: "/api/v1/builds/:id/parity", run: byId(getParity) },
   { method: "GET", path: "/api/v1/snapshots/:id", run: byId(getSnapshot) },
+  { method: "POST", path: "/api/v1/snapshots/:id/review", run: reviewShot },
+  { method: "POST", path: "/api/v1/builds/:id/accept-all", run: acceptBuild },
 ];
 
 /** The `:param` values when `path` fits the pattern, else null. */
@@ -280,50 +299,6 @@ function match(pattern: string, path: string[]): string[] | null {
   return params;
 }
 
-type ApiError = { status: number; code: string; message: string };
-
-function errorOf(e: unknown): ApiError {
-  if (e instanceof BadRequest) return { status: 400, code: "bad_request", message: e.message };
-  if (e instanceof NotFoundError) return { status: 404, code: "not_found", message: e.message };
-  if (e instanceof Forbidden) return { status: 403, code: "forbidden", message: e.message };
-  if (e instanceof Unprocessable) return { status: 422, code: "unprocessable", message: e.message };
-  if (
-    e instanceof BuildFinalisedError ||
-    e instanceof SnapshotCountError ||
-    e instanceof NoRecoveryError
-  )
-    return { status: 409, code: "conflict", message: e.message };
-  if (e instanceof TooLarge)
-    return { status: 413, code: "too_large", message: `PNG over ${MAX_PNG_BYTES} bytes` };
-  // Not one of the refusals above: a failed upload or finalise, which is the server's fault (PS-227).
-  reportError(e, { area: "api" });
-  throw e;
-}
-
-/** An upload endpoint's error is the string it always was; every other carries a code. */
-function failWith(upload: boolean, { status, code, message }: ApiError): Response {
-  if (upload) return fail(status, message);
-  return json({ api_version: API_VERSION, error: { code, message } }, status);
-}
-
-/** `pixelslash/<x.y.z>`, the CLI's User-Agent; null for any other client. */
-function cliVersion(request: Request): number[] | null {
-  const found = /^pixelslash\/(\d+)\.(\d+)\.(\d+)/.exec(request.headers.get("user-agent") ?? "");
-  return found ? found.slice(1).map(Number) : null;
-}
-
-/** True when the request is from a CLI older than `min` (`x.y.z`); other clients are never refused. */
-function belowMinimum(request: Request, min: string | undefined): boolean {
-  const have = cliVersion(request);
-  const want = min?.split(".").map(Number);
-  if (!have || !want || want.some((n) => !Number.isInteger(n))) return false;
-  for (let i = 0; i < 3; i += 1) {
-    const diff = (have[i] ?? 0) - (want[i] ?? 0);
-    if (diff !== 0) return diff < 0;
-  }
-  return false;
-}
-
 /**
  * The API, `/api/v1/…`, as a plain Request → Response so tests and the Worker route share it.
  * `authorize` turns the token into an actor: a CI token reaches its one project, an org (`psorg_`)
@@ -332,6 +307,11 @@ function belowMinimum(request: Request, min: string | undefined): boolean {
  * their replies are in `ENDPOINTS` and the "API" section of docs/cli.md.
  */
 export async function handleApi(request: Request, deps: ApiDeps): Promise<Response> {
+  const timer = new ServerTimer();
+  return withServerTiming(await route(request, deps, timer), timer);
+}
+
+async function route(request: Request, deps: ApiDeps, timer: ServerTimer): Promise<Response> {
   const path = new URL(request.url).pathname.split("/").filter(Boolean);
   const fits = ENDPOINTS.flatMap((e) => {
     const params = match(e.path, path);
@@ -345,8 +325,14 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
       code: "cli_outdated",
       message: `upgrade the CLI: this server needs pixelslash ${deps.minCliVersion} or newer`,
     });
-  const actor = await authorize({ db: deps.db, request });
-  if (await overApiLimit(deps.rateLimit, request, actor && bearer(request)))
+  const { actor, limited } = await timer.time("auth", async () => {
+    const who = await authorize({ db: deps.db, request });
+    return {
+      actor: who,
+      limited: await overApiLimit(deps.rateLimit, request, who && bearer(request)),
+    };
+  });
+  if (limited)
     return retryAfter(
       failWith(upload, {
         status: 429,
@@ -370,7 +356,7 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
     return failWith(false, { status: 404, code: "not_found", message: "not found" });
   }
   try {
-    return await hit.endpoint.run({ ...deps, actor, request }, hit.params);
+    return await hit.endpoint.run({ ...deps, actor, request, timer }, hit.params);
   } catch (e) {
     return failWith(upload, errorOf(e));
   }

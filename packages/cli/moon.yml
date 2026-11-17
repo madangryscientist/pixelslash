@@ -1,0 +1,40 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+dependsOn:
+  - "engine"
+
+tasks:
+  typecheck:
+    command: "tsc -p packages/cli/tsconfig.json"
+    options:
+      runFromWorkspaceRoot: true
+  lint:
+    script: "oxlint --type-aware --deny-warnings packages/cli && bun scripts/check-slop.ts packages/cli"
+    options:
+      runFromWorkspaceRoot: true
+  test:
+    command: "bun --bun vitest run"
+    inputs:
+      - "**/*"
+      - "/fixtures/**/*"
+  # Everything scripts/build-cli.ts writes, so a cache hit restores the whole package.
+  build:
+    command: "bun scripts/build-cli.ts"
+    outputs:
+      - "dist"
+      - "wasm/diff.wasm"
+      - "LICENSE"
+      - "NOTICE"
+    options:
+      runFromWorkspaceRoot: true
+  # The built bundle against pages it serves itself on 127.0.0.1, with every PIXELSLASH_* var stripped:
+  # nothing leaves the machine, so a pass can be cached. A failed run is never cached.
+  smoke:
+    command: "bun --bun vitest run -c vitest.smoke.config.ts"
+    inputs:
+      # Vitest refuses a `.only` when CI is set.
+      - "$CI"
+    deps:
+      - "~:build"

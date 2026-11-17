@@ -16,6 +16,15 @@ export function projectCrumb(project: { id: string; name: string }): Crumb {
   };
 }
 
+/** The project's crumbs: a subproject's parent first, then the project itself. */
+export function projectCrumbs(project: {
+  id: string;
+  name: string;
+  parent: { id: string; name: string } | null;
+}): Crumb[] {
+  return [...(project.parent ? [projectCrumb(project.parent)] : []), projectCrumb(project)];
+}
+
 /** The build, by branch and short commit: the commit is a key, so it is set in mono. */
 export function buildCrumbLabel(build: { branch: string; commitSha: string }): ReactNode {
   return (

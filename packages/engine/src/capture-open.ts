@@ -1,12 +1,33 @@
 import type { Browser, BrowserContext, Page } from "playwright";
-import { keepNativeRaf, settleCapture } from "./capture.ts";
+import { type Inflight, keepNativeRaf, settleCapture, trackInflight } from "./capture.ts";
 import type { Route, Stabilise, Variant } from "./config.ts";
 import type { Session } from "./setup.ts";
 import { CaptureError } from "./errors.ts";
-import type { SettleSteps } from "./timings.ts";
+import type { CaptureSteps, SettleSteps } from "./timings.ts";
 import { awaitStory } from "./storybook.ts";
 
-export type Opened = { navigateMs: number; settleMs: number; settle: SettleSteps };
+/** `storyMs` is the Storybook render wait, which is inside `settleMs`; absent on a route that is not a story. */
+export type Opened = {
+  navigateMs: number;
+  settleMs: number;
+  settle: SettleSteps;
+  storyMs?: number;
+};
+
+/** A shot's capture steps: what opening the page measured, with the setup before it and the screenshot and measure after. */
+export function stepsOf(
+  opened: Opened,
+  parts: { setupMs: number; screenshotMs: number; measureMs: number },
+): CaptureSteps {
+  const { navigateMs, settleMs, settle, storyMs } = opened;
+  return {
+    navigateMs: Math.round(navigateMs),
+    settleMs: Math.round(settleMs),
+    settle,
+    ...parts,
+    ...(storyMs !== undefined && { storyMs: Math.round(storyMs) }),
+  };
+}
 
 /** The part of a shot that was running; a crash names it (PS-332). */
 export type ShotStep = "goto" | "settle" | "screenshot";
@@ -14,14 +35,21 @@ export type ShotStep = "goto" | "settle" | "screenshot";
 /** Where a shot is, written as it goes so a failure can name the step it was in, and whether its page crashed. */
 export type ShotProgress = { step: ShotStep; crashed: boolean };
 
-/** Load the page and wait for it to settle; returns how long each took, the page's own time. */
+/**
+ * Load the page and wait for it to settle; returns how long each took, the page's own time. A page
+ * that is used again (a pooled preview page) passes the tracker it has counted requests on since it
+ * was made.
+ */
 export async function openPage(
   page: Page,
   url: string,
   route: Route,
-  { timeoutMs, progress }: { timeoutMs: number; progress: ShotProgress },
+  opts: { timeoutMs: number; progress: ShotProgress; inflight?: Inflight },
 ): Promise<Opened> {
+  const { timeoutMs, progress } = opts;
   page.setDefaultNavigationTimeout(timeoutMs);
+  // Before `goto`, so the requests the navigation starts are counted (a new page has had none).
+  const inflight = opts.inflight ?? trackInflight(page);
   progress.step = "goto";
   const loading = performance.now();
   const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -32,13 +60,25 @@ export async function openPage(
   progress.step = "settle";
   // A story's own render signal and the generic settle share one budget.
   const started = Date.now();
-  if (route.storybook) await awaitStory(page, route.name, timeoutMs);
-  const settle = await settleCapture(page, Math.max(1, timeoutMs - (Date.now() - started)));
+  const storyMs = route.storybook ? await storyWait(page, route.name, timeoutMs) : undefined;
+  const settle = await settleCapture(
+    page,
+    Math.max(1, timeoutMs - (Date.now() - started)),
+    inflight,
+  );
   return {
     navigateMs: settling - loading,
     settleMs: performance.now() - settling,
     settle,
+    ...(storyMs !== undefined && { storyMs }),
   };
+}
+
+/** How long the story's own render signal took, unrounded. */
+async function storyWait(page: Page, name: string, timeoutMs: number): Promise<number> {
+  const waiting = performance.now();
+  await awaitStory(page, name, timeoutMs);
+  return performance.now() - waiting;
 }
 
 /** The context a shot is taken in: its variant's viewport and theme, and the session setup left. */

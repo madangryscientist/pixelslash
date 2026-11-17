@@ -1,4 +1,12 @@
-import { type DiffSummary, ENGINE_VERSION, measurePngs, summarizeDiff } from "./diff.ts";
+import {
+  type DiffIgnore,
+  type DiffOptions,
+  type DiffSummary,
+  ENGINE_VERSION,
+  type PixelDiff,
+  measurePngs,
+  summarizeDiff,
+} from "./diff.ts";
 import type { MaskRect } from "./config-areas.ts";
 import type { SnapshotEntry } from "./snapshot.ts";
 
@@ -18,6 +26,12 @@ export type PickedShot = {
   image_url: string;
   fingerprint: unknown;
   ignore: MaskRect[];
+  /**
+   * The sha256 of the baseline's PNG, as the server stored it. Absent from a server that does not
+   * send it, and null for a baseline stored before the server hashed uploads: either way the
+   * baseline is fetched, as it always was.
+   */
+  sha256?: string | null;
 };
 
 /** The server's pick for one shot key. */
@@ -53,9 +67,28 @@ export type CiResult = {
 /** What of a manifest entry the measure reads: its options and its ignore areas. */
 export type MeasuredShot = Pick<SnapshotEntry, "diff" | "ignore">;
 
-function measure(shot: MeasuredShot, png: Buffer, picked: PickedShot, main: Buffer): CiResult {
+/**
+ * How a shot is measured: `measurePngs` here. The CLI passes the diff pool's (`pooledMeasure`, Bun
+ * only); this module stays free of it, since the web app imports it.
+ */
+export type Measure = (
+  main: Buffer,
+  branch: Buffer,
+  options: DiffOptions,
+  ignore: DiffIgnore,
+) => (PixelDiff & { overlay: Buffer }) | Promise<PixelDiff & { overlay: Buffer }>;
+
+/** The baseline the shot is measured against: the server's pick and its bytes. */
+type Against = { picked: PickedShot; main: Buffer };
+
+async function measure(
+  shot: MeasuredShot,
+  png: Buffer,
+  { picked, main }: Against,
+  by: Measure,
+): Promise<CiResult> {
   // Always measured, never the identical-bytes shortcut: the upload carries a mask for every result.
-  const result = measurePngs(main, png, shot.diff, { main: picked.ignore, branch: shot.ignore });
+  const result = await by(main, png, shot.diff ?? {}, { main: picked.ignore, branch: shot.ignore });
   return {
     baselineId: picked.id,
     status: result.changed ? "changed" : "unchanged",
@@ -65,21 +98,47 @@ function measure(shot: MeasuredShot, png: Buffer, picked: PickedShot, main: Buff
 }
 
 /**
- * Measure a shot against every shot the server named: `baseline`, and `accepted` when it is
- * another one. Whether the environments match and which way a carry falls stay the server's call;
- * finalise reads the result for the baseline it settles on and ignores the other. At most two.
+ * `measureShot` with its measure: `measureShotWith(pooledMeasure)` in the CLI, which diffs in the
+ * run's diff pool.
  */
-export async function measureShot(
-  shot: MeasuredShot,
-  png: Buffer,
-  pick: BaselinePick,
-  fetchPng: (picked: PickedShot) => Promise<Buffer>,
-): Promise<CiResult[]> {
-  const named = [pick.baseline, pick.accepted].filter((p): p is PickedShot => p !== null);
-  const distinct = named.filter((p, i) => named.findIndex((q) => q.id === p.id) === i);
-  const results: CiResult[] = [];
-  for (const picked of distinct) results.push(measure(shot, png, picked, await fetchPng(picked)));
-  return results;
+export function measureShotWith(by: Measure) {
+  /**
+   * Measure a shot against every shot the server named: `baseline`, and `accepted` when it is
+   * another one. Whether the environments match and which way a carry falls stay the server's call;
+   * finalise reads the result for the baseline it settles on and ignores the other. At most two.
+   */
+  return async (
+    shot: MeasuredShot,
+    png: Buffer,
+    pick: BaselinePick,
+    fetchPng: (picked: PickedShot) => Promise<Buffer>,
+  ): Promise<CiResult[]> => {
+    const named = [pick.baseline, pick.accepted].filter((p): p is PickedShot => p !== null);
+    const distinct = named.filter((p, i) => named.findIndex((q) => q.id === p.id) === i);
+    const results: CiResult[] = [];
+    for (const picked of distinct)
+      results.push(await measure(shot, png, { picked, main: await fetchPng(picked) }, by));
+    return results;
+  };
+}
+
+/** `measureShot` on this thread, with `measurePngs`: what the web app's tests drive. */
+export const measureShot = measureShotWith(measurePngs);
+
+/**
+ * The pick without the shots that are this PNG's own bytes (same sha256, known only when the server
+ * sent one). Such a shot is unchanged by definition, so nothing is fetched or diffed for it; the
+ * same pick comes back when none is. A null or absent hash never matches.
+ */
+export function withoutSame(pick: BaselinePick, sha256: string): BaselinePick {
+  const same = (p: PickedShot | null) =>
+    p !== null && typeof p.sha256 === "string" && p.sha256 === sha256;
+  if (!same(pick.baseline) && !same(pick.accepted)) return pick;
+  return {
+    ...pick,
+    baseline: same(pick.baseline) ? null : pick.baseline,
+    accepted: same(pick.accepted) ? null : pick.accepted,
+  };
 }
 
 export { ENGINE_VERSION };

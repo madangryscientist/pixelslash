@@ -197,6 +197,7 @@ describe("opencode helper", () => {
 
   test("runs one call at a time and drops a call whose client went away while it waited", async () => {
     const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+    const { promise: began, resolve: firstBegan } = Promise.withResolvers<void>();
     const running: number[] = [];
     let live = 0;
     let peak = 0;
@@ -204,6 +205,7 @@ describe("opencode helper", () => {
       live++;
       peak = Math.max(peak, live);
       running.push(live);
+      firstBegan();
       const done = gate.then(() => {
         live--;
         return 0;
@@ -217,8 +219,8 @@ describe("opencode helper", () => {
     const waited = handle(
       new Request(chat().url, { method: "POST", body: await chat().text(), signal: abort.signal }),
     );
-    await new Promise((r) => setTimeout(r, 20));
-    expect(running).toHaveLength(1);
+    await began;
+    expect(running).toEqual([1]);
     abort.abort();
     expect((await waited).status).toBe(499);
     release();

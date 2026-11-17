@@ -64,7 +64,7 @@ build: a981b89f-… (608fbfc on main)
 **On any other branch**, the build errors, naming the shots and what moved, and `upload` exits 1:
 
 ```
-the upload had finished: 3/3 shots sent
+3/3 shots sent and finalised; the failure came after
 UPLOAD FAILED: build 4c98d50e-… errored on the server: 3 of 3 shots were captured in another environment than their baselines (image bare → sha256:newimage), so they were not compared; upload the default branch from this environment, then rebase this branch onto that commit and upload it again
 ```
 

@@ -6,7 +6,7 @@
     "target": "ES2023",
     "jsx": "react-jsx",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["./worker-configuration.d.ts", "node", "vite/client"],
+    "types": ["./worker-configuration.d.ts", "node", "bun", "vite/client"],
     "paths": { "#/*": ["./src/*"] }
   }
 }

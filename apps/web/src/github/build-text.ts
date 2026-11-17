@@ -2,7 +2,7 @@ import { buildUrl } from "#/api/read";
 import type { BuildCounts } from "#/db/build-counts";
 import type { BuildStatus } from "#/db/schema";
 
-/** The words the check run and the PR comment share (PS-23, PS-82): a build's title, counts and link. */
+/** The words the commit status and the PR comment share (PS-23, PS-82): a build's title, counts and link. */
 
 export type SyncedBuild = {
   id: string;
@@ -22,7 +22,7 @@ export function titleOf(build: SyncedBuild, counts: BuildCounts): string {
   return "Diffing the shots";
 }
 
-/** The counts as a Markdown table, as the check run's summary and the PR comment show them. */
+/** The counts as a Markdown table, as the PR comment shows them. */
 export const countsTable = (counts: BuildCounts): string[] => [
   `| Changed | To review | Accepted | Rejected | New | Removed | Unchanged |`,
   `| ---: | ---: | ---: | ---: | ---: | ---: | ---: |`,

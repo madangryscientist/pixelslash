@@ -47,7 +47,11 @@ export const GROUPS = [
   },
   { id: "build", title: "While you build", summary: "Re-capture a feature as you work on it." },
   { id: "agents", title: "Agents", summary: "Drive PixelSlash from a coding agent." },
-  { id: "reference", title: "Reference", summary: "The API, timings and error reporting." },
+  {
+    id: "reference",
+    title: "Reference",
+    summary: "The API, timings, error reporting and environment variables.",
+  },
   {
     id: "help",
     title: "Help",
@@ -269,6 +273,12 @@ export const DOC_PAGES: readonly DocPageDef[] = [
     title: "Error reporting",
     group: "reference",
     sections: ["Error reporting (opt-in)"],
+  },
+  {
+    slug: "environment",
+    title: "Environment variables",
+    group: "reference",
+    sections: ["Environment variables"],
   },
   {
     slug: "gtk",

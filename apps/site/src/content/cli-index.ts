@@ -273,7 +273,7 @@ export function commandIndexMarkdown(entries: readonly CommandEntry[]): string {
   const lines: string[] = [
     "# Every command",
     "",
-    "Every `pixelslash` command in one line, the page that explains it and its flags. It is generated from the synopsis blocks of `docs/cli.md`, so it lists what the CLI reference documents.",
+    "Find the command you need: each `pixelslash` command in one line, with the page that explains it and its flags.",
     "",
     "A command given a bad flag prints its own usage line and exits 2; `pixelslash --version` prints the version and exits 0. Every other exit code, and what a runner does with it, is on [Exit codes](/docs/exit-codes).",
     "",

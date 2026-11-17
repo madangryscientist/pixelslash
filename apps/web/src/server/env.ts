@@ -147,7 +147,7 @@ export const checkRunDeps = (db: Db): CheckRunDeps => ({
 /** Whether the deployment can post a build's verdict to GitHub (App or token), for the settings' note. */
 export const githubChecksConfigured = (): boolean => githubApp() !== null || githubToken() !== null;
 
-/** Bring the builds' check runs up to their state (PS-23); never throws. */
+/** Bring the builds' commit statuses up to their state (PS-23); never throws. */
 export const syncChecks = (db: Db, buildIds: Iterable<string>): Promise<void> =>
   syncCheckRuns(checkRunDeps(db), buildIds);
 

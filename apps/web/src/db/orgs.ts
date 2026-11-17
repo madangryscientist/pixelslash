@@ -1,8 +1,18 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { SNAPSHOT_GROUPS } from "#/lib/snapshot-groups";
 import { inChunks } from "./chunks";
 import { type Db, NotFoundError } from "./db";
 import { type BuildCounts, countBuilds, emptyCounts } from "./build-counts";
+import { refuseOnSubproject } from "./effective";
+import { getProject, requireParent } from "./project-read";
+
+export {
+  type PageProject,
+  SubprojectDepthError,
+  getProject,
+  getProjectWithOrg,
+} from "./project-read";
+import { nestProjects } from "./project-tree";
 import { type DiffLocation, builds, members, orgs, projects, users } from "./schema";
 import { invites } from "./schema-invites";
 import { prComments } from "./schema-pr-comments";
@@ -32,7 +42,8 @@ export type LatestBuild = {
   counts: BuildCounts;
 };
 
-export type ProjectOverview = Project & { latest: LatestBuild | null };
+/** A project on the org page; `parentName` is set for a subproject, which follows its parent. */
+export type ProjectOverview = Project & { latest: LatestBuild | null; parentName: string | null };
 
 export type OrgMember = {
   userId: string;
@@ -58,7 +69,10 @@ export type OrgOverview = Org & {
   waiting: number;
 };
 
-async function latestBuilds(db: Db, projectIds: string[]): Promise<Map<string, LatestBuild>> {
+export async function latestBuilds(
+  db: Db,
+  projectIds: string[],
+): Promise<Map<string, LatestBuild>> {
   const latest = new Map<string, LatestBuild>();
   if (projectIds.length === 0) return latest;
   const rows = await inChunks(projectIds, 0, (part) =>
@@ -155,7 +169,7 @@ export async function listOrgs(db: Db, userId: string): Promise<OrgOverview[]> {
 }
 
 function addProject(entry: OrgOverview, project: Project, build: LatestBuild | null): void {
-  entry.projects.push({ ...project, latest: build });
+  entry.projects.push({ ...project, latest: build, parentName: null });
   if (build && build.counts.toReview > 0) entry.waiting += 1;
 }
 
@@ -179,6 +193,7 @@ function assemble(
     if (project) addProject(entry, project, latest.get(project.id) ?? null);
     byId.set(org.id, entry);
   }
+  for (const entry of byId.values()) entry.projects = nestProjects(entry.projects);
   for (const { orgId, ...member } of memberRows) byId.get(orgId)?.members.push(member);
   for (const { orgId, ...invite } of inviteRows) byId.get(orgId)?.invites.push(invite);
   return [...byId.values()];
@@ -235,8 +250,15 @@ export async function withdrawInvite(
 export const diffLocationOf = (configured: string | undefined): DiffLocation =>
   configured === "ci" ? "ci" : "server";
 
-/** A new project: its name, and where it diffs (ob 1727); left out, the column's default: `server`. */
-export type NewProject = { name: string; diffLocation?: DiffLocation | undefined };
+/**
+ * A new project: its name, and where it diffs (ob 1727); left out, the column's default: `server`.
+ * With `parentId`, a subproject of that top-level project of the same org.
+ */
+export type NewProject = {
+  name: string;
+  diffLocation?: DiffLocation | undefined;
+  parentId?: string | undefined;
+};
 
 export async function createProject(
   db: Db,
@@ -249,10 +271,12 @@ export async function createProject(
 }
 
 async function insertProject(db: Db, orgId: string, made: string | NewProject): Promise<Project> {
-  const { name, diffLocation } = typeof made === "string" ? { name: made } : made;
+  const { name, diffLocation, parentId } = typeof made === "string" ? { name: made } : made;
+  if (parentId !== undefined) await requireParent(db, orgId, parentId);
+  // A subproject's repo is its parent's, read through `effectiveProject`: its own stays null.
   const [project] = await db
     .insert(projects)
-    .values({ id: crypto.randomUUID(), orgId, name, diffLocation })
+    .values({ id: crypto.randomUUID(), orgId, name, diffLocation, parentProjectId: parentId })
     .returning();
   if (!project) throw new Error("project insert returned nothing");
   return project;
@@ -272,7 +296,15 @@ export async function ensureProject(
     const [row] = await db
       .select()
       .from(projects)
-      .where(and(eq(projects.orgId, orgId), eq(projects.name, made.name)));
+      .where(
+        and(
+          eq(projects.orgId, orgId),
+          made.parentId === undefined
+            ? isNull(projects.parentProjectId)
+            : eq(projects.parentProjectId, made.parentId),
+          eq(projects.name, made.name),
+        ),
+      );
     return row;
   };
   const existing = await find();
@@ -293,7 +325,7 @@ export async function setDefaultBranch(
   projectId: string,
   branch: string,
 ): Promise<void> {
-  await getProject(db, userId, projectId);
+  refuseOnSubproject(await getProject(db, userId, projectId), "default branch");
   await db.update(projects).set({ defaultBranch: branch }).where(eq(projects.id, projectId));
 }
 
@@ -308,7 +340,7 @@ export async function setDiffLocation(
   await db.update(projects).set({ diffLocation }).where(eq(projects.id, projectId));
 }
 
-/** The GitHub repo the project's builds report a check run to (PS-23); null disconnects it. */
+/** The GitHub repo the project's builds report a commit status to (PS-23); null disconnects it. */
 export async function setGithubRepo(
   db: Db,
   userId: string,
@@ -316,6 +348,7 @@ export async function setGithubRepo(
   githubRepo: string | null,
 ): Promise<void> {
   const project = await getProject(db, userId, projectId);
+  refuseOnSubproject(project, "GitHub repo");
   await db.update(projects).set({ githubRepo }).where(eq(projects.id, projectId));
   // A run id belongs to the repo it was made in: another repo gets new runs on the next sync.
   if (project.githubRepo?.toLowerCase() !== githubRepo?.toLowerCase()) {
@@ -323,31 +356,4 @@ export async function setGithubRepo(
     // So is a comment id: the PRs of another repo get comments of their own.
     await db.delete(prComments).where(eq(prComments.projectId, projectId));
   }
-}
-
-/** A project the user can see, or NotFoundError: another org's project does not exist to them. */
-export async function getProject(db: Db, userId: string, projectId: string): Promise<Project> {
-  const [row] = await db
-    .select({ project: projects })
-    .from(projects)
-    .innerJoin(members, and(eq(members.orgId, projects.orgId), eq(members.userId, userId)))
-    .where(eq(projects.id, projectId));
-  if (!row) throw new NotFoundError("project");
-  return row.project;
-}
-
-/** A visible project with the org it belongs to: the page header names both. */
-export async function getProjectWithOrg(
-  db: Db,
-  userId: string,
-  projectId: string,
-): Promise<{ project: Project; org: Pick<Org, "id" | "name"> }> {
-  const [row] = await db
-    .select({ project: projects, org: { id: orgs.id, name: orgs.name } })
-    .from(projects)
-    .innerJoin(orgs, eq(orgs.id, projects.orgId))
-    .innerJoin(members, and(eq(members.orgId, projects.orgId), eq(members.userId, userId)))
-    .where(eq(projects.id, projectId));
-  if (!row) throw new NotFoundError("project");
-  return row;
 }

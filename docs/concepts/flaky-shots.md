@@ -1,4 +1,4 @@
-# Making shots stable
+# Flaky shots
 
 A flaky shot differs from itself: the same code, shot twice, gives two images. PixelSlash prevents most of that before the shot, detects the rest after it, and helps you fix the cause.
 
@@ -8,12 +8,12 @@ Before each shot, capture waits for the page to settle, in this order:
 
 1. Web fonts are ready.
 2. Every image has loaded.
-3. The network has gone idle.
+3. No request is in flight.
 4. Two animation frames have been drawn.
 
 This can't be turned off. It is bounded by `timeoutMs`, 8 seconds by default. A page that doesn't settle in time fails with `capture settle exceeded <n>ms`. It doesn't hang, and it doesn't shoot early.
 
-Capture takes up to four shots at once, each with its own timeout and all sharing the CPU. A page that only just settles when shot alone can run out of time here.
+Capture takes several shots at once (up to ten, fewer on a machine with fewer cores; the config's `concurrency` sets it), each with its own timeout and all sharing the CPU. A page that only just settles when shot alone can run out of time here: lower `concurrency`.
 
 ## Stabilisation
 
