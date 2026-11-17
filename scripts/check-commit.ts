@@ -11,13 +11,13 @@
  * that page, not of wherever it sends a visitor.
  */
 
-export interface CheckResult {
+interface CheckResult {
   ok: boolean;
   /** What the page said last: its sha, or why there was none. */
   seen: string;
 }
 
-export interface CheckOptions {
+interface CheckOptions {
   timeoutMs?: number;
   intervalMs?: number;
   log?: (line: string) => void;
@@ -32,7 +32,7 @@ export function buildCommitsIn(html: string): string[] {
   return [...html.matchAll(META)]
     .map((match) => match[0])
     .filter((tag) => attr(tag, "name") === "build-commit")
-    .map((tag) => (attr(tag, "content") ?? "").replaceAll("&amp;", "&"));
+    .map((tag) => attr(tag, "content") ?? "");
 }
 
 type Attempt = { kind: "done"; result: CheckResult } | { kind: "retry"; seen: string };

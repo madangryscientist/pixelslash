@@ -139,7 +139,9 @@ test("every prerendered page names the commit it was built from, in its head onl
   expect(files.length).toBeGreaterThanOrEqual(PATHS.length);
   for (const file of files) {
     const html = readFileSync(new URL(file, dist), "utf8");
-    const head = html.slice(0, html.indexOf("</head>"));
+    const end = html.indexOf("</head>");
+    expect(end, file).toBeGreaterThan(0);
+    const head = html.slice(0, end);
     const metas = [...html.matchAll(/<meta\s[^>]*>/g)].filter(
       (match) => attr(match[0], "name") === "build-commit",
     );

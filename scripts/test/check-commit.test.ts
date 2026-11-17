@@ -81,10 +81,12 @@ describe("checkCommit", () => {
     expect(Date.now() - started).toBeLessThan(1_000);
   });
 
-  test("every request carries a fresh cache-busting query", () => {
-    const busts = queries.filter(Boolean);
-    expect(busts.length).toBe(queries.length);
-    expect(new Set(busts).size).toBe(busts.length);
+  test("every request carries a fresh cache-busting query", async () => {
+    queries.length = 0;
+    await checkCommit(`${base()}/other`, SHA, { timeoutMs: 100, intervalMs: 20 });
+    expect(queries.length).toBeGreaterThan(1);
+    expect(queries.every(Boolean)).toBe(true);
+    expect(new Set(queries).size).toBe(queries.length);
   });
 });
 
