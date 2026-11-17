@@ -10,6 +10,11 @@ import type { ReactNode } from "react";
 import { SCHEMES, Shell } from "#/components/shell";
 import appCss from "../styles.css?url";
 
+// Set by vite.config.ts (`define`); a test run without it says unknown.
+declare const PIXELSLASH_BUILD_COMMIT: string | undefined;
+const BUILD_COMMIT =
+  typeof PIXELSLASH_BUILD_COMMIT === "string" ? PIXELSLASH_BUILD_COMMIT : "unknown";
+
 // colourSchemeScript knows the `dark` class only. The page is prerendered with `latte` on <html>, so
 // once that script has decided, this takes `latte` off a dark page: exactly one scope is ever set.
 const SCOPE_SCRIPT = `${colourSchemeScript};(function(){var r=document.documentElement;r.classList.toggle("${SCHEMES.light}",!r.classList.contains("${SCHEMES.dark}"))})()`;
@@ -20,6 +25,8 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "color-scheme", content: "light dark" },
+      // Which commit is live, read back after a deploy by scripts/check-commit.ts. Not rendered.
+      { name: "build-commit", content: BUILD_COMMIT },
       { title: "PixelSlash: visual review for the web" },
       {
         name: "description",

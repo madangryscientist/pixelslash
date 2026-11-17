@@ -23,6 +23,9 @@ registry: the image is built from this checkout.
    docker compose up -d        # builds pixelslash-self-host:local, then serves on :3000
    ```
 
+   `BUILD_COMMIT=$(git rev-parse HEAD) docker compose up -d --build` puts the commit in the page's
+   `build-commit` meta; without it the meta says `unknown`, since the image has no `.git`.
+
 3. Open the URL, sign in with GitHub, and create an org, a project and a token. Then upload from CI
    or a shell with `PIXELSLASH_TOKEN=<token> pixelslash upload --server <URL> --branch main`.
 
@@ -396,7 +399,12 @@ From `apps/web`:
 CLOUDFLARE_ENV=production bun run build                          # writes dist/ for env.production
 bunx wrangler d1 migrations apply pixelslash --remote --env production
 bunx wrangler deploy --var SENTRY_RELEASE:"$(git rev-parse --short HEAD)"
+bun ../../scripts/check-commit.ts https://app.pixelslash.dev/ "$(git rev-parse HEAD)"
 ```
+
+The last line proves the deploy is live: every page carries `<meta name="build-commit">`, the commit it
+was built from (`build-commit.ts`), and the check fetches the page until it names this one (up to two
+minutes, past the edge's lag), exiting 1 with the sha it saw if it never does.
 
 Build first: `wrangler deploy` ships what `dist/` holds, and a build made without
 `CLOUDFLARE_ENV=production` is the top level's (placeholder D1 id, no route, no `app.pixelslash.dev`).
@@ -475,6 +483,8 @@ PIXELSLASH_LAN_SSH=root@$SSH_HOST PIXELSLASH_LAN_CT=$CT PIXELSLASH_LAN_SSH_KEY=~
 `dist` into one tarball, sends it over ssh to the Proxmox host and in with `pct push`, and runs that
 release's own `deploy/ssh/update.sh` in the CT. The host, the CT and the key come only from those
 variables (`PIXELSLASH_LAN_SSH_KEY` is optional); nothing is hard-coded. It is not run automatically.
+After the switch, with `PIXELSLASH_PUBLIC_URL` set, it runs `scripts/check-commit.ts` on that URL and
+fails unless the page's `build-commit` meta names the sha; unset, it prints that command for you to run.
 
 On the CT, `update.sh` unpacks the release into `releases/<sha>` beside the one serving, installs it
 (`bun install --frozen-lockfile --production`) and runs the D1 migrations (additive only), then

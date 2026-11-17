@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { LISTED_PAGES } from "../src/content/docs-map.ts";
 import { MOVED, REDIRECTS } from "../src/content/moved.ts";
@@ -126,5 +127,25 @@ test("each moved page answers a 301 to its slashslash.build address", async ({ p
     const response = await page.request.get(path, { maxRedirects: 0 });
     expect(response.status(), path).toBe(301);
     expect(response.headers()["location"], path).toBe(location);
+  }
+});
+
+// The built files themselves, every page the prerender wrote: scripts/check-commit.ts reads this meta after a deploy.
+test("every prerendered page names the commit it was built from, in its head only", () => {
+  const dist = new URL("../dist/client/", import.meta.url);
+  const files = readdirSync(dist, { recursive: true, encoding: "utf8" }).filter((file) =>
+    file.endsWith(".html"),
+  );
+  expect(files.length).toBeGreaterThanOrEqual(PATHS.length);
+  for (const file of files) {
+    const html = readFileSync(new URL(file, dist), "utf8");
+    const head = html.slice(0, html.indexOf("</head>"));
+    const metas = [...html.matchAll(/<meta\s[^>]*>/g)].filter(
+      (match) => attr(match[0], "name") === "build-commit",
+    );
+    expect(metas, file).toHaveLength(1);
+    const [tag = ""] = metas.map((match) => match[0]);
+    expect(head, file).toContain(tag);
+    expect(attr(tag, "content"), file).toMatch(/^([0-9a-f]{40}(-dirty)?|unknown)$/);
   }
 });

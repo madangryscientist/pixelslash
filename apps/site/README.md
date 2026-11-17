@@ -127,7 +127,12 @@ One command, from `apps/site`, with a Cloudflare API token for the account that 
 
 ```bash
 bun run build && bunx wrangler deploy
+bun ../../scripts/check-commit.ts https://pixelslash.dev/docs "$(git rev-parse HEAD)"
 ```
+
+The second line proves the deploy is live: every page carries `<meta name="build-commit">`, the commit
+it was built from (`apps/web/build-commit.ts`), and the check waits up to two minutes for the docs page
+to name this one. It checks `/docs`, since `/` is a 301 to slashslash.build.
 
 `wrangler.jsonc` attaches the Worker to `pixelslash.dev` as a custom domain (`workers_dev` is off),
 so the deploy creates the hostname's DNS record itself. `bunx wrangler deploy --dry-run --outdir

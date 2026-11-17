@@ -44,3 +44,13 @@ test("sign in with GitHub, and a project's pages hydrate in the reader's own zon
   await expect(row).toContainText("active");
   expect(hydrationErrors).toEqual([]);
 });
+
+// The root route's head carries it, so one page stands for every route (scripts/check-commit.ts reads it after a deploy).
+test("the page names the commit it was built from in a meta nobody sees", async ({ page }) => {
+  await open(page, "/");
+  const metas = page.locator('head meta[name="build-commit"]');
+  await expect(metas).toHaveCount(1);
+  const commit = (await metas.getAttribute("content")) ?? "";
+  expect(commit).toMatch(/^([0-9a-f]{40}(-dirty)?|unknown)$/);
+  await expect(page.locator("body")).not.toContainText(commit);
+});

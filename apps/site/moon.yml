@@ -42,6 +42,9 @@ tasks:
       - "/docs/metrics.md"
       - "/docs/concepts/**/*"
       - "/docs/help/**/*"
+      # The build-commit meta's value (apps/web/build-commit.ts): its code, and the commit it may be told.
+      - "/apps/web/build-commit.ts"
+      - "$BUILD_COMMIT"
     # .wrangler/deploy/config.json is written by @cloudflare/vite-plugin and read by `vite preview`
     # and `wrangler`, so a cache hit must restore it with dist.
     outputs:

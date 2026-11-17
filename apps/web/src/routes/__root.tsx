@@ -6,6 +6,11 @@ import { THEME_SCRIPT } from "#/lib/theme";
 import { getShell } from "#/server/fns";
 import appCss from "../styles.css?url";
 
+// Set by vite.config.ts (`define`); a test run without it says unknown.
+declare const PIXELSLASH_BUILD_COMMIT: string | undefined;
+const BUILD_COMMIT =
+  typeof PIXELSLASH_BUILD_COMMIT === "string" ? PIXELSLASH_BUILD_COMMIT : "unknown";
+
 export const Route = createRootRoute({
   // The viewer for the header, the theme cookie for the <html> class and the browser's error sink (PS-227), all from the server.
   loader: () => getShell(),
@@ -14,6 +19,8 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "color-scheme", content: "light dark" },
+      // Which commit is live, read back after a deploy by scripts/check-commit.ts. Not rendered.
+      { name: "build-commit", content: BUILD_COMMIT },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
