@@ -7,7 +7,7 @@ import { projects } from "#/db/schema";
 import { type World, world } from "#/db/twins-test-support";
 import { useHydrated } from "#/lib/use-hydrated";
 import { getTwinOptions } from "#/server/twin-fns";
-import { render, screen, signInTo, within } from "#/test/render";
+import { render, screen, signInTo, waitFor, within } from "#/test/render";
 import { TwinSettings } from "./twin-settings";
 
 vi.mock("#/server/env", () => import("#/test/render").then((m) => m.serverEnv));
@@ -62,6 +62,10 @@ async function openSettings(seed: World, projectId: string) {
   return { ...rendered, card, select };
 }
 
+/** The card's save button, by its name: while a save runs it reads "Saving…" instead. */
+const saveButton = (card: ReturnType<typeof within>) =>
+  card.getByRole("button", { name: "Save twin project" });
+
 const twinOf = async (seed: World, projectId: string) =>
   (await seed.db.select().from(projects).where(eq(projects.id, projectId)))[0]?.twinProjectId;
 
@@ -89,12 +93,9 @@ describe("the project settings' twin project", () => {
     expect(save).toHaveProperty("disabled", false);
     await user.click(save);
 
-    expect(await twinOf(seed, native)).toBe(web);
     // The save re-ran the loader: the card now holds `web` as saved, so there is nothing to save.
-    expect(await card.findByRole("button", { name: "Save twin project" })).toHaveProperty(
-      "disabled",
-      true,
-    );
+    await waitFor(() => expect(saveButton(card)).toHaveProperty("disabled", true));
+    expect(await twinOf(seed, native)).toBe(web);
     expect(select()).toHaveProperty("value", web);
   });
 
@@ -110,11 +111,8 @@ describe("the project settings' twin project", () => {
     await user.selectOptions(select(), "None");
     await user.click(card.getByRole("button", { name: "Save twin project" }));
 
+    await waitFor(() => expect(saveButton(card)).toHaveProperty("disabled", true));
     expect(await twinOf(seed, seed.native)).toBeNull();
-    expect(await card.findByRole("button", { name: "Save twin project" })).toHaveProperty(
-      "disabled",
-      true,
-    );
     expect(select()).toHaveProperty("value", "");
   });
 

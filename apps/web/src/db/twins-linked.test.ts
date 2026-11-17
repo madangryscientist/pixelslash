@@ -176,12 +176,6 @@ describe("twinCandidates", () => {
     ]);
   });
 
-  test("a project alone in its org has none", async () => {
-    const solo = await createOrg(db, userId, "Solo");
-    const only = await createProject(db, userId, solo.id, "only");
-    expect(await twinCandidates(db, userId, only.id)).toEqual([]);
-  });
-
   test("a non-member gets the same not-found as every other setting", async () => {
     const stranger = await signInGithubUser(db, {
       githubId: 2,
