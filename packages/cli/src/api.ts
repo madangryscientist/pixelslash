@@ -61,8 +61,19 @@ function apiError(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * What came back when the answer is not the API's own, such as a Cloudflare 520 page: the `cf-ray`
+ * that names the request at the edge, and the start of the body. No retry: the cause has to show.
+ */
+function notApiAnswer(res: Response, text: string): string {
+  const ray = res.headers.get("cf-ray");
+  const head = new TextDecoder().decode(new TextEncoder().encode(text).slice(0, 200));
+  const body = head ? `body ${JSON.stringify(head)}` : "empty body";
+  return `not the API's answer (${ray ? `cf-ray ${ray}` : "no cf-ray"}; ${body})`;
+}
+
 function refusal(server: string, call: string, res: Response, text: string): RemoteError {
-  const detail = apiError(text) ?? `not the API's answer (${res.statusText || "no JSON"})`;
+  const detail = apiError(text) ?? notApiAnswer(res, text);
   const hint = res.status === 401 ? `; run \`pixelslash login --server ${server}\`` : "";
   return new RemoteError(`${call} -> ${res.status} ${detail}${hint}`);
 }
