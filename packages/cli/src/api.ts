@@ -78,6 +78,19 @@ function refusal(server: string, call: string, res: Response, text: string): Rem
   return new RemoteError(`${call} -> ${res.status} ${detail}${hint}`);
 }
 
+/**
+ * A request that got no answer at all, such as a socket the far end closed: which call it was, when
+ * (to match the server's or the edge's logs, since CI output can be buffered), and the error's code
+ * (`ECONNRESET`, `ConnectionRefused`) when it has one. No retry: the cause has to show.
+ */
+function unreachable(server: string, call: string, e: unknown): RemoteError {
+  const message = e instanceof Error ? e.message : String(e);
+  const code = isObj(e) && typeof e.code === "string" ? `${e.code}: ` : "";
+  return new RemoteError(
+    `${call}: cannot reach ${server} at ${new Date().toISOString()} (${code}${message})`,
+  );
+}
+
 export function apiClient(server: string, token: string, fetch: FetchLike): ApiClient {
   const request = async (method: string, path: string, qs: string, body?: unknown) => {
     const call = `${method} ${path}`;
@@ -94,9 +107,7 @@ export function apiClient(server: string, token: string, fetch: FetchLike): ApiC
         ...(body !== undefined && { body: JSON.stringify(body) }),
       });
     } catch (e) {
-      throw new RemoteError(
-        `cannot reach ${server}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      throw unreachable(server, call, e);
     }
     const text = await res.text().catch(() => "");
     if (!res.ok) throw refusal(server, call, res, text);

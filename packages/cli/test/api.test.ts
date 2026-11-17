@@ -48,3 +48,41 @@ describe("a refused request", () => {
     );
   });
 });
+
+describe("a request with no answer", () => {
+  test("a socket the server closes names the call, the time and the error's code", async () => {
+    // A real server that reads the request and hangs up without a byte back, as at 21:03Z in
+    // hackcove CI. Before this the line said only `cannot reach <server>: <message>`.
+    const server = Bun.listen({
+      hostname: "127.0.0.1",
+      port: 0,
+      socket: {
+        data(socket) {
+          socket.end();
+        },
+      },
+    });
+    try {
+      const url = `http://127.0.0.1:${server.port}`;
+      const before = Date.now();
+      const err = await apiClient(url, "psu_secret", fetch)
+        .get("/api/v1/projects")
+        .then(
+          () => undefined,
+          (e: unknown) => e,
+        );
+      if (!(err instanceof RemoteError))
+        throw new Error(`expected a RemoteError, got ${String(err)}`);
+      const match =
+        /^GET \/api\/v1\/projects: cannot reach (\S+) at (\S+) \(ECONNRESET: .+\)$/.exec(
+          err.message,
+        );
+      expect(match?.[1]).toBe(url);
+      const at = Date.parse(match?.[2] ?? "");
+      expect(at).toBeGreaterThanOrEqual(before);
+      expect(at).toBeLessThanOrEqual(Date.now());
+    } finally {
+      server.stop(true);
+    }
+  });
+});

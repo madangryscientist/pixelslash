@@ -100,6 +100,10 @@ describe("pixelslash whoami", () => {
       },
     });
     expect(code).toBe(3);
-    expect(cap.stderr).toBe(`cannot reach ${SERVER}: connection refused\n`);
+    expect(cap.stderr).toMatch(
+      new RegExp(
+        `^GET /api/v1/me: cannot reach ${SERVER} at \\d{4}-\\d\\d-\\d\\dT[\\d:.]+Z \\(connection refused\\)\\n$`,
+      ),
+    );
   });
 });
