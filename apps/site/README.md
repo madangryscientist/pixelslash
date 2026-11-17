@@ -34,8 +34,8 @@ Four of those files are drawn by scripts, never by hand, each from a real run of
 - `bun scripts/report.ts` runs `fixtures/pages/live.html` against `fixtures/pages/local.html`, then
   uploads the two shots to a local e2e build of the review app (`apps/web/e2e/site-report.shoot.ts`,
   through `apps/web/playwright.site-report.config.ts`: org "Acme", project "checkout", a fresh local
-  D1, nothing leaves the machine) and saves its compare view of the changed shot, 1280x800 at 2x in
-  the light theme with Highlight on, as `public/report.png`. What the CLI run measured goes to
+  D1, nothing leaves the machine) and saves its compare view of the changed shot, 1280 wide at 2x in
+  the light theme with Highlight on and the shot at 1:1, cut from the Accept and Reject row down to just under the change, as `public/report.png`. What the CLI run measured goes to
   `src/content/report.json`. The shoot fixes what would change per run (the shas, the names, the
   signed-in user), so a rerun on the same machine draws the same pixels.
 

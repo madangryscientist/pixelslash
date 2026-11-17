@@ -17,12 +17,16 @@ const env = (name: string) => {
   return value;
 };
 
+const CHANGE_BOX = 'svg[aria-label="Measured regions"] rect[data-kind="change"]';
+
 // Fixed, so the page reads the same on every run.
 const SHA_MAIN = "4f1c2e9a7b3d5c8e0a1f2b3c4d5e6f7a8b9c0d1e";
 const SHA_BRANCH = "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d";
 
-// 1280x800 in the review app's default light theme, at 2x like the site's other images.
-test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, colorScheme: "light" });
+// The review app's default light theme, at 2x like the site's other images. The width is the
+// viewport's; the height is cut to the content below.
+const WIDTH = 1280;
+test.use({ viewport: { width: WIDTH, height: 800 }, deviceScaleFactor: 2, colorScheme: "light" });
 
 test("the compare view of the changed checkout shot", async ({ page, provision }) => {
   const main = await readFile(env("PIXELSLASH_SITE_REPORT_MAIN"));
@@ -71,8 +75,10 @@ test("the compare view of the changed checkout shot", async ({ page, provision }
   await highlight.click();
   await expect(highlight).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('svg[aria-label="Measured regions"]').first()).toBeVisible();
+  await page.getByRole("radio", { name: "1:1", exact: true }).click();
   await page.mouse.move(0, 0);
   await highlight.blur();
+  await page.getByRole("radio", { name: "1:1", exact: true }).blur();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   // Both panes' pictures drawn, not just their frames.
   const images = page.locator("main img");
@@ -83,9 +89,22 @@ test("the compare view of the changed checkout shot", async ({ page, provision }
     ),
   );
   await page.evaluate(() => window.scrollTo(0, 0));
+  // Cut to what reads at site size: from the Accept and Reject row (under the badges) down through
+  // the panes and the side panel, ending just under the measured change. At 1:1 the shot is drawn
+  // at its own size, so the change is legible; Fit would shrink the whole 1280 px page into a pane.
+  const top = (await page.getByRole("button", { name: /^Accept/ }).boundingBox())?.y;
+  const region = await page.locator(CHANGE_BOX).first().boundingBox();
+  if (top === undefined || !region) throw new Error("no Accept button or change box to cut to");
+  const clip = {
+    x: 0,
+    y: top - 10,
+    width: WIDTH,
+    height: region.y + region.height + 32 - (top - 10),
+  };
   // A transition still running (the toggles' colours) would differ from run to run: finish it.
   await page.screenshot({
     path: env("PIXELSLASH_SITE_REPORT_OUT"),
+    clip,
     animations: "disabled",
     caret: "hide",
   });
