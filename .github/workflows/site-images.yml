@@ -22,6 +22,11 @@ on:
       - "apps/site/scripts/hero.ts"
       - "apps/site/scripts/report.ts"
       - "apps/site/scripts/site-images.ts"
+      # report.png is the review app's compare view, shot from a local e2e build of it.
+      - "apps/web/src/**"
+      - "apps/web/e2e/site-report.shoot.ts"
+      - "apps/web/playwright.site-report.config.ts"
+      - "apps/web/playwright.config.ts"
       - "fixtures/pages/**"
       - "bun.lock"
       - ".tool-versions"
@@ -53,6 +58,9 @@ jobs:
       - name: Install the Playwright browser
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
+      # report.ts builds the review app and serves it on a fresh local D1 (the e2e harness:
+      # apps/web/playwright.site-report.config.ts), as ci.yml's `web` job does; nothing is uploaded off
+      # the runner.
       - name: Regenerate
         run: bun apps/site/scripts/site-images.ts --body "$RUNNER_TEMP/body.md"
       - name: Open or update the pull request

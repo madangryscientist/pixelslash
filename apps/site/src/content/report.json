@@ -1,14 +1,14 @@
 {
   "width": 1280,
   "height": 720,
-  "changedPixels": 19033,
+  "changedPixels": 19103,
   "regions": [
     {
       "x": 24,
       "y": 122,
       "w": 354,
       "h": 56,
-      "changedPixels": 19033,
+      "changedPixels": 19103,
       "kind": "change"
     }
   ]

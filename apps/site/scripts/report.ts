@@ -1,13 +1,12 @@
-// Shoots public/report.png, the report a run writes, with the real CLI: fixtures/pages/live.html as
-// Main and fixtures/pages/local.html as Branch. The Timings table is hidden, since its milliseconds
-// change on every run. Keeps what the run measured in src/content/report.json. Rerun it after a
-// change to the report: `bun scripts/report.ts` in apps/site. `--out <dir>` writes into
-// <dir>/public and <dir>/src/content instead (site-images.ts).
+// Shoots public/report.png, the review app's compare view of one changed shot, from a real run: the
+// CLI captures fixtures/pages/live.html as Main and fixtures/pages/local.html as Branch, then
+// apps/web/e2e/site-report.shoot.ts uploads those two shots to a local e2e build of the review app
+// (never a hosted server) and screenshots the compare view. Keeps what the run measured in
+// src/content/report.json. Rerun it after a change to the review screen: `bun scripts/report.ts` in
+// apps/site. `--out <dir>` writes into <dir>/public and <dir>/src/content instead (site-images.ts).
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-import { chromium } from "@playwright/test";
 import { json, measured, outDir, pixelslash, pngSize, site } from "./cli-run.ts";
 
 const dest = outDir();
@@ -26,19 +25,11 @@ try {
   const base = `http://localhost:${server.port}`;
   const manifest = await pixelslash(["--live", `${base}/main`, "--local", `${base}/branch`], out);
   await mkdir(join(dest, "public"), { recursive: true });
-  const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage({
-      viewport: { width: 1200, height: 960 },
-      deviceScaleFactor: 2,
-    });
-    await page.goto(pathToFileURL(join(out, "report.html")).href, { waitUntil: "load" });
-    await page.addStyleTag({ content: "section.timings { display: none !important; }" });
-    await page.evaluate(() => document.fonts.ready.then(() => undefined));
-    await page.screenshot({ path: join(dest, "public/report.png") });
-  } finally {
-    await browser.close();
-  }
+  await shootReviewApp(
+    join(out, "main.png"),
+    join(out, "local.png"),
+    join(dest, "public/report.png"),
+  );
   const result = measured(await pngSize(join(out, "main.png")), manifest);
   await mkdir(join(dest, "src/content"), { recursive: true });
   await writeFile(join(dest, "src/content/report.json"), json(result));
@@ -46,4 +37,20 @@ try {
 } finally {
   await server.stop(true);
   await rm(out, { recursive: true, force: true });
+}
+
+/** Runs the review app's site-report shoot (apps/web) on these two shots, saving the page to `to`. */
+async function shootReviewApp(mainPng: string, branchPng: string, to: string): Promise<void> {
+  const run = Bun.spawn(["bunx", "playwright", "test", "-c", "playwright.site-report.config.ts"], {
+    cwd: join(site, "../web"),
+    env: {
+      ...process.env,
+      PIXELSLASH_SITE_REPORT_MAIN: mainPng,
+      PIXELSLASH_SITE_REPORT_BRANCH: branchPng,
+      PIXELSLASH_SITE_REPORT_OUT: to,
+    },
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  if ((await run.exited) !== 0) throw new Error(`the review app shoot exited ${run.exitCode}`);
 }
