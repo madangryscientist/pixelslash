@@ -76,7 +76,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "e2e/**", "smoke/**"],
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "e2e/**", "local-build/**"],
       "rules": {
         "typescript/consistent-type-assertions": "off",
         "typescript/no-non-null-assertion": "off",

@@ -113,3 +113,23 @@ test("create an org, a project and a CI token by clicking; an empty org says wha
   await openSettings(page, "storefront");
   await issueToken(page);
 });
+
+/** The settings page's diff location form: a save survives a reload. What a CI project's upload then does is `local-build/upload.local-build.test.ts`. */
+test("the diff location is saved from the project settings and survives a reload", async ({
+  page,
+  provision,
+}) => {
+  const { projectId } = await provision({ org: "Ci Co", project: "ci-shots" });
+  await open(page, `/projects/${projectId}/settings`);
+  const inCi = page.getByRole("radio", { name: /^In CI/ });
+  await expect(inCi).not.toBeChecked();
+  await page.getByText("In CI", { exact: true }).click();
+  // Reload only once the save's server call has returned: its response is what makes the value stick.
+  const saved = page.waitForResponse(
+    (res) => res.request().method() === "POST" && !!res.request().postData()?.includes('"ci"'),
+  );
+  await page.getByRole("button", { name: "Save diff location" }).click();
+  expect((await saved).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByRole("radio", { name: /^In CI/ })).toBeChecked();
+});

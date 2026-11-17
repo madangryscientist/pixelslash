@@ -20,6 +20,8 @@ export type Shot = {
   name: string;
   png: Buffer;
   flaky?: "review" | "skip";
+  /** A layout metrics file (PS-294, `docs/metrics.md`), sent as the `metrics` part. */
+  metrics?: object;
 };
 
 /** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
@@ -48,6 +50,12 @@ function shotForm(shot: Shot): FormData {
   }
   form.set("meta", JSON.stringify(meta));
   form.set("file", pngBlob(shot.png), "shot.png");
+  if (shot.metrics)
+    form.set(
+      "metrics",
+      new Blob([JSON.stringify(shot.metrics)], { type: "application/json" }),
+      "metrics.json",
+    );
   return form;
 }
 
