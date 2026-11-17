@@ -28,6 +28,7 @@ try {
   await shootReviewApp(
     join(out, "main.png"),
     join(out, "local.png"),
+    manifest.changedPixels,
     join(dest, "public/report.png"),
   );
   const result = measured(await pngSize(join(out, "main.png")), manifest);
@@ -39,14 +40,23 @@ try {
   await rm(out, { recursive: true, force: true });
 }
 
-/** Runs the review app's site-report shoot (apps/web) on these two shots, saving the page to `to`. */
-async function shootReviewApp(mainPng: string, branchPng: string, to: string): Promise<void> {
+/**
+ * Runs the review app's site-report shoot (apps/web) on these two shots, saving the page to `to`. The
+ * shoot fails unless the app's diff counts the same `changedPixels` as the CLI run.
+ */
+async function shootReviewApp(
+  mainPng: string,
+  branchPng: string,
+  changedPixels: number,
+  to: string,
+): Promise<void> {
   const run = Bun.spawn(["bunx", "playwright", "test", "-c", "playwright.site-report.config.ts"], {
     cwd: join(site, "../web"),
     env: {
       ...process.env,
       PIXELSLASH_SITE_REPORT_MAIN: mainPng,
       PIXELSLASH_SITE_REPORT_BRANCH: branchPng,
+      PIXELSLASH_SITE_REPORT_CHANGED_PIXELS: String(changedPixels),
       PIXELSLASH_SITE_REPORT_OUT: to,
     },
     stdout: "inherit",

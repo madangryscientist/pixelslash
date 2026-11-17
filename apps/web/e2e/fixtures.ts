@@ -35,8 +35,6 @@ type ProvisionOptions = {
   project?: string;
   /** Add the project (and its token) to that provision's org instead of making a new one. */
   into?: Provisioned;
-  /** Name the org exactly `org`, with no suffix: for a run that shoots the page, on a fresh D1. */
-  exact?: boolean;
 };
 
 export type Provision = (options?: ProvisionOptions) => Promise<Provisioned>;
@@ -59,14 +57,14 @@ function ciToken() {
  * member, the project and a CI token, written to the D1 in one statement batch: what clicking through
  * the orgs page and the project settings made. Creating each by clicking is `orgs.spec.ts`.
  */
-function provisionRows({ org = "Flake Co", project = "flaky", into, exact }: ProvisionOptions) {
+function provisionRows({ org = "Flake Co", project = "flaky", into }: ProvisionOptions) {
   const made = into === undefined;
   const ids = {
     orgId: into?.orgId ?? randomUUID(),
     projectId: randomUUID(),
     tokenId: randomUUID(),
   };
-  const orgName = into?.orgName ?? (exact ? org : `${org} ${randomUUID().slice(0, 8)}`);
+  const orgName = into?.orgName ?? `${org} ${randomUUID().slice(0, 8)}`;
   const { token, hash, prefix } = ciToken();
   const rows = [
     ...(made

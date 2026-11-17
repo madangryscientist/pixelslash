@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, open, test } from "./fixtures";
 import { uploadBuild } from "./api-upload";
 import { sql } from "./d1";
-import { highlightToggle } from "./snapshot-viewer";
+import { highlightToggle, showPanel } from "./snapshot-viewer";
 
 /**
  * The review app's compare view of one changed shot, saved as the site's `report.png`. The shots are
@@ -27,7 +27,8 @@ test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, colorSc
 test("the compare view of the changed checkout shot", async ({ page, provision }) => {
   const main = await readFile(env("PIXELSLASH_SITE_REPORT_MAIN"));
   const branch = await readFile(env("PIXELSLASH_SITE_REPORT_BRANCH"));
-  const { token, projectId } = await provision({ org: "Acme", project: "checkout", exact: true });
+  const changedPixels = Number(env("PIXELSLASH_SITE_REPORT_CHANGED_PIXELS"));
+  const { token, orgId, projectId } = await provision({ project: "checkout" });
   const viewport = "1280x720";
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "cart", png: main, viewport },
@@ -42,15 +43,36 @@ test("the compare view of the changed checkout shot", async ({ page, provision }
     },
     [{ name: "cart", png: branch, viewport }],
   );
-  // The stub's user reads as a test account in the header; this D1 is the run's own.
-  sql("UPDATE users SET login = 'jordan-lee', name = 'Jordan Lee' WHERE login = 'e2e-octocat'");
+  // `provision` suffixes the org's name, and the stub's user reads as a test account in the header:
+  // name both for the page. This D1 is the run's own.
+  sql(
+    [
+      `UPDATE orgs SET name = 'Acme' WHERE id = '${orgId}'`,
+      "UPDATE users SET login = 'jordan-lee', name = 'Jordan Lee' WHERE login = 'e2e-octocat'",
+    ].join(";\n"),
+  );
   await open(page, `/projects/${projectId}/builds/${buildId}`);
   await page.getByTestId("snapshot-row").first().getByRole("link").click();
   await expect(page).toHaveURL(/\/snapshots\//);
   await expect(page.locator('[data-hydrated="true"]')).toBeVisible();
+  // The review app's own diff counted what the CLI run did, so report.json describes this page.
+  await showPanel(page);
+  await expect(page.getByTestId("changed-px")).toHaveText(
+    new RegExp(`^${changedPixels.toLocaleString("en-US")} \\(`),
+  );
+  const panel = page.getByRole("button", { name: "Side panel", exact: true });
+  await panel.click();
+  await expect(panel).toHaveAttribute("aria-pressed", "false");
+  // No hover or focus ring left on it in the shot.
+  await page.mouse.move(0, 0);
+  await panel.blur();
   // Highlight on, so the measured region is drawn on the shot.
-  await highlightToggle(page).click();
+  const highlight = highlightToggle(page);
+  await highlight.click();
+  await expect(highlight).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('svg[aria-label="Measured regions"]').first()).toBeVisible();
+  await page.mouse.move(0, 0);
+  await highlight.blur();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   // Both panes' pictures drawn, not just their frames.
   const images = page.locator("main img");
@@ -61,5 +83,10 @@ test("the compare view of the changed checkout shot", async ({ page, provision }
     ),
   );
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: env("PIXELSLASH_SITE_REPORT_OUT") });
+  // A transition still running (the toggles' colours) would differ from run to run: finish it.
+  await page.screenshot({
+    path: env("PIXELSLASH_SITE_REPORT_OUT"),
+    animations: "disabled",
+    caret: "hide",
+  });
 });
