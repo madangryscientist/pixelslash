@@ -82,7 +82,7 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | --- | --- | --- | --- |
 | `packages/cli/smoke` | 1 | smoke | new |
 | `apps/web/smoke` | 1 | smoke | new |
-| `apps/web/e2e` | 26 (was 34 before the cut below), 51 tests (was 68) | e2e | one happy path per feature, in a real browser (the operator health page's 404 for everyone else and the page for a listed login, `admin.spec.ts`; its empty state is a unit test, since the e2e database always has the stub's seed). Every spec starts signed in from one `setup` project and builds its org, project and CI token with `provision` (`e2e/fixtures.ts`), a write to the D1; `orgs.spec.ts` is the one test that makes them by clicking, and `admin.spec.ts`'s figures test is the one that reads the whole D1. `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
+| `apps/web/e2e` | 27, 52 tests (`playwright test --list`; 34 and 68 before the cuts below) | e2e | one happy path per feature, in a real browser (the operator health page's 404 for everyone else and the page for a listed login, `admin.spec.ts`; its empty state is a unit test, since the e2e database always has the stub's seed). Every spec starts signed in from one `setup` project and builds its org, project and CI token with `provision` (`e2e/fixtures.ts`), a write to the D1; `orgs.spec.ts` is the one test that makes them by clicking, and `admin.spec.ts`'s figures test is the one that reads the whole D1. `rss-burst.spec.ts` is a memory check and is outside the gate; `stub-refusal.spec.ts` checks the build kind, which is a build-level test; the CLI-driven specs in `upload.spec.ts` are integration-shaped but need the real build, so they stay here |
 | `apps/site/e2e` | 4 | e2e | nav, footer and dead links on the prerendered pages, desktop and phone (named `smoke.spec.ts`; it is an e2e); one header on every page and the theme toggle (`header.spec.ts`); the home page in both themes (`home.spec.ts`); the pricing page fills the column and its one action leads to the self-host guide (`pricing.spec.ts`) |
 | `packages/cli/test` | 30 | integration | the `pixelslash` commands run in-process or as a child, against a fake server and real temp dirs. The `*-support.ts` files are helpers |
 | `packages/engine/test` | 50 | integration + unit | store, upload, capture (real Chromium), report and DS judge are integration; `diff*`, `regions`, `fingerprint`, `sentry-scrub`, `route-names`, `change-note`, `config*` are unit |
@@ -120,6 +120,14 @@ Eight web specs and three tests in two others were each a data and logic check r
 Every assertion moved to the lowest layer that can prove it, or is looks only (theme, phone width). The
 page wiring that a browser used to prove is now a render test: `renderToStaticMarkup` for components
 with no router, and `src/test/render-routed.tsx` (a memory-history router) for components with a link.
+A component that is clicked or typed into is rendered in happy-dom with Testing Library through
+`src/test/render.tsx`: the app's router at a memory history around it, and, for a route, the server
+functions it calls bound to a fresh `testDb()` store signed in as a seeded user (the file's header shows
+the three `vi.mock` lines). A `createServerFn` does not run its validator or return its handler's result
+outside the Start compiler, so each server function a route test binds is split into its validator and
+a plain function of the store, the viewer and the input, which the server function wraps
+(`src/server/twin-fns.ts` is the first). Such a test runs the component and the handlers, not the HTTP
+hop between them, which only the e2e suite exercises.
 The count goes from 34 spec files and 68 tests to 26 and 51 (`bunx playwright test --list` in `apps/web`).
 
 | Removed | Still proved by |
@@ -134,11 +142,11 @@ The count goes from 34 spec files and 68 tests to 26 and 51 (`bunx playwright te
 | `stale.spec.ts` | `components/stale.test.tsx`, `components/twins.test.tsx`, `db/stale.test.ts`, `db/stale-review.test.ts`, `api/stale.test.ts`, `diff/process-stale.test.ts`; accepting a stale shot is walked by `review.spec.ts` |
 | `ai-review.spec.ts` "a build with 10 changed shots gets no summary, says why, and offers no Regenerate" and "with no model a changed shot is reviewed as plain pixels" | `components/build-summary.test.tsx`, `components/ai-notes.test.tsx`, `diff/process.test.ts` |
 | `twins.spec.ts` "a build shows its twin and links to it" | `components/twins.test.tsx`, `db/twins.test.ts`, `api/twins.test.ts` |
+| `twins.spec.ts` "the project settings link a twin project of the same org, and clear it" (the file is gone) | `components/twin-settings.test.tsx` (no options alone in an org; pick, save, held after the loader re-runs; None clears it, which the spec's title claimed and never tested; a refused save in the alert), with `getTwinOptions` and `saveTwinProject` running against a temp store; `db/twins-linked.test.ts` (the link rule, and `twinCandidates`). The HTTP hop to a server function is still walked by the other settings specs |
 
 Kept, with the reason: the other two tests in `ai-review.spec.ts` (an opted-in project's model auto-passes a
-noise-only shot; a project without its own model uses the org's) and the project settings test in
-`twins.spec.ts` need the settings forms, their server functions and the stub model pipeline together, which
-no render test reaches.
+noise-only shot; a project without its own model uses the org's) need the settings forms, their server
+functions and the stub model pipeline together, which no render test reaches.
 
 The two merges planned beside this cut: `admin-health-now.test.ts` is folded into `admin-health.test.ts`
 (its fixtures moved to `admin-health-kit.ts` so the file stays under the 300-line lint cap).

@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
-import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
+import { type Rendered, fireEvent, render } from "#/test/render";
 import type { DiffResult } from "#/db/schema";
 import { CompositionFocus, CompositionPanel, type Composition, findingsLine } from "./composition";
 import { SnapshotViewer, type ViewState } from "./snapshot-viewer";
@@ -60,42 +59,29 @@ const view: ViewState = {
 };
 
 let host: HTMLElement;
-let root: ReturnType<typeof createRoot>;
-
-beforeAll(() => {
-  Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
-});
-
-afterEach(() => {
-  act(() => root.unmount());
-  host.remove();
-});
+let user: Rendered["user"];
 
 /** The shot page's pieces in the order the route lays them out: the viewer, then the panel. */
-function mount(result: DiffResult | null) {
-  host = document.createElement("div");
-  document.body.appendChild(host);
-  root = createRoot(host);
-  act(() =>
-    root.render(
-      <CompositionFocus>
-        <SnapshotViewer
-          snapshotId="s1"
-          bases={null}
-          name="hero"
-          mainUrl="/main.png"
-          branchUrl="/branch.png"
-          diffUrl={null}
-          result={result}
-          removed={false}
-          composition={composition}
-          view={view}
-          panel={null}
-        />
-        <CompositionPanel composition={composition} />
-      </CompositionFocus>,
-    ),
+async function mount(result: DiffResult | null) {
+  const rendered = await render(
+    <CompositionFocus>
+      <SnapshotViewer
+        snapshotId="s1"
+        bases={null}
+        name="hero"
+        mainUrl="/main.png"
+        branchUrl="/branch.png"
+        diffUrl={null}
+        result={result}
+        removed={false}
+        composition={composition}
+        view={view}
+        panel={null}
+      />
+      <CompositionPanel composition={composition} />
+    </CompositionFocus>,
   );
+  ({ container: host, user } = rendered);
 }
 
 const gapBox = () => host.querySelector<HTMLElement>('[data-testid="gap-box"]');
@@ -114,21 +100,13 @@ const must = (el: HTMLElement | null): HTMLElement => {
   return el;
 };
 
-/** A pointer entering or leaving an element, the events React's enter and leave handlers read. */
-function pointer(el: Element, kind: "enter" | "leave") {
-  const [over, out] = [
-    ["mouseover", "pointerover"],
-    ["mouseout", "pointerout"],
-  ] as const;
-  const types = kind === "enter" ? over : out;
-  act(() => {
-    for (const type of types) el.dispatchEvent(new MouseEvent(type, { bubbles: true }));
-  });
-}
+/** A pointer entering or leaving an element, as a person's mouse does. */
+const pointer = (el: Element, kind: "enter" | "leave") =>
+  kind === "enter" ? user.hover(el) : user.unhover(el);
 
 describe("a shot's composition findings on the shot page", () => {
-  test("one gap and one special case are listed under the shot, each with its reason", () => {
-    mount(measured);
+  test("one gap and one special case are listed under the shot, each with its reason", async () => {
+    await mount(measured);
     const text = host.textContent ?? "";
     expect(text).toContain("Hack Cove UI gaps on Branch (1)");
     expect(host.querySelector('[aria-label="Hack Cove UI gaps"]')?.textContent).toContain(
@@ -140,8 +118,8 @@ describe("a shot's composition findings on the shot page", () => {
     );
   });
 
-  test("the boxes are drawn once each, on the Branch pane, at their share of the measured size", () => {
-    mount(measured);
+  test("the boxes are drawn once each, on the Branch pane, at their share of the measured size", async () => {
+    await mount(measured);
     expect(host.querySelectorAll('[data-testid="gap-box"]')).toHaveLength(1);
     expect(host.querySelectorAll('[data-testid="special-box"]')).toHaveLength(1);
     expect(gapBox()?.getAttribute("title")).toBe(
@@ -159,48 +137,45 @@ describe("a shot's composition findings on the shot page", () => {
     expect(host.querySelectorAll("figure [data-testid='gap-box']")).toHaveLength(1);
   });
 
-  test("a new shot, which nothing measured, has its boxes placed on the image's own size", () => {
-    mount(null);
+  test("a new shot, which nothing measured, has its boxes placed on the image's own size", async () => {
+    await mount(null);
     // Nothing measured it, so no box can be placed until the image says how big it is.
     expect(gapBox()).toBeNull();
-    const img = host.querySelector<HTMLImageElement>('img[src="/branch.png"]');
-    expect(img).not.toBeNull();
+    const img = must(host.querySelector<HTMLImageElement>('img[src="/branch.png"]'));
     Object.defineProperty(img, "naturalWidth", { value: 40 });
     Object.defineProperty(img, "naturalHeight", { value: 40 });
-    act(() => {
-      img?.dispatchEvent(new Event("load"));
-    });
+    fireEvent.load(img);
     expect(host.querySelectorAll('[data-testid="gap-box"]')).toHaveLength(1);
     expect(host.querySelectorAll('[data-testid="special-box"]')).toHaveLength(1);
     expect(gapBox()?.style.left).toBe("25%");
   });
 
-  test("hovering a box lights its row, and hovering a row lights its box", () => {
-    mount(measured);
+  test("hovering a box lights its row, and hovering a row lights its box", async () => {
+    await mount(measured);
     expect(gapRow().hasAttribute("data-focused")).toBe(false);
-    pointer(must(gapBox()), "enter");
+    await pointer(must(gapBox()), "enter");
     expect(gapRow().getAttribute("data-focused")).toBe("true");
-    pointer(must(gapBox()), "leave");
+    await pointer(must(gapBox()), "leave");
     expect(gapRow().hasAttribute("data-focused")).toBe(false);
 
     const idle = gapBox()?.style.zIndex;
-    pointer(gapRow(), "enter");
+    await pointer(gapRow(), "enter");
     expect(gapBox()?.style.zIndex).toBe("1");
     expect(idle).not.toBe("1");
-    pointer(gapRow(), "leave");
+    await pointer(gapRow(), "leave");
     expect(gapBox()?.style.zIndex).not.toBe("1");
   });
 
-  test("the boxes have their own toggle, and a legend that counts both kinds while they are drawn", () => {
-    mount(measured);
+  test("the boxes have their own toggle, and a legend that counts both kinds while they are drawn", async () => {
+    await mount(measured);
     expect(legend()?.textContent).toContain("Not from Hack Cove UI");
     expect(legend()?.textContent).toContain("Special case");
     expect(legend()?.textContent?.replace(/\D/g, "")).toBe("11");
-    act(() => toggle()?.click());
+    await user.click(must(toggle() ?? null));
     expect(gapBox()).toBeNull();
     expect(specialBox()).toBeNull();
     expect(legend()).toBeNull();
-    act(() => toggle()?.click());
+    await user.click(must(toggle() ?? null));
     expect(gapBox()).not.toBeNull();
     expect(legend()).not.toBeNull();
   });
