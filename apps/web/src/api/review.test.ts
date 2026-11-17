@@ -33,10 +33,6 @@ async function changed() {
       { name: "about", png: shot() },
     ],
   });
-  await ctx.db
-    .update(builds)
-    .set({ createdAt: new Date(Date.now() - 60_000) })
-    .where(eq(builds.commitSha, sha(1)));
   const feature = await upload(ctx, {
     branch: "feature",
     commit: sha(2),

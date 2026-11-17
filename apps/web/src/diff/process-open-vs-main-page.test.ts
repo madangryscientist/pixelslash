@@ -1,10 +1,8 @@
-import { eq } from "drizzle-orm";
 import { expect, test } from "vitest";
 import { buildView } from "#/db/review";
-import { builds } from "#/db/schema";
 import { walkAround } from "#/lib/review-walk";
 import { summaryCounts } from "#/lib/summary-counts";
-import { type BuildSpec, type Ctx, type Shot, context, sha, upload as send } from "./test-builds";
+import { type BuildSpec, type Shot, context, sha, upload } from "./test-builds";
 import { RED, shot } from "./test-shots";
 
 /**
@@ -16,19 +14,6 @@ import { RED, shot } from "./test-shots";
 
 const white = shot();
 const red = shot({ blocks: [{ x: 8, y: 8, w: 16, h: 12, rgb: RED }] });
-
-let clock = 0;
-
-/** Upload, then date the build a second after the last one: the branch's newest build must be unambiguous. */
-async function upload(ctx: Ctx, spec: BuildSpec) {
-  const build = await send(ctx, spec);
-  clock += 1;
-  await ctx.db
-    .update(builds)
-    .set({ createdAt: new Date(Date.now() - 600_000 + clock * 1000) })
-    .where(eq(builds.id, build.id));
-  return build;
-}
 
 const feat = (): Shot[] => [
   { name: "home", png: white },

@@ -44,15 +44,12 @@ test("the action row keeps its place as j walks shots with short and long titles
   page,
   provision,
 }) => {
-  // Two full walks of the shots, one per width, on top of the upload and the sign-in.
-  test.setTimeout(90_000);
   const { token, projectId } = await provision({ org: "Walk Co", project: "walk" });
   await uploadBuild(
     token,
     { branch: "main", commitSha: SHA_MAIN },
     NAMES.map((name) => ({ name, png: WHITE })),
   );
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "walk", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

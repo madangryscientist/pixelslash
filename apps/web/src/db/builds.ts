@@ -10,6 +10,7 @@ import { type Db, NotFoundError } from "./db";
 import { type SentFlake, labelFlake } from "./flakes";
 import { type Held, type HeldImage, heldImages } from "./held-images";
 import { heldShot } from "./markers";
+import { arrival } from "./schema-columns";
 import { snapshotStem } from "./stem";
 import {
   type BuildTimings,
@@ -97,7 +98,7 @@ export async function createBuild(
   status: "uploading" | "passed" = "uploading",
 ): Promise<string> {
   const id = crypto.randomUUID();
-  await db.insert(builds).values({ id, projectId, ...input, status });
+  await db.insert(builds).values({ id, projectId, ...input, status, createdAt: arrival() });
   return id;
 }
 

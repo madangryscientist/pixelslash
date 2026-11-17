@@ -17,8 +17,6 @@ test("an errored shot is re-run from the build page, and the build gets its verd
     { name: "hero", png: WHITE },
     { name: "ticker", png: WHITE },
   ]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

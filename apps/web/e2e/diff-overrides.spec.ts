@@ -14,8 +14,6 @@ test("an override set on the snapshot screen flips the verdict and exports as co
 }) => {
   const { token, projectId } = await provision({ org: "Override Co", project: "overrides" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

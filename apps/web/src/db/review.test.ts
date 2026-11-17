@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { context, sha, upload } from "#/diff/test-builds";
 import { RED, shot } from "#/diff/test-shots";
@@ -7,7 +6,7 @@ import { createBuild } from "./builds";
 import { createOrg } from "./orgs";
 import { signInGithubUser } from "./users";
 import { NotFoundError } from "./db";
-import { builds as buildRows, snapshots as snapshotRows } from "./schema";
+import { snapshots as snapshotRows } from "./schema";
 import { listBuilds } from "./build-list";
 import {
   NotReviewableError,
@@ -33,12 +32,6 @@ async function twoBuilds() {
       { name: "contact", png: shot() },
     ],
   });
-  // `created_at` has second resolution, so two uploads in one second tie on the clock. The list
-  // orders by that clock; the test moves the first build a minute back to model real arrivals.
-  await ctx.db
-    .update(buildRows)
-    .set({ createdAt: new Date(Date.now() - 60_000) })
-    .where(eq(buildRows.commitSha, sha(1)));
   const feature = await upload(ctx, {
     branch: "feature",
     commit: sha(2),
@@ -120,10 +113,6 @@ describe("the review model reads", () => {
       },
     );
     expect(errored.status).toBe("errored");
-    await ctx.db
-      .update(buildRows)
-      .set({ createdAt: new Date(Date.now() - 60_000) })
-      .where(eq(buildRows.commitSha, sha(1)));
     const next = await upload(ctx, {
       branch: "main",
       commit: sha(2),
@@ -137,10 +126,6 @@ describe("the review model reads", () => {
   test("a build after an accepted earlier build is not the first baseline (ob 1718)", async () => {
     const ctx = await context();
     await upload(ctx, { branch: "main", commit: sha(1), shots: [{ name: "home", png: shot() }] });
-    await ctx.db
-      .update(buildRows)
-      .set({ createdAt: new Date(Date.now() - 60_000) })
-      .where(eq(buildRows.commitSha, sha(1)));
     const next = await upload(ctx, {
       branch: "main",
       commit: sha(2),

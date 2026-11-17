@@ -13,8 +13,6 @@ test("Details and Tools start shut; the slider draws both shots at one scale, dr
 }) => {
   const { token, projectId } = await provision({ org: "Slider Co", project: "slider" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [{ name: "hero", png: WHITE }]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const buildId = await uploadBuild(
     token,
     { branch: "work", commitSha: SHA_WORK, mergeBaseSha: SHA_MAIN, ancestorShas: [SHA_MAIN] },

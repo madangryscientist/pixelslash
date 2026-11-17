@@ -111,8 +111,8 @@ export async function groupOf(
         eq(builds.commitSha, commitSha),
       ),
     )
-    // `created_at` has a second's resolution, so the insert order (`rowid`) breaks a tie; the
-    // random id cannot, and a rerun in the same second as the build it replaces must win.
+    // Two isolates can still write one `created_at` millisecond, so the insert order (`rowid`)
+    // breaks a tie; the random id cannot, and a rerun must win over the build it replaces.
     .orderBy(desc(builds.createdAt), desc(sql`${builds}.rowid`));
   // Newest first, so the first build met per project is the one that counts.
   const newest = new Map<string, SyncedBuild>();

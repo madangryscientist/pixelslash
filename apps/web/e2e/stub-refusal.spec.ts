@@ -98,10 +98,7 @@ async function start(
 }
 
 test.describe("a production build and the GitHub stand-in", () => {
-  test.describe.configure({ timeout: 240_000 });
-
   test.beforeAll(async () => {
-    test.setTimeout(240_000);
     const redirect = existsSync(DEPLOY_REDIRECT) ? readFileSync(DEPLOY_REDIRECT) : null;
     const env = { ...process.env };
     delete env["CLOUDFLARE_ENV"];

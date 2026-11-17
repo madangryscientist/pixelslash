@@ -20,15 +20,13 @@ async function capture(page: Page, name: string) {
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
 }
 
-async function seed(page: Page, provision: Provision) {
+async function seed(provision: Provision) {
   const { token, projectId } = await provision({ org: "List Co", project: "list" });
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, [
     { name: "hero", png: WHITE },
     { name: "ticker", png: WHITE },
     { name: "footer", png: WHITE },
   ]);
-  // `created_at` has second resolution; a gap keeps "newest first" unambiguous.
-  await page.waitForTimeout(1100);
   const staleId = await uploadBuild(
     token,
     {
@@ -57,7 +55,7 @@ test.describe("on a phone", () => {
     page,
     provision,
   }) => {
-    const projectId = await seed(page, provision);
+    const projectId = await seed(provision);
     await open(page, `/projects/${projectId}`);
 
     const card = page.getByTestId("build-card").first();
@@ -107,7 +105,7 @@ for (const scheme of ["light", "dark"] as const) {
     test.use({ colorScheme: scheme, viewport: { width: 1280, height: 800 } });
 
     test("a build with work to review does not read passed", async ({ page, provision }) => {
-      const projectId = await seed(page, provision);
+      const projectId = await seed(provision);
       await open(page, `/projects/${projectId}`);
 
       const row = page.getByTestId("build-row").first();

@@ -37,7 +37,7 @@ test("a browser error reaches Sentry with release and environment, and no cookie
         }, message);
         return (await envelopes()).filter((text) => text.includes("e2e browser error")).length;
       },
-      { intervals: [250], timeout: 20_000 },
+      { intervals: [250] },
     )
     .toBeGreaterThan(0);
 

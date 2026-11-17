@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { context, rows, sha, upload } from "#/diff/test-builds";
 import { shot } from "#/diff/test-shots";
 import { selectBaselines, snapshotKeyOf } from "./baselines";
 import { createBuild, finaliseBuild, getBuild } from "./builds";
 import { isMarker } from "./markers";
-import { builds } from "./schema";
 import { usageCounts } from "./usage";
 
 /**
@@ -48,12 +46,6 @@ describe("removed markers", () => {
       ancestorShas: [],
       prNumber: null,
     });
-    // `created_at` has whole seconds: order the three so the second is the branch's previous build.
-    for (const [n, build] of [first, second].entries())
-      await ctx.db
-        .update(builds)
-        .set({ createdAt: new Date(Date.now() - 60_000 + n * 1000) })
-        .where(eq(builds.id, build.id));
     const third = await getBuild(ctx.db, ctx.projectId, id);
     const pricing = snapshotKeyOf({ name: "pricing", ...SHOT });
     const about = snapshotKeyOf({ name: "about", ...SHOT });

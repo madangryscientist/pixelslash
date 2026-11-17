@@ -108,6 +108,10 @@ function shots(blockAt: number) {
 test.skip(COUNT === 0, "PS-200 measurement: set PIXELSLASH_RSS_BURST to the shot count");
 
 test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, provision }) => {
+  // Two uploads of COUNT full-page shots, the diff, the explanations and a 10 s settle: at 50 shots
+  // the diff alone took 12 to 38 s and the explanations 31 to 43 s (bench/PERF.md, its RSS burst
+  // runs on the dev desktop), past the 30 s default at the smallest count it is run with; the
+  // count goes to 500.
   test.setTimeout(1_200_000);
   const { token, projectId } = await provision({ org: "Burst Co", project: "burst" });
   if (MODEL) {
@@ -143,7 +147,6 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, pr
   await uploadBuild(token, { branch: "main", commitSha: SHA_MAIN }, main);
   const mainMs = Date.now() - t0;
   const afterMain = workerdRssMb();
-  await page.waitForTimeout(1100);
   const t1 = Date.now();
   const id = await uploadBuild(
     token,
@@ -156,12 +159,16 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, pr
   const t2 = Date.now();
   if (MODEL) {
     await open(page, `/projects/${projectId}/builds/${id}`);
+    // The explanations took 31 to 43 s at 50 shots (bench/PERF.md, its RSS burst runs), past the
+    // helper's 30 s, and grow with the shot count.
     await explained(page, 500_000);
   }
   const explainMs = Date.now() - t2;
   clearInterval(sampler);
   const homeTimes = await home.stop();
   const afterBranch = workerdRssMb();
+  // Not a sync: the reported `settled10s` figure is defined as workerd's RSS ten seconds after the
+  // burst, so this wall-clock wait is the measurement itself.
   await page.waitForTimeout(10_000);
   const settled = workerdRssMb();
   const peak = Math.max(...samples, afterBranch);
