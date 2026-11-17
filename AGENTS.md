@@ -285,6 +285,14 @@ git log --format='%s%n%b' main..<branch>
 Never commit implementation straight to `main`. Never `git commit -am`: stage
 new files explicitly or they are silently dropped.
 
+## Facts file: `FACTS.md`
+
+`FACTS.md`, beside the README, says what PixelSlash does today, what is planned, its licence and where it
+runs, one fact per line with a stable id that the marketing sites cite. A PR that changes what the product
+does, where it runs or its licence updates `FACTS.md` in the same PR and bumps its "Checked against" line
+(`origin/main`'s short sha and the date). Keep its shape: the same headings in every product repo, so the
+sites can parse it. A fact that stops being true is removed or moved to Planned; its id is never reused.
+
 ## Capability matrix: `docs/capabilities/`
 
 `docs/capabilities/matrix.html` is the standing answer to "what does this do, against the field":

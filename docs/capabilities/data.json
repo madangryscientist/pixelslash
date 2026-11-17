@@ -711,7 +711,7 @@
       "label": "Free tier / OSS plan",
       "ps": {
         "v": "p",
-        "note": "Free to self-host for your own use with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app is not live",
+        "note": "Free to self-host for your own use with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app at app.pixelslash.dev has no plans or billing",
         "commit": "cad8b76"
       },
       "t": {
@@ -722,7 +722,7 @@
         "lost": "y"
       },
       "plan": "",
-      "gap": "a hosted free plan: the hosted app is not live, so the free way to run the review app is to host it yourself"
+      "gap": "a hosted free plan: the hosted app has no plans, free or paid"
     },
     {
       "g": "platform",

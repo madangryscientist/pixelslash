@@ -15,6 +15,11 @@ anything bigger than a fix, open an issue first so we can agree on it before you
 PixelSlash does today; a change that moves either updates it in the same pull request.
 A feature issue can name the [persona](docs/personas/README.md) it is for.
 
+[`FACTS.md`](FACTS.md) lists what PixelSlash does today, what is planned, its licence and where it
+runs; the project's sites check their claims against it. A pull request that changes what the
+product does, where it runs or its licence updates `FACTS.md` in the same pull request, and moves
+its "Checked against" line to the current `main`.
+
 ## The gate
 
 A change is ready when all of these pass from a fresh checkout:
