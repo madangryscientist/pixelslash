@@ -11,7 +11,7 @@ to a review server where a person accepts or rejects them.
 
 You need [Bun](https://bun.sh) (the CLI runs on it, not on Node; `npx` and `bunx` both start it)
 and two screenshots of the same page: Main (the version you ship today) and Branch (your change).
-PixelSlash is early (0.1.x). It is published on npm as `@hackcove/pixelslash`:
+PixelSlash is early (0.7.x). It is published on npm as `@hackcove/pixelslash`:
 `npm i -D @hackcove/pixelslash` installs it, and the command is `pixelslash`.
 
 ```bash
