@@ -167,7 +167,8 @@ app.pixelslash.dev with the `PIXELSLASH_TOKEN` secret. The PixelSlash check on a
 against main's. It is not required, and with no secret (a fork) it skips and passes.
 
 **The site images bot** (`.github/workflows/site-images.yml`) runs `bun apps/site/scripts/site-images.ts` on
-`main` when the engine, the CLI, the hero page, `fixtures/pages` or those scripts change. When an image really
+`main` when the engine, the CLI, the review app (`apps/web/src`, whose compare view `report.png` shows), the
+hero page, `fixtures/pages` or those scripts change. When an image really
 changed it force-pushes `bot/site-images` and opens (or updates) a pull request titled `chore(site): regenerate
 the site images`, which may change only `apps/site/public/hero/*.png`, `apps/site/public/report.png`,
 `apps/site/src/content/hero.json` and `apps/site/src/content/report.json`. It acts with the `SITE_IMAGES_TOKEN`

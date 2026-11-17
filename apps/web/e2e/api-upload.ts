@@ -22,6 +22,8 @@ export type Shot = {
   flaky?: "review" | "skip";
   /** A layout metrics file (PS-294, `docs/metrics.md`), sent as the `metrics` part. */
   metrics?: object;
+  /** What the CLI records as the shot's viewport; the 40 px fixtures' by default. */
+  viewport?: string;
 };
 
 /** The CLI's form for one shot; a flaky one carries its record and runs 2 and 3, run 2 differing. */
@@ -31,7 +33,7 @@ function shotForm(shot: Shot): FormData {
     name: shot.name,
     platform: "linux",
     browser: "chromium",
-    viewport: "40x40",
+    viewport: shot.viewport ?? "40x40",
     theme: "light",
     tags: ["web"],
     fingerprint: { image: "version:e2e", browser: "chromium 1", fonts: "sha256:f" },
