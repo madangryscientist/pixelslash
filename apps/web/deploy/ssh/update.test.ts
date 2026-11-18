@@ -1,13 +1,14 @@
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   readlinkSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 import {
@@ -184,6 +185,51 @@ describe("update.sh", () => {
     expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
     expect(releaseNames(s)).toEqual(["aaaaaaa"]);
     expect(commands.filter((line) => line.startsWith("systemctl"))).toEqual([]);
+  });
+
+  describe("the retired opencode helper", () => {
+    const HELPER_URL = "http://127.0.0.1:4180/v1";
+
+    test("a CT that still runs it has it removed, with the rows that point at it", () => {
+      const s = setup();
+      writeFileSync(join(s.unitDir, "pixelslash-opencode.service"), "[Unit]\n");
+      mkdirSync(dirname(s.helper.switchFile), { recursive: true });
+      writeFileSync(s.helper.switchFile, "opencode-go/some-model\n");
+      writeFileSync(`${s.helper.switchFile}.bak-haiku`, "opencode-go/other-model\n");
+      writeFileSync(s.helper.key, "key\n");
+      writeFileSync(s.helper.bin, "");
+      s.model("org-helper", HELPER_URL);
+      s.model("org-own", "https://models.example/v1");
+
+      const { status, commands } = deploy(s, pack("aaaaaaa"));
+
+      expect(status).toBe(0);
+      expect(
+        commands.some((line) =>
+          line.startsWith("systemctl disable --now --quiet pixelslash-opencode "),
+        ),
+      ).toBe(true);
+      expect(readdirSync(s.unitDir)).not.toContain("pixelslash-opencode.service");
+      for (const file of [
+        s.helper.switchFile,
+        `${s.helper.switchFile}.bak-haiku`,
+        s.helper.key,
+        s.helper.bin,
+      ])
+        expect(existsSync(file)).toBe(false);
+      expect(s.models()).toEqual([{ orgId: "org-own", baseUrl: "https://models.example/v1" }]);
+    });
+
+    test("a clean CT deploys and no helper unit is touched", () => {
+      const s = setup();
+      s.model("org-own", "https://models.example/v1");
+
+      const { status, commands } = deploy(s, pack("aaaaaaa"));
+
+      expect(status).toBe(0);
+      expect(commands.filter((line) => line.includes("pixelslash-opencode"))).toEqual([]);
+      expect(s.models()).toEqual([{ orgId: "org-own", baseUrl: "https://models.example/v1" }]);
+    });
   });
 
   describe("error reporting (PS-227)", () => {

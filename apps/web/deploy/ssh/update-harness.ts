@@ -66,6 +66,8 @@ export function setup() {
 
   const db = new Database(join(root, "d1.sqlite"));
   db.run("CREATE TABLE builds (id TEXT PRIMARY KEY, status TEXT, processing_started_at INTEGER)");
+  // What the migrations make on a CT: every deploy deletes the retired helper's rows from it.
+  db.run("CREATE TABLE org_models (org_id TEXT PRIMARY KEY, base_url TEXT)");
   const build = (id: string, status: string, startedAgoMs: number | null) =>
     db.run("INSERT INTO builds VALUES (?, ?, ?)", [
       id,
@@ -73,7 +75,31 @@ export function setup() {
       startedAgoMs === null ? null : Date.now() - startedAgoMs,
     ]);
 
-  return { build, home, legacyWeb, stubs, unitDir, log, releases: join(home, "releases") };
+  const model = (orgId: string, baseUrl: string) =>
+    db.run("INSERT INTO org_models VALUES (?, ?)", [orgId, baseUrl]);
+  const models = () =>
+    new Database(join(root, "d1.sqlite"))
+      .query("SELECT org_id AS orgId, base_url AS baseUrl FROM org_models ORDER BY org_id")
+      .all();
+  // Where the retired opencode helper left its files on a CT.
+  const helper = {
+    switchFile: join(root, "etc/opencode-helper"),
+    key: join(root, "opencode.key"),
+    bin: join(root, "opencode-bin"),
+  };
+
+  return {
+    build,
+    model,
+    models,
+    helper,
+    home,
+    legacyWeb,
+    stubs,
+    unitDir,
+    log,
+    releases: join(home, "releases"),
+  };
 }
 
 export type Setup = ReturnType<typeof setup>;
@@ -106,7 +132,7 @@ export function pack(
 ) {
   const dir = join(root, "pack", sha);
   mkdirSync(join(dir, "apps/web/deploy/ssh"), { recursive: true });
-  for (const unit of [...UNITS, ...WATCHDOG_UNITS, "pixelslash-opencode.service", "watchdog.sh"])
+  for (const unit of [...UNITS, ...WATCHDOG_UNITS, "watchdog.sh"])
     copyFileSync(join(LAN, unit), join(dir, "apps/web/deploy/ssh", unit));
   mkdirSync(join(dir, "apps/web/dist/server"), { recursive: true });
   writeFileSync(join(dir, "apps/web/dist/server/index.js"), `// ${sha}\n`);
@@ -151,7 +177,9 @@ export function deploy(s: Setup, tarball: string, env: Record<string, string> = 
       PIXELSLASH_APP_PATH: `${s.stubs}:/usr/bin:/bin`,
       PIXELSLASH_UNIT_DIR: s.unitDir,
       PIXELSLASH_WATCHDOG_BIN: join(root, "watchdog-bin"),
-      PIXELSLASH_HELPER_SWITCH: join(root, "no-helper-switch"),
+      PIXELSLASH_HELPER_SWITCH: s.helper.switchFile,
+      PIXELSLASH_HELPER_KEY: s.helper.key,
+      PIXELSLASH_OPENCODE_BIN: s.helper.bin,
       PIXELSLASH_D1_RETRY_SLEEP: "0",
       STUB_LOG: s.log,
       STUB_DB: join(root, "d1.sqlite"),

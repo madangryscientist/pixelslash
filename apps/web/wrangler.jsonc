@@ -216,7 +216,7 @@
         // self-host's `.dev.vars` sets api.github.com so its check runs reach GitHub (PS-281).
         "GITHUB_APP_API_BASE": "",
         "PIXELSLASH_PUBLIC_URL": "",
-        // The Playwright run's model is a stub on localhost, and the LAN self-host's helper is on loopback.
+        // The Playwright run's model is a stub on localhost, and the LAN self-host may run its own model on its network.
         "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "1",
         // Retention is off in the e2e build; the LAN self-host's `.dev.vars` does not set it either.
         "PIXELSLASH_RETENTION_DAYS": "",

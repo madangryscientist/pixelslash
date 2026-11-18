@@ -32,11 +32,9 @@
 # the last 15 minutes (a build older than that is an orphan, as 7a698500 was, and never blocks).
 # PIXELSLASH_DEPLOY_FORCE=1 on the release.sh command line deploys anyway.
 #
-# The opencode helper (ob 1900) is a switch: the file /etc/pixelslash/opencode-helper holds the
-# model (`provider/model`), and while it exists this script installs opencode, installs and enables
-# pixelslash-opencode, and points every org without a model of its own at the helper. Without the
-# file nothing about the helper is installed, and one that was is disabled and removed. See
-# apps/web/README.md, "The AI explain step through opencode".
+# The opencode helper is gone: every deploy retires one a CT still runs (its unit, switch, key and
+# binary) and removes the org_models rows that point at it, so an org explains only through its own
+# model endpoint. On a CT that never ran it this changes nothing.
 #
 # The diff sidecar (PS-203) is always installed: pixelslash-diff runs the server diff on
 # 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come up is reported and
@@ -60,10 +58,11 @@ LEGACY=$APP_HOME/pixelslash
 SHARED_WEB=$LEGACY/apps/web
 UNIT_DIR=${PIXELSLASH_UNIT_DIR:-/etc/systemd/system}
 WATCHDOG_BIN=${PIXELSLASH_WATCHDOG_BIN:-/usr/local/sbin/pixelslash-watchdog}
+# What the retired opencode helper left on a CT.
 HELPER_SWITCH=${PIXELSLASH_HELPER_SWITCH:-/etc/pixelslash/opencode-helper}
-HELPER_KEY=$APP_HOME/.config/pixelslash/opencode.key
+HELPER_KEY=${PIXELSLASH_HELPER_KEY:-$APP_HOME/.config/pixelslash/opencode.key}
 HELPER_URL=http://127.0.0.1:4180/v1
-OPENCODE_BIN=$APP_HOME/.opencode/bin/opencode
+OPENCODE_BIN=${PIXELSLASH_OPENCODE_BIN:-$APP_HOME/.opencode/bin/opencode}
 D1_RETRY_SLEEP=${PIXELSLASH_D1_RETRY_SLEEP:-2}
 # A build that started processing within this many seconds is live, and a deploy waits for it.
 LIVE_BUILD_SECONDS=900
@@ -87,45 +86,14 @@ wait_for_port() {
   return 1
 }
 
-# opencode, the release the capture image pins ($1/docker/capture/Dockerfile: version and sha256),
-# from the same npm tarball. Installed once per version; nothing is downloaded when it is there.
-install_opencode() {
-  local dockerfile=$1/docker/capture/Dockerfile version sha
-  version=$(sed -n 's/^ARG OPENCODE_VERSION=//p' "$dockerfile")
-  # The ADD whose URL is the opencode tarball: its checksum is on the line before it.
-  sha=$(grep -B1 'cli-linux-x64' "$dockerfile" | sed -n 's/.*--checksum=sha256:\([0-9a-f]*\).*/\1/p')
-  [[ -n $version && -n $sha ]] || { echo "no pinned opencode in $dockerfile" >&2; return 1; }
-  if [[ -x $OPENCODE_BIN ]] && "$OPENCODE_BIN" --version 2>/dev/null | grep -qx "opencode v$version"; then
-    return
+# Removes the opencode helper from a CT that still runs it: the unit, the switch (and its backups),
+# the key and the binary. Run on every deploy; on a clean CT it does nothing.
+retire_helper() {
+  if [[ -f $UNIT_DIR/pixelslash-opencode.service ]]; then
+    systemctl disable --now --quiet pixelslash-opencode || true
+    rm -f "$UNIT_DIR"/pixelslash-opencode.service
   fi
-  local tmp
-  tmp=$(mktemp -d)
-  curl -fsSL "https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-$version.tgz" -o "$tmp/opencode.tgz"
-  echo "$sha  $tmp/opencode.tgz" | sha256sum -c --quiet
-  tar -xzf "$tmp/opencode.tgz" -C "$tmp" --strip-components=2 package/bin/opencode
-  install -d -o "$APP_USER" -g "$APP_USER" "$(dirname "$OPENCODE_BIN")"
-  install -m 755 -o "$APP_USER" -g "$APP_USER" "$tmp/opencode" "$OPENCODE_BIN"
-  rm -rf "$tmp"
-}
-
-# With the switch on, every org without a model of its own explains through the helper (the key
-# column is a placeholder: the real key is the helper's token file). An org that has a model of
-# its own keeps it. With it off, the rows that point at the helper are removed. $1 is the release.
-point_models() {
-  local sql
-  sql=$(mktemp)
-  if [[ -n $2 ]]; then
-    cat >"$sql" <<SQL
-INSERT INTO org_models (org_id, base_url, model, api_key, auto_pass_noise)
-SELECT id, '$HELPER_URL', '$2', 'opencode-helper', 0 FROM orgs WHERE is_smoke = 0
-ON CONFLICT (org_id) DO UPDATE SET model = excluded.model WHERE org_models.base_url = excluded.base_url;
-SQL
-  else
-    echo "DELETE FROM org_models WHERE base_url = '$HELPER_URL';" >"$sql"
-  fi
-  chmod 644 "$sql"
-  d1 "$1" execute DB --file="$sql"
-  rm -f "$sql"
+  rm -f "$HELPER_SWITCH" "$HELPER_SWITCH".bak-* "$HELPER_KEY" "$OPENCODE_BIN"
 }
 
 # `wrangler d1 $2...` on the local D1, in release $1. An upload in flight holds the database's write
@@ -298,17 +266,8 @@ rollback() {
   pause_watchdog
   set_current "$prev"
   install_units "$prev"
-  # The helper too, when it is installed: it would otherwise run on from the deleted release.
-  local units=(pixelslash-diff pixelslash-stub pixelslash-web)
-  if [[ -f $UNIT_DIR/pixelslash-opencode.service ]]; then
-    local pd
-    pd=$(deploy_dir "$prev")
-    [[ ! -f $pd/pixelslash-opencode.service ]] ||
-      install -m 644 "$pd"/pixelslash-opencode.service "$UNIT_DIR"/
-    units+=(pixelslash-opencode)
-  fi
   systemctl daemon-reload
-  systemctl restart "${units[@]}"
+  systemctl restart pixelslash-diff pixelslash-stub pixelslash-web
   [[ -z $failed || $failed == "$prev" ]] || rm -rf "$failed"
   if ! wait_for_port 3000 60 pixelslash-web; then
     echo "the previous release did not come up on :3000 either" >&2
@@ -327,23 +286,12 @@ main() {
   local rel=$RELEASES/$name prev="" unpacked=""
   [[ ! -L $CURRENT ]] || prev=$(readlink -f "$CURRENT")
 
-  # The switch, read before anything changes: a bad one fails here, with the LAN still up.
-  local helper_model="" had_helper=0
-  [[ -f $UNIT_DIR/pixelslash-opencode.service ]] && had_helper=1
-  if [[ -f $HELPER_SWITCH ]]; then
-    helper_model=$(tr -d '[:space:]' <"$HELPER_SWITCH")
-    [[ $helper_model =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] ||
-      { echo "$HELPER_SWITCH must hold one provider/model, e.g. opencode-go/claude-haiku-5-5" >&2; exit 1; }
-    [[ -f $HELPER_KEY && $(stat -c '%a %U' "$HELPER_KEY") == "600 $APP_USER" ]] ||
-      { echo "$HELPER_KEY must exist, mode 600, owned by $APP_USER" >&2; exit 1; }
-  fi
-
   # Before anything changes: a deploy under a live build errors that build.
   [[ -z $prev ]] || refuse_live_build "$prev" || exit 1
 
   # Everything up to the switch happens beside the serving release, which does not notice; a failure
   # here deletes a release this deploy unpacked, so it never takes one of the kept places. One still
-  # kept (going back to it, or the current one again to apply a changed helper switch or secrets)
+  # kept (going back to it, or the current one again to apply changed secrets)
   # is not unpacked again: `current` is pointed at it and it is restarted. Only a complete release
   # is kept, since a failed one is deleted.
   trap '[[ -z $unpacked ]] || rm -rf "$unpacked"; exit 1' ERR HUP INT TERM
@@ -357,7 +305,6 @@ main() {
   take_carried "$rel"
   copy_secrets "$rel"
   stamp_sentry "$rel" "$name"
-  [[ -z $helper_model ]] || install_opencode "$rel"
   # Additive only, so the release still serving runs on the migrated schema until the restart.
   d1 "$rel" migrations apply DB
 
@@ -365,36 +312,21 @@ main() {
   trap 'rollback "$prev" "$unpacked"' ERR HUP INT TERM
   pause_watchdog
   install_units "$rel"
-  if [[ -n $helper_model ]]; then
-    install -m 644 "$rel"/apps/web/deploy/ssh/pixelslash-opencode.service "$UNIT_DIR"/
-  elif [[ $had_helper == 1 ]]; then
-    systemctl disable --now --quiet pixelslash-opencode || true
-    rm -f "$UNIT_DIR"/pixelslash-opencode.service
-  fi
+  retire_helper
   systemctl daemon-reload
   set_current "$rel"
-  # The sidecar is up before the server that sends to it. Waited for like the helper, but a sidecar
-  # that does not come up costs speed, not a result: it is reported, and the update goes on.
+  # No org explains through the retired helper. The table is there: the migration above made it. A
+  # failure here is reported, not rolled back: the release is fine, and the next deploy tries again.
+  d1 "$rel" execute DB --command "$(printf %q "DELETE FROM org_models WHERE base_url = '$HELPER_URL';")" ||
+    echo "could not delete the retired helper's org_models rows: the next deploy tries again" >&2
+  # The sidecar is up before the server that sends to it. A sidecar that does not come up costs
+  # speed, not a result: it is reported, and the update goes on.
   systemctl enable --quiet pixelslash-diff
   systemctl restart pixelslash-diff
   if ! wait_for_port 4181; then
     journalctl -u pixelslash-diff -n 5 --no-pager >&2 || true
     echo "pixelslash-diff did not come up on :4181: server diffs run in-process, up to their limit" >&2
   fi
-  # The helper is up before any org is pointed at it: a unit that will not start fails the update
-  # here, and no row aims at a port with nothing behind it.
-  if [[ -n $helper_model ]]; then
-    systemctl enable --quiet pixelslash-opencode
-    systemctl restart pixelslash-opencode
-    # `restart` returns once the process is forked, so a helper that dies on start (a missing
-    # module, a bad key file) is only seen by waiting for its port. Without it no row points there.
-    if ! wait_for_port 4180; then
-      journalctl -u pixelslash-opencode -n 5 --no-pager >&2 || true
-      echo "pixelslash-opencode did not come up on :4180" >&2
-      rollback "$prev" "$unpacked"
-    fi
-  fi
-  if [[ -n $helper_model || $had_helper == 1 ]]; then point_models "$rel" "$helper_model"; fi
   systemctl enable --quiet pixelslash-stub pixelslash-web
   systemctl restart pixelslash-stub pixelslash-web
   # serve.ts (PS-220) starts Miniflare on :3000 in under a second on the CT; it gets 30 s. A
