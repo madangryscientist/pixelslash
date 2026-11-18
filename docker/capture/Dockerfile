@@ -9,10 +9,6 @@
 #
 # Pass the image digest at run time (-e PIXELSLASH_IMAGE_DIGEST=sha256:…) and the
 # fingerprint records it; without it the fingerprint records the version below.
-#
-# opencode is in the image for the `opencode` judge kind (PIXELSLASH_OPENCODE_MODEL).
-# The model key is never baked in: pass it at run time (-e OPENCODE_API_KEY=… or a
-# mounted ~/.local/share/opencode/auth.json). Nothing the capture does uses it.
 
 FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS base
 
@@ -39,19 +35,6 @@ RUN apt-get update \
  && tar -xzf /tmp/liberation-fonts-ttf-2.1.5.tar.gz -C /licences/liberation-fonts --strip-components=1 --wildcards '*/LICENSE' '*/AUTHORS' \
  && tar -xjf /tmp/dejavu-fonts-ttf-2.37.tar.bz2 -C /licences/dejavu-fonts --strip-components=1 --wildcards '*/LICENSE' '*/AUTHORS' \
  && chmod -R a+rX /licences
-
-# opencode, the pinned release. The tarball is @opencode/cli-linux-x64 (glibc, x86-64) from
-# the npm registry, where `opencode upgrade` fetches it; the sha256 below was computed from
-# that file and its sha512 matched the registry's `integrity`. To bump: change both values
-# (`curl -fsSL https://registry.npmjs.org/@opencode%2fcli-linux-x64/<version>` gives the
-# tarball URL; hash the download).
-FROM base AS opencode
-ARG OPENCODE_VERSION=2.1.4
-ADD --checksum=sha256:ce05abe2dce1041391c8ec8cdb8da066f640fd471e72ac846dcb089c441e11e1 \
-    https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-${OPENCODE_VERSION}.tgz /tmp/opencode.tgz
-RUN mkdir /opencode \
- && tar -xzf /tmp/opencode.tgz -C /opencode --strip-components=2 package/bin/opencode \
- && chmod 755 /opencode/opencode
 
 FROM base
 ARG PIXELSLASH_IMAGE_VERSION=0.1.0-dev
@@ -83,8 +66,6 @@ RUN find /usr/share/fonts -mindepth 1 -maxdepth 1 ! -name pixelslash -exec rm -r
  && rm -rf /usr/local/share/fonts /root/.fonts /root/.local/share/fonts \
  && fc-cache -f \
  && fc-list --format '%{file}\n' | sort
-
-COPY --from=opencode /opencode/opencode /usr/local/bin/opencode
 
 COPY packages/engine/src packages/engine/src
 # The diff's compiled module (PS-210): the CLI diffs only through it.
