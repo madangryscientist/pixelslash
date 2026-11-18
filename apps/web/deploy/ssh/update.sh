@@ -315,8 +315,10 @@ main() {
   retire_helper
   systemctl daemon-reload
   set_current "$rel"
-  # No org explains through the retired helper. The table is there: the migration above made it.
-  d1 "$rel" execute DB --command "$(printf %q "DELETE FROM org_models WHERE base_url = '$HELPER_URL';")"
+  # No org explains through the retired helper. The table is there: the migration above made it. A
+  # failure here is reported, not rolled back: the release is fine, and the next deploy tries again.
+  d1 "$rel" execute DB --command "$(printf %q "DELETE FROM org_models WHERE base_url = '$HELPER_URL';")" ||
+    echo "could not delete the retired helper's org_models rows: the next deploy tries again" >&2
   # The sidecar is up before the server that sends to it. A sidecar that does not come up costs
   # speed, not a result: it is reported, and the update goes on.
   systemctl enable --quiet pixelslash-diff
