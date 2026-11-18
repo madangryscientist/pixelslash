@@ -58,8 +58,3 @@ tasks:
     options:
       cache: false
       runFromWorkspaceRoot: true
-  decoders:
-    command: "bun bench/src/perf/decoders.ts"
-    options:
-      cache: false
-      runFromWorkspaceRoot: true

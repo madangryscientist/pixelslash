@@ -55,10 +55,6 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .tool-versions
-      # global.json pins the SDK; engines/dotnet is part of the gate where an SDK exists.
-      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
-        with:
-          global-json-file: global.json
       - run: bun install --frozen-lockfile
       # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
       - name: Install the Playwright browser
@@ -159,8 +155,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The moon remote cache as in `gate`: a push to main writes (the `moon-cache-write` environment and
-    # its token), so main's build and e2e results reach the cache; every other run only reads. It does
-    # not use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # its token), so main's build and e2e results reach the cache; every other run only reads. Moon's
+    # graph needs no SDK, so none is installed. MOON_BASE and the full
     # history: see `gate`.
     environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:
@@ -238,8 +234,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The moon remote cache as in `gate`: a push to main writes (the `moon-cache-write` environment and
-    # its token), so main's build and e2e results reach the cache; every other run only reads. It does
-    # not use engines/dotnet, and moon's graph needs no SDK, so none is installed. MOON_BASE and the full
+    # its token), so main's build and e2e results reach the cache; every other run only reads. Moon's
+    # graph needs no SDK, so none is installed. MOON_BASE and the full
     # history: see `gate`.
     environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'moon-cache-write' || '' }}
     env:

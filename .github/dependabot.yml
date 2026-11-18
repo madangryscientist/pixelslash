@@ -15,12 +15,3 @@ updates:
     groups:
       actions:
         patterns: ["*"]
-  - package-ecosystem: nuget
-    directories:
-      - /engines/dotnet/PixelSlash.Diff
-      - /engines/dotnet/PixelSlash.Diff.Tests
-    schedule:
-      interval: weekly
-    groups:
-      minor-and-patch:
-        update-types: [minor, patch]

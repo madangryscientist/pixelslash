@@ -1,6 +1,5 @@
 # moon workspace. A project id is its directory's old Nx name, so `bunx moon run engine:test` runs the
-# engine's tests. The two .NET projects (the .csproj files under engines/dotnet) are one moon project,
-# `dotnet`. Projects are listed, not globbed.
+# engine's tests. Projects are listed, not globbed.
 #
 # No toolchain is declared (no .moon/toolchains.yml): every task runs on the `system` toolchain, so
 # moon runs our bun commands as they are and never downloads Bun or runs `bun install`.
@@ -15,7 +14,6 @@ projects:
   engine: "packages/engine"
   playwright: "packages/playwright"
   scripts: "scripts"
-  dotnet: "engines/dotnet"
 
 vcs:
   client: "git"

@@ -14,8 +14,9 @@ implicitInputs:
   # moon's input globs do not read .gitignore, so what a build or a test run leaves behind is listed
   # here: moon's own cache, node_modules (a workspace package's holds symlinks the glob still walks),
   # dist, the licence files and tarballs the package builds copy in, the CLI's wasm copy, .wrangler,
-  # the Playwright output and snapshots, the pack output, a local run's .pixelslash/, and the dotnet
-  # and cargo build output (present after a local build, so listed even where nothing matches today).
+  # the Playwright output and snapshots, the pack output, a local run's .pixelslash/, the cargo build
+  # output and the bin, obj and TestResults folders a build leaves (present after a local build, so
+  # listed even where nothing matches today).
   - "!/.moon/cache/**"
   - "!/**/.pixelslash/**"
   - "!/packs/**"
@@ -35,7 +36,6 @@ implicitInputs:
   - "!/**/bin/**"
   - "!/**/obj/**"
   - "!/**/TestResults/**"
-  - "!/engines/dotnet/native/out/**"
   - "!/engines/wasm/target/**"
   - "!/engines/wasm/native/target/**"
   # routeTree.gen.ts is left in: `tsr generate` rewrites it to the same bytes, so the hash holds, and

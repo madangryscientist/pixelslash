@@ -119,7 +119,6 @@ by group; a group is one layer unless a row says otherwise. Counts are from the 
 | `apps/site/src/content` | 3 | integration | the pages are built from the repo's own docs, so a heading or a code block cannot drift |
 | `packages/playwright`, `examples/playwright-node` | 2 | integration | the Playwright integration against an upload stub |
 | `bench/test` | 12 | unit | the benchmark's scoring and runner; `bench:check` is the regression guard (integration: it replays the cached Argos verdicts) |
-| `engines/dotnet` | 1 project | integration | xunit, only where the .NET SDK is present |
 
 ### Duplicates cut
 

@@ -46,7 +46,6 @@ function fake(
       return null;
     },
     exec: async (cmd) => {
-      if (cmd[0] === "dotnet") return ok("10.0.100\n");
       if (cmd[0] === "systemctl") {
         const name = cmd[3];
         const unit = cmd[5];
@@ -111,7 +110,6 @@ describe("beginEnv none", () => {
       cpuModel: "Test CPU 9000",
       kernel: "7.2.8",
       bun: "1.3.0",
-      dotnet: "10.0.100",
       boost: "1",
       governor: "performance",
       reservedCpus: null,
@@ -232,7 +230,6 @@ describe("headerLines", () => {
     cpuModel: "Test CPU 9000",
     kernel: "7.2.8",
     bun: "1.3.0",
-    dotnet: "10.0.100",
     reservedCpus: null,
     hostCpus: null,
     memoryMin: null,
@@ -255,7 +252,7 @@ describe("headerLines", () => {
 
   test("none prints the machine in two lines", () => {
     expect(headerLines(base)).toEqual([
-      "env: none · Test CPU 9000 · kernel 7.2.8 · bun 1.3.0 · dotnet 10.0.100",
+      "env: none · Test CPU 9000 · kernel 7.2.8 · bun 1.3.0",
       "boost on · governor performance · host load 0.42 at start, 0.50 at end",
     ]);
   });
