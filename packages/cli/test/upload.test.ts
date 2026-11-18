@@ -141,12 +141,16 @@ describe("pixelslash upload", () => {
     expect(api.calls).toHaveLength(0);
   });
 
-  test("--judge with no local judge says `skip: no judge` and uploads as without it", async () => {
+  // A hosted model named in the env chooses no judge either: the judge is local only.
+  test.each([
+    ["--judge with no local judge", {}],
+    ["--judge with PIXELSLASH_OPENCODE_MODEL set", { PIXELSLASH_OPENCODE_MODEL: "opencode-go/m" }],
+  ])("%s says `skip: no judge` and uploads as without it", async (_name, extra) => {
     const [cwd, dir, api, cap] = [await gitRepo(), await snapshotDir(), fakeUploadApi(), capture()];
     const code = await run(["upload", dir, "--server", SERVER, "--judge"], cap.io, {
       fetch: api.fetch,
       cwd,
-      env: { PIXELSLASH_TOKEN: "psci_env" },
+      env: { PIXELSLASH_TOKEN: "psci_env", ...extra },
       which: () => null,
     });
     expect(code).toBe(0);

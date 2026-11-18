@@ -620,7 +620,7 @@
       "label": "Local-only mode (nothing leaves)",
       "ps": {
         "v": "y",
-        "note": "the default; shots leave only through `upload` or `capture --upload`, or to the model's provider when `PIXELSLASH_OPENCODE_MODEL` names a hosted one (opt-in); `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake and the review decisions a personal token makes",
+        "note": "the default; shots leave only through `upload` or `capture --upload`; `check` measures against the server's baselines without uploading; `dev` re-diffs one page on every save, locally; the MCP fix loop takes shots locally and only reads the server, bar resolving a flake and the review decisions a personal token makes",
         "commit": "9c2cdfb"
       },
       "t": {
@@ -638,7 +638,7 @@
       "label": "AI judgement against a design system",
       "ps": {
         "v": "y",
-        "note": "local mlx or ollama, or a hosted model through a tool-less `opencode run` when `PIXELSLASH_OPENCODE_MODEL` names one; DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict; `upload --judge` writes one sentence per changed shot, shown on the build and branch pages; on the server, a project's own (or its org's) OpenAI-compatible model explains each change region from three crops, and on a branch build with fewer than ten changed shots writes one summary from its measurements and region notes, with no images in that call, each sentence linking to the shots it names; given the uploader's brief (`upload --brief`), it closes with one sentence on whether the changes match it, read as untrusted text and deciding nothing",
+        "note": "local mlx or ollama; DS rasters, violations; in `dev`, the differences from a feature's spec and reference images, boxed, with no verdict; `upload --judge` writes one sentence per changed shot, shown on the build and branch pages; on the server, a project's own (or its org's) OpenAI-compatible model explains each change region from three crops, and on a branch build with fewer than ten changed shots writes one summary from its measurements and region notes, with no images in that call, each sentence linking to the shots it names; given the uploader's brief (`upload --brief`), it closes with one sentence on whether the changes match it, read as untrusted text and deciding nothing",
         "commit": "cad8b76"
       },
       "t": {

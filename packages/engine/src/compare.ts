@@ -16,7 +16,6 @@ import { UsageError } from "./errors.ts";
 import type { FetchLike } from "./figma.ts";
 import {
   bunSpawn,
-  JudgeError,
   judgePage,
   pngNames,
   resolveJudge,
@@ -204,17 +203,10 @@ async function judgePair(
   const kind = resolveJudge(deps);
   if (kind == null) return { already: [], fresh: [], skipped: true, skipReason: "no judge" };
   const input = { dsDir: ds, components, spawn: deps.spawn ?? bunSpawn, kind };
-  try {
-    const already = await judgePage(join(out, "live.png"), input);
-    const localHits = await judgePage(join(out, "local.png"), input);
-    const liveNames = new Set(already.map((v) => v.component));
-    return { already, fresh: localHits.filter((v) => !liveNames.has(v.component)), skipped: false };
-  } catch (error) {
-    // A configured opencode judge that did not answer skips the judge, like having none: the
-    // pair has no verdict and invents no violations.
-    if (!(error instanceof JudgeError)) throw error;
-    return { already: [], fresh: [], skipped: true, skipReason: `judge ${error.reason}` };
-  }
+  const already = await judgePage(join(out, "live.png"), input);
+  const localHits = await judgePage(join(out, "local.png"), input);
+  const liveNames = new Set(already.map((v) => v.component));
+  return { already, fresh: localHits.filter((v) => !liveNames.has(v.component)), skipped: false };
 }
 
 /** The pair's one shot timing: its diff, and its capture with the capture's parts when it shot. */

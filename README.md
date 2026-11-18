@@ -53,8 +53,8 @@ code.
 - **Many pages:** `--routes FILE` compares a list of paths, and `compare` diffs two snapshot
   directories.
 - **A design-system judge:** `--ds DIR` checks each shot against your component rasters with a
-  local vision model (mlx on a Mac, or ollama), or a hosted one you name through opencode. With no
-  judge installed the run prints `skip: no judge` and invents no violations.
+  local vision model (mlx on a Mac, or ollama). With no judge installed the run prints
+  `skip: no judge` and invents no violations.
 - **Snapshots in CI:** [`pixelslash capture`](docs/cli.md#snapshot-capture-the-pinned-image) shoots
   every route in a config inside a pinned image and records what rendered each shot, so a shot from
   a different setup is named as one. A `v*` tag publishes it to `ghcr.io/madangryscientist/pixelslash-capture`.
