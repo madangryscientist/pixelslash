@@ -26,13 +26,7 @@ export {
 export { CaptureError, DevLockError, FigmaError, UploadError, UsageError } from "./errors.ts";
 export { BRIEF_LIMIT, briefTooLong, trimBrief } from "./brief.ts";
 export { fetchFigmaRasters, resolveToken } from "./figma.ts";
-export {
-  askOpencode,
-  JudgeError,
-  OPENCODE_MODEL_ENV,
-  type ProcLike,
-  type SpawnProc,
-} from "./judge.ts";
+export type { ProcLike, SpawnProc } from "./judge.ts";
 export { PLATFORMS, type NativePlatform } from "./native.ts";
 export { importPngs, type ImportOptions, type ImportResult } from "./import-pngs.ts";
 export { isHttpUrl, loadRoutes } from "./routes.ts";

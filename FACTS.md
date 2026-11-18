@@ -18,14 +18,14 @@ PixelSlash shows what changed on a web page between two versions of it, Main and
 - `playwright-helper`: `@hackcove/pixelslash-playwright` takes snapshots from your own Playwright tests, in Chromium only.
 - `native-screenshots`: takes Android and iOS screenshots (from Maestro or any tool that writes PNGs) and pairs them with web shots of the same name and theme.
 - `ignore-and-redact`: an area can be left out of the diff and still shown, or painted over before the PNG is written.
-- `design-system-judge`: optionally checks each shot against your design system's component images with a local vision model (mlx or ollama), or a hosted one you name; with no judge installed it prints `skip: no judge` and reports no violations.
+- `design-system-judge`: optionally checks each shot against your design system's component images with a local vision model (mlx or ollama); with no judge installed it prints `skip: no judge` and reports no violations.
 - `accessibility-checks`: optionally runs axe-core on each page and lists the WCAG A and AA violations that are new on Branch; this never changes the exit code.
 - `flaky-shot-detection`: re-shoots each changed shot and flags it as flaky when the shots disagree; `pixelslash flake` reproduces one locally and names the cause.
 - `dev-mode`: `pixelslash dev` re-shoots a page or component on every save and compares it with the previous one, uploading nothing.
 - `mcp-server`: `pixelslash mcp` is an MCP server, so a coding agent can read builds and changed shots and accept or reject a change.
 - `init`: `pixelslash init` writes a `pixelslash.config.ts` from a few questions.
 - `exit-codes`: exit codes are a fixed contract for CI ([the table](docs/cli.md#exit-codes-and-the-failed-line)): a compare run exits 0 when it finishes, whatever changed in pixels, 1 on new design-system violations on Branch or when the run failed, 2 on a usage error and 7 on a crash, never 1.
-- `local-unless-upload`: screenshots leave the machine only through `pixelslash upload` or `--upload`, and then only to the server you name, or to a hosted judge model you name yourself.
+- `local-unless-upload`: screenshots leave the machine only through `pixelslash upload` or `--upload`, and then only to the server you name.
 - `upload-to-review-app`: `pixelslash upload` sends shots to a PixelSlash review app, which diffs them against the default branch and holds the build for a person to accept or reject each change.
 - `review-app-keyboard`: in the review app, `j` and `k` move through a build, `a` accepts and `r` rejects.
 - `github-status-and-comment`: the review app posts a commit status on GitHub and keeps one comment per pull request; it does not react to anything on GitHub.

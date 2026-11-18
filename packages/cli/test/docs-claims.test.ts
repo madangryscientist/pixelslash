@@ -83,7 +83,7 @@ describe("the environment variables section", () => {
     new RegExp(`Bun\\.env\\.(${NAME})\\b`, "g"),
     new RegExp(`\\benv\\.(${NAME})\\b`, "g"),
     new RegExp(`\\benv\\["(${NAME})"\\]`, "g"),
-    // A name held in a constant and used as an env key (SENTRY_DSN_VAR, OPENCODE_MODEL_ENV).
+    // A name held in a constant and used as an env key (SENTRY_DSN_VAR).
     /"(PIXELSLASH_[A-Z0-9_]+)"/g,
   ];
 
@@ -106,7 +106,7 @@ describe("the environment variables section", () => {
   );
 
   test("the scan finds the variables it is known to", () => {
-    const known = ["PIXELSLASH_TOKEN", "PIXELSLASH_SENTRY_DSN", "PIXELSLASH_OPENCODE_MODEL"];
+    const known = ["PIXELSLASH_TOKEN", "PIXELSLASH_SENTRY_DSN"];
     expect(known.filter((name) => !readNames.has(name))).toEqual([]);
     expect(readNames.size).toBeGreaterThanOrEqual(12);
   });

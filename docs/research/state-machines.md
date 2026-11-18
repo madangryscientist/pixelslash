@@ -264,7 +264,7 @@ Gaps: the measure and a11y phase after the screenshot is still reported as `scre
 | Machine | States and transitions | Gap |
 | --- | --- | --- |
 | `RunState.stage` | `capture`, `compare`, `upload`, or none, set from the command table; one transition, capture to upload on `capture --upload` (`cli/src/failure.ts:10`, `upload.ts:253`) | check, dev and flake crash with no stage |
-| Judge availability | `opencode:<model>` if its env var is set, else mlx, else ollama, else none; JudgeError reasons: binary missing, timeout, exit, empty answer (`engine/src/judge.ts:48` to `71`) | |
+| Judge availability | mlx, else ollama, else none (`engine/src/judge.ts:39` to `46`) | |
 | Dev mode choice | subcommand on the store, else attach to a live session, else `--once` or the loop; keys r, p, u, m, f, q, SIGTERM as q (`cli/src/dev.ts:497`, `dev-loop.ts`) | |
 | Flake | `open` to `resolved` and back; a new detection reopens (`web/src/db/flakes.ts:55` to `220`) | `openFlake` races on the evidence array |
 | Flake upload pass | per changed shot: `flaky`, `changed` or `skipped`; policy `review` or `skip` (`cli/src/flake-upload.ts`) | |
