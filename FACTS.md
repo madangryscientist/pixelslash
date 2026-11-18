@@ -1,6 +1,6 @@
 # PixelSlash facts
 
-Checked against main at 0f1c696 on 2026-11-17.
+Checked against main at 4120ff6 on 2026-11-18.
 
 ## What it is
 PixelSlash shows what changed on a web page between two versions of it, Main and Branch, as a report you open in a browser, and can send those screenshots to a review app where a person accepts or rejects each change. It is in alpha, and the command line tool is at version 0.7.
@@ -43,7 +43,7 @@ PixelSlash shows what changed on a web page between two versions of it, Main and
 ## Where it runs
 - `npm-cli`: the command line tool installs from npm as `@hackcove/pixelslash` and runs on Bun, not Node.
 - `npm-playwright-helper`: the Playwright helper installs from npm as `@hackcove/pixelslash-playwright` and runs on Node.
-- `capture-image`: the capture image is published as `ghcr.io/madangryscientist/pixelslash-capture`, one tag per release.
+- `capture-image`: the capture image is published as `ghcr.io/slashsuite/pixelslash-capture`, one tag per release.
 - `from-source`: from a clone of the repository with Bun: `bun install`, then `bun run pixelslash`.
 - `hosted-review-app`: the review app is hosted at app.pixelslash.dev, with sign-in by GitHub or Google.
 - `self-host-cloudflare`: the review app runs on your own Cloudflare account (Workers, D1, R2), following `apps/web/SELF-HOST.md`.

@@ -1,6 +1,6 @@
 {
   "name": "PixelSlash Review",
-  "url": "https://github.com/madangryscientist/pixelslash",
+  "url": "https://github.com/slashsuite/pixelslash",
   "description": "Posts a PixelSlash commit status on each build's commit, whose Details opens the build page, and one comment on its pull request with the counts.",
   "public": false,
   "redirect_url": "http://localhost:8787/",

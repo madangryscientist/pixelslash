@@ -25,8 +25,8 @@ type Gates = { repoPublic: boolean; appLive: boolean };
 const GATES: Gates = { repoPublic: REPO_PUBLIC, appLive: APP_LIVE };
 
 const REPO_HOSTS = [
-  "github.com/madangryscientist/pixelslash",
-  "ghcr.io/madangryscientist/pixelslash",
+  "github.com/slashsuite/pixelslash",
+  "ghcr.io/slashsuite/pixelslash",
 ];
 
 /** `a/b/../c` → `a/c`, against the directory of `sourcePath`. */

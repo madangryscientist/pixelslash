@@ -57,7 +57,7 @@ code.
   `skip: no judge` and invents no violations.
 - **Snapshots in CI:** [`pixelslash capture`](docs/cli.md#snapshot-capture-the-pinned-image) shoots
   every route in a config inside a pinned image and records what rendered each shot, so a shot from
-  a different setup is named as one. A `v*` tag publishes it to `ghcr.io/madangryscientist/pixelslash-capture`.
+  a different setup is named as one. A `v*` tag publishes it to `ghcr.io/slashsuite/pixelslash-capture`.
 - **Your own Playwright tests:** [snapshots from the tests you already
   have](docs/cli.md#snapshots-from-your-own-playwright-tests).
 - **A review server:** [`pixelslash upload`](docs/cli.md#uploading-to-a-server) sends shots to a
