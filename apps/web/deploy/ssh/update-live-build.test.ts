@@ -39,7 +39,7 @@ describe("a build in flight (PS-228)", () => {
     expect(stderr).toContain("b-live");
     expect(stderr).toContain("PIXELSLASH_DEPLOY_FORCE=1");
     nothingChanged(s);
-    expect(commands.filter((line) => !line.includes("d1 execute"))).toEqual([]);
+    expect(commands.filter((line) => !line.includes("FROM builds"))).toEqual([]);
   });
 
   test("PIXELSLASH_DEPLOY_FORCE=1 deploys anyway", () => {
@@ -50,7 +50,7 @@ describe("a build in flight (PS-228)", () => {
 
     expect(status).toBe(0);
     expect(current(s)).toBe(join(s.releases, "bbbbbbb"));
-    expect(commands.some((line) => line.includes("d1 execute"))).toBe(false);
+    expect(commands.some((line) => line.includes("FROM builds"))).toBe(false);
   });
 
   test("an old stuck processing build does not block", () => {
@@ -65,11 +65,11 @@ describe("a build in flight (PS-228)", () => {
 
   test("a D1 that cannot be asked blocks too, and FORCE gets past it", () => {
     const s = serving();
-    // Only the question fails; the migrations and the install still work.
+    // Only the question fails; the migrations, the install and the helper cleanup still work.
     writeFileSync(
       join(s.stubs, "bunx"),
       "#!/usr/bin/env bash\n" +
-        '[[ " $* " != *" d1 execute "* ]] || { echo "no such table: builds" >&2; exit 1; }\n',
+        '[[ " $* " != *"FROM builds"* ]] || { echo "no such table: builds" >&2; exit 1; }\n',
     );
 
     const blocked = deploy(s, pack("bbbbbbb"));
@@ -85,6 +85,6 @@ describe("a build in flight (PS-228)", () => {
     s.build("b-live", "processing", MIN);
     const { status, commands } = deploy(s, pack("aaaaaaa"));
     expect(status).toBe(0);
-    expect(commands.some((line) => line.includes("d1 execute"))).toBe(false);
+    expect(commands.some((line) => line.includes("FROM builds"))).toBe(false);
   });
 });

@@ -79,7 +79,7 @@ On by default; `SECURITY.md` says why each exists.
 
 | Setting | Where | Meaning |
 | --- | --- | --- |
-| `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS` | `wrangler.jsonc` vars (`1` under `env.e2e`) | Empty (the default): a project's or org's model base URL on loopback, RFC 1918, link-local, CGNAT, their IPv6 forms, or a `.local`/`.internal`/single-label name is refused at save and before each call, after resolving the name (`src/ai/model-host.ts`). `1` lets them through, for a self-host running its own model; the LAN CT's helper on loopback needs it. Never set it on a deployment strangers can sign in to. |
+| `PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS` | `wrangler.jsonc` vars (`1` under `env.e2e`) | Empty (the default): a project's or org's model base URL on loopback, RFC 1918, link-local, CGNAT, their IPv6 forms, or a `.local`/`.internal`/single-label name is refused at save and before each call, after resolving the name (`src/ai/model-host.ts`). `1` lets them through, for a self-host running its own model. Never set it on a deployment strangers can sign in to. |
 | `GITHUB_OAUTH_BASE`, `GITHUB_API_BASE` | `wrangler.jsonc` vars | A production build refuses to start unless they are `https://github.com` and `https://api.github.com` (`src/auth/stub-guard.ts`). Only `vite dev` and the `CLOUDFLARE_ENV=e2e` build may point at the GitHub stand-in. |
 | `GOOGLE_OAUTH_BASE` | `wrangler.jsonc` vars | Empty, Google's own endpoints. A production build refuses to start when it is set; only the Playwright run points it at the stand-in, which answers as a Google account too. |
 | `API_RATE_LIMIT`, `SIGNIN_RATE_LIMIT` | `wrangler.jsonc` `ratelimits` | Cloudflare rate-limit bindings: `/api/v1/*` per token (a refused token per client IP), 3000 a minute; `/auth/github`, `/auth/google` and their callbacks per client IP, 30 a minute. Over the limit is a 429. Not under `env.e2e`, so the e2e build and the LAN CT run with the no-op seam in `src/server/rate-limit.ts` and are never limited. |
@@ -453,7 +453,7 @@ public DNS. Real GitHub sign-in is a later ticket.
 | Releases | `/home/pixelslash/releases/<sha>/`, user `pixelslash`, one per deploy, built on the machine that deploys; `releases/current` is the one serving. The last 3 are kept. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
 | Old checkout | `/home/pixelslash/pixelslash`, the git checkout the CT served from and built in before PS-225. Nothing runs from it now; it holds the state and the secrets below. |
 | State | D1 and R2 in the old checkout's `apps/web/.wrangler/state` on the CT's disk; every release's `apps/web/.wrangler/state` links to it, so it is kept across restarts, deploys and rollbacks. |
-| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/ssh/serve.ts`: the production build on Miniflare, no vite), from `deploy/ssh/`, in `releases/current/apps/web`. `pixelslash-diff` (`bun deploy/ssh/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. With the opencode switch on (below) a fourth, `pixelslash-opencode`, runs the same way. `pixelslash-watchdog.timer` restarts `pixelslash-web` or `pixelslash-diff` when one is active and silent (below). |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/ssh/serve.ts`: the production build on Miniflare, no vite), from `deploy/ssh/`, in `releases/current/apps/web`. `pixelslash-diff` (`bun deploy/ssh/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. `pixelslash-watchdog.timer` restarts `pixelslash-web` or `pixelslash-diff` when one is active and silent (below). |
 
 `deploy/ssh/serve.ts` calls Miniflare's API on the build (`dist/server` is the Worker, `dist/client` the
 assets): the D1 and R2 in `.wrangler/state/v3` that `vite preview` kept, the `wrangler.json` vars with
@@ -491,8 +491,11 @@ On the CT, `update.sh` unpacks the release into `releases/<sha>` beside the one 
 points `current` at it and restarts the units. **The downtime is that restart only.** A release that
 does not come up on :3000 goes back to the previous one by itself and is deleted; the script's header
 and comments have the details. A sha still kept on the CT (the last 3) is switched to without
-unpacking it again, so deploying the current sha applies a changed opencode switch or
-`.dev.vars.e2e`, and deploying an older one from a clean checkout of it is the rollback by hand.
+unpacking it again, so deploying the current sha applies a changed `.dev.vars.e2e`, and deploying
+an older one from a clean checkout of it is the rollback by hand. Every deploy also retires the old
+opencode helper from a CT that still runs it (its unit, switch, key and binary, and the org model
+rows that point at it); on a CT without it this does nothing. An org explains through
+its own model endpoint, set in the project's or org's settings.
 wrangler is a runtime dependency of `apps/web` so the production install has it for the migrations.
 
 **A deploy does not run under a live build (PS-228).** The restart kills the Worker mid-diff and the
@@ -594,7 +597,7 @@ killed, and systemd read `active` with `NRestarts=0`. Held locally to the sideca
 - **No `MemoryHigh` and no swap on either unit.** Over `MemoryMax` the kernel kills the process, the
   unit fails, and `Restart=` brings it back. The same overload with no High was killed within seconds.
 - **The limits rest on these numbers**, measured locally under `MemorySwapMax=0`, on synthetic
-  busy PNGs. The sum of the Maxes, with `pixelslash-opencode`'s 500M, is 4000M of the CT's 6 GiB. The
+  busy PNGs. The sum of the Maxes is 3500M of the CT's 6 GiB. The
   Proxmox host is overcommitted, so the limits are ceilings, not reservations.
 
 | Unit | `MemoryMax` | Peak measured |
@@ -625,49 +628,6 @@ at this size passes the 15 s timeout, the sidecar is skipped for that run and th
 12.5 Mpx limit.
 Docker (`deploy/docker/start.ts`) has the pixel limits and respawns its sidecar, but sets no cgroup
 limits and has no watchdog.
-
-### The AI explain step through opencode
-
-The explain step needs a model, and workerd cannot start a process, so on the CT it reaches the
-`opencode` CLI through a helper on the same box: `deploy/ssh/opencode-helper.ts`, unit
-`pixelslash-opencode`. It serves one route, `POST /v1/chat/completions` on `127.0.0.1:4180`, in the
-shape `complete()` in `src/ai/model.ts` already sends, and answers each call with the engine's
-tool-less `opencode run` (no `--auto`, a deny-everything agent, no server). A region's three crops
-and the build summary's text-only call both go through it. The images are written to a private temp
-dir that is removed when the call ends. It is **off** until you turn it on, and it is for this
-personal self-host only: the OpenCode Go plan it uses is for personal use.
-
-```bash
-# On the CT, as root: the model (provider/model), then the key.
-echo opencode-go/claude-haiku-5-5 > /etc/pixelslash/opencode-helper
-install -d -o pixelslash -g pixelslash /home/pixelslash/.config/pixelslash
-install -m 600 -o pixelslash -g pixelslash /dev/stdin /home/pixelslash/.config/pixelslash/opencode.key
-# Then, on the deploying machine, deploy (the sha already serving is restarted, not unpacked again).
-apps/web/deploy/ssh/release.sh "$(git rev-parse HEAD)"
-```
-
-While `/etc/pixelslash/opencode-helper` exists, a deploy (`update.sh` on the CT) checks it and the key file (which must
-be mode 600), installs the opencode release the capture image pins, enables the unit, and gives
-every non-smoke org without a model a row pointing at `http://127.0.0.1:4180/v1` with a placeholder
-key. The real key is only in the token file; the helper puts it in opencode's environment, so it is
-never in git, the unit, a log line or a reply. An org or project with a model of its own keeps it
-and wins. The rows are written when a deploy runs, so an org created afterwards has no explain
-step until the next deploy. Remove the file and deploy again to turn it off: the rows that
-point at the helper are deleted and the unit is stopped and removed. With the file never made,
-a deploy does nothing about the helper.
-
-The helper runs one call at a time (the CT has no memory for more; the unit is capped at 500 MB)
-and gives a call 18 s. One call takes about 4 s. The app sends a shot's regions up to six at a
-time, each with a 20 s limit that starts when it is sent, so a shot with more than about four
-changed regions has its later calls time out while they wait in the helper's line. The shot then
-keeps the notes it did get, is never auto-passed, and is not retried (the explain queue retries
-only a shot that got none), so its review is partial. Raising the helper's concurrency means a
-bigger memory cap for the unit, and fewer calls at once means a change to the app's fan-out, which
-the hosted path shares; neither is done here. The journal has one line per call, with the model,
-the image count, the time and the outcome (a named reason only, never opencode's own output, a
-prompt or an image): `journalctl -u pixelslash-opencode -f`. A shot none of whose calls worked
-reads as a named `ai_error` (`opencode: timeout`, `opencode: exit`). The hosted
-Cloudflare path does not use any of this.
 
 `vite preview` sends each request to workerd on a connection of its own (`freshConnectionPerRequest`
 in `vite.config.ts`, ob 1876). On the CT workerd closes its connection about 50 ms after it answers a
