@@ -205,6 +205,8 @@ Upper bounds (estimates, not measured; one phase's whole share removed):
 
 ## Run log
 
+2026-11-18 · the C# port of the diff: `engines/dotnet`, `bench:decoders` and the .NET SDK step are removed from the repo (PR #292). Their rows below stay as measured.
+
 2026-10-25 · PS-211: the JS pngjs and napi-image engines are retired from the bench, with their overlay encoders, `--decoder` and `--overlay`. The bench times one JS engine, `diff.wasm` (PS-210), and the C# engine. Their rows below stay as measured.
 
 Newest first. One entry per perf run that landed. The `env` column says what the machine was doing

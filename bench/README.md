@@ -390,105 +390,20 @@ reserved cores too, and `irqaffinity=` moves the interrupts away. Use them if th
 
 ### The two engines: what `bench:perf` times
 
-Since PS-211 the bench times two engines, one diff each:
+Since PS-211 the bench times one engine, `diff.wasm`:
 
 | engine | what it is | how to run it |
 | --- | --- | --- |
 | `ts-diff`, `--engine wasm` | `diff.wasm` through `wasmDiff`, the one diff the CLI and the server run (PS-210) | `bun bench/src/impl/ts-diff.ts diff <base.png> <head.png> --json` |
-| C#, `PixelSlash.Diff` | the diff ported to C# (see below) | `dotnet build engines/dotnet/PixelSlash.Diff -c Release`, then `dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll diff <base.png> <head.png> --json` |
 
 Time both in one interleaved run (on demand, never in the gate):
 
 ```bash
-bun run bench:perf -- --runs 1 --impl "bun bench/src/impl/ts-diff.ts --engine wasm" \
-  --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
+bun run bench:perf -- --runs 1 --impl "bun bench/src/impl/ts-diff.ts --engine wasm"
 ```
 
 With no `--impl`, `bench:perf` still compares two git refs (`--base`, the land-time check); the
 engines are timed with `--impl`.
-
-### The C# implementation: `engines/dotnet`
-
-`engines/dotnet/PixelSlash.Diff` is the TypeScript engine's diff ported to C# (.NET 10) behind the
-contract: the same YIQ threshold, anti-alias test, 24 px region grouping, speck, noise and shift
-rules, and the same overlap-only rule for shots of different sizes. PNGs are decoded with
-SkiaSharp (MIT, Skia BSD-3), base and head at once, since PS-168; `--decoder stb --decode
-sequential` is the StbImageSharp (Unlicense or MIT) path it had before. See "Decoders and encoders". `engines/dotnet/PixelSlash.Diff.Tests` holds its xunit tests on
-tiny rasters. Both are the one moon project `dotnet` (`engines/dotnet/moon.yml`), so
-`bun run test` builds and runs them. It needs the .NET SDK that `global.json` pins (see AGENTS.md).
-
-```bash
-dotnet build engines/dotnet/PixelSlash.Diff -c Release
-bun run bench -- --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
-bun run bench:perf -- --impl "bun bench/src/impl/ts-diff.ts" \
-  --impl "dotnet engines/dotnet/PixelSlash.Diff/bin/Release/net10.0/PixelSlash.Diff.dll"
-```
-
-When it landed (ob 1910), its accuracy tables matched the reference implementation's on both
-corpora, row for row, and its verdict and region boxes matched on every one of the 157 pairs.
-Nothing keeps that true: a change to the TS diff (`diff.ts`, `regions.ts`, `shift.ts`) is not
-ported by itself, so port it and run the bench with both `--impl`s again. Two differences in what it does:
-it has no ignore areas (the contract has none), and it does not encode an overlay image, and neither does the
-bench's WASM reference since PS-211, so the two do equal work. The parity is for 8-bit PNGs, which is every shot in both corpora
-and what a browser screenshot is: StbImageSharp and pngjs round a 16-bit sample down to 8 bits
-differently, so a 16-bit pair can differ by one level before the diff starts.
-
-**Phases in C# (ob 1932).** `Stopwatch` brackets the same boundaries as the TypeScript side, with
-`anti_alias` timed on its own (a clock read around each test, so the `pixel_compare` loop minus it
-is reported). StbImageSharp's `ImageResult.FromMemory` is one call, so `PngDecode.cs` takes the steps
-stb itself takes, through stb's code: it walks the chunks, inflates through stb's public zlib entry
-point and unfilters through `stbi__create_png_image_raw`, which stb made public but with an internal
-first parameter type, so that one call is by reflection. No decoder is added or swapped, and a test
-holds the output byte-identical to `FromMemory` for every PNG in both corpora and `fixtures/ds`. The
-thin path takes only 8-bit, non-interlaced RGB or RGBA without tRNS; any other PNG goes through
-`FromMemory` whole, reports `decode_read` and `decode_other` only, and leaves out the inflate and
-unfilter phases. `--decode parallel` is `Task.WhenAll` over the two files (each read and decode on its own task).
-
-Two things the C# split cannot show cleanly, so read `decode_other` with them in mind. The runtime
-starts in tier-0 JIT, so the first image through a freshly started process pays for compiling
-stb's row loops, and that time lands in whichever phase runs the code first (mostly `decode_other`
-and `decode_unfilter`); a long-lived process would not. And `decode_other` includes the copy out of
-stb's buffer and the RGB to RGBA expansion, which stb does inside `FromMemory` too.
-
-### Decoders and encoders: `bench:decoders` (PS-168)
-
-The C# implementation takes a decoder by name. The production engine (`packages/engine`) is not
-touched by it and decodes and encodes inside `diff.wasm`, so there is no decoder to pick there. The
-TS decoder and overlay-encoder rows (PS-168) went with the engines they served: the TS decoders in
-PS-210, the overlay encoders in PS-211. Their numbers stay in `PERF.md`.
-
-```bash
-bun run bench:decoders -- --env dedicated            # every candidate below, written to bench/results/decoders-<yyyy-mm>.md
-engines/dotnet/native/build.sh                        # once: libspng (zlib and zlib-ng) and Wuffs, into native/out/
-<csharp> [--decoder stb|spng|spng-zlibng|wuffs|skia] diff a.png b.png --json [--decode parallel|sequential]
-bun bench/src/impl/ts-diff.ts [--engine wasm] [--no-tiles] diff a.png b.png --json
-```
-
-Each switch is given at most once, before `diff` (how `--impl` passes an implementation's own
-flags) or after the operands (where the harness puts `--decode`). An unknown name is exit 2, and a
-decoder whose library is not built or not compiled in is a usage error, never a silent fallback.
-Every C# decoder must give the baseline's RGBA byte for byte (StbImageSharp): a gate test decodes
-every PNG in both corpora and `fixtures/ds` with each one that is present.
-
-| engine | decoder | licence | where it runs | how it gets here |
-| --- | --- | --- | --- | --- |
-| C# | `skia` (default, parallel) | MIT (SkiaSharp), BSD-3 (Skia) | C# | NuGet |
-| C# | `stb` | Unlicense or MIT | C# | NuGet; the only one that splits its decode into phases |
-| C# | `spng`, `spng-zlibng` | BSD-2 (libspng), zlib (zlib, zlib-ng) | C# | `native/build.sh` |
-| C# | `wuffs` | Apache-2.0 | C# | `native/build.sh` |
-
-`native/build.sh` fetches each library's source at a pinned sha256 into
-`~/.cache/pixelslash-native`, builds it with the system `gcc` and writes `native/out/*.so`
-(gitignored). It needs the network once. Without it, the decoder tests skip the native decoders
-and the C# default still runs: that is why the default is `skia`, the fastest permissive decoder
-that comes from NuGet, and not `spng-zlibng` or `wuffs`, which measured faster (`bench/PERF.md`).
-
-`bench:decoders` builds the C# engine, then runs
-`bench:perf --impl` over every C# decoder in one interleaved run (its flags,
-such as `--env dedicated`, `--runs` or `--only`, go through). The TS impl's `bun build --compile`
-start-up row went in PS-210: a compiled binary does not carry `diff.wasm`, which the engine reads
-from disk. Peak RSS is what each process reports as `peak_rss_bytes` (its own `VmHWM`), because the
-kernel's rusage for a child carries the parent's high-water mark through fork and exec.
 
 ## The regression guard
 

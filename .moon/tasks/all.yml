@@ -9,9 +9,7 @@ implicitInputs:
   - "/tsconfig.base.json"
   - "/.oxlintrc.json"
   - "/scripts/check-slop.ts"
-  - "/global.json"
   - "/.tool-versions"
-  - "/engines/dotnet/Directory.Build.*"
 
 # Run every task in CI whether or not the change touched it, so a push to main (nothing affected
 # against origin/main) still gates and saves the cache.

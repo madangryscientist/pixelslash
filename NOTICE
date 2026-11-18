@@ -13,8 +13,6 @@ entry says where its code is used and gives the licence, reproduced in full at t
      packages/engine/src/yiq.ts      lumaIq, colourDelta, MAX_YIQ_DELTA
      engines/wasm/src/lib.rs         MAX_YIQ_DELTA, blended, luma, luma_iq, colour_delta,
                                      has_many_siblings, is_antialiased
-     engines/dotnet/PixelSlash.Diff/Diff.cs
-                                     MaxYiqDelta, Luma, ColourDelta, HasManySiblings, IsAntialiased
    The YIQ coefficients, the 35215 maximum delta and the neighbour tests follow pixelmatch's
    YIQ colour delta.
 
@@ -33,8 +31,7 @@ entry says where its code is used and gives the licence, reproduced in full at t
      transmission color space in mobile applications. The YIQ weights behind the colour delta,
      as pixelmatch cites them.
    - Vysniauskas, V. (2009). Anti-aliased Pixel and Intensity Slope Detector. The anti-alias test
-     (engines/wasm/src/lib.rs is_antialiased; engines/dotnet/PixelSlash.Diff/Diff.cs
-     IsAntialiased), as pixelmatch cites it.
+     (engines/wasm/src/lib.rs is_antialiased), as pixelmatch cites it.
 
 4. Argos calibration cases (MIT)
    Copyright 2017 Olivier Tassinari & Greg Bergé; https://github.com/argos-ci/argos

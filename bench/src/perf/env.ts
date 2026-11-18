@@ -25,7 +25,6 @@ export type EnvHeader = {
   cpuModel: string;
   kernel: string;
   bun: string;
-  dotnet: string;
   /** The reserved CPUs, as the scope reports them; null for `none`. */
   reservedCpus: string | null;
   /** What the host's own slices were left with during the run (user.slice AllowedCPUs). */
@@ -65,15 +64,6 @@ const SYS_CPU = "/sys/devices/system/cpu";
 
 const firstLine = (text: string | null): string => (text ?? "").split("\n")[0]?.trim() ?? "";
 
-async function versionOf(deps: EnvDeps, cmd: string[]): Promise<string> {
-  try {
-    const r = await deps.exec(cmd);
-    return r.code === 0 ? firstLine(r.out) : "unavailable";
-  } catch {
-    return "unavailable";
-  }
-}
-
 const loadNow = (deps: EnvDeps): string => (deps.read("/proc/loadavg") ?? "").split(" ")[0] ?? "";
 
 /** The distinct governors of the given CPUs, e.g. "performance". */
@@ -92,7 +82,6 @@ async function baseHeader(deps: EnvDeps, env: EnvName): Promise<EnvHeader> {
     cpuModel: model ?? "unknown",
     kernel: firstLine(deps.read("/proc/sys/kernel/osrelease")) || "unknown",
     bun: deps.bunVersion,
-    dotnet: await versionOf(deps, ["dotnet", "--version"]),
     reservedCpus: null,
     hostCpus: null,
     memoryMin: null,
@@ -251,7 +240,7 @@ function reservedLines(h: EnvHeader): string[] {
 /** The header as printed under the table's title. */
 export function headerLines(h: EnvHeader): string[] {
   return [
-    `env: ${h.env} · ${h.cpuModel} · kernel ${h.kernel} · bun ${h.bun} · dotnet ${h.dotnet}`,
+    `env: ${h.env} · ${h.cpuModel} · kernel ${h.kernel} · bun ${h.bun}`,
     `boost ${BOOST_LABEL[h.boost] ?? h.boost} · governor ${h.governor} · host load ${h.loadStart} at start, ${h.loadEnd} at end`,
     ...(h.env === "none" ? [] : reservedLines(h)),
   ];

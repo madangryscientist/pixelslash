@@ -29,7 +29,7 @@ bun install
 bun run typecheck       # tsc, strict, on every project
 bun run lint            # oxlint (type-aware, --deny-warnings) and check-slop
 bun run format:check    # oxfmt; `bun run format` fixes it
-bun run test            # Vitest under Bun, and xunit for engines/dotnet
+bun run test            # Vitest under Bun
 ```
 
 - **Each script runs through moon** (`moon run :typecheck`, `:lint`, `:test`), one project at a time
@@ -40,9 +40,6 @@ bun run test            # Vitest under Bun, and xunit for engines/dotnet
 - **Tests** live in `packages/*/test/`. A test that makes a temp dir removes it, and a new
   project's `vitest.config.ts` lists the `globalSetup` in `scripts/test-tmp-scope.ts` so a run
   cannot fill `/tmp`.
-- **The .NET SDK is optional.** `engines/dotnet` is a C# port of the diff that the benchmark
-  scores. Without a working `dotnet` the root scripts skip it and say so (`bun scripts/moon.ts` does
-  the check); a change to `engines/dotnet` needs the SDK, pinned in `global.json` and `.tool-versions`.
 - **The benchmark guard** (`bench:check`) is part of `test`. If a score moves on purpose, commit
   a new `bench/results/<date>.json` in the same change; see `bench/README.md`.
 - **A change to `apps/web`** also runs `bunx moon run web:build` and `bunx moon run web:test-e2e`

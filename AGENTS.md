@@ -33,7 +33,6 @@ holds what they inherit:
 | `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, serving the docs, self-host and security pages, each prerendered from the repo's own docs; no D1, R2 or sign-in. The four marketing pages (`/`, `/how-it-works`, `/compare`, `/pricing`) 301 to slashslash.build/pixelslash from the site's Worker entry. The planner deploys it after a merge (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
-| `dotnet` | `engines/dotnet` | the diff ported to C# behind the bench's diff contract (`PixelSlash.Diff`), and its xunit tests (`PixelSlash.Diff.Tests`): two `.csproj` files, one moon project, tagged `dotnet`. `bun run test` builds and runs them. A benchmark subject, not used by the CLI or the app |
 
 **Files another site reads by path.** The slashslash.build site fetches these from this repo at a
 pinned commit, and refreshes the pin when one of them changes on `main`:
@@ -63,33 +62,12 @@ bun run typecheck                 # moon run --concurrency 3 :typecheck  (tsc, s
 bun run lint                      # moon run --concurrency 3 :lint  (oxlint --type-aware --deny-warnings + check-slop;
                                   # check-dashes fails on an em or en dash in any tracked text file)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
-bun run test                      # moon run --concurrency 3 :test  (Vitest under the Bun runtime, and xunit for engines/dotnet)
+bun run test                      # moon run --concurrency 3 :test  (Vitest under the Bun runtime)
 ```
 
-**The .NET SDK is optional** (`engines/dotnet`, ob 1910; opt-in for contributors, PS-251). The root
-scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `scripts/moon.ts`, which runs
-`dotnet --version` first. Two paths:
-
-- **With a working `dotnet`** (this desktop): nothing changes. `bun run test` builds and tests
-  `PixelSlash.Diff.Tests` with xunit. The version is pinned twice, in `.tool-versions` (mise
-  activates it in this directory, with no `mise trust` needed) and in `global.json` (what `dotnet`
-  itself reads); `mise install` installs it. Without a `.tool-versions` here the mise shim fails with
-  "dotnet ... not currently active". The first restore fetches NuGet packages, so it needs the
-  network once. `.tool-versions` also pins Bun (`bun 1.4.4`), which CI's `setup-bun` steps read too, so
-  `mise install` installs that as well.
-- **Without one** (a container, an outside contributor): the wrapper prints
-  `dotnet SDK not found: skipping engines/dotnet` and adds `--query "tag!=dotnet"` to `moon run`, so
-  the TS projects run as before and the `dotnet` project does not. A `dotnet` that cannot run (no SDK
-  matching `global.json`) counts as missing. This path does not fail in CI either: the SDK is
-  optional. Setting `PIXELSLASH_DOTNET_DISABLE` (any value) yourself skips the check and the line,
-  and leaves the project out.
-
-The reason for the wrapper: moon's graph needs no SDK, so every moon command works without one, but
-`moon run :test` runs every project's `test`, and `dotnet:test` fails where there is no `dotnet`. A
-bare `bunx moon run :test` skips the wrapper, so on a machine without an SDK add
-`--query "tag!=dotnet"` yourself, or run one project. The wrapper also puts the root's
-`node_modules/.bin` on PATH, which moon does not. The SDK is for the gate and the bench only: it is
-not in the capture image or on the self-host. A change to `engines/dotnet` needs the SDK to be checked.
+The root scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `scripts/moon.ts`, which puts
+the root's `node_modules/.bin` on PATH: moon does not, and the tasks call `tsc` and `oxlint` from there. A bare
+`bunx moon run :test` skips the wrapper, so run it from `bun run test` or as `bun scripts/moon.ts run :test`.
 
 One project: `bunx moon run engine:test`, `bunx moon run cli:lint`. A task id cannot hold a colon, so
 the Playwright suites are `test-e2e` (`bunx moon run web:test-e2e`). moon caches locally in
