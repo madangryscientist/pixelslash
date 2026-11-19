@@ -24,10 +24,7 @@ type Gates = { repoPublic: boolean; appLive: boolean };
 
 const GATES: Gates = { repoPublic: REPO_PUBLIC, appLive: APP_LIVE };
 
-const REPO_HOSTS = [
-  "github.com/slashsuite/pixelslash",
-  "ghcr.io/slashsuite/pixelslash",
-];
+const REPO_HOSTS = ["github.com/slashsuite/pixelslash", "ghcr.io/slashsuite/pixelslash"];
 
 /** `a/b/../c` → `a/c`, against the directory of `sourcePath`. */
 function joinRepoPath(sourcePath: string, relative: string): string {
