@@ -93,7 +93,7 @@ export async function measureAgainstMain(
     db: Db;
     blobs: BlobStore;
     diff?: typeof diffPngs | undefined;
-    diffSidecar?: string | undefined;
+    diffLimitMpx?: number | undefined;
     /** The run's writes; the caller writes what is left queued when this returns or throws. */
     writes: SnapshotWrites;
   },

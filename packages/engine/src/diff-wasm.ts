@@ -5,6 +5,11 @@
  * and everything after the boxes (merging, noise, shift labels, floors) is `measuredDiff`. The
  * chunk walk is `png-walk.ts`, pngjs's reader down to its error messages. There is no JS fallback:
  * a module that will not load or instantiate fails with an error that names it.
+ *
+ * `wasmDiff` runs it start to end. `wasmDiffBanded` (PS-464) runs the same steps but stops between
+ * them, and between bands of the pixel loop, so a server that diffs on the thread that also answers
+ * its requests can answer them during a long diff. The steps are one generator, so both give the
+ * same result: a band boundary only decides where the loop pauses, never what it computes.
  */
 import { constants, deflateSync, inflateSync } from "node:zlib";
 import { diffModule } from "#diff-module";
@@ -185,10 +190,18 @@ type WasmDiffOptions = {
    * off side is the bench's A/B.
    */
   tiles?: boolean | undefined;
+  /**
+   * Run the tiled pixel loop in bands of this many 64 px tile rows, pausing between them. Unset, the
+   * loop is one call. Only `wasmDiffBanded` pauses; the result is the same either way.
+   */
+  bandTileRows?: number | undefined;
 };
 
+/** A run of the diff: it yields where a banded caller may let other work in, and returns the result. */
+type Steps<T> = Generator<void, T, void>;
+
 /** The pixel loop and the blob boxes: over the whole overlap, or over the differing tiles. */
-function compare(
+function* compare(
   wasm: DiffExports,
   shots: readonly [number, number, number, number, number, number],
   [skip, maxDelta, field, overlay, out]: [number, number, number, number, number],
@@ -196,8 +209,14 @@ function compare(
     gap,
     tiles,
     phases,
-  }: { gap: number; tiles: boolean | undefined; phases: WasmPhases | undefined },
-): number {
+    band,
+  }: {
+    gap: number;
+    tiles: boolean | undefined;
+    phases: WasmPhases | undefined;
+    band: number | undefined;
+  },
+): Steps<number> {
   const [, aw, ah, , bw, bh] = shots;
   const width = Math.min(aw, bw);
   const height = Math.min(ah, bh);
@@ -207,23 +226,38 @@ function compare(
   }
   const map = alloc(wasm, wasm.tile_map_len(width, height));
   timed(phases, "tile_hash", () => wasm.tiles(...shots, map));
-  timed(phases, "pixel_compare", () =>
-    wasm.diff_tiled(...shots, skip, maxDelta, field, overlay, out, map),
-  );
+  if (band === undefined) {
+    timed(phases, "pixel_compare", () =>
+      wasm.diff_tiled(...shots, skip, maxDelta, field, overlay, out, map),
+    );
+  } else {
+    // The tile rows, from the module's own grid: its map for one row of pixels is one tile row.
+    const tileRows = wasm.tile_map_len(width, height) / Math.max(1, wasm.tile_map_len(width, 1));
+    // The band at row 0 zeroes the field, the overlay and the counts, so it runs even with no rows.
+    for (let ty = 0; ty === 0 || ty < tileRows; ty += band) {
+      if (ty > 0) yield;
+      timed(phases, "pixel_compare", () =>
+        wasm.diff_tiled_rows(...shots, skip, maxDelta, field, overlay, out, map, ty, ty + band),
+      );
+    }
+  }
+  yield;
   return timed(phases, "regions", () =>
     wasm.blob_boxes_tiled(field, width, height, gap, map, out + 8),
   );
 }
 
-function run(
+function* run(
   wasm: DiffExports,
   [main, branch]: [Buffer, Buffer],
-  { options = {}, ignore = {}, encode, phases, tiles }: WasmDiffOptions,
-): PixelDiff & { overlay: Buffer } {
+  { options = {}, ignore = {}, encode, phases, tiles, bandTileRows }: WasmDiffOptions,
+): Steps<PixelDiff & { overlay: Buffer }> {
   wasm.reset();
   // The chunk walk and the copies into the module are decode_other.
   const ma = untimed(phases, "decode_other", () => decodeInto(wasm, main, phases));
+  yield;
   const br = untimed(phases, "decode_other", () => decodeInto(wasm, branch, phases));
+  yield;
   const width = Math.min(ma.width, br.width);
   const height = Math.min(ma.height, br.height);
   const n = width * height;
@@ -238,7 +272,8 @@ function run(
   const maxDelta = MAX_YIQ_DELTA * threshold * threshold;
   const shots = [ma.at, ma.width, ma.height, br.at, br.width, br.height] as const;
   const gap = options.mergeDistance ?? DEFAULT_MERGE_DISTANCE;
-  const count = compare(wasm, shots, [skip, maxDelta, field, overlay, out], { gap, tiles, phases });
+  const loop = { gap, tiles, phases, band: bandTileRows };
+  const count = yield* compare(wasm, shots, [skip, maxDelta, field, overlay, out], loop);
   if (count === 0xffffffff) throw new Error("diff.wasm: memory is full");
   let encodeWith = encode;
   if (!encodeWith) {
@@ -246,6 +281,7 @@ function run(
       encodeOverlay(wasm, overlay, overlayWidth, overlayHeight),
     );
     encodeWith = () => png;
+    yield;
   }
   // Views only now: a call that grows the memory detaches every view made before it.
   const memory = wasm.memory.buffer;
@@ -305,9 +341,46 @@ export function wasmDiff(
 ): PixelDiff & { overlay: Buffer } {
   try {
     wasm ??= instantiate(diffModule());
-    return run(wasm, pair, options);
+    const steps = run(wasm, pair, options);
+    for (;;) {
+      const step = steps.next();
+      if (step.done) return step.value;
+    }
   } catch (error) {
     wasm = null;
     throw error;
+  }
+}
+
+/** Instances no banded diff is using. One is taken for a whole diff, so two never share memory. */
+const idle: DiffExports[] = [];
+
+/** The pixel loop's band when the caller names none: 8 tile rows, 512 px, ~80 ms of a full change at 1280 wide. */
+const BAND_TILE_ROWS = 8;
+
+/**
+ * `wasmDiff`, awaiting `pause()` between its steps and between bands of the pixel loop (PS-464), so
+ * the thread it runs on can do other work during a long diff. The result is `wasmDiff`'s.
+ *
+ * Each diff takes an instance of its own for its whole run and gives it back at the end, so diffs
+ * that overlap never share a module's memory, and one that is abandoned at a pause (a request the
+ * runtime cancelled) keeps its instance until it is collected. Limiting how many run at once is the
+ * caller's: each one in flight holds its own memory.
+ */
+export async function wasmDiffBanded(
+  pair: [Buffer, Buffer],
+  { pause, ...options }: WasmDiffOptions & { pause: () => Promise<void> },
+): Promise<PixelDiff & { overlay: Buffer }> {
+  const own = idle.pop() ?? instantiate(diffModule());
+  const steps = run(own, pair, { bandTileRows: BAND_TILE_ROWS, ...options });
+  for (;;) {
+    // An error leaves the instance out of the pool, so the next diff starts on a fresh one.
+    const step = steps.next();
+    if (step.done) {
+      // One idle instance is kept, so its memory (as large as its largest diff) is held once.
+      if (idle.length === 0) idle.push(own);
+      return step.value;
+    }
+    await pause();
   }
 }

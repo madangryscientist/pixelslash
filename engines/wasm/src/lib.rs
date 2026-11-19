@@ -797,17 +797,28 @@ impl<'a> Compare<'a> {
     /// The loop's state for `diff`'s arguments, with the field and the overlay zeroed.
     #[allow(clippy::too_many_arguments)]
     fn new(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, skip: usize, max_delta: f64, field: usize, overlay: usize) -> Self {
+        Self::open(a, aw, ah, b, bw, bh, skip, max_delta, field, overlay, true)
+    }
+
+    /// `new`, zeroing the field and the overlay only when `zero` is set: a later band of
+    /// `diff_tiled_rows` keeps what the bands before it wrote.
+    #[allow(clippy::too_many_arguments)]
+    fn open(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, skip: usize, max_delta: f64, field: usize, overlay: usize, zero: bool) -> Self {
         let a = Img { d: bytes(a, aw as usize * ah as usize * 4), w: aw as usize, h: ah as usize };
         let b = Img { d: bytes(b, bw as usize * bh as usize * 4), w: bw as usize, h: bh as usize };
         let (ow, oh) = (a.w.min(b.w), a.h.min(b.h));
         let n = ow * oh;
         let fields = bytes_mut(field, n * 3);
-        fields.fill(0);
+        if zero {
+            fields.fill(0);
+        }
         let (kind, rest) = fields.split_at_mut(n);
         let (amplitude, lighter) = rest.split_at_mut(n);
         let paint_w = a.w.max(b.w);
         let paint = bytes_mut(overlay, paint_w * a.h.max(b.h) * 4);
-        paint.fill(0);
+        if zero {
+            paint.fill(0);
+        }
         let skip = if skip == 0 { None } else { Some(bytes(skip, n)) };
         Compare { a, b, ow, kind, amplitude, lighter, paint, paint_w, skip, max_delta, changed: 0, antialiased: 0 }
     }
@@ -849,6 +860,13 @@ impl<'a> Compare<'a> {
         let out = unsafe { slice::from_raw_parts_mut(out as *mut u32, 2) };
         out[0] = self.changed;
         out[1] = self.antialiased;
+    }
+
+    /// `finish`, adding this band's counts to the ones already at `out`.
+    fn add_to(&self, out: usize) {
+        let out = unsafe { slice::from_raw_parts_mut(out as *mut u32, 2) };
+        out[0] += self.changed;
+        out[1] += self.antialiased;
     }
 }
 
@@ -998,6 +1016,49 @@ pub extern "C" fn diff_tiled(
         }
     }
     pass.finish(out);
+}
+
+/// `diff_tiled` over the tile rows `ty0..ty1` only (PS-464), so a caller can stop between bands and
+/// let other work run. The band that starts at tile row 0 zeroes the field, the overlay and the
+/// counts; every later band adds to them. Run over every tile row, in bands in order, the result is
+/// `diff_tiled`'s, field, overlay and counts: each pixel's test reads only the two whole shots, never
+/// another pixel's result, so where the loop stops between rows changes nothing.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn diff_tiled_rows(
+    a: usize,
+    aw: u32,
+    ah: u32,
+    b: usize,
+    bw: u32,
+    bh: u32,
+    skip: usize,
+    max_delta: f64,
+    field: usize,
+    overlay: usize,
+    out: usize,
+    map: usize,
+    ty0: u32,
+    ty1: u32,
+) {
+    let first = ty0 == 0;
+    let mut pass = Compare::open(a, aw, ah, b, bw, bh, skip, max_delta, field, overlay, first);
+    let (ow, oh) = (pass.ow, pass.a.h.min(pass.b.h));
+    let (tw, th) = tile_grid(ow, oh);
+    let map = bytes(map, tw * th);
+    for ty in (ty0 as usize)..(ty1 as usize).min(th) {
+        for tx in 0..tw {
+            if map[ty * tw + tx] != 0 {
+                let (x0, y0) = (tx * TILE, ty * TILE);
+                pass.rect(x0, y0, (x0 + TILE).min(ow), (y0 + TILE).min(oh));
+            }
+        }
+    }
+    if first {
+        pass.finish(out);
+    } else {
+        pass.add_to(out);
+    }
 }
 
 /// `blobBoxes(field, dilatedChanged(field, gap))`: the changed pixels of `kind` (`w` x `h`)

@@ -1,6 +1,6 @@
 /**
- * The Docker self-host's entrypoint (PS-240): one container that runs the review app and the diff
- * worker, with every byte of state under one volume. See apps/web/README.md, "Self-host in 5
+ * The Docker self-host's entrypoint (PS-240): one container, one process, that runs the review
+ * app, server diff included, with every byte of state under one volume. See apps/web/README.md, "Self-host in 5
  * minutes", and docker/self-host/compose.yaml.
  *
  * - The app is the production build (`bun run build`, so the stub guard of PS-250 holds) on
@@ -9,8 +9,8 @@
  *   files: both under `$PIXELSLASH_DATA_DIR/state` (default `/data/state`), so a restart keeps them.
  * - The migrations run before the app listens (`migrate.ts`), on a D1-only Miniflare over the same
  *   files, so no request reaches a schema that is not there yet.
- * - The diff worker is `deploy/ssh/diff-sidecar.ts` on 127.0.0.1:4181 (`PIXELSLASH_DIFF_SIDECAR_PORT`),
- *   started here and started again if it exits. The Worker measures in-process while it is down.
+ * - The server diff runs in the Worker, in-process, up to `DIFF_LIMIT_MPX` (24.5 Mpx unless the
+ *   environment says otherwise): a pair over it ends the build `errored`, naming the size.
  * - Nothing is fetched from Cloudflare: `cf: false` gives requests Miniflare's placeholder
  *   `request.cf` instead of downloading one from workers.cloudflare.com at start.
  * - Config comes from the container's environment: any name the build's `vars` has, and the
@@ -31,7 +31,6 @@ const DATA_DIR = process.env["PIXELSLASH_DATA_DIR"] || "/data";
 const PERSIST_ROOT = join(DATA_DIR, "state/v3");
 const TMP_PATH = join(DATA_DIR, "tmp");
 const SECRETS_DIR = join(DATA_DIR, "secrets");
-const SIDECAR_PORT = Number(process.env["PIXELSLASH_DIFF_SIDECAR_PORT"] || 4181);
 
 /** Bindings that are secrets on Cloudflare, so the build's `vars` does not name them all. */
 const SECRET_NAMES = [
@@ -46,7 +45,8 @@ const SECRET_NAMES = [
 /** What a self-host means where the build's `vars` mean Cloudflare; the environment still wins. */
 const SELF_HOST_DEFAULTS: Record<string, string> = {
   DEFAULT_DIFF_LOCATION: "server",
-  DIFF_SIDECAR_URL: `http://127.0.0.1:${SIDECAR_PORT}`,
+  // The LAN self-host's limit (wrangler.jsonc, env.e2e); a production build's vars do not name it.
+  DIFF_LIMIT_MPX: "24.5",
   SENTRY_ENVIRONMENT: "self-host",
 };
 
@@ -76,7 +76,7 @@ export function bindingsFrom(
   kept: (name: string, make: () => string) => string,
 ): Record<string, string> {
   const bindings: Record<string, string> = { ...SELF_HOST_DEFAULTS };
-  for (const name of [...varNames, ...SECRET_NAMES]) {
+  for (const name of [...varNames, ...Object.keys(SELF_HOST_DEFAULTS), ...SECRET_NAMES]) {
     const value = env[name];
     if (value !== undefined && value !== "") bindings[name] = value;
   }
@@ -122,21 +122,6 @@ async function migrate(config: ReturnType<typeof readConfig>): Promise<void> {
   }
 }
 
-/** The diff worker, started again two seconds after it exits until the container stops. */
-function startSidecar(stopping: () => boolean): void {
-  const child = Bun.spawn(["bun", "deploy/ssh/diff-sidecar.ts"], {
-    cwd: WEB_ROOT,
-    env: { ...process.env, PIXELSLASH_DIFF_SIDECAR_PORT: String(SIDECAR_PORT) },
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  void child.exited.then((code) => {
-    if (stopping()) return;
-    log(`diff sidecar exited (${code}); starting it again in 2 s`);
-    setTimeout(() => startSidecar(stopping), 2000);
-  });
-}
-
 if (import.meta.main) {
   const config = readConfig();
   const bindings = bindingsFrom(process.env, Object.keys(config.vars ?? {}), keptSecret);
@@ -147,14 +132,11 @@ if (import.meta.main) {
   }
   mkdirSync(TMP_PATH, { recursive: true });
   await migrate(config);
-  let stopping = false;
-  startSidecar(() => stopping);
   const mf = new Miniflare({
     ...miniflareOptions({ persistRoot: PERSIST_ROOT, tmpPath: TMP_PATH, bindings }),
     cf: false,
   });
   const stop = () => {
-    stopping = true;
     void mf.dispose().finally(() => process.exit(0));
   };
   process.on("SIGTERM", stop);

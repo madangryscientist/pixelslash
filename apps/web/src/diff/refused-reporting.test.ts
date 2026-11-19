@@ -1,13 +1,11 @@
 import { Buffer } from "node:buffer";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { reportError } from "#/server/sentry";
-import { resetFallbackLog } from "./sidecar";
 import { context, onlyShot, sha, upload } from "./test-builds";
 
 vi.mock("#/server/sentry", () => ({ reportError: vi.fn<typeof reportError>() }));
 
 beforeEach(() => {
-  resetFallbackLog();
   vi.mocked(reportError).mockClear();
 });
 
@@ -35,8 +33,9 @@ async function pair(height: number, options: Parameters<typeof upload>[2]) {
 
 describe("what reaches Sentry from a build with an unmeasured shot (PS-328)", () => {
   test("a shot over the size limit is an outcome of the upload: stored and shown, never reported", async () => {
-    const { build, held } = await pair(40_000, { diffSidecar: "http://example.com" });
-    const said = "too large for a server diff: 1280x40000 = 51.2 Mpx, limit 24.5 Mpx";
+    const { build, held } = await pair(40_000, { diffLimitMpx: 24.5 });
+    const said =
+      "too large for a server diff on this server: 1280x40000 = 51.2 Mpx, limit 24.5 Mpx";
     expect(build.status).toBe("errored");
     expect(build.error).toContain("1 of 1 shots could not be measured");
     expect(build.error).toContain(`(${held.viewport}, ${held.theme}): ${said}`);

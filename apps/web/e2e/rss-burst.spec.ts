@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { expect, open, test } from "./fixtures";
 import { SHA_MAIN, SHA_WORK, explained, uploadBuild } from "./api-upload";
 import { type Block, png } from "./png";
-import { SERVER, SERVER_PORT, SIDECAR_PORT, STUB } from "./ports";
+import { SERVER, SERVER_PORT, STUB } from "./ports";
 
 /**
  * PS-200's measurement, not a test: replays an upload burst of full-page shots (a main build, then
@@ -11,8 +11,8 @@ import { SERVER, SERVER_PORT, SIDECAR_PORT, STUB } from "./ports";
  * never runs it: `PIXELSLASH_RSS_BURST=50 bunx playwright test rss-burst` from `apps/web`.
  * Linux only (/proc).
  *
- * PS-203 added the diff sidecar's RSS and the diff's time. The run diffs in the sidecar, as the LAN
- * does; `PIXELSLASH_E2E_NO_SIDECAR=1` diffs in workerd, as Cloudflare does. A finalise
+ * PS-203 added the diff's time. The diff runs in workerd, as everywhere; with the e2e build's
+ * pixel limit (`DIFF_LIMIT_MPX`) unless `PIXELSLASH_E2E_DIFF_LIMIT_MPX` says otherwise. A finalise
  * stops at the Worker's diff budget, so the branch build is finalised again until nothing is left
  * unmeasured, as the CLI does; `diffSeconds` is the branch upload less the main one (the same PUTs,
  * no diff).
@@ -46,9 +46,6 @@ function rssMb(comm: string, marker: string, arg = ""): number {
 
 /** Every workerd this run started (they inherit its port from the env). */
 const workerdRssMb = () => rssMb("workerd", `PIXELSLASH_E2E_PORT=${SERVER_PORT}`);
-/** The run's diff sidecar; 0 when it runs without one. Its argv tells it from the test workers, which inherit the var. */
-const sidecarRssMb = () =>
-  rssMb("bun", `PIXELSLASH_DIFF_SIDECAR_PORT=${SIDECAR_PORT}`, "diff-sidecar.ts");
 /** `vite preview`, the Node process in front of workerd: on the LAN box it shares workerd's cgroup. */
 const viteRssMb = () => rssMb("node", `PIXELSLASH_E2E_PORT=${SERVER_PORT}`, "preview");
 
@@ -127,18 +124,15 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, pr
   const branch = shots(260);
 
   const samples: number[] = [];
-  const sidecarSamples: number[] = [];
   const viteSamples: number[] = [];
   const unitSamples: number[] = [];
   const idle = workerdRssMb();
-  const sidecarIdle = sidecarRssMb();
   // 0 means no workerd was found in /proc, not a small number: do not print it as a result.
   expect(idle).toBeGreaterThan(0);
   const sampler = setInterval(() => {
     const workerd = workerdRssMb();
     const vite = viteRssMb();
     samples.push(workerd);
-    sidecarSamples.push(sidecarRssMb());
     viteSamples.push(vite);
     unitSamples.push(workerd + vite);
   }, 250);
@@ -172,8 +166,6 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, pr
   await page.waitForTimeout(10_000);
   const settled = workerdRssMb();
   const peak = Math.max(...samples, afterBranch);
-  const sidecarPeak = Math.max(0, ...sidecarSamples);
-  const sidecarSettled = sidecarRssMb();
   const vitePeak = Math.max(0, ...viteSamples);
   const unitPeak = Math.max(0, ...unitSamples);
   const homeFailed = homeTimes.filter((ms) => ms < 0).length;
@@ -182,7 +174,6 @@ test(`workerd RSS across a burst of ${COUNT} full-page shots`, async ({ page, pr
   process.stdout.write(
     `RSS-BURST shots=${COUNT} ${WIDTH}x${HEIGHT} idle=${idle}MB afterMain=${afterMain}MB ` +
       `peak=${peak}MB afterBranch=${afterBranch}MB settled10s=${settled}MB seconds=${seconds} ` +
-      `sidecar idle=${sidecarIdle}MB peak=${sidecarPeak}MB settled10s=${sidecarSettled}MB ` +
       `mainUpload=${(mainMs / 1000).toFixed(1)}s branchUpload=${(branchMs / 1000).toFixed(1)}s ` +
       `diffSeconds=${((branchMs - mainMs) / 1000).toFixed(1)} finalises=${rounds} ` +
       `vitePeak=${vitePeak}MB unitPeak=${unitPeak}MB home=${homeTimes.length} probes, ${homeFailed} failed, ` +

@@ -5,7 +5,7 @@ import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
 import type { DiffIgnore, DiffOptions } from "../src/diff.ts";
 import { isDiffExports } from "../src/diff-exports.ts";
-import { wasmDiff } from "../src/diff-wasm.ts";
+import { wasmDiff, wasmDiffBanded } from "../src/diff-wasm.ts";
 
 // PS-191: the tile pass hashes 64 px tiles and runs the pixel loop and the region pass only where
 // they differ. It must give the whole-overlap answer, overlay included, or it is not an option. On
@@ -177,6 +177,39 @@ describe("shots of different sizes: changes on the overlap's edge (PS-222)", () 
       expect([overlay.width, overlay.height]).toEqual(larger);
       expect(paintedOutside(overlay, ow, oh)).toBe(0);
     }
+  });
+});
+
+const pause = async () => {};
+/** `diffed`, banded `rows` tile rows at a time. */
+async function banded(pair: [Buffer, Buffer], rows: number, options: DiffOptions = {}) {
+  const { overlay, ...rest } = await wasmDiffBanded(pair, { pause, options, bandTileRows: rows });
+  return { ...rest, overlay: createHash("sha256").update(overlay).digest("hex") };
+}
+
+describe("the banded pixel loop at its edges (PS-464)", () => {
+  test.each([
+    ["a blob across a band boundary", png(300, 400, [...square(10, 60, 3), ...square(10, 66, 3)])],
+    ["a change in the last, clipped, tile row", png(300, 400, square(297, 397, 3))],
+    ["no change at all", png(300, 400)],
+  ] as const)("%s", async (_, branch) => {
+    const pair: [Buffer, Buffer] = [png(300, 400), branch];
+    for (const rows of [1, 2, 3, 100]) expect(await banded(pair, rows)).toEqual(diffed(pair, true));
+  });
+
+  test("shots of different sizes, and one shorter than a tile", async () => {
+    for (const pair of [
+      [png(300, 400), png(270, 430, square(260, 395, 4))],
+      [png(40, 30), png(100, 90, square(1, 1, 2))],
+    ] as [Buffer, Buffer][])
+      expect(await banded(pair, 1)).toEqual(diffed(pair, true));
+  });
+
+  test("a diff after another starts from zero counts, not the last one's", async () => {
+    // The first diff leaves its counts in the instance it gives back; the next one reuses it.
+    await banded([png(300, 400), png(300, 400, square(5, 5, 4))], 1);
+    const pair: [Buffer, Buffer] = [png(300, 400), png(300, 400)];
+    expect((await banded(pair, 1)).changedPixels).toBe(0);
   });
 });
 

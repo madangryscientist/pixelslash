@@ -10,6 +10,7 @@ test("the environment wins over the build's vars and the self-host defaults", ()
       GITHUB_CLIENT_SECRET: "secret",
       DEFAULT_DIFF_LOCATION: "client",
       APP_NAME: "",
+      DIFF_LIMIT_MPX: "30",
       PATH: "/usr/bin",
     },
     ["GITHUB_CLIENT_ID", "DEFAULT_DIFF_LOCATION", "APP_NAME"],
@@ -20,7 +21,11 @@ test("the environment wins over the build's vars and the self-host defaults", ()
     GITHUB_CLIENT_SECRET: "secret",
     DEFAULT_DIFF_LOCATION: "client",
     SENTRY_ENVIRONMENT: "self-host",
+    // A self-host default the build's vars do not name is still overridden by the environment.
+    DIFF_LIMIT_MPX: "30",
   });
+  // An empty one keeps the default: the Docker self-host always has a limit.
+  expect(bindingsFrom({ DIFF_LIMIT_MPX: "" }, [], kept)["DIFF_LIMIT_MPX"]).toBe("24.5");
   // An empty value is unset, and a name that is neither a var nor a secret is not a binding.
   expect(bindings).not.toHaveProperty("APP_NAME");
   expect(bindings).not.toHaveProperty("PATH");

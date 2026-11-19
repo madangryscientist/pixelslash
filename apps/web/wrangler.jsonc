@@ -160,7 +160,7 @@
         "GITHUB_APP_API_BASE": "",
         "PIXELSLASH_PUBLIC_URL": "https://app.pixelslash.dev",
         // Strangers sign in here, so a project's model is never on a private network. The LAN's
-        // DIFF_SIDECAR_URL is not set either: the diff here is in the Worker or in CI.
+        // DIFF_LIMIT_MPX is not set either: the Worker has Cloudflare's own limits.
         "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "",
         "PIXELSLASH_RETENTION_DAYS": "",
         "PIXELSLASH_RETENTION_DELETE": "",
@@ -199,10 +199,11 @@
         "IMAGE_SIGNING_SECRET": "e2e-image-secret",
         // A fixed test value (base64 of 32 zero bytes), never a real secret.
         "MODEL_KEY_SECRET": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        // The LAN self-host's diff sidecar (PS-203, deploy/ssh/diff-sidecar.ts) on loopback. The
-        // Playwright run points it at its own sidecar's port (vite.config.ts). Cloudflare's vars
-        // above never set it: there the server diff stays in-process (diff.wasm, as everywhere).
-        "DIFF_SIDECAR_URL": "http://127.0.0.1:4181",
+        // The LAN self-host's pixel limit for a server diff, in Mpx (src/diff/limit.ts): a pair
+        // over it ends the build errored, naming the size. Measured to fit pixelslash-web's
+        // MemoryMax (apps/web/README.md, "Memory limits and the watchdog"). Cloudflare's vars above
+        // never set it; a Playwright run may override it (vite.config.ts).
+        "DIFF_LIMIT_MPX": "24.5",
         // Off here; the Playwright run points it at its own ingest stub (vite.config.ts), and the
         // LAN self-host's `.dev.vars` sets the real DSN, release and `lan`.
         "SENTRY_DSN": "",

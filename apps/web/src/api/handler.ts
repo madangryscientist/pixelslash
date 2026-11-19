@@ -45,8 +45,8 @@ export type ApiDeps = {
   minCliVersion?: string | undefined;
   /** The engine's diff for finalise; a test passes one that throws (ob 1727). */
   diff?: ProcessDeps["diff"];
-  /** The self-host's diff sidecar for finalise (PS-203); unset measures in-process. */
-  diffSidecar?: ProcessDeps["diffSidecar"];
+  /** The self-host's pixel limit for finalise's diff, `DIFF_LIMIT_MPX`; unset admits every shot. */
+  diffLimitMpx?: ProcessDeps["diffLimitMpx"];
   /** Where a finalised build's changed shots go to be explained (ob 1875). */
   explainQueue?: ProcessDeps["explainQueue"];
   /** `MODEL_KEY_SECRET`, which opens the project's stored model key (ob 1786). */
@@ -121,7 +121,7 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
   // after `errored`.
   // The model's explanations are not in it: they are queued once the verdict is written (ob 1875).
   const blobs = orgBlobs(ctx.store, orgId);
-  const { db, diff, diffSidecar, explainQueue, modelKeySecret } = ctx;
+  const { db, diff, diffLimitMpx, explainQueue, modelKeySecret } = ctx;
   // The commit status says `pending` while the diff runs, then the verdict (PS-23); neither call
   // can fail the finalise.
   const sync = () =>
@@ -130,7 +130,7 @@ async function closeBuild(ctx: Ctx, build: Build, { orgId }: BuildOwner): Promis
     });
   await sync();
   const result = await processBuild(
-    { db, blobs, diff, diffSidecar, explainQueue, modelKeySecret, timer: ctx.timer },
+    { db, blobs, diff, diffLimitMpx, explainQueue, modelKeySecret, timer: ctx.timer },
     done,
   );
   await sync();

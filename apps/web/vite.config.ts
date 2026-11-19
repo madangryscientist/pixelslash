@@ -31,15 +31,15 @@ export const pngjsSyncInflate: Plugin = {
 
 /**
  * The e2e run's GitHub stand-in listens on a free port picked per run (`e2e/ports.ts`), so the
- * URLs in `wrangler.jsonc` (:4174, for running the stand-in by hand) are replaced with it. So is
- * the diff sidecar's (:4181, the LAN's), with the run's own sidecar or with none (PS-203). A run
+ * URLs in `wrangler.jsonc` (:4174, for running the stand-in by hand) are replaced with it. A run
+ * with `PIXELSLASH_E2E_DIFF_LIMIT_MPX` set gets that pixel limit instead of the LAN's (empty is none). A run
  * with `PIXELSLASH_E2E_SENTRY_PORT` also gets a DSN pointing at that ingest stand-in (PS-227).
  */
 function pointAtStub(config: { vars?: Record<string, unknown> }) {
   const port = process.env["PIXELSLASH_E2E_STUB_PORT"];
   if (!port) return {};
   const base = `http://localhost:${port}`;
-  const sidecar = process.env["PIXELSLASH_E2E_SIDECAR"] ?? "";
+  const limit = process.env["PIXELSLASH_E2E_DIFF_LIMIT_MPX"];
   const sentryPort = process.env["PIXELSLASH_E2E_SENTRY_PORT"];
   return {
     vars: {
@@ -50,7 +50,7 @@ function pointAtStub(config: { vars?: Record<string, unknown> }) {
       GOOGLE_CLIENT_ID: "e2e-google-client",
       GOOGLE_CLIENT_SECRET: "e2e-google-secret",
       GOOGLE_OAUTH_BASE: base,
-      DIFF_SIDECAR_URL: sidecar,
+      ...(limit === undefined ? {} : { DIFF_LIMIT_MPX: limit }),
       // The stub GitHub user (e2e/github-stub.ts) is the operator in the Playwright run; the rival and a visitor are not (PS-330).
       PIXELSLASH_ADMIN_LOGINS: "e2e-octocat",
       SENTRY_RELEASE: "e2e",

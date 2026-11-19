@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { provisionByClicking } from "./ui-provision";
 import { open } from "../../e2e/fixtures";
 import { png } from "../../e2e/png";
-import { SERVER, SERVER_PORT, SIDECAR_PORT, STUB } from "../../e2e/ports";
+import { SERVER, SERVER_PORT, STUB } from "../../e2e/ports";
 
 /**
  * The Docker self-host (PS-240), end to end against the image: a fresh volume, sign-in through the
@@ -88,10 +88,14 @@ async function snapshotDir(shot: Buffer) {
   return dir;
 }
 
-/** The real CLI uploads one shot; returns the build id it printed. */
+/**
+ * The real CLI uploads one shot; returns the build id it printed. On the default branch, which
+ * accepts every shot, so each upload is the next one's baseline: on another branch a shot whose
+ * change nobody decided is a baseline only for an unchanged shot (src/db/baselines.ts).
+ */
 async function upload(shot: Buffer, token: string): Promise<string> {
   const dir = await snapshotDir(shot);
-  const res = spawnSync("bun", [CLI, "upload", dir, "--server", SERVER, "--branch", "e2e"], {
+  const res = spawnSync("bun", [CLI, "upload", dir, "--server", SERVER, "--branch", "main"], {
     cwd: ROOT,
     env: { ...process.env, PIXELSLASH_TOKEN: token },
     encoding: "utf8",
@@ -120,7 +124,6 @@ test("signs in, takes an upload, diffs it, and keeps it all across a restart", a
     "pixelslash-self-host:e2e",
     {
       PORT: String(SERVER_PORT),
-      PIXELSLASH_DIFF_SIDECAR_PORT: String(SIDECAR_PORT),
       GITHUB_CLIENT_ID: "e2e-client",
       GITHUB_CLIENT_SECRET: "e2e-secret",
       GITHUB_OAUTH_BASE: STUB,
@@ -140,14 +143,26 @@ test("signs in, takes an upload, diffs it, and keeps it all across a restart", a
     diff_error: null,
     diff_result: { changed_pixels: 100 },
   });
-  // The diff worker is up inside the container.
-  docker(
-    "exec",
-    name,
-    "bun",
-    "-e",
-    `process.exit((await fetch("http://127.0.0.1:${SIDECAR_PORT}/health")).ok ? 0 : 1)`,
+  // That diff ran in the one process: the container runs `start.ts` and the workerd it started,
+  // and nothing else (a `bun -e`, this exec or the image's health check, left out).
+  const running: string[] = JSON.parse(
+    docker(
+      "exec",
+      name,
+      "bun",
+      "-e",
+      `const { readdirSync, readFileSync } = require("node:fs");
+      const own = String(process.pid);
+      const cmds = readdirSync("/proc").filter((p) => /^\\d+$/.test(p) && p !== own).map((p) => {
+        try { return readFileSync("/proc/" + p + "/cmdline", "utf8").split("\\0").filter(Boolean).join(" "); }
+        catch { return ""; }
+      }).filter(Boolean);
+      console.log(JSON.stringify(cmds));`,
+    ),
   );
+  expect(running.filter((cmd) => !/workerd|^bun -e /.test(cmd))).toEqual([
+    "bun deploy/docker/start.ts",
+  ]);
 
   docker("restart", name);
   await up(SERVER);
@@ -174,7 +189,6 @@ test("the production image signs in through github.com", async () => {
   spawnSync("docker", ["rm", "-f", `${RUN}-app`]);
   const name = start(`${RUN}-prod`, "pixelslash-self-host:local", {
     PORT: String(SERVER_PORT),
-    PIXELSLASH_DIFF_SIDECAR_PORT: String(SIDECAR_PORT),
     PIXELSLASH_DATA_DIR: "/tmp/data",
     GITHUB_CLIENT_ID: "self-host-client",
     GITHUB_CLIENT_SECRET: "unused",

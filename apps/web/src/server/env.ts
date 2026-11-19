@@ -10,6 +10,7 @@ import type { ModelHostPolicy } from "#/ai/model-host";
 import type { Reading } from "#/lib/reading";
 import { retryBusy } from "#/db/busy";
 import { diffLocationOf } from "#/db/orgs";
+import { diffLimitOf } from "#/diff/limit";
 import { type GithubApp, createGithubApp, githubAppConfigOf } from "#/github/app";
 import { type CheckRunDeps, syncCheckRuns } from "#/github/check-run";
 import { createGithubToken, githubTokenConfigOf } from "#/github/token";
@@ -70,11 +71,10 @@ export const apiRateLimit = (): RateLimiter | undefined => env.API_RATE_LIMIT;
 export const signInRateLimit = (): RateLimiter | undefined => env.SIGNIN_RATE_LIMIT;
 
 /**
- * The self-host's diff sidecar (PS-203): a loopback URL where a Bun process runs the same
- * `diff.wasm` diff outside workerd's memory. Cloudflare never sets it; unset, the server diff runs
- * here in-process, in the same module (PS-210).
+ * The self-host's admission limit for a server diff, in Mpx (`DIFF_LIMIT_MPX`): a pair over it ends
+ * the build `errored`, naming the size. Cloudflare never sets it, and unset admits every shot.
  */
-export const diffSidecarUrl = (): string | undefined => env.DIFF_SIDECAR_URL || undefined;
+export const diffLimitMpx = (): number | undefined => diffLimitOf(env.DIFF_LIMIT_MPX);
 
 /**
  * Where this deployment reports its errors (PS-227): null without a DSN, which is the whole

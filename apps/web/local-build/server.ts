@@ -7,8 +7,8 @@ import { STATE, WEB, run } from "./paths";
 
 /**
  * The local-build suite's server (PS-15): the production build, served by `vite preview` over a fresh
- * local D1 and R2 in `.wrangler/local-build`, and nothing else. No GitHub stand-in, no sidecar and no
- * error sink are started, and every URL the build can call out to points at a port nothing listens
+ * local D1 and R2 in `.wrangler/local-build`, and nothing else. No GitHub stand-in and no error sink
+ * are started, and every URL the build can call out to points at a port nothing listens
  * on, so the run reaches no host but this machine. It is integration: a local build on local data.
  *
  * This file is the config's `globalSetup`: the server is built and started once per run, and its URL
@@ -27,9 +27,8 @@ function buildEnv(dead: number) {
     PIXELSLASH_E2E: "1",
     CLOUDFLARE_ENV: "e2e",
     PIXELSLASH_E2E_STATE: STATE,
-    // The build's outbound URLs, all on a closed loopback port; "" turns the diff sidecar off.
+    // The build's outbound URLs, all on a closed loopback port.
     PIXELSLASH_E2E_STUB_PORT: String(dead),
-    PIXELSLASH_E2E_SIDECAR: "",
     TMPDIR: join(WEB, STATE, "tmp"),
   };
 }
