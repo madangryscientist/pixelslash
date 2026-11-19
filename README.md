@@ -74,8 +74,8 @@ code.
 
 ## The review app
 
-The hosted app is at [app.pixelslash.dev](https://app.pixelslash.dev); the project site is
-[pixelslash.dev](https://pixelslash.dev).
+The hosted app is at [pixelslash.dev](https://pixelslash.dev); the project pages and docs are at
+[slashslash.build/pixelslash](https://slashslash.build/pixelslash).
 
 `apps/web` is the review server: TanStack Start on Cloudflare Workers, D1 for data, R2 for the
 shots, GitHub sign-in. CI uploads a build with the CLI, and people review it there. The
@@ -86,8 +86,9 @@ PixelSlash is in alpha.
 Nothing leaves your machine unless you pass `--upload`, and then only to the server you name.
 `SECURITY.md` has the rest of the threat model and how to report a vulnerability.
 
-`apps/site` is the project site at pixelslash.dev: static pages prerendered from this repo's own
-docs, the capability matrix and a real report. See [`apps/site/README.md`](apps/site/README.md).
+`apps/site` was the project site at pixelslash.dev: static pages prerendered from this repo's own
+docs, the capability matrix and a real report. Its pages now live on slashslash.build/pixelslash, and
+it no longer has a domain. See [`apps/site/README.md`](apps/site/README.md).
 
 ## From source
 

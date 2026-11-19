@@ -6,10 +6,13 @@
   "main": "src/server.ts",
   // The docs site: every page is prerendered, so the Worker serves static files and holds no data
   // (no D1, no R2, no secrets). Its own entry (src/server.ts) answers the four marketing paths,
-  // which moved to slashslash.build, with a 301. It answers on the apex of the pixelslash.dev zone only.
+  // which moved to slashslash.build, with a 301.
   "workers_dev": false,
   // `/security` is the page; every link, the canonical URL and the sitemap say so, with no redirect.
   "assets": { "html_handling": "drop-trailing-slash" },
-  "routes": [{ "pattern": "pixelslash.dev", "custom_domain": true }],
+  // No route: the apex pixelslash.dev belongs to the review app now (apps/web, env.production),
+  // which also answers this site's old paths with a 301 to slashslash.build. Leave this
+  // empty so a later deploy of the site cannot take the apex back.
+  "routes": [],
   "observability": { "enabled": false },
 }

@@ -711,7 +711,7 @@
       "label": "Free tier / OSS plan",
       "ps": {
         "v": "p",
-        "note": "Free to self-host for your own use with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app at app.pixelslash.dev has no plans or billing",
+        "note": "Free to self-host for your own use with every feature: no plan, billing or quota in the code. No hosted plan, free or otherwise: the hosted app at pixelslash.dev has no plans or billing",
         "commit": "cad8b76"
       },
       "t": {

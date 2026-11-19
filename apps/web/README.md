@@ -358,10 +358,10 @@ PIXELSLASH_TOKEN_PATH=~/.config/pixelslash/hackcove-local.token \
 
 To start over, stop the server and remove `.wrangler/state`.
 
-## Deploy to Cloudflare (app.pixelslash.dev)
+## Deploy to Cloudflare (pixelslash.dev)
 
 The hosted app (PS-277) is `env.production` in `wrangler.jsonc`: the Worker `pixelslash-web-production` on the
-custom domain `app.pixelslash.dev`, D1 `pixelslash` (WEUR), R2 `pixelslash-blobs` and the queue
+custom domains `pixelslash.dev` and `app.pixelslash.dev`, D1 `pixelslash` (WEUR), R2 `pixelslash-blobs` and the queue
 `pixelslash-explain`, all in the maintainer's account. It is a named env, built with
 `CLOUDFLARE_ENV=production`, so the top level keeps its placeholder D1 id and no route: `vite dev`, the
 unnamed build, the e2e build and the LAN CT read the same config as before. The Worker's name is
@@ -397,7 +397,7 @@ From `apps/web`:
 CLOUDFLARE_ENV=production bun run build                          # writes dist/ for env.production
 bunx wrangler d1 migrations apply pixelslash --remote --env production
 bunx wrangler deploy --var SENTRY_RELEASE:"$(git rev-parse --short HEAD)"
-bun ../../scripts/check-commit.ts https://app.pixelslash.dev/ "$(git rev-parse HEAD)"
+bun ../../scripts/check-commit.ts https://pixelslash.dev/ "$(git rev-parse HEAD)"
 ```
 
 The last line proves the deploy is live: every page carries `<meta name="build-commit">`, the commit it
@@ -405,7 +405,7 @@ was built from (`build-commit.ts`), and the check fetches the page until it name
 minutes, past the edge's lag), exiting 1 with the sha it saw if it never does.
 
 Build first: `wrangler deploy` ships what `dist/` holds, and a build made without
-`CLOUDFLARE_ENV=production` is the top level's (placeholder D1 id, no route, no `app.pixelslash.dev`).
+`CLOUDFLARE_ENV=production` is the top level's (placeholder D1 id, no route, no custom domain).
 Apply migrations before the deploy that needs them; the migration step is the only one that changes
 the database. `wrangler deploy --dry-run --outdir "$TMPDIR/ps-web-dry"` after the build prints the
 bindings (the D1 id, the bucket, the queue, the vars) and exits without deploying; the route is in
@@ -430,11 +430,31 @@ base64 of 32 bytes and, once projects have sealed keys, must not change (see [Se
 client ids; the secrets above are the other half). `GITHUB_APP_ID` is a var too: `5528217`, the App "PixelSlash Review"
 (PS-234, slug `pixelslash-review`), whose key is the `GITHUB_APP_PRIVATE_KEY` secret. While either half of a sign-in is empty it is off (no button, `/auth/<provider>` a 404).
 
-**Do not make a DNS record for `app.pixelslash.dev` by hand** (not a CNAME, not an A record, not
-in the dashboard). `custom_domain: true` makes Cloudflare create the record and the certificate during
-`wrangler deploy`; a record that already exists makes that deploy fail ("hostname already has
-DNS record"), and deleting it is a step on a live zone. The route names only `app.pixelslash.dev`, so
-a deploy never touches the apex (the marketing site) or any other record.
+**Do not make a DNS record for `pixelslash.dev` or `app.pixelslash.dev` by hand** (not a CNAME, not an
+A record, not in the dashboard). `custom_domain: true` makes Cloudflare create the record and the
+certificate during `wrangler deploy`; a record that already exists makes that deploy fail ("hostname
+already has DNS record"), and deleting it is a step on a live zone. The routes name only those two
+hostnames, so a deploy never touches any other record.
+
+**The apex moved here from the site Worker.** The app was on `app.pixelslash.dev` alone, and the apex
+`pixelslash.dev` was the docs site (`apps/site`, Worker `pixelslash-site`), whose pages now live on
+slashslash.build. The apex is now the app's primary host (`PIXELSLASH_PUBLIC_URL`, the address a check
+run links to), and `apps/site/wrangler.jsonc` has no route, so a deploy of the site cannot take it back.
+The app's entry answers the moves itself (`src/server/moved.ts`) before any route runs, with a 301:
+
+- the old site's paths on either host (`/docs`, `/docs/<slug>`, `/security`, `/self-host`,
+  `/how-it-works`, `/compare`, `/pricing`, `/search-index.json`, `/sitemap.xml`) go to their
+  slashslash.build address, the query kept;
+- a page view on `app.pixelslash.dev` goes to the same path on `pixelslash.dev`. The old host still
+  serves `/api/`, `/images/` and the sign-in callbacks (`/auth/<provider>/callback`) itself, since a
+  redirect to another origin drops the `Authorization` header of a CLI or CI upload, a POST cannot be
+  redirected safely, and a callback needs the state cookie its sign-in set on that host. A sign-in
+  start on the old host goes to the apex, so the session cookie is set there. Keep the old callback
+  URL on each OAuth client until no sign-in started on the old host can still be in flight.
+
+If Cloudflare refuses the app's deploy because the site Worker still holds the apex, remove the
+`pixelslash.dev` custom domain from `pixelslash-site` (Workers, `pixelslash-site`, Domains) and run the
+same deploy again at once.
 
 ## Run it on the Proxmox server
 
