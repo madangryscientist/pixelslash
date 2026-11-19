@@ -1,0 +1,79 @@
+# Installs Playwright's chromium-headless-shell and the system libraries it needs, once per runner image
+# and Playwright version, instead of against the live Ubuntu mirrors on every job. A warm run restores
+# the browser and the packages from the cache and touches no mirror; a cold run (a new runner image, a
+# Playwright bump, a new browser input) runs apt once and saves what it fetched. The install step's
+# timeout (set by each caller) is what bounds a slow mirror.
+
+name: Playwright browser
+description: Install chromium-headless-shell and its system libraries, cached per runner image and Playwright version.
+
+inputs:
+  working-directory:
+    description: Directory whose Playwright version decides the install (where `bunx playwright` resolves).
+    required: true
+  browser:
+    description: '"true" installs the browser too; "false" installs only the system libraries.'
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # Runner image and Playwright version are the cache key. ImageOS and ImageVersion are runner machine
+    # variables in the shell, not part of the env context, so they are read here, never as ${{ env.* }}.
+    - id: key
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [ -z "${ImageOS:-}" ] || [ -z "${ImageVersion:-}" ]; then
+          echo "::error::ImageOS or ImageVersion is not set on this runner"
+          exit 1
+        fi
+        version="$(bunx playwright --version | awk '{print $2}')"
+        if [ -z "$version" ]; then
+          echo "::error::could not read the Playwright version"
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "image=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cache/ms-playwright
+          ~/.cache/playwright-debs
+        key: playwright-${{ runner.os }}-${{ steps.key.outputs.image }}-${{ steps.key.outputs.version }}-${{ inputs.browser }}
+
+    # Warm: the packages the image lacks are already in the cache, so install them with no network.
+    # An empty folder means the image already had every package.
+    - name: Restore the system libraries from the cache
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if compgen -G "$HOME/.cache/playwright-debs/*.deb" > /dev/null; then
+          sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$HOME"/.cache/playwright-debs/*.deb
+        fi
+
+    # Cold: Playwright's own install-deps, so the package set is the one --with-deps installs, by
+    # construction. apt keeps the .deb files it downloads, and a drop-in points apt's archive folder at
+    # the cache, so those files are what gets saved.
+    - name: Fetch and install the system libraries
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        debs="$HOME/.cache/playwright-debs"
+        mkdir -p "$debs/partial"
+        echo "Dir::Cache::archives \"$debs/\";" | sudo tee /etc/apt/apt.conf.d/99playwright-debs > /dev/null
+        bunx playwright install-deps chromium-headless-shell
+        sudo chown -R "$USER" "$debs"
+
+    - name: Install the Playwright browser
+      if: inputs.browser == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: bunx playwright install chromium-headless-shell

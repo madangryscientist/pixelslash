@@ -58,8 +58,10 @@ jobs:
       - run: bun install --frozen-lockfile
       # Run from packages/engine: the isolated linker gives the root no `playwright` bin.
       - name: Install the Playwright browser
-        working-directory: packages/engine
-        run: bunx playwright install --with-deps chromium-headless-shell
+        uses: ./.github/actions/playwright
+        timeout-minutes: 5
+        with:
+          working-directory: packages/engine
       - run: bun run typecheck
       - run: bun run lint
       - run: bun run format:check
@@ -85,8 +87,11 @@ jobs:
       - run: bun install --frozen-lockfile
       # System libraries for chromium; the check installs the browser itself, from the sample's Playwright.
       - name: Install the browser's system libraries
-        working-directory: packages/engine
-        run: bunx playwright install-deps chromium-headless-shell
+        uses: ./.github/actions/playwright
+        timeout-minutes: 5
+        with:
+          working-directory: packages/engine
+          browser: "false"
       - run: bun run check:example
 
   changes:
@@ -125,7 +130,7 @@ jobs:
           fi
           # apps/web and packages (what it imports), plus what decides how they install and run.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/web/|packages/|fixtures/|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$|\.github/actions/)'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
@@ -133,7 +138,7 @@ jobs:
           # The site's build inputs (apps/site/moon.yml: the docs it renders), its Playwright globalSetup,
           # and what decides how it installs.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|docs/|README\.md$|SECURITY\.md$|apps/web/SELF-HOST\.md$|apps/web/github-app/manifest\.json$|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$|\.github/actions/)'; then
             echo "site=true" >> "$GITHUB_OUTPUT"
           else
             echo "site=false" >> "$GITHUB_OUTPUT"
@@ -143,7 +148,7 @@ jobs:
           # docs-only edit skips the browser run. A spec that quotes a docs sentence is only run on a site
           # change or on main. Keep this list inside the one above.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/site/|scripts/test-tmp-scope\.ts$|package\.json$|\.moon/|tsconfig\.base\.json$|bun\.lock$|bunfig\.toml$|\.tool-versions$|\.github/workflows/ci\.yml$|\.github/actions/)'; then
             echo "site_e2e=true" >> "$GITHUB_OUTPUT"
           else
             echo "site_e2e=false" >> "$GITHUB_OUTPUT"
@@ -173,8 +178,10 @@ jobs:
           bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
-        working-directory: apps/web
-        run: bunx playwright install --with-deps chromium-headless-shell
+        uses: ./.github/actions/playwright
+        timeout-minutes: 5
+        with:
+          working-directory: apps/web
       - run: bunx moon run web:build
       - name: e2e (production build)
         id: e2e
@@ -252,8 +259,10 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
         if: needs.changes.outputs.site_e2e == 'true'
-        working-directory: apps/site
-        run: bunx playwright install --with-deps chromium-headless-shell
+        uses: ./.github/actions/playwright
+        timeout-minutes: 5
+        with:
+          working-directory: apps/site
       # Prerenders every page with crawlLinks and failOnError, so a dead internal link or a missing
       # cli.md anchor fails here.
       - run: bunx moon run site:build
@@ -290,8 +299,10 @@ jobs:
           bun-version-file: .tool-versions
       - run: bun install --frozen-lockfile
       - name: Install the Playwright browser
-        working-directory: apps/web
-        run: bunx playwright install --with-deps chromium-headless-shell
+        uses: ./.github/actions/playwright
+        timeout-minutes: 5
+        with:
+          working-directory: apps/web
       - name: Capture and upload the dogfood shots
         working-directory: apps/web
         env:
