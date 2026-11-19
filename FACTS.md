@@ -1,6 +1,6 @@
 # PixelSlash facts
 
-Checked against main at 9fd2a54 on 2026-11-19.
+Checked against main at 52e13ea on 2026-11-19.
 
 ## What it is
 PixelSlash shows what changed on a web page between two versions of it, Main and Branch, as a report you open in a browser, and can send those screenshots to a review app where a person accepts or rejects each change. It is in alpha, and the command line tool is at version 0.7.
@@ -10,6 +10,7 @@ PixelSlash shows what changed on a web page between two versions of it, Main and
 - `compare-two-urls`: shoots two URLs that are already running, with Playwright's Chromium headless shell, and compares them; it does not start a dev server.
 - `waits-for-page-to-settle`: before each shot it waits for fonts, images, the network, two animation frames and an idle main thread, and fails at a timeout rather than shooting early or hanging.
 - `perceptual-diff`: tells anti-aliasing, faint noise and sub-pixel shifts apart from a real change, and reports changed regions, not only a pixel count.
+- `wasm-diff-engine`: the diff runs in a Rust crate compiled to WebAssembly, the same module in the command line tool and in the review app; there is no JavaScript fallback.
 - `size-change-overlap-only`: when the two shots differ in size, it diffs only the overlapping area and states both sizes.
 - `many-pages`: compares a list of paths in one run (`--routes`), and compares two folders of snapshots (`compare`).
 - `pinned-capture-image`: `pixelslash capture` shoots every route in a config inside a pinned container image and records what rendered each shot.
