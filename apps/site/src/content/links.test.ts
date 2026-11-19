@@ -71,7 +71,7 @@ describe("resolveHref", () => {
     const repo = `${REPO_URL}/security/advisories/new`;
     expect(resolveHref(repo, "SECURITY.md", CLOSED)).toBeNull();
     expect(resolveHref(repo, "SECURITY.md", OPEN)).toBe(repo);
-    const image = "https://ghcr.io/madangryscientist/pixelslash-capture";
+    const image = "https://ghcr.io/slashsuite/pixelslash-capture";
     expect(resolveHref(image, "docs/cli.md", CLOSED)).toBeNull();
   });
 

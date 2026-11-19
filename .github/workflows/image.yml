@@ -1,7 +1,7 @@
 name: Capture image
 
 # Builds docker/capture/Dockerfile and pushes it to GHCR as
-# ghcr.io/madangryscientist/pixelslash-capture:<version> when a `v*` tag is pushed (v0.1.0 -> 0.1.0).
+# ghcr.io/slashsuite/pixelslash-capture:<version> when a `v*` tag is pushed (v0.1.0 -> 0.1.0).
 # Nothing else triggers it, so no pull request, fork or branch push can publish an image. The only
 # credential is the run's own GITHUB_TOKEN; no other secret is read.
 
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/madangryscientist/pixelslash-capture
+  IMAGE: ghcr.io/slashsuite/pixelslash-capture
 
 jobs:
   image:

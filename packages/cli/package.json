@@ -12,7 +12,7 @@
   "license": "Elastic-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/madangryscientist/pixelslash.git",
+    "url": "git+https://github.com/slashsuite/pixelslash.git",
     "directory": "packages/cli"
   },
   "bin": {

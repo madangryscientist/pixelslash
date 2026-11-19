@@ -59,7 +59,7 @@ async function checkPage(
     await expect(footer.getByTestId("source-status")).toHaveText("GitHub");
     await expect(footer.getByTestId("source-status")).toHaveAttribute(
       "href",
-      "https://github.com/madangryscientist/pixelslash",
+      "https://github.com/slashsuite/pixelslash",
     );
 
     const known = new Set<string>([...PAGES.map((item) => item.to), ...DOC_PATHS]);
