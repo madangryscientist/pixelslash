@@ -40,7 +40,14 @@ describe("movedTo", () => {
     );
   });
 
-  test("leaves the API, sign-in and signed images on the old host", () => {
+  test("sends a sign-in start on the old host to the apex, so its session cookie lands there", () => {
+    expect(at("https://app.pixelslash.dev/auth/github?next=%2Forgs")).toBe(
+      "https://pixelslash.dev/auth/github?next=%2Forgs",
+    );
+    expect(at("https://app.pixelslash.dev/auth/google")).toBe("https://pixelslash.dev/auth/google");
+  });
+
+  test("leaves the API, the sign-in callbacks and signed images on the old host", () => {
     expect(at("https://app.pixelslash.dev/api/v1/builds")).toBeNull();
     expect(at("https://app.pixelslash.dev/auth/github/callback?code=c&state=s")).toBeNull();
     expect(at("https://app.pixelslash.dev/auth/google/callback")).toBeNull();

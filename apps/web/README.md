@@ -446,10 +446,11 @@ The app's entry answers the moves itself (`src/server/moved.ts`) before any rout
   `/how-it-works`, `/compare`, `/pricing`, `/search-index.json`, `/sitemap.xml`) go to their
   slashslash.build address, the query kept;
 - a page view on `app.pixelslash.dev` goes to the same path on `pixelslash.dev`. The old host still
-  serves `/api/`, `/auth/` and `/images/` itself, since a redirect to another origin drops the
-  `Authorization` header of a CLI or CI upload and a POST cannot be redirected safely. A sign-in
-  started on either host returns to that host's own callback, so each OAuth client lists both
-  callback URLs.
+  serves `/api/`, `/images/` and the sign-in callbacks (`/auth/<provider>/callback`) itself, since a
+  redirect to another origin drops the `Authorization` header of a CLI or CI upload, a POST cannot be
+  redirected safely, and a callback needs the state cookie its sign-in set on that host. A sign-in
+  start on the old host goes to the apex, so the session cookie is set there. Keep the old callback
+  URL on each OAuth client until no sign-in started on the old host can still be in flight.
 
 If Cloudflare refuses the app's deploy because the site Worker still holds the apex, remove the
 `pixelslash.dev` custom domain from `pixelslash-site` (Workers, `pixelslash-site`, Domains) and run the

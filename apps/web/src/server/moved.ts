@@ -2,11 +2,12 @@
  * Where an old address on pixelslash.dev now lives, or null when the app answers it as it is.
  *
  * The review app moved from app.pixelslash.dev to the apex, pixelslash.dev, which used to serve the
- * docs site. On the old host a page view goes to the same path on the apex; the API, the sign-in
- * callbacks and the signed image URLs are still served there, because a redirect to another origin
- * drops the Authorization header (CLI and CI uploads) and a POST cannot be redirected safely. The
- * docs site's pages and files moved to slashslash.build, so their old paths go there on either
- * host. Any other host (a self-host, a local build) is never redirected.
+ * docs site. On the old host a page view goes to the same path on the apex, a sign-in start too (so
+ * the session cookie is set on the apex); the API, the sign-in callbacks and the signed image URLs
+ * are still served there, because a redirect to another origin drops the Authorization header (CLI
+ * and CI uploads), a POST cannot be redirected safely, and a callback needs the state cookie its
+ * sign-in set on that host. The docs site's pages and files moved to slashslash.build, so their old
+ * paths go there on either host. Any other host (a self-host, a local build) is never redirected.
  */
 
 const APEX = "pixelslash.dev";
@@ -16,8 +17,8 @@ const PAGES = "https://slashslash.build/pixelslash";
 /** The old site's pages, each now under PAGES at the same path. */
 const MOVED_PAGES = new Set(["/how-it-works", "/compare", "/pricing", "/security", "/self-host"]);
 
-/** Paths the old host still serves itself: the API, sign-in and signed images. */
-const KEPT_ON_OLD_HOST = ["/api/", "/auth/", "/images/"];
+/** Paths the old host still serves itself: the API, the sign-in callbacks and signed images. */
+const KEPT_ON_OLD_HOST = /^\/(?:api\/|images\/|auth\/[^/]+\/callback\/?$)/;
 
 export function movedTo(url: URL, method: string): string | null {
   if (method !== "GET" && method !== "HEAD") return null;
@@ -28,7 +29,7 @@ export function movedTo(url: URL, method: string): string | null {
   const site = siteAddress(bare);
   if (site) return site + url.search;
 
-  if (url.hostname === OLD_APP && !KEPT_ON_OLD_HOST.some((prefix) => path.startsWith(prefix))) {
+  if (url.hostname === OLD_APP && !KEPT_ON_OLD_HOST.test(path)) {
     return `https://${APEX}${path}${url.search}`;
   }
   return null;

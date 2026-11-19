@@ -48,4 +48,4 @@ PixelSlash shows what changed on a web page between two versions of it, Main and
 - `hosted-review-app`: the review app is hosted at pixelslash.dev, with sign-in by GitHub or Google.
 - `self-host-cloudflare`: the review app runs on your own Cloudflare account (Workers, D1, R2), following `apps/web/SELF-HOST.md`.
 - `self-host-docker`: the review app runs in Docker, one image and one volume with `docker compose up` in `docker/self-host/`, with no Cloudflare account.
-- `docs-site`: the documentation is at pixelslash.dev/docs.
+- `docs-site`: the documentation is at slashslash.build/pixelslash/docs.
