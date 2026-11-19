@@ -26,11 +26,7 @@ import { expect } from "vitest";
 // in-flight build check runs its real SQL; everything else it only logs.
 const SCRIPT = fileURLToPath(new URL("./update.sh", import.meta.url));
 const LAN = fileURLToPath(new URL(".", import.meta.url));
-export const UNITS = [
-  "pixelslash-stub.service",
-  "pixelslash-diff.service",
-  "pixelslash-web.service",
-];
+export const UNITS = ["pixelslash-stub.service", "pixelslash-web.service"];
 export const WATCHDOG_UNITS = ["pixelslash-watchdog.service", "pixelslash-watchdog.timer"];
 
 let root = "";

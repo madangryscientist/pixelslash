@@ -3,14 +3,16 @@
  * (PS-325). Each caller checks its own turn on a timer rather than being woken by the call before
  * it, because that call may never wake it: workerd can cancel a request whose client went away, and
  * then its `finally` never runs. So nothing here relies on one: a call that stops running gives its
- * place up when its lease ends, and a waiter that stops polling loses its place in the queue.
+ * place up when its lease ends, and a waiter that stops polling loses its place in the queue. A
+ * long call that yields keeps its place by renewing the lease (`renew`) each time it yields, so the
+ * lease can stay short and a call that stopped running frees its turn soon after.
  */
 
 const POLL_MS = 25;
 /** Far above `POLL_MS`, as a busy thread delays every timer. A live waiter dropped by mistake rejoins. */
 const WAITER_GONE_MS = 5000;
 
-export type CallGate = <T>(work: () => Promise<T>) => Promise<T>;
+export type CallGate = <T>(work: (renew: () => void) => Promise<T>) => Promise<T>;
 
 export function callGate(
   limit: number,
@@ -38,7 +40,11 @@ export function callGate(
     const call = { expires: now() + leaseMs };
     running.push(call);
     try {
-      return await work();
+      return await work(() => {
+        call.expires = now() + leaseMs;
+        // A waiter may have dropped it as expired during a long step: it is running, so it is back.
+        if (!running.includes(call)) running.push(call);
+      });
     } finally {
       running = running.filter((other) => other !== call);
     }

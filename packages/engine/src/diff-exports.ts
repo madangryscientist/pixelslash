@@ -60,6 +60,23 @@ export type DiffExports = {
     out: number,
     map: number,
   ): void;
+  /** `diff_tiled` over tile rows `ty0..ty1`; the band at row 0 zeroes, later ones add (PS-464). */
+  diff_tiled_rows(
+    a: number,
+    aw: number,
+    ah: number,
+    b: number,
+    bw: number,
+    bh: number,
+    skip: number,
+    maxDelta: number,
+    field: number,
+    overlay: number,
+    out: number,
+    map: number,
+    ty0: number,
+    ty1: number,
+  ): void;
   blob_boxes_tiled(
     kind: number,
     width: number,
@@ -85,6 +102,7 @@ const EXPORTS = [
   "tile_map_len",
   "tiles",
   "diff_tiled",
+  "diff_tiled_rows",
   "blob_boxes_tiled",
 ];
 

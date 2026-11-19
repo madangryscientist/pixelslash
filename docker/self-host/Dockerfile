@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# The PixelSlash self-host (PS-240): the review app and its diff worker in one image, with the
+# The PixelSlash self-host (PS-240): the review app, server diff included, in one image, with the
 # database (D1, a SQLite file under Miniflare), the shots (R2, files under Miniflare) and the
 # generated secrets on one volume at /data. Built from the repo root:
 #

@@ -1,3 +1,5 @@
+The diff sidecar this design measures against was removed when the self-host became one process, so its sidecar figures below are history.
+
 # The Rust upload service: design for approval (PS-217)
 
 Status: **proposed**, waiting on the maintainer. No build ticket is dispatched until he approves this

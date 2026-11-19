@@ -55,14 +55,13 @@ describe("update.sh", () => {
     );
     expect(statSync(join(s.unitDir, "../watchdog-bin")).mode & 0o777).toBe(0o755);
 
-    // Install and migrate in the new release, then the sidecar, then the server. Nothing builds.
+    // Install and migrate in the new release, then the server. Nothing builds.
     const at = (prefix: string) => commands.findIndex((line) => line.startsWith(prefix));
     expect(commands).toContain(`bun install --frozen-lockfile --production @ ${rel}`);
     expect(commands).toContain(
       `bunx wrangler d1 migrations apply DB --local --env e2e @ ${rel}/apps/web`,
     );
-    expect(at("bunx wrangler d1 migrations")).toBeLessThan(at("systemctl restart pixelslash-diff"));
-    expect(at("systemctl restart pixelslash-diff")).toBeLessThan(
+    expect(at("bunx wrangler d1 migrations")).toBeLessThan(
       at("systemctl restart pixelslash-stub pixelslash-web"),
     );
     expect(commands.filter((line) => /build/.test(line))).toEqual([]);
@@ -74,7 +73,7 @@ describe("update.sh", () => {
     expect(status).toBe(0);
     const at = (prefix: string) => commands.findIndex((line) => line.startsWith(prefix));
     expect(at("systemctl stop pixelslash-watchdog.timer")).toBeLessThan(
-      at("systemctl restart pixelslash-diff"),
+      at("systemctl restart pixelslash-stub pixelslash-web"),
     );
     expect(at("systemctl restart pixelslash-stub pixelslash-web")).toBeLessThan(
       at("systemctl enable --now --quiet pixelslash-watchdog.timer"),
@@ -100,9 +99,7 @@ describe("update.sh", () => {
     expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
     expect(releaseNames(s)).toEqual(["aaaaaaa"]);
     const restarts = commands.filter((line) => line.startsWith("systemctl restart"));
-    expect(restarts.at(-1)).toMatch(
-      /^systemctl restart pixelslash-diff pixelslash-stub pixelslash-web/,
-    );
+    expect(restarts.at(-1)).toMatch(/^systemctl restart pixelslash-stub pixelslash-web @/);
     // The state is not touched by a rollback.
     expect(readFileSync(join(s.legacyWeb, ".wrangler/state/v3/builds"), "utf8")).toBe(
       "42 builds\n",
@@ -185,6 +182,36 @@ describe("update.sh", () => {
     expect(current(s)).toBe(join(s.releases, "aaaaaaa"));
     expect(releaseNames(s)).toEqual(["aaaaaaa"]);
     expect(commands.filter((line) => line.startsWith("systemctl"))).toEqual([]);
+  });
+
+  describe("the retired diff unit", () => {
+    test("a CT that still runs pixelslash-diff has it stopped, disabled and its unit file removed", () => {
+      const s = setup();
+      writeFileSync(join(s.unitDir, "pixelslash-diff.service"), "[Unit]\n");
+
+      const { status, commands } = deploy(s, pack("aaaaaaa"));
+
+      expect(status).toBe(0);
+      const at = (prefix: string) => commands.findIndex((line) => line.startsWith(prefix));
+      expect(at("systemctl disable --now --quiet pixelslash-diff ")).toBeGreaterThan(-1);
+      // The reload after the file is gone is what drops the unit from systemd.
+      expect(at("systemctl disable --now --quiet pixelslash-diff ")).toBeLessThan(
+        at("systemctl daemon-reload"),
+      );
+      expect(readdirSync(s.unitDir)).not.toContain("pixelslash-diff.service");
+      expect(readdirSync(s.unitDir).toSorted()).toEqual([...UNITS, ...WATCHDOG_UNITS].toSorted());
+      expect(commands.filter((line) => /(restart|enable).*pixelslash-diff/.test(line))).toEqual([]);
+    });
+
+    test("a CT without it deploys clean, and nothing names pixelslash-diff", () => {
+      const s = setup();
+
+      const { status, commands } = deploy(s, pack("aaaaaaa"));
+
+      expect(status).toBe(0);
+      expect(commands.filter((line) => line.includes("pixelslash-diff"))).toEqual([]);
+      expect(readdirSync(s.unitDir).toSorted()).toEqual([...UNITS, ...WATCHDOG_UNITS].toSorted());
+    });
   });
 
   describe("the retired opencode helper", () => {

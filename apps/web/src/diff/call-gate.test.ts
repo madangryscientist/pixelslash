@@ -86,6 +86,33 @@ describe("callGate", () => {
     expect(time.now()).toBeGreaterThanOrEqual(LEASE_MS);
   });
 
+  test("a call that renews at each yield keeps its turn past the lease; once it stops, the lease ends it", async () => {
+    let t = 0;
+    const gate = callGate(1, LEASE_MS, {
+      now: () => t,
+      sleep: async () => {
+        await Promise.resolve();
+      },
+    });
+    const order: string[] = [];
+    const step = Promise.withResolvers<void>();
+    void gate(async (renew) => {
+      for (let i = 0; i < 5; i++) {
+        t += LEASE_MS / 2;
+        renew();
+        await Promise.resolve();
+      }
+      order.push("long, still running");
+      await step.promise; // Cancelled here: no more renewals and no finally.
+    });
+    const next = gate(async () => order.push("next"));
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(order).toEqual(["long, still running"]);
+    t += LEASE_MS + 1;
+    await next;
+    expect(order).toEqual(["long, still running", "next"]);
+  });
+
   test("a waiter cancelled in the queue does not hold up the one behind it", async () => {
     const time = fakeTime();
     let polls = 0;

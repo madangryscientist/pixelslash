@@ -1,13 +1,13 @@
-"""Samples pixelslash-web's and pixelslash-diff's memory on the CT; driven by rss-burst.ts over ssh.
+"""Samples pixelslash-web's memory on the CT; driven by rss-burst.ts over ssh.
 
 Prints one JSON line per sample (every INTERVAL s): each process class's resident MB (VmRSS, summed),
-each unit's cgroup memory (current, swap, anon, file) and the unit's `high` event count. A line on
+the unit's cgroup memory (current, swap, anon, file) and its `high` event count. A line on
 stdin `mark NAME` prints a mark line with every class's VmHWM (the peak since the last mark) and then
 resets VmHWM (clear_refs 5), so the next mark is the peak of the phase in between.
 Needs root (clear_refs) and cgroup v2. Read-only apart from the HWM reset.
 
-PS-220: `CG`, `WEB_UNIT` and `DIFF_UNIT` point it at other cgroups, so the same run can sample two
-`systemd-run --user` units on a desktop (perf/rss-burst.ts --local). Processes of the web unit are
+PS-220: `CG` and `WEB_UNIT` point it at another cgroup, so the same run can sample a
+`systemd-run --user` unit on a desktop (perf/rss-burst.ts --local). Processes of the web unit are
 workerd, `vite` (vite preview), `host` (deploy/ssh/serve.ts, PS-220) or `other` (bunx).
 """
 
@@ -21,7 +21,6 @@ INTERVAL = float(os.environ.get("INTERVAL", "0.25"))
 CG = os.environ.get("CG", "/sys/fs/cgroup/system.slice/")
 UNITS = {
     "web": os.environ.get("WEB_UNIT", "pixelslash-web.service"),
-    "diff": os.environ.get("DIFF_UNIT", "pixelslash-diff.service"),
 }
 
 
@@ -43,8 +42,6 @@ def kb(pid, field):
 def klass(unit, pid):
     comm = read(f"/proc/{pid}/comm").strip()
     cmd = read(f"/proc/{pid}/cmdline")
-    if unit == "diff":
-        return "sidecar"
     if comm.startswith("workerd"):
         return "workerd"
     if "vite" in cmd:
@@ -80,7 +77,7 @@ def mb(n):
 
 
 def sample():
-    rss = {"workerd": 0, "vite": 0, "host": 0, "other": 0, "sidecar": 0}
+    rss = {"workerd": 0, "vite": 0, "host": 0, "other": 0}
     for cls, pid in pids():
         rss[cls] += kb(pid, "VmRSS")
     row = {"t": round(time.time(), 3)}
@@ -100,7 +97,7 @@ def sample():
 
 
 def mark(name):
-    hwm = {"workerd": 0, "vite": 0, "host": 0, "other": 0, "sidecar": 0}
+    hwm = {"workerd": 0, "vite": 0, "host": 0, "other": 0}
     for cls, pid in pids():
         hwm[cls] += kb(pid, "VmHWM")
         try:

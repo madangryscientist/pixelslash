@@ -1,7 +1,7 @@
 import type { RegionOptions, Region, Specks } from "./regions.ts";
 import type { ShiftOptions } from "./shift.ts";
 import { identicalBytes } from "./identical.ts";
-import { wasmDiff } from "./diff-wasm.ts";
+import { wasmDiff, wasmDiffBanded } from "./diff-wasm.ts";
 
 export { identicalResult, readPngSize } from "./identical.ts";
 
@@ -73,6 +73,27 @@ export function diffPngs(
   ignore: DiffIgnore = {},
 ): PixelDiff {
   return identicalBytes(main, branch) ?? wasmDiff([main, branch], { options, ignore });
+}
+
+/**
+ * `diffPngs` for a server that answers requests on the thread it diffs on (PS-464): the same result,
+ * but the diff awaits `pause()` between its steps and between bands of its pixel loop, so a long
+ * diff never holds the thread for the whole of it.
+ */
+export async function diffPngsBanded(
+  main: Buffer,
+  branch: Buffer,
+  {
+    options = {},
+    ignore = {},
+    pause,
+  }: {
+    options?: DiffOptions | undefined;
+    ignore?: DiffIgnore | undefined;
+    pause: () => Promise<void>;
+  },
+): Promise<PixelDiff> {
+  return identicalBytes(main, branch) ?? wasmDiffBanded([main, branch], { options, ignore, pause });
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   ENGINE_VERSION,
   type PixelDiff,
   diffPngs,
+  diffPngsBanded,
   identicalResult,
   readPngSize,
   summarizeDiff,
@@ -15,14 +16,8 @@ import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } fr
 import { msBetween } from "#/db/server-timings";
 import { snapshotStem } from "#/db/stem";
 import type { BlobStore } from "#/storage/blobs";
+import { callGate } from "./call-gate";
 import { checkCiResult } from "./ci-result";
-import {
-  type SidecarDiff,
-  SidecarError,
-  logFallbackOnce,
-  sidecarDiff,
-  sidecarEndpoint,
-} from "./sidecar";
 
 /**
  * The two ways a shot is compared with a baseline (ob 1727): measured here with the engine, or
@@ -84,36 +79,6 @@ function sameBytes(
 }
 
 /**
- * The self-host's sidecar when one is named, else none (PS-203). Unset is logged once: Cloudflare
- * never sets it, and a self-host that meant to can see it did not. A URL that is not on loopback is
- * refused, and the shots stay in-process.
- */
-function sidecarOf(url: string | undefined): SidecarDiff | null {
-  if (!url) {
-    logFallbackOnce("unset", "DIFF_SIDECAR_URL is not set");
-    return null;
-  }
-  const endpoint = sidecarEndpoint(url);
-  if (endpoint) return sidecarDiff(endpoint);
-  logFallbackOnce("refused", `DIFF_SIDECAR_URL ${url} is not an http URL on loopback`);
-  return null;
-}
-
-/**
- * The largest shot a self-host diffs, by the box both PNGs fit in (PS-323): ~1280x19000, twice the
- * largest shot in the PS-214 corpus. Memory follows the pixels (~30 MB per Mpx), so this is what
- * `pixelslash-diff.service`'s MemoryMax is sized from: an admission check, because an allocation
- * failure inside the diff is already too late.
- */
-const SIDECAR_LIMIT_MPX = 24.5;
-/**
- * The largest shot workerd diffs when the sidecar fails (PS-323): 1280x9500 fits. A diff adds ~30 MB
- * per Mpx on top of everything the app already holds, so a sidecar timeout must not add a full tall
- * diff to it; on 2026-11-05 that is what kept the review app from answering.
- */
-const FALLBACK_LIMIT_MPX = 12.5;
-
-/**
  * A shot over a size limit: an outcome of what was uploaded, not a server fault (PS-328), so it is
  * stored and shown but never reported. A re-run cannot help it.
  */
@@ -121,8 +86,13 @@ export class DiffRefusedError extends Error {
   override name = "DiffRefusedError";
 }
 
-/** Refuse a pair above `limit`, in words the build's error shows. A PNG with no size is the diff's to report. */
-function refuseOver(what: string, limit: number, main: Buffer, branch: Buffer): void {
+/**
+ * Refuse a pair above `limit` Mpx, by the box both PNGs fit in (PS-323), in words the build's error
+ * shows. Memory follows the pixels (~30 MB per Mpx on top of what the app holds), so this is an
+ * admission check: an allocation failure inside the diff is already too late. A PNG with no size
+ * is the diff's to report.
+ */
+function refuseOver(limit: number, main: Buffer, branch: Buffer): void {
   const a = readPngSize(main);
   const b = readPngSize(branch);
   if (!a || !b) return;
@@ -131,58 +101,54 @@ function refuseOver(what: string, limit: number, main: Buffer, branch: Buffer): 
   const mpx = (width * height) / 1_000_000;
   if (mpx > limit)
     throw new DiffRefusedError(
-      `${what}: ${width}x${height} = ${mpx.toFixed(1)} Mpx, limit ${limit} Mpx`,
+      `too large for a server diff on this server: ${width}x${height} = ${mpx.toFixed(1)} Mpx, limit ${limit} Mpx`,
     );
 }
 
 /**
- * One comparer's diffs: in the sidecar when there is one, and in-process when there is none or it
- * fails. Both run the same `diff.wasm` with the same options (PS-210), so the result is the same.
- * With a sidecar configured both are bounded (PS-323), and a shot over a limit throws, which errors
- * the build naming it (`diffOrRecord`). Without one nothing changes: Cloudflare has its own limits.
+ * One server diff at a time in this isolate (PS-464). The diff runs on the thread that answers every
+ * request, in bands with a pause between them (`diffPngsBanded`), so a page asked for during a long
+ * diff waits for one band, not the whole diff. Each diff in flight holds a wasm instance of its own,
+ * as large as its shots, so they take turns: two tall diffs at once would double that memory and
+ * halve each one's share of the thread for no gain. A diff renews its turn's lease at every pause,
+ * so a diff whose request the runtime cancelled at a pause (its `finally` never runs) frees the turn
+ * within the lease, and a live one keeps it however long it takes. The lease is far above one band.
  */
-function measurer(
-  diff: typeof diffPngs,
-  url: string | undefined,
-): (
-  pair: [Buffer, Buffer],
-  args: { options: DiffOptions | undefined; ignore: DiffIgnore },
-) => Promise<PixelDiff> {
-  let sidecar = sidecarOf(url);
-  const bounded = Boolean(url);
-  return async ([main, branch], { options, ignore }) => {
-    if (bounded) refuseOver("too large for a server diff", SIDECAR_LIMIT_MPX, main, branch);
-    if (sidecar) {
-      try {
-        return await sidecar(main, branch, options ?? {}, ignore);
-      } catch (e) {
-        if (!(e instanceof SidecarError)) throw e;
-        // A file the sidecar could not diff is not its failure: the in-process diff says why, as on Cloudflare.
-        if (e.kind !== "rejected") logFallbackOnce(e.kind, e.message);
-        // Not reached once, not tried again this run: a hung sidecar costs the diff budget one
-        // timeout of this run's, not one per shot, and whatever wait it had behind other runs' calls.
-        if (e.kind === "unreachable") sidecar = null;
-      }
-    }
-    if (bounded)
-      refuseOver(
-        "too large for an in-process diff without the diff sidecar",
-        FALLBACK_LIMIT_MPX,
-        main,
-        branch,
-      );
-    return diff(main, branch, options, ignore);
-  };
-}
+const oneDiff = callGate(1, 15_000);
 
-/** The server diff: both PNGs read here, and measured here or in the self-host's sidecar. */
+type Diff = (
+  main: Buffer,
+  branch: Buffer,
+  options?: DiffOptions,
+  ignore?: DiffIgnore,
+) => PixelDiff | Promise<PixelDiff>;
+
+const bandedDiff: Diff = (main, branch, options, ignore) =>
+  oneDiff((renew) =>
+    // Lets every request that is ready run before the next band: a timer, not a microtask.
+    diffPngsBanded(main, branch, {
+      options,
+      ignore,
+      pause: () => {
+        renew();
+        return new Promise<void>((resolve) => setTimeout(resolve, 0));
+      },
+    }),
+  );
+
+/** The server diff: both PNGs read and measured here, in-process, a band at a time. */
 export function serverComparer(deps: {
   blobs: BlobStore;
+  /** Stands in for the engine's diff in a test; unset is the banded diff. */
   diff?: typeof diffPngs | undefined;
-  /** The self-host's diff sidecar (PS-203), `DIFF_SIDECAR_URL`; unset measures in-process. */
-  diffSidecar?: string | undefined;
+  /**
+   * The self-host's admission limit in Mpx, `DIFF_LIMIT_MPX`: a pair over it errors the build
+   * naming the size. Unset (Cloudflare, which has its own limits) admits every shot.
+   */
+  diffLimitMpx?: number | undefined;
 }): Comparer {
-  const measure = measurer(deps.diff ?? diffPngs, deps.diffSidecar);
+  const diff: Diff = deps.diff ?? bandedDiff;
+  const limit = deps.diffLimitMpx;
   return async (shot, baseline) => {
     // The same bytes, known from the uploads' hashes: unchanged, with nothing read and no overlay.
     // A shot without a hash or a size (older, or a marker) is read like any other.
@@ -206,9 +172,10 @@ export function serverComparer(deps: {
     // of the boxes drawn on the test in the review UI (ob 1499).
     let result: PixelDiff;
     try {
-      result = await measure([main, branch], {
-        options: shot.resolvedDiff?.options ?? shot.diffOptions,
-        ignore: { main: baseline.ignore, branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)] },
+      if (limit !== undefined) refuseOver(limit, main, branch);
+      result = await diff(main, branch, shot.resolvedDiff?.options ?? shot.diffOptions, {
+        main: baseline.ignore,
+        branch: [...shot.ignore, ...uiRects(shot.resolvedDiff)],
       });
     } finally {
       // The uploads are read once and dead now. A Worker has no gc(): freed here, a burst of

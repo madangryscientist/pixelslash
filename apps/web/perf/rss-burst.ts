@@ -8,10 +8,10 @@
  * shot four at a time, finalise), then a branch build of changed shots that the server diffs in
  * its finalise, finalised again until nothing is left unmeasured. `perf/rss-sampler.py` runs on
  * the CT over ssh and prints the resident memory of workerd, `vite preview` (or, since PS-220,
- * `deploy/ssh/serve.ts`) and the diff sidecar.
+ * `deploy/ssh/serve.ts`).
  *
- * `--local 1` (PS-220) runs the sampler on this machine instead, against two `systemd-run --user`
- * units (`--web-unit`, `--diff-unit`; their cgroups sit under `--cg`), and restarts them with
+ * `--local 1` (PS-220) runs the sampler on this machine instead, against a `systemd-run --user`
+ * unit (`--web-unit`; its cgroup sits under `--cg`), and restarts it with
  * `systemctl --user`. That is how the desktop A/B of `vite preview` against `serve.ts` is taken:
  * `--server` and `PIXELSLASH_TOKEN` name a local review app, `--org` a local org. perf/README.md.
  */
@@ -46,11 +46,10 @@ const SSH = LOCAL
   : need("ssh", "the ssh command to the Proxmox host, e.g. 'ssh -i ~/.ssh/key root@pve'");
 const CT = LOCAL ? "" : need("ct", "the id of the container the server runs in");
 const WEB_UNIT = opt("web-unit", "pixelslash-web.service");
-const DIFF_UNIT = opt("diff-unit", "pixelslash-diff.service");
 const CG = opt("cg", "/sys/fs/cgroup/system.slice/");
 /** The org the run's throwaway project goes in (a personal token that belongs to several needs one). */
 const ORG = opt("org", "pixelslash");
-/** Restart pixelslash-web and pixelslash-diff first, so the run starts from a cold unit. */
+/** Restart pixelslash-web first, so the run starts from a cold unit. */
 const RESTART = opt("restart", "1") === "1";
 function credentials(): { servers?: Record<string, { token: string }> } {
   return JSON.parse(readFileSync(`${homedir()}/.config/pixelslash/credentials.json`, "utf8"));
@@ -65,7 +64,7 @@ type Mark = { mark: string; t: number; hwm: Record<string, number> };
 const samples: Sample[] = [];
 const marks: Mark[] = [];
 
-const CLASSES = ["workerd", "vite", "host", "sidecar"] as const;
+const CLASSES = ["workerd", "vite", "host"] as const;
 
 // ---- the sampler on the CT -----------------------------------------------------------------
 
@@ -84,7 +83,7 @@ const sampler = Bun.spawn(
     stdin: "pipe",
     stdout: "pipe",
     stderr: "inherit",
-    env: { ...process.env, CG, WEB_UNIT, DIFF_UNIT },
+    env: { ...process.env, CG, WEB_UNIT },
   },
 );
 /** One line of the sampler's output: a sample, or the answer to a `mark`. */
@@ -251,11 +250,7 @@ const peakOf = (key: string, from: number, to: number) =>
 const lastOf = (key: string, at: number) => samples.filter((s) => s.t <= at).at(-1)?.[key] ?? 0;
 
 if (RESTART) {
-  await ct(
-    LOCAL
-      ? `systemctl --user restart ${DIFF_UNIT} ${WEB_UNIT}`
-      : "systemctl restart pixelslash-diff pixelslash-web",
-  );
+  await ct(LOCAL ? `systemctl --user restart ${WEB_UNIT}` : "systemctl restart pixelslash-web");
   await Bun.sleep(2000);
 }
 await waitUp();
@@ -339,7 +334,6 @@ const result = {
     webUnitFilePeakMB: peakOf("web_file", p.from, p.to),
     webUnitEndMB: lastOf("web_cur", p.to),
     webHighEvents: lastOf("web_high_events", p.to),
-    diffUnitPeakMB: peakOf("diff_cur", p.from, p.to),
   })),
   probes: {
     count: homeTimes.length,

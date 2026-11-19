@@ -37,9 +37,9 @@ What it does (`deploy/docker/start.ts`, `docker/self-host/`):
 - On every start it applies any pending `drizzle/` migration before it listens. It records each one
   in wrangler's `d1_migrations` table, so `wrangler d1 migrations apply DB --local --persist-to
   <volume>/state` agrees with it.
-- New projects diff on the server (`DEFAULT_DIFF_LOCATION=server`). The diff worker
-  (`deploy/ssh/diff-sidecar.ts`) runs in the same container on 127.0.0.1:4181 and is restarted if it
-  exits.
+- New projects diff on the server (`DEFAULT_DIFF_LOCATION=server`), in the same process: one
+  container, one process. A shot over `DIFF_LIMIT_MPX` (24.5 Mpx unless `.env` sets it) ends its build
+  `errored`, naming the size.
 - `IMAGE_SIGNING_SECRET` and `MODEL_KEY_SECRET` are generated into `/data/secrets` on the first start,
   unless `.env` sets them. A restart keeps them, and with them the signed image URLs and the sealed
   model keys.
@@ -96,9 +96,7 @@ never told a DSN (so the reporter's chunk is never fetched) and no request goes 
 | `SENTRY_ENVIRONMENT` | `wrangler.jsonc` vars; `update.sh` | `lan` on the CT, `e2e` under the e2e runs, `dev` otherwise. |
 
 **What is reported.** On the server (`@sentry/cloudflare`): an error the Worker lets out, an `/api/v1`
-failure that becomes a 5xx (failed uploads and finalizes), a failed shot or build diff, and a diff
-sidecar failure (`src/diff/sidecar.ts`; the sidecar is a Bun process, but only the Worker talks to
-it, so the Worker reports its failures). In the browser (`@sentry/react`): an uncaught error and an
+failure that becomes a 5xx (failed uploads and finalizes), and a failed shot or build diff. In the browser (`@sentry/react`): an uncaught error and an
 error that reaches a route's error component. Server-function errors are turned into a response by
 TanStack Start before the Worker's wrapper sees them, so they are not reported on the server: one
 that breaks a page reaches the browser's error component and is reported there. Tracing is off
@@ -453,7 +451,7 @@ public DNS. Real GitHub sign-in is a later ticket.
 | Releases | `/home/pixelslash/releases/<sha>/`, user `pixelslash`, one per deploy, built on the machine that deploys; `releases/current` is the one serving. The last 3 are kept. Bun is in `~pixelslash/.bun`, Node 24 (for wrangler) in `/usr/local`. |
 | Old checkout | `/home/pixelslash/pixelslash`, the git checkout the CT served from and built in before PS-225. Nothing runs from it now; it holds the state and the secrets below. |
 | State | D1 and R2 in the old checkout's `apps/web/.wrangler/state` on the CT's disk; every release's `apps/web/.wrangler/state` links to it, so it is kept across restarts, deploys and rollbacks. |
-| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/ssh/serve.ts`: the production build on Miniflare, no vite), from `deploy/ssh/`, in `releases/current/apps/web`. `pixelslash-diff` (`bun deploy/ssh/diff-sidecar.ts`, the diff sidecar below) runs beside them. All three restart on failure and start on boot. `pixelslash-watchdog.timer` restarts `pixelslash-web` or `pixelslash-diff` when one is active and silent (below). |
+| Units | `pixelslash-stub` (`bun e2e/github-stub.ts`) and `pixelslash-web` (`bun deploy/ssh/serve.ts`: the production build on Miniflare, no vite), from `deploy/ssh/`, in `releases/current/apps/web`. Both restart on failure and start on boot. The server diff runs in `pixelslash-web` (below). `pixelslash-watchdog.timer` restarts `pixelslash-web` when it is active and silent (below). |
 
 `deploy/ssh/serve.ts` calls Miniflare's API on the build (`dist/server` is the Worker, `dist/client` the
 assets): the D1 and R2 in `.wrangler/state/v3` that `vite preview` kept, the `wrangler.json` vars with
@@ -536,98 +534,83 @@ then stops at the budget: the build reads `errored` and names how many shots are
 sent again resumes (it keeps what was measured and diffs the rest), and `pixelslash upload` sends it
 again by itself while the count falls, so the build ends with all 145 measured and its real verdict.
 
-### The diff sidecar
+### The server diff and its pixel limit
 
-In-process the server diff is the engine's `diff.wasm`, the CLI's diff (PS-210; there is no pngjs
-diff and no switch). On the self-host the Worker instead sends each
-shot's two PNGs to a Bun process on the same box: `deploy/ssh/diff-sidecar.ts`, unit
-`pixelslash-diff`, on `127.0.0.1:4181`. It runs the engine's own `diffPngs` (the same `diff.wasm`) with the same
-options and ignore areas, and answers with the result and the overlay, so the verdict, the counts,
-the regions and the overlay's bytes are the same as in-process (`src/diff/sidecar.test.ts` holds
-this on a `bench/corpus` pair and the e2e fixtures). It stays because it keeps a burst's diffs
-out of `pixelslash-web`'s memory: on the RSS burst (`e2e/rss-burst.spec.ts`, workerd and vite together)
-PS-210 measured the in-process diff at a 1519 to 1588 MB peak and 1124 MB with the sidecar.
+The server diff is the engine's `diff.wasm`, the CLI's diff (PS-210; there is no pngjs diff and no
+switch), run in workerd in the finalise request, here as on Cloudflare and in Docker: one process.
+The shots never leave `pixelslash-web` (invariant 4).
 
-`DIFF_SIDECAR_URL` names it, in `wrangler.jsonc`'s `env.e2e` vars only, so the CT build and the
-production e2e run use it (that run starts a sidecar of its own on a free port;
-`PIXELSLASH_E2E_NO_SIDECAR=1` runs it without one). `test:e2e:dev` starts none, so the in-process diff
-stays under an e2e run. The Cloudflare deploy never sets it and never runs a sidecar. Only a
-loopback URL (`127.0.0.1`, `localhost`, `[::1]`) is used; any other is refused, so a typo cannot send
-shots off the box. When it is unset, refused, down, times out (15 s) or answers with an error, the
-shot is measured in-process (the same `diff.wasm`), and the reason is
-logged once per kind, not once per shot.
-After the first shot it cannot reach, the rest of that run skips it, so a hung sidecar costs one
-timeout, not one per shot. A PNG the sidecar cannot decode is measured in-process too, without a log
-line, so the diff reports it in its own words as on Cloudflare; over the 12.5 Mpx limit below it gets
-that limit's message instead.
+**A band at a time (PS-464, `diffPngsBanded`).** workerd answers every request on one thread, and a
+whole diff of a 1280x16800 pair holds it for about 4 s (the pixel loop 2.7 s, the regions 1 s). Run
+in one piece, that left `GET /` unanswered for over 10 s on 30 of 72 probes while one uploader sent
+seven such shots, and for up to 35 s with three. So the server runs the pixel loop in bands of 8 tile
+rows (512 px) and lets every ready request run between bands and between the diff's other steps.
+The result is the one-piece diff's, overlay included: a pixel's test reads only the two shots,
+never another pixel's result (the engine's corpus tests hold this on every bench pair, at one tile
+row a band). One diff runs at a time (`src/diff/call-gate.ts`): each holds a wasm instance as large
+as its shots, so two at once would double that memory and halve each one's share of the thread. The
+regions pass is still one piece, so a page can wait about a second behind it.
 
-**One call at a time (PS-325, `src/diff/sidecar.ts`).** The sidecar's diff is synchronous, so it
-answers one call at a time and a caller also waits for every call ahead of it. The web process keeps
-that queue itself: a call waits for its turn first, and its 15 s starts only then, so a busy sidecar
-is not taken for a down one. The wait still counts against the run's diff ceiling: a run that spends
-its budget waiting stops with shots left, and the next finalise carries on. The ceiling is checked
-between shots and a queued call cannot give up, so one finalise can outlast 25 s by its queue. A hung
-sidecar's timeouts now come in turn: with four runs waiting, the last falls back after a minute, not
-15 s. The queue survives a request cancelled mid-call (a lease, `src/diff/call-gate.ts`).
-
-**Pixel limits (PS-323, `src/diff/compare.ts`).** With a sidecar configured, a shot over 24.5 Mpx
-(1280x19140) is not diffed at all, and one over 12.5 Mpx (1280x9765) is not diffed in-process after
-the sidecar failed, so a sidecar timeout cannot add a tall diff to workerd's memory. The size comes
-from the PNG's header. Such a shot keeps the reason in its `diffError`, and the build ends `errored`
-naming it: `too large for an in-process diff without the diff sidecar: 1280x16800 = 21.5 Mpx,
-limit 12.5 Mpx`. A deployment with no sidecar, Cloudflare included, has neither limit and keeps the
-diff ceiling above.
-
-```
-server diff: in-process (unreachable): http://127.0.0.1:4181/v1/diff: Unable to connect...
-```
-
-The shots go over loopback to a process bound to 127.0.0.1 and nowhere else; nothing is written to
-disk (invariant 4). A deploy installs and restarts the unit before `pixelslash-web` starts, and a
-sidecar that does not come up is a warning, not a rollback: the Worker measures in-process. Logs,
-one line per diff with its time: `journalctl -u pixelslash-diff -f`.
+**The pixel limit (`DIFF_LIMIT_MPX`, `src/diff/limit.ts`).** Memory follows the pixels: a diff adds
+about 30 MB per Mpx on top of everything the app already holds, so the self-host admits a pair only
+up to a size, by the box both PNGs fit in, read from their headers before anything is decoded. A
+pair over it is not diffed: the shot keeps the reason in its `diffError`, and the build ends
+`errored` naming it, `too large for a server diff on this server: 1280x20000 = 25.6 Mpx, limit 24.5
+Mpx`. A re-run cannot help it, so it is not reported to Sentry. The limit is set in
+`wrangler.jsonc`'s `env.e2e` vars (the CT build and the e2e runs) and by the Docker entrypoint, both
+24.5 Mpx (1280x19140): the top of the range the old diff process allowed, and well inside
+`pixelslash-web`'s 4000M by the measurement below.
+Cloudflare never sets it: unset admits every shot, and the Worker's own limits and the diff ceiling
+above apply. A value that is not a positive number fails every API call naming the var.
 
 ### Memory limits and the watchdog
 
-On 2026-11-05 a tall upload left `pixelslash-web` and `pixelslash-diff` in D state over their
-`MemoryHigh`, with swap full: port 3000 accepted connections and answered nothing, nothing was
-killed, and systemd read `active` with `NRestarts=0`. Held locally to the sidecar's limits and fed
-1280x16800 diffs, the sidecar wedged the same way and stayed wedged past 270 s (PS-323). So:
+On 2026-11-05 a tall upload left `pixelslash-web` and the separate diff process of the day in D
+state over their `MemoryHigh`, with swap full: port 3000 accepted connections and answered nothing,
+nothing was killed, and systemd read `active` with `NRestarts=0`. Held locally to those limits and
+fed 1280x16800 diffs, the diff process wedged the same way and stayed wedged past 270 s (PS-323). So:
 
-- **No `MemoryHigh` and no swap on either unit.** Over `MemoryMax` the kernel kills the process, the
-  unit fails, and `Restart=` brings it back. The same overload with no High was killed within seconds.
-- **The limits rest on these numbers**, measured locally under `MemorySwapMax=0`, on synthetic
-  busy PNGs. The sum of the Maxes is 3500M of the CT's 6 GiB. The
-  Proxmox host is overcommitted, so the limits are ceilings, not reservations.
+- **No `MemoryHigh` and no swap.** Over `MemoryMax` the kernel kills the process, the unit fails,
+  and `Restart=` brings it back. The same overload with no High was killed within seconds.
+- **One unit holds it all.** Every server diff runs in `pixelslash-web`, so its `MemoryMax` is
+  4000M: the 2500M it had, the 1000M of the diff process it replaced and the 500M of the retired
+  opencode helper. That is the only Max on the CT's 6 GiB; the stub is small. The Proxmox host is
+  overcommitted, so the limit is a ceiling, not a reservation.
+- **The limit rests on these numbers** (PS-464), measured locally with `perf/web-burst.ts` on one
+  `systemd-run --user` unit shaped like the CT's (`MemoryMax=4000M`, `MemorySwapMax=0`, no
+  `MemoryHigh`, `OOMPolicy=stop`), on synthetic busy PNGs with every pixel changed, three uploaders
+  at once, each a baseline and two branch builds of 7 shots:
 
-| Unit | `MemoryMax` | Peak measured |
-| --- | --- | --- |
-| `pixelslash-diff` | 1000M | Through the server on 7 shots at 1280x16800: 694 MiB with a small change, 783 MiB with every pixel changed. Direct diffs with every pixel changed: 763 MiB at that size and 826 MiB at 1280x19140 (24.5 Mpx), 4.3-4.8 s each |
-| `pixelslash-web` | 2500M | 480 and 504 MiB on the same 7 shots; 775 MiB with the sidecar down on 7 at 1280x9500 (12.2 Mpx), ~465 MiB over what it held before the diffs; ~1.6-1.8 GB on the live bursts (ob 1887, PS-155) |
+| Shots | Peak (cgroup / anon) | Settled 30 s after (cgroup / anon) | OOM kills, restarts | `GET /` over 10 s | Slowest `GET /` | Burst |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1280x16800 (21.5 Mpx) | 1506 / 1097 MiB | 1425 / 1087 MiB | 0, 0 | 0 of 267 | 7.6 s | 238 s |
+| 1280x19140 (24.5 Mpx, the limit) | 1707 / 1254 MiB | 1537 / 1167 MiB | 0, 0 | 0 of 258 | 6.8 s | 229 s |
 
-  Those 7 shots took 3.6 s with a small change. With every pixel changed the first finalise stopped at
-  the diff ceiling after 5 shots (21.3 s) and the next measured the other 2 (8.5 s): `changes`, 31.9 s.
+  The unit idles at 184 MiB. The cgroup figure counts page cache from the local R2 files, which the
+  kernel reclaims at the Max; anon is what workerd holds. The live bursts of ob 1887 and PS-155
+  reached 1.6 to 1.8 GB without a diff in the unit. Added to the diff's anon at the limit (about
+  1.1 GB above idle) that is about 2.9 GB, under 4000M; that is a sum, not a run of both at once,
+  and if it is ever wrong the kernel kills the unit at the Max and it restarts. Before the
+  banded diff the same 1280x16800 run peaked at 1636 MiB but missed 108 of 218 probes, for up to
+  35 s, and the old two-unit setup missed none at 775 MiB plus 801 MiB for the diff process, in
+  108 s: three uploaders of tall shots at once now take about twice as long, and the app answers
+  throughout. One uploader at a time (seven 1280x16800 shots, two branch builds) took 69 s against
+  63 s unbanded, with no probe missed and the slowest 3.4 s.
 
-  Under sustained uploads `pixelslash-web` reaches its Max with page cache (R2's files): at 2505 MiB
-  its anonymous memory was ~790 MiB, nothing was killed and `GET /` kept answering.
 - **The watchdog.** `pixelslash-watchdog.timer` runs `/usr/local/sbin/pixelslash-watchdog` every 30 s, as
   root: `update.sh` copies `deploy/ssh/watchdog.sh` there, because `pixelslash` owns the releases. It
-  asks `GET /` on 3000 and `GET /health` on 4181, with 10 s to answer, and restarts a unit that is
-  active and has not answered 4 passes in a row: `journalctl -u pixelslash-watchdog`. Any HTTP
-  answer counts as alive, and a unit that is not active is left to `Restart=`. A deploy stops the timer
-  for its restarts. It needs `curl` on the CT; `update.sh` stops before changing anything
-  without it. `watchdog.test.ts` proves its decisions on a stub; `perf/wedge-check.ts` runs it
-  against a really wedged sidecar (`perf/README.md`).
+  asks `GET /` on 3000, with 10 s to answer, and restarts the unit when it is active and has not
+  answered 4 passes in a row: `journalctl -u pixelslash-watchdog`. Any HTTP answer counts as alive,
+  and a unit that is not active is left to `Restart=`. A deploy stops the timer for its restarts. It
+  needs `curl` on the CT; `update.sh` stops before changing anything without it. `watchdog.test.ts`
+  proves its decisions on a stub; `perf/wedge-check.ts` runs it against a really wedged web unit
+  (`perf/README.md`).
+- **Retiring the old diff unit.** A CT deployed before this ran a separate diff unit beside the web unit.
+  Every deploy stops and disables it and removes its unit file (`retire_diff` in `update.sh`); a CT
+  without it is left as it is.
 
-**Known limit.** Three or more uploaders sending tall shots continuously (5.5 MB PNGs, measured with
-20 shots to diff) starve the call to the sidecar inside workerd's one thread, whose memory is not the
-problem: unlimited memory gave the same result. The 15 s timeout fires. The server keeps answering,
-and the build ends `errored` with the ceiling or a limit named; re-run it once the load has passed.
-A diff is synchronous, and these times are from a desktop: on a host slow enough that a whole-page change
-at this size passes the 15 s timeout, the sidecar is skipped for that run and the shot errors naming the
-12.5 Mpx limit.
-Docker (`deploy/docker/start.ts`) has the pixel limits and respawns its sidecar, but sets no cgroup
-limits and has no watchdog.
+Docker (`deploy/docker/start.ts`) has the same pixel limit, but sets no cgroup limits and has no
+watchdog.
 
 `vite preview` sends each request to workerd on a connection of its own (`freshConnectionPerRequest`
 in `vite.config.ts`, ob 1876). On the CT workerd closes its connection about 50 ms after it answers a

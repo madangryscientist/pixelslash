@@ -1,26 +1,28 @@
-# Diff sidecar under load (PS-325)
+# One web unit under tall uploads (PS-464)
 
-`perf/sidecar-load.ts` runs N background uploaders of 1280x16800 shots (default 3) and one foreground
-20-shot build against a local production server with the sidecar, finalising as the CLI does until
-nothing is left unmeasured. On demand only: it is not in the gate, its numbers are proof for the
-change that ran it, and it runs on a development machine, **never against the review server**.
+`perf/web-burst.ts` starts one local web unit shaped like the CT's `pixelslash-web` (`deploy/ssh/serve.ts`
+on the e2e build, in a `systemd-run --user` unit with `MemoryMax=4000M`, `MemorySwapMax=0`, no
+`MemoryHigh`, `OOMPolicy=stop` and `Restart=on-failure`), then has N uploaders (default 3) each send a
+baseline and `--builds` branch builds of `--shots` tall shots, every pixel changed, finalising as the
+CLI does. Every server diff runs in that unit's workerd. On demand only: it is not in the gate, its
+numbers are proof for the change that ran it, and it runs on a development machine, **never against
+the review server**.
 
 ```bash
 cd apps/web
-CLOUDFLARE_ENV=e2e bun run build                                 # again after any change to the server
-bun perf/sidecar-load.ts --uploaders 3 --fresh 1 --out run.json  # ~6 min; 5 uploaders ~10 min
+# The build bakes the pixel limit in: empty for none, a number for that limit, unset for wrangler.jsonc's.
+PIXELSLASH_E2E=1 CLOUDFLARE_ENV=e2e PIXELSLASH_E2E_STUB_PORT=9 PIXELSLASH_E2E_DIFF_LIMIT_MPX= bun run build
+bun perf/web-burst.ts --size 1280x16800 --uploaders 3 --shots 7 --builds 2 --fresh 1 --out run.json
 ```
 
-It needs `systemd-run --user`; it starts its own `ps-sidecar-load-web` and `-diff` units with the
-shipped memory limits, and stops them at the end. **`--fresh 1` deletes `apps/web/.wrangler/state`**;
-without it a run refuses to start on state it did not make. A run writes about 5.5 MB a shot there.
-
-Every pixel changes by default, a diff's slowest case (~3.9 s on this size) and the load that shows
-the failure; `--change small` diffs in ~0.3 s and does not. The other flags (`--shots`, `--bg-shots`,
-`--size`, `--concurrency`, `--port`) are in the file's header. The result is read from the server's
-D1 file and the units' journals: the foreground's verdict and measured count, every build's state,
-the slowest `GET /` of a probe that runs throughout, and each unit's restarts and memory, with anon
-and page cache apart because the cgroup's peak counts the local R2 files' cache too.
+**`--fresh 1` deletes `apps/web/.wrangler/state`**; without it a run refuses to start on state it did not
+make. `GET /` is asked once a second with the watchdog's 10 s wait, and each answer is kept with the
+unit's state at the time, so the result says whether port 3000 ever stopped answering while the unit
+read `active` (an OOM kill and a restart are allowed). Memory is the cgroup's: `MemoryPeak`, and anon
+and page cache sampled each second, apart because the peak counts the local R2 files' cache too. What
+each build ended as is read from the server's own D1 file. `perf/web-unit.ts` is the harness both this
+and `wedge-check.ts` start the unit with. The results and the limit they set are in
+`apps/web/README.md`, "Memory limits and the watchdog".
 
 # Server memory during an upload burst (PS-214)
 
@@ -40,7 +42,7 @@ SHOTS="200" perf/run.sh out-dir # one size, into out-dir
 bun perf/rss-burst.ts --shots 200 --out run.json   # one run, all flags in the file header
 bun perf/table.ts perf/results/<run>               # the tables below
 bun perf/rss-burst.ts --local 1 --server http://127.0.0.1:3301 --cg <app.slice cgroup> \
-  --web-unit <unit>.service --diff-unit <unit>.service --shots 200 --out run.json   # a desktop run (PS-220, below)
+  --web-unit <unit>.service --shots 200 --out run.json   # a desktop run (PS-220, below)
 ```
 
 Needs: ssh to the Proxmox host (`$SSH_HOST`, `pct exec $CT`), a personal token in
@@ -75,9 +77,9 @@ Check `pct exec $CT -- df -h /` before a run, and do not run 500 again until tha
 The logs below are dated and name the limits of their day. Since PS-323 neither unit has a
 `MemoryHigh`; `apps/web/README.md`, "Memory limits and the watchdog", has the current ones.
 
-`perf/wedge-check.ts` (on demand, desktop only, needs `systemd-run --user`) wedges a real sidecar
-under the old limits in a throwaway user unit, and exits 0 only when `deploy/ssh/watchdog.sh` brings
-it back.
+`perf/wedge-check.ts` (on demand, desktop only, needs `systemd-run --user` and an e2e build) wedges a
+real web unit under a `MemoryHigh` just over what the app holds, with tall uploads whose every pixel
+changed, and exits 0 only when `deploy/ssh/watchdog.sh` brings it back.
 
 ## Results (MB)
 

@@ -36,10 +36,12 @@
 # binary) and removes the org_models rows that point at it, so an org explains only through its own
 # model endpoint. On a CT that never ran it this changes nothing.
 #
-# The diff sidecar (PS-203) is always installed: pixelslash-diff runs the server diff on
-# 127.0.0.1:4181, and is restarted before pixelslash-web. One that does not come up is reported and
-# the update goes on, since the Worker then diffs in-process, up to a lower pixel limit. See
-# apps/web/README.md, "The diff sidecar".
+# The separate diff process is gone too: the Worker diffs in-process, up to the build's
+# DIFF_LIMIT_MPX, in pixelslash-web's memory. Every deploy retires a pixelslash-diff unit a CT still
+# runs (stopped, disabled, its unit file removed); on a CT without one this changes nothing. A
+# rollback to a release from before it does not bring the unit back: that release's Worker cannot
+# reach it and diffs in-process, under its own lower limit, and reports that unit unreachable to
+# Sentry once per isolate: that alert after a rollback is expected.
 #
 # So is the liveness check (PS-323): pixelslash-watchdog is stopped for the restarts, timer and any
 # pass in progress, so it cannot restart a unit mid-update, and started once the release serves. It
@@ -84,6 +86,15 @@ wait_for_port() {
     sleep 0.5
   done
   return 1
+}
+
+# Removes the old diff process from a CT that still runs it: stopped, disabled and its unit file gone. The
+# daemon-reload after it drops the unit. Run on every deploy; on a clean CT it does nothing.
+retire_diff() {
+  if [[ -f $UNIT_DIR/pixelslash-diff.service ]]; then
+    systemctl disable --now --quiet pixelslash-diff || true
+    rm -f "$UNIT_DIR"/pixelslash-diff.service
+  fi
 }
 
 # Removes the opencode helper from a CT that still runs it: the unit, the switch (and its backups),
@@ -208,8 +219,7 @@ deploy_dir() {
 install_units() {
   local d
   d=$(deploy_dir "$1")
-  install -m 644 "$d"/pixelslash-stub.service "$d"/pixelslash-diff.service \
-    "$d"/pixelslash-web.service "$UNIT_DIR"/
+  install -m 644 "$d"/pixelslash-stub.service "$d"/pixelslash-web.service "$UNIT_DIR"/
   # A release before the watchdog (PS-323), which a rollback can land on, has none of it: what is
   # installed stays and keeps working. The script is copied out, owned by root who runs it, because
   # `pixelslash` owns the release.
@@ -267,7 +277,7 @@ rollback() {
   set_current "$prev"
   install_units "$prev"
   systemctl daemon-reload
-  systemctl restart pixelslash-diff pixelslash-stub pixelslash-web
+  systemctl restart pixelslash-stub pixelslash-web
   [[ -z $failed || $failed == "$prev" ]] || rm -rf "$failed"
   if ! wait_for_port 3000 60 pixelslash-web; then
     echo "the previous release did not come up on :3000 either" >&2
@@ -312,6 +322,7 @@ main() {
   trap 'rollback "$prev" "$unpacked"' ERR HUP INT TERM
   pause_watchdog
   install_units "$rel"
+  retire_diff
   retire_helper
   systemctl daemon-reload
   set_current "$rel"
@@ -319,14 +330,6 @@ main() {
   # failure here is reported, not rolled back: the release is fine, and the next deploy tries again.
   d1 "$rel" execute DB --command "$(printf %q "DELETE FROM org_models WHERE base_url = '$HELPER_URL';")" ||
     echo "could not delete the retired helper's org_models rows: the next deploy tries again" >&2
-  # The sidecar is up before the server that sends to it. A sidecar that does not come up costs
-  # speed, not a result: it is reported, and the update goes on.
-  systemctl enable --quiet pixelslash-diff
-  systemctl restart pixelslash-diff
-  if ! wait_for_port 4181; then
-    journalctl -u pixelslash-diff -n 5 --no-pager >&2 || true
-    echo "pixelslash-diff did not come up on :4181: server diffs run in-process, up to their limit" >&2
-  fi
   systemctl enable --quiet pixelslash-stub pixelslash-web
   systemctl restart pixelslash-stub pixelslash-web
   # serve.ts (PS-220) starts Miniflare on :3000 in under a second on the CT; it gets 30 s. A

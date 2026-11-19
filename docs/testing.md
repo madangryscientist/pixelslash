@@ -76,7 +76,7 @@ can see. It governs any synthetic org: the local build's today, a smoke against 
    deletes that org and user before it writes them, so a re-run adds no row that survives (the local
    build's rerun test proves it).
 3. **No real outbound side effects.** The build is the `CLOUDFLARE_ENV=e2e` build with every URL it can
-   call (GitHub, Google, the diff sidecar, Sentry) pointed at a closed loopback port or emptied, so the
+   call (GitHub, Google, Sentry) pointed at a closed loopback port or emptied, so the
    diff runs in-process and the run reaches no host but this machine.
 4. **Credentials.** Every seed issues its own random CI token; only its SHA-256 is stored. No token is in
    the repo or read from the environment.
@@ -220,10 +220,10 @@ bunx moon run web:test-e2e     # the happy paths in a real browser
 bunx moon run <project>:test   # integration + unit
 ```
 
-In CI the web e2e runs every spec once on the production build (with the diff in the sidecar). A second run
-on `vite dev` is cut to `e2e/review.spec.ts`: it exists so the pngjs diff inside workerd, as on Cloudflare,
-stays under an e2e run, and that spec makes the server diff and reads its result. The CLI's uploads diff in
-workerd too, on the production build with no sidecar, in the local-build step that follows. The site's e2e runs the `desktop` project only (not the phone one), and only when the site
+In CI the web e2e runs every spec once on the production build (the diff in workerd, under the LAN's pixel limit). A second run
+on `vite dev` is cut to `e2e/review.spec.ts`: it keeps the dev module graph under an e2e run, and
+that spec makes the server diff and reads its result. The CLI's uploads diff in
+workerd too, on the production build, in the local-build step that follows. The site's e2e runs the `desktop` project only (not the phone one), and only when the site
 itself changed (`apps/site/` or what decides how it installs) or on `main`; a docs-only edit is checked by
 `moon run site:build` (a dead internal link or a missing `cli.md` anchor fails the prerender) and the site's unit
 tests, and a spec that quotes a docs sentence waits for the next site change or the push to `main`.

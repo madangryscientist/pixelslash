@@ -21,7 +21,7 @@ tasks:
       - "/fixtures/**/*"
       - "/docs/cli.md"
   # build, test-local-build and test-e2e all write `dist` and `.wrangler/deploy`. The local-build suite and
-  # the e2e cannot depend on `build`, because each bakes its own run's stub ports and sidecar URL into the
+  # the e2e cannot depend on `build`, because each bakes its own run's stub ports and pixel limit into the
   # build (vite.config.ts, pointAtStub). So the three share the `web-dist` mutex, and moon runs one at a time.
   build:
     command: "bun run vite build"
@@ -36,8 +36,8 @@ tasks:
     options:
       mutex: "web-dist"
   # The local-build suite and the e2e build the app themselves (the e2e's web server runs `bun run build`,
-  # the suite's `local-build/server.ts` too) and serve it on loopback only: a local D1, the GitHub and Sentry stand-ins and the diff
-  # sidecar, nothing off the machine. So a run's result is the repo's files (the inherited inputs; a
+  # the suite's `local-build/server.ts` too) and serve it on loopback only: a local D1, the GitHub and Sentry stand-ins, nothing off
+  # the machine. So a run's result is the repo's files (the inherited inputs; a
   # failure's test-results and .wrangler are excluded there), the Playwright build pinned in bun.lock
   # (all.yml), and the env vars below. A failed run is never cached.
   test-local-build:
@@ -54,9 +54,9 @@ tasks:
     inputs:
       # `forbidOnly` in playwright.config.ts.
       - "$CI"
-      # Which server and diff path the run uses (playwright.config.ts).
+      # Which server the run uses (playwright.config.ts), and its pixel limit (vite.config.ts).
       - "$PIXELSLASH_E2E_DEV"
-      - "$PIXELSLASH_E2E_NO_SIDECAR"
+      - "$PIXELSLASH_E2E_DIFF_LIMIT_MPX"
       # rss-burst.spec.ts runs only when the count is set. It is a measurement (clock and RSS), run with
       # `bunx playwright test rss-burst` from apps/web, not through moon; these only keep a burst run through
       # moon from replaying the gate's pass. Add `--force` to measure through moon.
