@@ -141,7 +141,7 @@ bunx moon run web:test-e2e        # Playwright: a local build on a fresh local D
 **The `visual` job** (`ci.yml`) runs on every pull request that changes the web app and on every push to
 `main`: it builds the review app, captures the six dogfood shots (project, build and snapshot pages, light and
 dark, over the synthetic seed in `apps/web/e2e/dogfood-seed.ts`, so no real data) and uploads them to
-pixelslash.dev with the `PIXELSLASH_TOKEN` secret. The PixelSlash check on a PR is posted from that build,
+the hosted app (through its old host app.pixelslash.dev, which still serves the API) with the `PIXELSLASH_TOKEN` secret. The PixelSlash check on a PR is posted from that build,
 against main's. It is not required, and with no secret (a fork) it skips and passes.
 
 **The site images bot** (`.github/workflows/site-images.yml`) runs `bun apps/site/scripts/site-images.ts` on
