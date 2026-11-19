@@ -93,7 +93,7 @@
   // `CLOUDFLARE_ENV=e2e`: the Playwright build, signing in against the local GitHub stub
   // (e2e/github-stub.ts). Bindings are not inherited by an env, so they repeat here.
   "env": {
-    // `CLOUDFLARE_ENV=production`: app.pixelslash.dev (PS-277). A named env, so the top level above keeps
+    // `CLOUDFLARE_ENV=production`: pixelslash.dev (PS-277; it moved there from app.pixelslash.dev). A named env, so the top level above keeps
     // the placeholder D1 id (and the local state `vite dev` and the unnamed build key on) and `vite dev`,
     // the e2e build and the LAN self-host never see a real id or a route. Bindings and vars are not
     // inherited by an env, so they repeat here; `main`, the flags, the cron and observability are.
@@ -102,9 +102,14 @@
     "production": {
       // The Worker is `pixelslash-web-production` (the top level's name plus the env, not overridden), so a
       // deploy that forgets `CLOUDFLARE_ENV=production` publishes a different Worker, never over this one.
-      // A Worker custom domain: Cloudflare creates the DNS record and the certificate itself. The
-      // hostname must have no DNS record before the first deploy, and the apex is not named here.
-      "routes": [{ "pattern": "app.pixelslash.dev", "custom_domain": true }],
+      // Worker custom domains: Cloudflare creates the DNS record and the certificate itself. A
+      // hostname must have no DNS record before the first deploy. The app is the apex; the old
+      // app.pixelslash.dev still answers, and `src/server/moved.ts` sends its page views to the apex
+      // while it keeps serving the API, sign-in and signed images.
+      "routes": [
+        { "pattern": "pixelslash.dev", "custom_domain": true },
+        { "pattern": "app.pixelslash.dev", "custom_domain": true },
+      ],
       "d1_databases": [
         {
           "binding": "DB",
@@ -158,7 +163,7 @@
         "GITHUB_APP_ID": "5528217",
         // Empty: the App uses GITHUB_API_BASE above, which is api.github.com here (PS-281).
         "GITHUB_APP_API_BASE": "",
-        "PIXELSLASH_PUBLIC_URL": "https://app.pixelslash.dev",
+        "PIXELSLASH_PUBLIC_URL": "https://pixelslash.dev",
         // Strangers sign in here, so a project's model is never on a private network. The LAN's
         // DIFF_LIMIT_MPX is not set either: the Worker has Cloudflare's own limits.
         "PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS": "",

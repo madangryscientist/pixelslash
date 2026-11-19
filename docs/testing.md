@@ -88,7 +88,7 @@ can see. It governs any synthetic org: the local build's today, a smoke against 
 
 ### Not done: a smoke against production (needs a human)
 
-Nothing here runs against `app.pixelslash.dev`. No path in the app creates a synthetic org, so there is
+Nothing here runs against `pixelslash.dev`. No path in the app creates a synthetic org, so there is
 none in production. A production smoke needs steps only Jacobus can take:
 
 1. Set `is_smoke = 1` on a dedicated prod org (a D1 `UPDATE`).

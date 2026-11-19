@@ -1172,7 +1172,7 @@ pixelslash check [--config FILE] [--out DIR] [--base BRANCH] [--only NAME]... [-
 
 ### Reviewing the review app with itself
 
-`bun run dogfood:upload` (in `apps/web`) captures the review app's own project, build and snapshot pages, light and dark, from a local build, and uploads them, so a UI change to `apps/web` is a build to review in our own workspace. CI runs it too: the `visual` job in `.github/workflows/ci.yml` uploads to `https://app.pixelslash.dev` on every pull request that changes the web app (with `--branch`, `--pr` and `--base` from the pull request) and on every push to `main` (`--branch main`, the baseline every pull request is compared with). The PixelSlash check on a pull request comes from that build. Without the `PIXELSLASH_TOKEN` secret (a fork's pull request) it prints `visual: no PIXELSLASH_TOKEN, skipping the upload` and passes, and it is not a required check.
+`bun run dogfood:upload` (in `apps/web`) captures the review app's own project, build and snapshot pages, light and dark, from a local build, and uploads them, so a UI change to `apps/web` is a build to review in our own workspace. CI runs it too: the `visual` job in `.github/workflows/ci.yml` uploads to `https://pixelslash.dev` on every pull request that changes the web app (with `--branch`, `--pr` and `--base` from the pull request) and on every push to `main` (`--branch main`, the baseline every pull request is compared with). The PixelSlash check on a pull request comes from that build. Without the `PIXELSLASH_TOKEN` secret (a fork's pull request) it prints `visual: no PIXELSLASH_TOKEN, skipping the upload` and passes, and it is not a required check.
 
 ```
 PIXELSLASH_SERVER=https://<server> PIXELSLASH_TOKEN_FILE=<path to a project's CI token> \

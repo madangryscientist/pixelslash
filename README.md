@@ -74,8 +74,8 @@ code.
 
 ## The review app
 
-The hosted app is at [app.pixelslash.dev](https://app.pixelslash.dev); the project site is
-[pixelslash.dev](https://pixelslash.dev).
+The hosted app is at [pixelslash.dev](https://pixelslash.dev); the project pages and docs are at
+[slashslash.build/pixelslash](https://slashslash.build/pixelslash).
 
 `apps/web` is the review server: TanStack Start on Cloudflare Workers, D1 for data, R2 for the
 shots, GitHub sign-in. CI uploads a build with the CLI, and people review it there. The

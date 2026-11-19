@@ -219,7 +219,7 @@ jobs:
       - name: Deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ps-web-dry"
-      - name: Deploy dry run, env.production (app.pixelslash.dev)
+      - name: Deploy dry run, env.production (pixelslash.dev)
         working-directory: apps/web
         run: |
           CLOUDFLARE_ENV=production bun run build
@@ -264,7 +264,7 @@ jobs:
 
   # The review app reviews itself: `bun run dogfood:upload` (apps/web) captures its project, build and
   # snapshot pages, light and dark, from a local build over the fixed synthetic seed, and uploads them to
-  # app.pixelslash.dev. The PixelSlash check on a pull request is posted by that server's GitHub App from
+  # pixelslash.dev. The PixelSlash check on a pull request is posted by that server's GitHub App from
   # this build; main's builds are the baseline every pull request is compared with. Not a required check,
   # and with no PIXELSLASH_TOKEN (a fork's pull request gets no secrets) it skips and passes. A release (a
   # tag, through workflow_call) and a manual run do not upload. Its own runner, so the fixed ports and
@@ -295,7 +295,7 @@ jobs:
         working-directory: apps/web
         env:
           PIXELSLASH_CI_TOKEN: ${{ secrets.PIXELSLASH_TOKEN }}
-          PIXELSLASH_SERVER: https://app.pixelslash.dev
+          PIXELSLASH_SERVER: https://pixelslash.dev
           EVENT: ${{ github.event_name }}
           PR: ${{ github.event.pull_request.number }}
         run: |

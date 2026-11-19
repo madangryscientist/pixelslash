@@ -11,6 +11,7 @@ import {
   startRefusal,
   sweepStore,
 } from "#/server/env";
+import { movedTo } from "#/server/moved";
 import { withOptionalSentry } from "#/server/sentry";
 import { sweepAbandoned } from "#/db/abandoned";
 import { sweepRetention } from "#/db/retention";
@@ -28,13 +29,18 @@ if (refused) throw new Error(refused);
 const SWEEP_BATCH = 100;
 
 /**
- * The Worker's entry: TanStack Start's `fetch`, the explain queue's consumer (ob 1875), which
+ * The Worker's entry: TanStack Start's `fetch`, after the 301s of addresses that moved (`movedTo`:
+ * the old app host and the old docs site's paths), the explain queue's consumer (ob 1875), which
  * explains each finalised build's changed shots with the project's model off the request, and the
  * hourly sweep: abandoned builds end `errored` first (PS-324, always on), then the retention sweep (PS-239), which does nothing until `PIXELSLASH_RETENTION_DAYS` is set and only logs
  * what it would delete until `PIXELSLASH_RETENTION_DELETE` is `true`. All report their errors to Sentry when `SENTRY_DSN` is set (PS-227) and run unwrapped when it is not.
  */
 export default withOptionalSentry({
-  fetch: (request) => handler.fetch(request),
+  fetch: (request) => {
+    const to = movedTo(new URL(request.url), request.method);
+    if (to) return Response.redirect(to, 301);
+    return handler.fetch(request);
+  },
   async scheduled(): Promise<void> {
     // Before the retention early return: ending abandoned builds needs no retention window.
     const db = database();

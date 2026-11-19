@@ -3,7 +3,7 @@ import { unstable_readConfig } from "wrangler";
 import { describe, expect, test } from "vitest";
 import { githubStubRefusal } from "./stub-guard";
 
-/** `env.production` in `wrangler.jsonc` (PS-277): app.pixelslash.dev, and nothing else's config. */
+/** `env.production` in `wrangler.jsonc` (PS-277): pixelslash.dev, the old app.pixelslash.dev beside it, and nothing else's config. */
 
 const CONFIG = fileURLToPath(new URL("../../wrangler.jsonc", import.meta.url));
 const read = (env?: string) => unstable_readConfig({ config: CONFIG, env });
@@ -20,12 +20,15 @@ const SECRETS = [
 describe("env.production", () => {
   const prod = read("production");
 
-  test("targets the real D1, the bucket and the queue, on the custom domain only", () => {
+  test("targets the real D1, the bucket and the queue, on the custom domains only", () => {
     expect(prod.name).toBe("pixelslash-web-production");
     expect(prod.d1_databases[0]?.database_id).toBe("d01057df-95e1-45ef-a54c-e2fd78c4e1cf");
     expect(prod.r2_buckets[0]?.bucket_name).toBe("pixelslash-blobs");
     expect(prod.queues.producers?.[0]?.queue).toBe("pixelslash-explain");
-    expect(prod.routes).toEqual([{ pattern: "app.pixelslash.dev", custom_domain: true }]);
+    expect(prod.routes).toEqual([
+      { pattern: "pixelslash.dev", custom_domain: true },
+      { pattern: "app.pixelslash.dev", custom_domain: true },
+    ]);
   });
 
   test("sets the production vars, and no var shadows a secret", () => {
@@ -34,7 +37,7 @@ describe("env.production", () => {
       "154874965124-f14rub4dp41bq0bks3n53clg44kuffga.apps.googleusercontent.com",
     );
     expect(prod.vars["GITHUB_APP_ID"]).toBe("5528217");
-    expect(prod.vars["PIXELSLASH_PUBLIC_URL"]).toBe("https://app.pixelslash.dev");
+    expect(prod.vars["PIXELSLASH_PUBLIC_URL"]).toBe("https://pixelslash.dev");
     expect(prod.vars["SENTRY_ENVIRONMENT"]).toBe("production");
     expect(prod.vars["DEFAULT_DIFF_LOCATION"]).toBe("ci");
     expect(prod.vars["PIXELSLASH_ALLOW_PRIVATE_MODEL_HOSTS"]).toBe("");
