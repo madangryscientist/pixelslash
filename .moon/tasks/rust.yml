@@ -1,0 +1,16 @@
+# Inherited by the projects tagged `rust`: engines/wasm, whose tasks cover both its crates (the wasm
+# module and native/, which includes the same lib.rs). The committed module and the script that
+# checks it are inputs too, so `wasm:wasm-check` re-runs when either changes.
+$schema: "../cache/schemas/tasks.json"
+
+inheritedBy:
+  tags: ["rust"]
+
+implicitInputs:
+  - "/engines/wasm/**/*"
+  # cargo's own output. Left in, a build would change the hash it is hashed under.
+  - "!/engines/wasm/target/**"
+  - "!/engines/wasm/native/target/**"
+  - "/packages/engine/wasm/diff.wasm"
+  - "/packages/engine/wasm/diff.wasm.json"
+  - "/scripts/build-wasm.ts"

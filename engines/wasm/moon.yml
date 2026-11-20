@@ -1,0 +1,25 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+# Two cargo projects, each with its own Cargo.lock: the wasm crate here and the bench-only native
+# build in native/. One moon project covers both.
+tags: ["rust"]
+
+tasks:
+  format-check:
+    script: "cargo fmt --check && cd native && cargo fmt --check"
+  # The wasm32 pass sees the `cfg(target_arch = "wasm32")` code the host pass skips.
+  lint:
+    script: >-
+      cargo clippy --locked --all-targets -- -D warnings &&
+      cargo clippy --locked --all-targets --target wasm32-unknown-unknown -- -D warnings &&
+      cd native && cargo clippy --locked --all-targets -- -D warnings
+    deps:
+      - "~:format-check"
+  wasm-check:
+    command: "bun scripts/build-wasm.ts --check"
+    options:
+      runFromWorkspaceRoot: true
+  test:
+    script: "cargo test --locked && cd native && cargo test --locked"
+    deps:
+      - "~:wasm-check"

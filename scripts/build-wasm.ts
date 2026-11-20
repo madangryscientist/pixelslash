@@ -1,9 +1,9 @@
 /**
  * Build the diff's WebAssembly (PS-204) from `engines/wasm` and commit what it writes: the module
  * at `packages/engine/wasm/diff.wasm` and, beside it, `diff.wasm.json`, the sha256 of every input
- * and of the module. The gate never runs this (it needs Rust): an engine test reads the manifest
- * and fails when a source or the module no longer matches it, so the Rust cannot change without a
- * rebuild. `--check` rebuilds and fails when the result differs from the committed module.
+ * and of the module. An engine test reads the manifest and fails when a source or the module no
+ * longer matches it, so the Rust cannot change without a rebuild. `--check` rebuilds and fails when
+ * the result differs from the committed module; the gate runs it as `wasm:wasm-check`.
  *
  * The toolchain is pinned in `engines/wasm/rust-toolchain.toml`; with rustup or mise's Rust, `cargo`
  * picks it up there (`rustup target add wasm32-unknown-unknown` once).

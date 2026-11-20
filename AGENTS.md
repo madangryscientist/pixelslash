@@ -32,6 +32,7 @@ holds what they inherit:
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, serving the docs, self-host and security pages, each prerendered from the repo's own docs; no D1, R2 or sign-in. The four marketing pages (`/`, `/how-it-works`, `/compare`, `/pricing`) 301 to slashslash.build/pixelslash from the site's Worker entry. The architect deploys it after a merge (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
+| `wasm` | `engines/wasm` | the Rust diff module (`diff.wasm`, committed under `packages/engine/wasm`) and its bench-only native build in `native/`; `cargo fmt --check` and clippy in `lint`, `cargo test` and `wasm:check` in `test` |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
 
 **Files another site reads by path.** The slashslash.build site fetches these from this repo at a
@@ -58,11 +59,14 @@ A change is green when all of these pass **from the worktree**:
 
 ```bash
 bun install                       # FIRST: a fresh worktree has no node_modules, and so no moon
+(cd engines/wasm && rustup toolchain install)   # once per machine: the pinned Rust, with clippy and rustfmt
 bun run typecheck                 # moon run --concurrency 3 :typecheck  (tsc, strict)
 bun run lint                      # moon run --concurrency 3 :lint  (oxlint --type-aware --deny-warnings + check-slop;
                                   # check-dashes fails on an em or en dash in any tracked text file)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
 bun run test                      # moon run --concurrency 3 :test  (Vitest under the Bun runtime)
+                                  # lint and test also run engines/wasm: cargo fmt --check and clippy in
+                                  # wasm:lint, cargo test and wasm:check (the committed diff.wasm rebuilt) in wasm:test
 ```
 
 The root scripts (`typecheck`, `lint`, `test`, `bench`, `bench:check`) go through `scripts/moon.ts`, which puts

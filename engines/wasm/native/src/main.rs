@@ -1,5 +1,5 @@
 //! `diff.wasm`'s Rust built for the host (PS-212), to time it against the same code in wasm and
-//! against C#. Bench only: nothing ships it, and the gate never builds it.
+//! against C#. Bench only: nothing ships it. The gate lints and tests it (`wasm:lint`, `wasm:test`).
 //!
 //!   diff-native <runs> <pair.raw>...
 //!
