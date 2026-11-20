@@ -1,13 +1,18 @@
-# apps/site: pixelslash.dev
+# apps/site: the docs site
 
-The project's docs site. TanStack Start on a Cloudflare Worker, every page prerendered to static
-HTML at build time: no D1, no R2, no sign-in, no cookies, no forms. pixelslash.dev serves the docs,
-self-host and security pages.
+The old pixelslash.dev docs site. TanStack Start on a Cloudflare Worker, every page prerendered to
+static HTML at build time: no D1, no R2, no sign-in, no cookies, no forms. The site has no domain:
+`wrangler.jsonc` has `"routes": []` and `"workers_dev": false`, so no public address reaches this
+Worker. Its pages are served from slashslash.build/pixelslash. pixelslash.dev is the review app
+(`apps/web`; see `apps/web/README.md`, "The apex moved here").
 
 ## The marketing pages moved
 
-The home, how it works, compare and pricing pages are on slashslash.build now. pixelslash.dev answers
-each old path, with and without a trailing slash, with a `301` to its new address:
+The home, how it works, compare and pricing pages are on slashslash.build now. On pixelslash.dev the
+review app answers the old paths (`apps/web/src/server/moved.ts`): every one of them, the docs
+included, is a `301` to slashslash.build, except `/`, which is the review app's own home (a `200`).
+The table is what this Worker answers for the same four paths when a request does reach it, with and
+without a trailing slash:
 
 | Path | Location |
 | --- | --- |
@@ -17,7 +22,8 @@ each old path, with and without a trailing slash, with a `301` to its new addres
 | `/pricing` | `https://slashslash.build/pixelslash/pricing` |
 
 The list is `src/content/moved.ts`. The Worker's own entry, `src/server.ts`, answers it before
-TanStack Start does; no asset matches those paths, so every such request reaches the Worker. The nav
+TanStack Start does; no asset matches those paths, so every such request that reaches the Worker
+gets the `301`. No public address reaches it today. The nav
 (`src/content/nav.ts`) still shows the four, linking to slashslash.build, and the wordmark links the
 PixelSlash home there. `e2e/metadata.spec.ts` reads every moved path with no redirect followed and
 checks the `301` and the `Location`. slashslash.build fetches a few files from this repo at a pinned
@@ -126,18 +132,15 @@ bunx moon run site:test-e2e  # Playwright on the build, desktop and phone (CI ru
 
 ## Deploy
 
-One command, from `apps/site`, with a Cloudflare API token for the account that holds the
-`pixelslash.dev` zone in `CLOUDFLARE_API_TOKEN` (and `CLOUDFLARE_ACCOUNT_ID`):
+The Worker has no route: `wrangler.jsonc` has `"routes": []` and `"workers_dev": false`, so a deploy
+reaches no public address. Keep it that way. A route here would take pixelslash.dev from the review
+app, which serves the apex now (`apps/web/README.md`, "The apex moved here").
+
+From `apps/site`, with a Cloudflare API token for the account in `CLOUDFLARE_API_TOKEN` (and
+`CLOUDFLARE_ACCOUNT_ID`):
 
 ```bash
 bun run build && bunx wrangler deploy
-bun ../../scripts/check-commit.ts https://pixelslash.dev/docs "$(git rev-parse HEAD)"
 ```
 
-The second line proves the deploy is live: every page carries `<meta name="build-commit">`, the commit
-it was built from (`apps/web/build-commit.ts`), and the check waits up to two minutes for the docs page
-to name this one. It checks `/docs`, since `/` is a 301 to slashslash.build.
-
-`wrangler.jsonc` attaches the Worker to `pixelslash.dev` as a custom domain (`workers_dev` is off),
-so the deploy creates the hostname's DNS record itself. `bunx wrangler deploy --dry-run --outdir
-<dir>` builds the upload without sending it.
+`bunx wrangler deploy --dry-run --outdir <dir>` builds the upload without sending it.
