@@ -30,7 +30,7 @@ holds what they inherit:
 | `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
 | `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@hackcove/pixelslash-engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
-| `site` | `apps/site` | pixelslash.dev: TanStack Start on a Worker, serving the docs, self-host and security pages, each prerendered from the repo's own docs; no D1, R2 or sign-in. The four marketing pages (`/`, `/how-it-works`, `/compare`, `/pricing`) 301 to slashslash.build/pixelslash from the site's Worker entry. The architect deploys it after a merge (`apps/site/README.md`) |
+| `site` | `apps/site` | the old docs site, TanStack Start on a Worker, each page prerendered from the repo's own docs (`docs/`, `SECURITY.md`, `apps/web/SELF-HOST.md`); no D1, R2 or sign-in. It has no domain: `apps/site/wrangler.jsonc` has `"routes": []`, so no public address reaches it. Its pages are on slashslash.build/pixelslash. pixelslash.dev is the review app (`apps/web`), which 301s every old path of this site to slashslash.build, except `/`, its own home (`apps/web/src/server/moved.ts`). The gate still builds, prerenders and tests the site (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
 | `wasm` | `engines/wasm` | the Rust diff module (`diff.wasm`, committed under `packages/engine/wasm`) and its bench-only native build in `native/`; `cargo fmt --check` and clippy in `lint`, `cargo test` and `wasm:wasm-check` (what `bun run wasm:check` runs) in `test` |
 | `bench` | `bench` | the Argos benchmark: main and held-out corpora, runner, scoring (`bun run bench`, no VM: Argos's verdicts are cached; `bun run bench:check` is the regression guard, and `bun run test` runs it too; see `bench/README.md`). The VM is needed only for `--refresh-argos` |
@@ -42,9 +42,7 @@ pinned commit, and refreshes the pin when one of them changes on `main`:
 `apps/site/public/hero/main.png`, `apps/site/public/hero/branch.png`, `apps/site/public/report.png`,
 `apps/site/src/content/hero.json` and `docs/capabilities/data.json`. Changing their content is
 fine; moving, renaming or deleting one breaks that site's next update, so do not, unless the change
-says how the other side follows. One more is read live, not at a pin: its PixelSlash pages use
-`https://pixelslash.dev/social-card.png` (`apps/site/public/social-card.png`) as their share image,
-so keep it served at that URL, with no delete and no redirect, until that site hosts its own.
+says how the other side follows.
 
 `bunfig.toml` sets `[install] linker = "isolated"`: a package sees its own
 declared dependencies and the root's, not another package's. Declare what a
