@@ -126,18 +126,10 @@ describe("a D1 write that meets the lock (PS-228)", () => {
   });
 
   test("an error that is not a lock is not tried again", async () => {
-    let tries = 0;
-    const fake = {
-      prepare: () => ({
-        all: async () => {
-          tries++;
-          throw new Error("no such table: nope");
-        },
-      }),
-    };
-    // oxlint-disable-next-line no-unsafe-type-assertion -- a fake with only the members under test
-    const d1 = fake as unknown as D1Database;
-    await expect(retryBusy(d1).prepare("select 1").all()).rejects.toThrow(/no such table/);
-    expect(tries).toBe(1);
+    const { binding, state } = locked(held.d1, /nope/, 0);
+    await expect(retryBusy(binding).prepare("select * from nope").all()).rejects.toThrow(
+      /no such table/,
+    );
+    expect(state.tries).toBe(1);
   });
 });

@@ -9,6 +9,9 @@ description = "diff.wasm's Rust built for the host, to time it against C# (PS-21
 # No dependencies, like the module it builds.
 [dependencies]
 
+[lints.clippy]
+allow_attributes_without_reason = "deny"
+
 [[bin]]
 name = "diff-native"
 path = "src/main.rs"
