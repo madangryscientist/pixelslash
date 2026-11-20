@@ -366,7 +366,7 @@ fn sample(line: &[u8], i: usize, depth: usize) -> u32 {
 /// Returns 0, or `0x100 | type` for a filter type pngjs refuses, or `0x200 | index` for a palette
 /// index past the palette; like pngjs, every line is unfiltered before any pixel is looked up.
 #[unsafe(no_mangle)]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "an extern \"C\" export: JS passes each argument as a wasm scalar")]
 pub extern "C" fn decode(
     src: usize,
     width: u32,
@@ -794,7 +794,7 @@ struct Compare<'a> {
 
 impl<'a> Compare<'a> {
     /// The loop's state for `diff`'s arguments, with the field and the overlay zeroed.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "takes the extern diff exports' arguments unchanged")]
     fn new(
         a: usize,
         aw: u32,
@@ -812,7 +812,7 @@ impl<'a> Compare<'a> {
 
     /// `new`, zeroing the field and the overlay only when `zero` is set: a later band of
     /// `diff_tiled_rows` keeps what the bands before it wrote.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "takes the extern diff exports' arguments unchanged")]
     fn open(
         a: usize,
         aw: u32,
@@ -897,7 +897,7 @@ impl<'a> Compare<'a> {
 /// (`kind`, `amplitude`, `lighter`, overlap-sized, zeroed here) and paints the changed pixels
 /// magenta on `overlay` (the larger size, zeroed here). `out` gets [changed, antialiased].
 #[unsafe(no_mangle)]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "an extern \"C\" export: JS passes each argument as a wasm scalar")]
 pub extern "C" fn diff(
     a: usize,
     aw: u32,
@@ -1009,7 +1009,7 @@ pub extern "C" fn tiles(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, 
 /// would leave it unmarked too, and the anti-alias test of a pixel in a marked tile still reads
 /// its neighbours from the whole shots.
 #[unsafe(no_mangle)]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "an extern \"C\" export: JS passes each argument as a wasm scalar")]
 pub extern "C" fn diff_tiled(
     a: usize,
     aw: u32,
@@ -1045,7 +1045,7 @@ pub extern "C" fn diff_tiled(
 /// `diff_tiled`'s, field, overlay and counts: each pixel's test reads only the two whole shots, never
 /// another pixel's result, so where the loop stops between rows changes nothing.
 #[unsafe(no_mangle)]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "an extern \"C\" export: JS passes each argument as a wasm scalar")]
 pub extern "C" fn diff_tiled_rows(
     a: usize,
     aw: u32,

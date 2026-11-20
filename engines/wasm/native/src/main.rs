@@ -9,7 +9,6 @@
 //! ms of each step over `runs` warm runs, the first run's, and what the steps found (for checking
 //! against the wasm run).
 
-#[allow(dead_code)]
 #[path = "../../src/lib.rs"]
 mod diff;
 

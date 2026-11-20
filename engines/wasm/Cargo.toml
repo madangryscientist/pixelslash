@@ -9,6 +9,9 @@ description = "The server diff's hot loops (unfilter, pixel loop, region blobs) 
 # No dependencies: plain `extern "C"` exports, no wasm-bindgen, no allocator crate.
 [dependencies]
 
+[lints.clippy]
+allow_attributes_without_reason = "deny"
+
 [lib]
 crate-type = ["cdylib"]
 path = "src/lib.rs"
