@@ -36,8 +36,9 @@ The built module is committed at `packages/engine/wasm/diff.wasm`, and beside it
 The gate runs this crate as the moon project `wasm` (`moon.yml`), for it and for `native/`:
 `bun run lint` runs `cargo fmt --check` and `cargo clippy -D warnings` (the host, and
 `wasm32-unknown-unknown` for the `cfg(target_arch = "wasm32")` code), and `bun run test` runs
-`cargo test` and `wasm:check`. So the gate needs rustup: run `rustup toolchain install` in this
-directory once on a new machine. `rustfmt.toml` sets the 120-column width the code is written at.
+`cargo test` and `wasm:wasm-check` (`bun run wasm:check`). So the gate needs rustup: run
+`rustup toolchain install` in this directory once on a new machine. `rustfmt.toml` sets the
+120-column width the code is written at.
 
 The toolchain is pinned in `rust-toolchain.toml` (rustc 1.99.1, target `wasm32-unknown-unknown`).
 After editing the crate:
