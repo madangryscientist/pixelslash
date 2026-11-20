@@ -62,6 +62,12 @@ jobs:
         timeout-minutes: 5
         with:
           working-directory: packages/engine
+      # The Rust engine (engines/wasm): rustup reads engines/wasm/rust-toolchain.toml and installs
+      # 1.99.1 with the wasm32 target, clippy and rustfmt. Once, before moon runs the cargo tasks
+      # in parallel.
+      - name: Install the Rust toolchain
+        working-directory: engines/wasm
+        run: rustup toolchain install
       - run: bun run typecheck
       - run: bun run lint
       - run: bun run format:check

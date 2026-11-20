@@ -14,6 +14,7 @@ projects:
   engine: "packages/engine"
   playwright: "packages/playwright"
   scripts: "scripts"
+  wasm: "engines/wasm"
 
 vcs:
   client: "git"

@@ -185,7 +185,7 @@ fn unfilter_rgb(data: &[u8], w: usize, h: usize, out: &mut [u8]) -> u32 {
             failed = 1;
             break;
         }
-        for (to, px) in out[y * w * 4..(y + 1) * w * 4].chunks_exact_mut(4).zip(cur.chunks_exact(3)) {
+        for (to, px) in out[y * w * 4..(y + 1) * w * 4].as_chunks_mut::<4>().0.iter_mut().zip(cur.as_chunks::<3>().0) {
             to.copy_from_slice(&[px[0], px[1], px[2], 255]);
         }
     }
@@ -205,7 +205,7 @@ fn unfilter_pixels<const B: usize>(filter: u8, line: &[u8], up: Option<&[u8]>, o
         // Paeth with nothing above picks the left byte, as Sub adds it.
         (1, _) | (4, None) => {
             let mut left = [0u8; B];
-            for (to, px) in out.chunks_exact_mut(B).zip(line.chunks_exact(B)) {
+            for (to, px) in out.as_chunks_mut::<B>().0.iter_mut().zip(line.as_chunks::<B>().0) {
                 for c in 0..B {
                     left[c] = px[c].wrapping_add(left[c]);
                 }
@@ -219,7 +219,7 @@ fn unfilter_pixels<const B: usize>(filter: u8, line: &[u8], up: Option<&[u8]>, o
         }
         (3, _) => {
             let mut left = [0u8; B];
-            for (i, (to, px)) in out.chunks_exact_mut(B).zip(line.chunks_exact(B)).enumerate() {
+            for (i, (to, px)) in out.as_chunks_mut::<B>().0.iter_mut().zip(line.as_chunks::<B>().0).enumerate() {
                 for c in 0..B {
                     let above = up.map_or(0, |up| up[i * B + c]);
                     left[c] = px[c].wrapping_add(((left[c] as u32 + above as u32) >> 1) as u8);
@@ -229,7 +229,9 @@ fn unfilter_pixels<const B: usize>(filter: u8, line: &[u8], up: Option<&[u8]>, o
         }
         (4, Some(up)) => {
             let (mut left, mut up_left) = ([0u8; B], [0u8; B]);
-            for ((to, px), above) in out.chunks_exact_mut(B).zip(line.chunks_exact(B)).zip(up.chunks_exact(B)) {
+            for ((to, px), above) in
+                out.as_chunks_mut::<B>().0.iter_mut().zip(line.as_chunks::<B>().0).zip(up.as_chunks::<B>().0)
+            {
                 for c in 0..B {
                     left[c] = px[c].wrapping_add(paeth(left[c], above[c], up_left[c]));
                     up_left[c] = above[c];
@@ -306,10 +308,7 @@ fn line_bytes(width: usize, channels: usize, depth: usize) -> usize {
 pub extern "C" fn inflated_len(width: u32, height: u32, depth: u32, colour: u32, interlace: u32) -> u32 {
     let (list, n) = passes(width as usize, height as usize, interlace != 0);
     let channels = channels_of(colour);
-    list[..n]
-        .iter()
-        .map(|p| (line_bytes(p.width, channels, depth as usize) + 1) * p.height)
-        .sum::<usize>() as u32
+    list[..n].iter().map(|p| (line_bytes(p.width, channels, depth as usize) + 1) * p.height).sum::<usize>() as u32
 }
 
 // Ported from pngjs (MIT): see NOTICE.
@@ -325,8 +324,8 @@ fn unfilter_line(filter: u8, line: &mut [u8], up: &[u8], bpp: usize) -> bool {
             }
         }
         2 => {
-            for x in 0..line.len() {
-                line[x] = line[x].wrapping_add(above(x));
+            for (x, v) in line.iter_mut().enumerate() {
+                *v = v.wrapping_add(above(x));
             }
         }
         3 => {
@@ -434,8 +433,8 @@ pub extern "C" fn decode(
                     3 => [s(0), s(1), s(2), max],
                     _ => [s(0), s(1), s(2), s(3)],
                 };
-                let clear = (trans_n == 1 && raw[0] == t0)
-                    || (trans_n == 3 && raw[0] == t0 && raw[1] == t1 && raw[2] == t2);
+                let clear =
+                    (trans_n == 1 && raw[0] == t0) || (trans_n == 3 && raw[0] == t0 && raw[1] == t1 && raw[2] == t2);
                 for c in 0..4 {
                     px[c] = if clear { 0 } else { scale(raw[c]) as u8 };
                 }
@@ -445,7 +444,7 @@ pub extern "C" fn decode(
     }
     if colour == 3 {
         let colours = bytes(palette, entries as usize * 4);
-        for px in out.chunks_exact_mut(4) {
+        for px in out.as_chunks_mut::<4>().0 {
             let index = px[0] as usize;
             if index >= entries as usize {
                 return 0x200 | index as u32;
@@ -796,14 +795,37 @@ struct Compare<'a> {
 impl<'a> Compare<'a> {
     /// The loop's state for `diff`'s arguments, with the field and the overlay zeroed.
     #[allow(clippy::too_many_arguments)]
-    fn new(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, skip: usize, max_delta: f64, field: usize, overlay: usize) -> Self {
+    fn new(
+        a: usize,
+        aw: u32,
+        ah: u32,
+        b: usize,
+        bw: u32,
+        bh: u32,
+        skip: usize,
+        max_delta: f64,
+        field: usize,
+        overlay: usize,
+    ) -> Self {
         Self::open(a, aw, ah, b, bw, bh, skip, max_delta, field, overlay, true)
     }
 
     /// `new`, zeroing the field and the overlay only when `zero` is set: a later band of
     /// `diff_tiled_rows` keeps what the bands before it wrote.
     #[allow(clippy::too_many_arguments)]
-    fn open(a: usize, aw: u32, ah: u32, b: usize, bw: u32, bh: u32, skip: usize, max_delta: f64, field: usize, overlay: usize, zero: bool) -> Self {
+    fn open(
+        a: usize,
+        aw: u32,
+        ah: u32,
+        b: usize,
+        bw: u32,
+        bh: u32,
+        skip: usize,
+        max_delta: f64,
+        field: usize,
+        overlay: usize,
+        zero: bool,
+    ) -> Self {
         let a = Img { d: bytes(a, aw as usize * ah as usize * 4), w: aw as usize, h: ah as usize };
         let b = Img { d: bytes(b, bw as usize * bh as usize * 4), w: bw as usize, h: bh as usize };
         let (ow, oh) = (a.w.min(b.w), a.h.min(b.h));
@@ -830,10 +852,10 @@ impl<'a> Compare<'a> {
         for y in y0..y1 {
             for x in x0..x1 {
                 let at = y * ow + x;
-                if let Some(s) = self.skip {
-                    if s[at] != 0 {
-                        continue;
-                    }
+                if let Some(s) = self.skip
+                    && s[at] != 0
+                {
+                    continue;
                 }
                 let delta = colour_delta(a.d, (y * a.w + x) * 4, b.d, (y * b.w + x) * 4);
                 let size = if delta < 0.0 { -delta } else { delta };
@@ -938,19 +960,18 @@ fn tile_hash(img: &Img, x0: usize, y0: usize, x1: usize, y1: usize) -> u64 {
     let mut lanes = [SEED, SEED.rotate_left(16), SEED.rotate_left(32), SEED.rotate_left(48)];
     for y in y0..y1 {
         let row = &img.d[(y * img.w + x0) * 4..(y * img.w + x1) * 4];
-        let mut chunks = row.chunks_exact(32);
-        for c in &mut chunks {
+        let (chunks, rest) = row.as_chunks::<32>();
+        for c in chunks {
             lanes[0] = mix(lanes[0], word(c, 0));
             lanes[1] = mix(lanes[1], word(c, 8));
             lanes[2] = mix(lanes[2], word(c, 16));
             lanes[3] = mix(lanes[3], word(c, 24));
         }
-        let mut words = chunks.remainder().chunks_exact(8);
-        for (lane, w) in (&mut words).enumerate() {
+        let (words, tail) = rest.as_chunks::<8>();
+        for (lane, w) in words.iter().enumerate() {
             lanes[lane] = mix(lanes[lane], word(w, 0));
         }
         // A row is a whole number of pixels, so what is left is one pixel or nothing.
-        let tail = words.remainder();
         if !tail.is_empty() {
             let mut w = [0u8; 8];
             w[..tail.len()].copy_from_slice(tail);
