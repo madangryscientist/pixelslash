@@ -7,6 +7,8 @@ sub-pixel shifts are told apart from a real change. It is a standalone CLI that 
 Optionally it judges each shot against a design system with a vision model, or uploads the shots
 to a review server where a person accepts or rejects them.
 
+Every feature, with where it lives in the source: [FEATURES.md](FEATURES.md).
+
 ## Quickstart
 
 You need [Bun](https://bun.sh) (the CLI runs on it, not on Node; `npx` and `bunx` both start it)
