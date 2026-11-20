@@ -32,7 +32,7 @@ Widen the patterns, or remove them. `include` takes glob patterns matched agains
 
 The story's page never signalled that it had rendered, before the route's `timeoutMs` ran out. The story may await data, throw during render, or render only after an interaction.
 
-Open the story's iframe URL directly. If it needs data, provide it in the preview (a mock or a setup script); if it needs a click, it is not a snapshot yet.
+Open the story's iframe URL directly. If it needs data, provide it in the preview (a mock or a setup script); if it needs a click, it is not a shot yet.
 
 ## story `<name>` errored: `<message>`
 
@@ -142,13 +142,13 @@ Either keep the clock (the default is a fixed date), or set `timers: false` as w
 
 ## no manifest.json in `<dir>`
 
-`upload` or `compare` was pointed at a directory that is not a snapshot directory. Capture, `check` and `import` write `manifest.json` beside the PNGs; a directory of loose PNGs needs `pixelslash import` first.
+`upload` or `compare` was pointed at a directory that is not a shot directory. Capture, `check` and `import` write `manifest.json` beside the PNGs; a directory of loose PNGs needs `pixelslash import` first.
 
 Check the path. A relative path is resolved from where you ran the command, not from the config file.
 
 ## --out `<dir>` overlaps the snapshot dir `<dir>`
 
-`compare` refuses an output directory that is, holds or sits inside either input. Writing the report into the snapshots would make the next run read its own output.
+`compare` refuses an output directory that is, holds or sits inside either input. Writing the report into the shots would make the next run read its own output.
 
 Give `--out` a directory outside both inputs, such as `.pixelslash/compare`.
 

@@ -72,18 +72,18 @@ ripples into every app that uses it. Her goal is to catch a token or spacing reg
 consumer ships it, and to know which stories the change touched.
 
 She captures every story in light and dark, from Storybook or from Playwright. The design-system
-judge can run with a local vision model, so a violation is flagged without any screenshot leaving her
+judge can run with a local vision model, so a violation is flagged without any shot leaving her
 machine. Twins across themes and viewports show the same component in each setting side by side.
 
 She wins when a diff is measured at the level of a region and comes with a note, and when a
-violation is flagged without a screenshot leaving the machine. She loses when an intended change
+violation is flagged without a shot leaving the machine. She loses when an intended change
 produces noise on every story, and when there is no way to accept a library-wide change in one step.
 
 ## 4. Tomás, privacy-bound engineer at a regulated company
 
-Tomás works at a fintech or a health company. The screenshots of his product can show data that
+Tomás works at a fintech or a health company. The shots of his product can show data that
 looks like customer data, and nothing leaves the company network without security sign-off. His goal
-is visual review with every screenshot kept in-house.
+is visual review with every shot kept in-house.
 
 He self-hosts PixelSlash, with Docker or on a box inside the LAN, and keeps the storage under his
 own control. The CLI runs local unless it is told to upload. An AI model, when a project names one,

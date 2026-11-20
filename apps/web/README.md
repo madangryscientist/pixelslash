@@ -131,8 +131,8 @@ also carry it: with `PIXELSLASH_SENTRY_DSN` set, it goes into the tarball as a m
 A read-only page for the people who run the deployment: builds by status, the oldest in flight, every
 build stuck past `STALE_PROCESSING_MS`, the last 24 hours and 7 days (outcomes, errored builds grouped by
 the first words of their error, p50 / p95 / p99 of wall time and each step, and the newest builds'
-snapshots, compares and compare times, cache hits counted apart and timed nowhere; and, over the
-whole window, snapshots per build and time per snapshot as p50 / p95 / p99 with their `n`, the server's
+shots, compares and compare times, cache hits counted apart and timed nowhere; and, over the
+whole window, shots per build and time per shot as p50 / p95 / p99 with their `n`, the server's
 compares only: a CI build's times sit in `builds.timings` and reading them would read every build of
 the window), the release commit, the newest
 migration the database reports against the ones the code carries, and row counts. Set
@@ -173,7 +173,7 @@ project's default branch, is deleted with its blobs (R2, or the self-host's buck
 Default-branch builds are never deleted. Neither is a build a surviving build still points at as its
 baseline (`baselineKey`, `mainBaselineKey`, `baselineSnapshotId`, `carriedFrom`, and a removed marker's
 `image_key` / `baseline_key`), followed through the builds that are kept, so a chain only goes once
-nothing live reaches it. Flake evidence of a deleted build goes too; the flake itself stays. Usage
+nothing live reaches it. Flaky shot evidence of a deleted build goes too; the flaky shot itself stays. Usage
 counts drop with the builds. With retention on, a PR build's page says "expires in N days".
 
 - **Dry run first.** The Worker's hourly cron (`triggers.crons` in `wrangler.jsonc`) does nothing
@@ -247,7 +247,7 @@ that is never synced again keeps its old run until GitHub marks it stale.
 
 A build uploaded for a PR (`prNumber`) gets one comment on it, edited in place by every later build
 of the PR: the model's summary or "Summary skipped", the counts, the three to five most changed shots
-as links, and the build page link. Text and links only; no screenshot goes to GitHub. It is sent
+as links, and the build page link. Text and links only; no shot goes to GitHub. It is sent
 with the same client as the commit status (the App, or the token), only to the project's connected repo,
 and only when the project's "Comment on pull requests" setting (on by default) is on. A failed
 comment call is logged and never changes a build's verdict. The App needs `pull_requests: write`

@@ -20,7 +20,7 @@ export PIXELSLASH_SERVER=https://<your server>
 export PIXELSLASH_TOKEN="$PIXELSLASH_CI_TOKEN"
 ```
 
-Upload Main's snapshots first, as the baseline. The default branch's new shots are accepted automatically:
+Upload Main's shots first, as the baseline. The default branch's new shots are accepted automatically:
 
 ```
 npx pixelslash upload snapshots/main --branch main --wait --timeout 2m

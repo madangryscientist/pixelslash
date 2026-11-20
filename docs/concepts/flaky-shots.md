@@ -59,7 +59,7 @@ Zero-delay timers still run at load. A page that needs a delayed timer in order 
 
 `timers: true` needs a clock to pause, so with `clock: false` you must also set `timers: false`, or the run stops with `config: stabilise.timers needs a clock to pause: set stabilise.clock, or timers: false`.
 
-## How a flake is detected
+## How a flaky shot is detected
 
 Detection happens on upload. When a shot differs from its baseline, `--upload` captures it again, by default 2 more times. `flake: { "retries": N }` in the config or `--flake-retries N` changes that, and 0 turns it off.
 
@@ -104,7 +104,7 @@ Storybook stories use the tags `pixelslash-flaky-review` and `pixelslash-flaky-s
 
 ## Find the cause: `pixelslash flake ID`
 
-`pixelslash flakes` lists the open flakes on the server:
+`pixelslash flakes` lists the open flaky shots on the server:
 
 ```
 npx pixelslash flakes
@@ -145,7 +145,7 @@ It exits 6 when the shot is unstable and 0 when it is stable. `--runs` defaults 
 nothing written; --write writes the one you pick
 ```
 
-`--write` asks at the terminal and writes the number you type. Once the shot is stable here, `--resolve` closes the flake on the server. While it's unstable, it refuses:
+`--write` asks at the terminal and writes the number you type. Once the shot is stable here, `--resolve` closes the flaky shot on the server. While it's unstable, it refuses:
 
 ```
 not resolved: the shot is still unstable here

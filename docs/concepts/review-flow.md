@@ -22,7 +22,7 @@ pixelslash: uploaded 2 snapshots
 build: d834e691-… (94bca17 on new-button)
 ```
 
-This exits 0: the upload worked. It does not mean the change is approved. The command writes `build.json` into the snapshot directory, which is how the next step finds the build. [Baselines and branches](baselines-and-branches.md) has how each shot gets its baseline.
+This exits 0: the upload worked. It does not mean the change is approved. The command writes `build.json` into the shot directory, which is how the next step finds the build. [Baselines and branches](baselines-and-branches.md) has how each shot gets its baseline.
 
 ## Wait
 
@@ -96,7 +96,7 @@ A build ends in one of these states:
 
 These wait for a decision: a shot that changed, a new shot, an unchanged shot that carries an open change, and a flaky shot under `review`. These don't: a removed shot, and a flaky shot under `skip`.
 
-## A build with no snapshot directory
+## A build with no shot directory
 
 A later job, or a job on another runner, may not have `build.json`. Name the build instead:
 

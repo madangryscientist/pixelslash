@@ -8,7 +8,7 @@ Nothing here needs a hosted account. The comparison runs on your machine; a serv
 
 | In Chromatic | Here |
 | --- | --- |
-| A story | A route. A Storybook story becomes a snapshot read from the running Storybook's `index.json`; a page by URL is a route too. One story is one snapshot, unless the config gives it globals combinations (variants) |
+| A story | A route. A Storybook story becomes a shot read from the running Storybook's `index.json`; a page by URL is a route too. One story is one shot, unless the config gives it globals combinations (variants) |
 | A build | A build. `pixelslash upload` opens one at a commit and `pixelslash build` reads it; it holds every shot from that run |
 | A baseline | A baseline: the accepted shot a new one is measured against. The server picks the branch's previous shot, else the nearest accepted shot at the merge-base or its ancestors |
 | A PR check | A CI job that ends on `status --wait`. It captures, uploads, then exits by the review: 0 accepted, 4 rejected, 5 still waiting |
@@ -16,7 +16,7 @@ Nothing here needs a hosted account. The comparison runs on your machine; a serv
 | UI Review | [The review flow](../concepts/review-flow.md): a server you run shows the change, a person accepts or rejects, CI waits. There is no hosted service to sign up for today |
 | Ignoring elements | `ignore`, `data-pixelslash-ignore`, `--ignore` and `masks`. Selectors follow the element; a mask paints the pixels out of the stored shot, so they never leave the machine |
 | Flake filter | `--flake-retries` and the `flaky` policy. A changed shot is captured again; captures that disagree are `review` (wait for a person) or `skip` (kept out of the count) |
-| Threshold | `--threshold` and the two floors: a per-pixel tolerance, plus a minimum count and a minimum share of the shot before a run is `changed` |
+| Threshold | `--threshold` and the two floors: a per-pixel threshold, plus a minimum count and a minimum share of the shot before a run is `changed` |
 | TurboSnap | No equivalent. PixelSlash shoots the routes the config names, or the stories the Storybook index lists; it does not walk a bundler's dependency graph to decide what a change touched. `--only` narrows a local run by name |
 
 The rest of the capability comparison, including the tools either side does not have, is in [the capability matrix](../capabilities/matrix.html).
@@ -25,7 +25,7 @@ The rest of the capability comparison, including the tools either side does not 
 
 1. **Install and get a browser.** `npm i -D @hackcove/pixelslash`, then `npx pixelslash install-browser`. A PNG-only comparison needs no browser.
 2. **Write a config.** `npx pixelslash init --storybook http://localhost:6006` reads the index and writes a `pixelslash.config.ts`; `init --url` does the same for a page. Edit names, viewports and themes there.
-3. **Measure locally.** `npx pixelslash capture` shoots the routes, and `npx pixelslash compare DIR_A DIR_B` diffs two snapshot directories. For a pair of URLs, `--live` and `--local` are the two sides. Nothing is uploaded.
+3. **Measure locally.** `npx pixelslash capture` shoots the routes, and `npx pixelslash compare DIR_A DIR_B` diffs two shot directories. For a pair of URLs, `--live` and `--local` are the two sides. Nothing is uploaded.
 4. **Read the report.** Open `report.html` from `--out`. [Reading a report](../concepts/reading-a-report.md) labels it.
 5. **Add a server when you want review.** Run one, log in, then `pixelslash capture --upload` and `pixelslash status --wait`. [Run a review server](../ci/review-server.md) is the whole path.
 6. **Put it in CI.** Capture, upload, wait, and let the exit code fail the job. [GitHub Actions](../ci/github-actions.md) is a complete workflow; the other providers follow the same four steps.

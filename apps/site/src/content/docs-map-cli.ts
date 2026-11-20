@@ -75,7 +75,7 @@ export const CAPTURE_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "pngs-native",
-    title: "Native screenshots",
+    title: "Native shots",
     group: "capture",
     sections: ["Native screenshots (Maestro)"],
   },
@@ -94,7 +94,7 @@ export const CAPTURE_PAGES: readonly DocPageDef[] = [
   },
   {
     slug: "compare-dirs",
-    title: "Compare two snapshot dirs",
+    title: "Compare two shot dirs",
     group: "capture",
     sections: ["Comparing two snapshot dirs"],
     exits: true,

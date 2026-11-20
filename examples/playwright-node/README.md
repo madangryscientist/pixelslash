@@ -1,6 +1,6 @@
-# Playwright on plain Node, with PixelSlash snapshots
+# Playwright on plain Node, with PixelSlash shots
 
-A project outside the workspace that takes PixelSlash snapshots from its own Playwright tests, the way
+A project outside the workspace that takes PixelSlash shots from its own Playwright tests, the way
 a team that has never heard of Bun would: `npx playwright test` on Node, then `pixelslash upload`.
 
 It uses the two published packages, not the workspace:

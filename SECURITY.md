@@ -15,7 +15,7 @@ not test against someone else's deployment or data.
 ## What is in scope
 
 - **The CLI** (`packages/cli`, the `pixelslash` npm package) and **the engine** it runs
-  (`packages/engine`): for example, a screenshot or a token leaving the machine without
+  (`packages/engine`): for example, a shot or a token leaving the machine without
   `--upload`, a token written to a file or a log, or a crafted PNG or config that runs code.
 - **The review app** (`apps/web`) and **the upload API** (`/api/v1`): authentication and
   authorisation (reaching another org's builds, shots or tokens), token handling, the signed image

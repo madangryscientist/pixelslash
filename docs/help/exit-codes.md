@@ -60,7 +60,7 @@ This is not a verdict on your page. Check the server address and the token, then
 
 This is the normal answer from a CI job that is waiting for a review. Run the job again, or wait with a longer `--timeout`.
 
-## 6: the flake is still there
+## 6: the flaky shot is still there
 
 `flake` exits 6 when the shot is still unstable on your machine: at least one run differed from the first. It is not 1, because 1 stays reserved for new violations.
 

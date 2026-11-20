@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy a commit to a self-host container: build it here, ship the release, switch on the CT.
-# Run from a clean checkout of that commit (the planner's land worktree), on the desktop. See
+# Run from a clean checkout of that commit (the architect's land worktree), on the desktop. See
 # apps/web/README.md, "Run it on the Proxmox server".
 #
 #   PIXELSLASH_LAN_SSH=root@<proxmox host> PIXELSLASH_LAN_CT=<ct id> \

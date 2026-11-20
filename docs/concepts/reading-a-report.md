@@ -50,11 +50,11 @@ The word at the end is the [kind](how-a-comparison-works.md#regions): `changed`,
 
 ## 7. Timings
 
-The table says where the time went: capture, navigation, settling, the screenshot and the diff. Its footer breaks the settle into fonts, images, the network and frames. A slow settle usually has a slow network request behind it.
+The table says where the time went: capture, navigation, settling, the shot and the diff. Its footer breaks the settle into fonts, images, the network and frames. A slow settle usually has a slow network request behind it.
 
 ## Many pages: the index
 
-With `--routes`, or with `compare` on two snapshot directories, the run also writes `index.html`, with one line per page, each linking to that page's report.
+With `--routes`, or with `compare` on two shot directories, the run also writes `index.html`, with one line per page, each linking to that page's report.
 
 ![A routes index: three routes, each with its changed pixels](../../apps/site/public/docs-images/url-index.png)
 
@@ -68,7 +68,7 @@ If the two sides were rendered by different environments, a warning at the top l
 
 ## The flaky view
 
-An upload that captured its changed shots again writes `report.html` in the snapshot directory, titled **PixelSlash upload**:
+An upload that captured its changed shots again writes `report.html` in the shot directory, titled **PixelSlash upload**:
 
 ```
 1 flaky · 0 changed in every run · 0 not captured again · each changed shot captured 2 more times

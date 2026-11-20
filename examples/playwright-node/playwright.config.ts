@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-// Plain Node: `npx playwright test`. No Bun on this machine is needed to take the snapshots.
+// Plain Node: `npx playwright test`. No Bun on this machine is needed to take the shots.
 export default defineConfig({
   testDir: "./tests",
   reporter: "list",
