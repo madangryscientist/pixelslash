@@ -138,7 +138,7 @@ report: file://<run dir>/pixelslash-report/index.html
 visual gate: differences found, read the report
 ```
 
-The job exits 1. These two logs are what a passing run and a failing run print, from a local run of this page's `ci/visual-gate.sh` on 2026-11-11, not from a GitHub Actions run. It needed no browser: the run used `pixelslash import` on a PNG from the repo (`fixtures/ds/button.png`, once as it is and once with its blue recoloured green) and `pixelslash compare` on the two snapshot dirs; the workflow above captures the two servers' URLs in the pinned image instead. The report path is shortened. In the workflow it is `file:///work/pixelslash-report/index.html`, a path inside the container; the report is in the artifact.
+The job exits 1. These two logs are what a passing run and a failing run print, from a local run of this page's `ci/visual-gate.sh` on 2026-11-11, not from a GitHub Actions run. It needed no browser: the run used `pixelslash import` on a PNG from the repo (`fixtures/ds/button.png`, once as it is and once with its blue recoloured green) and `pixelslash compare` on the two shot dirs; the workflow above captures the two servers' URLs in the pinned image instead. The report path is shortened. In the workflow it is `file:///work/pixelslash-report/index.html`, a path inside the container; the report is in the artifact.
 
 ## Read the report
 

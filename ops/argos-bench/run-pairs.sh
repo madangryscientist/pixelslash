@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# From the maintainer's machine (ob 1476): send N screenshot pairs to the argos-bench VM, run Argos's
+# From the maintainer's machine (ob 1476): send N shot pairs to the argos-bench VM, run Argos's
 # comparison on them there, and bring the verdicts and diff images back.
 #
 #   ops/argos-bench/run-pairs.sh <pairs-dir> <out-dir> [--threshold n]

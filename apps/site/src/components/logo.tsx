@@ -36,7 +36,7 @@ export function Logo({ size = 24 }: { size?: number }): ReactNode {
  * (16 is one CSS pixel per art pixel). It is named "PixelSlash" for assistive tech.
  *
  * It sits straight on the page, so its fills follow the theme: the letters are text-violet-600 and the slash text-blue-600,
- * the accents both Hack Cove themes remap (Mocha mauve and blue on a dark page, Latte's darker mauve and blue on a light
+ * the accents both UISlash themes remap (Mocha mauve and blue on a dark page, Latte's darker mauve and blue on a light
  * one), so nothing here names a palette value.
  */
 export function Wordmark({ height = 16 }: { height?: number }): ReactNode {

@@ -47,7 +47,7 @@ local build on local data, no browser.
 
 - `web.local-build.test.ts`: the sign-in page serves and a bad token is refused; a synthetic org's main
   and branch builds upload over `/api/v1`, the branch build reads back `changes` with a `changed`
-  snapshot, and a real org's build is a 404 to it; the usage counts (below); a rerun of the seed.
+  shot, and a real org's build is a 404 to it; the usage counts (below); a rerun of the seed.
 - `upload.local-build.test.ts`: the real CLI from source. `upload` lands its rows and R2 objects under the
   token's org, the server's diff of a second upload, another org's token and a finalised build refused, a
   revoked token refused; `import` then `upload` of loose PNGs; a project set to diff in CI stores what the
@@ -82,7 +82,7 @@ can see. It governs any synthetic org: the local build's today, a smoke against 
    the repo or read from the environment.
 5. **A test proves it.** The local build's usage test reads `usageCounts` before and after its own org's
    two uploads and asserts no change. The control flips `is_smoke` to 0 and asserts the counts moved by
-   exactly those two builds and two snapshots, so the first assertion cannot pass merely because nothing
+   exactly those two builds and two shots, so the first assertion cannot pass merely because nothing
    was counted; flipping it back restores the first reading. The counts are deltas, so the test holds on a
    D1 other tests have written to.
 

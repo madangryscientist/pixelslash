@@ -1,6 +1,6 @@
 name: UI review
 
-# Checks that the app's UI is built the Hack Cove way. The rules and the model review live in
+# Checks that the app's UI is built the UISlash way. The rules and the model review live in
 # slashsuite/uislash; this file only names the app code to review. Layer 1 fails the
 # pull request with file:line annotations; layer 2 is advisory and never fails it.
 #

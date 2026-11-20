@@ -21,7 +21,7 @@ Both URLs must already be up. PixelSlash does not start a server for this comman
 
 The diff goes through the two images pixel by pixel. A pixel counts as changed when two things are true:
 
-- Its colour differs by more than a small tolerance, `--threshold`, which is 0.01 by default. The distance is perceptual, so it is closer to what an eye sees than to the raw numbers in the file.
+- Its colour differs by more than a small threshold, `--threshold`, which is 0.01 by default. The distance is perceptual, so it is closer to what an eye sees than to the raw numbers in the file.
 - It is not an anti-aliased edge in either image. Text and curves blend into their background, and those blended pixels move about between renders.
 
 The number of those pixels is `changedPixels`. It is the first thing a run prints:

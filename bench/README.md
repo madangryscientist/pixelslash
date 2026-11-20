@@ -1,6 +1,6 @@
 # bench: PixelSlash against Argos
 
-A re-runnable benchmark of **what gets flagged** (ob 1477): the same labelled screenshot pairs go
+A re-runnable benchmark of **what gets flagged** (ob 1477): the same labelled shot pairs go
 through PixelSlash's diff and through Argos's image comparison, and both are scored the same way.
 Argos is a benchmark rival, never a code source; it runs only through `ops/argos-bench/`.
 
@@ -103,7 +103,7 @@ It times eight steps, with the warm-up discarded, and reports the median and p95
 | `diff-phone`, `diff-desktop`, `diff-long` | `diffPngs` (decode, diff, region clustering) on a 390x844, a 1440x900 and a 1440x6000 pair |
 | `diff-long-small`, `diff-long-shift` | `diffPngs` on the long page against itself with one 40x16 badge recoloured, and with its lower half drawn 10 px down: the case tile hashes are for and their worst case (PS-191) |
 | `diff-identical` | `diffPngs` on the long page twice, the same file: the byte-equal shortcut (ob 1948) answers without decoding, so a tree without it pays the whole diff for "no change" |
-| `capture` | the real Playwright settle path (`settleCapture` plus a full-page screenshot) of a fixed page served by `Bun.serve` on localhost |
+| `capture` | the real Playwright settle path (`settleCapture` plus a full-page shot) of a fixed page served by `Bun.serve` on localhost |
 | `server-build` | the web app as the e2e starts it (production build, `vite preview`, a fresh local D1, GitHub stubbed): ten 800x600 shots uploaded and finalised, timed from the start of the build to the verdict |
 
 The fixtures are drawn from a fixed seed and written once per run, so base and head read the same
@@ -454,7 +454,7 @@ real one.
 
 ## Imported cases
 
-`bun run bench:import-flags` (ob 1734) turns the detection flags reviewers leave on the snapshot
+`bun run bench:import-flags` (ob 1734) turns the detection flags reviewers leave on the shot
 page into cases, so the diff is fixed against real misses and stays fixed. It is our tooling for
 tuning the diff, not a `pixelslash` command.
 

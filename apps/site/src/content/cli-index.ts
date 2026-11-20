@@ -12,10 +12,10 @@ import { findPage } from "./docs-map.ts";
 /** One line per command, for the index table. A test requires one for every command the CLI has. */
 export const COMMAND_SUMMARY: Readonly<Record<string, string>> = {
   init: "Write a pixelslash.config.ts from a few answers.",
-  capture: "Shoot every route and variant of a config into a snapshot dir.",
-  compare: "Compare two versions, or two snapshot dirs, and write a report.",
-  import: "Turn a dir of PNGs from any screenshot tool into a snapshot dir.",
-  upload: "Send a snapshot dir to a review server as a build.",
+  capture: "Shoot every route and variant of a config into a shot dir.",
+  compare: "Compare two versions, or two shot dirs, and write a report.",
+  import: "Turn a dir of PNGs from any screenshot tool into a shot dir.",
+  upload: "Send a shot dir to a review server as a build.",
   check: "Run the diff a server would run, before you push.",
   dev: "Re-capture a feature as you build it.",
   "install-browser": "Download the browsers capture launches.",
@@ -34,11 +34,11 @@ export const COMMAND_SUMMARY: Readonly<Record<string, string>> = {
 
 /**
  * One sentence shown after a command's usage, for what the usage alone does not say. `compare` is
- * two snapshot dirs; a pair of URLs or PNGs is the bare form, with no subcommand.
+ * two shot dirs; a pair of URLs or PNGs is the bare form, with no subcommand.
  */
 const AFTER_USAGE: Readonly<Record<string, string>> = {
   compare:
-    "For a pair of URLs or PNGs, leave the subcommand out: `pixelslash --live URL --local URL` is that run, and `pixelslash compare` itself takes two snapshot dirs.",
+    "For a pair of URLs or PNGs, leave the subcommand out: `pixelslash --live URL --local URL` is that run, and `pixelslash compare` itself takes two shot dirs.",
 };
 
 /** The page a command belongs on when its synopsis is shown on several. */

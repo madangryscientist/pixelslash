@@ -143,7 +143,7 @@ The exit code is 0 for a pixel-only run, changed or not: the first run, with its
 
 ## Compare two PNGs
 
-Already have screenshots? Hand them over and skip the browser. These two came from the run above:
+Already have shots? Hand them over and skip the browser. These two came from the run above:
 
 ```
 cp .pixelslash/main.png .pixelslash/branch.png .

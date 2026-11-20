@@ -1,6 +1,6 @@
 # PNGs you already have
 
-If something else already makes your screenshots, PixelSlash can diff them with no browser. Nothing here needs `install-browser`.
+If something else already makes your shots, PixelSlash can diff them with no browser. Nothing here needs `install-browser`.
 
 You need the package from [Getting started](../getting-started.md): `npm i -D @hackcove/pixelslash`. Bun has to be on your `PATH`. The examples run in `~/my-pngs`.
 
@@ -24,7 +24,7 @@ Two files with the same bytes are not decoded at all, and the count is `pixelsla
 
 ## A directory of PNGs: `import`
 
-`import` turns a directory of PNGs into a snapshot directory, which `compare` can read. A file's name is its shot's name, so `shots/main/home.png` pairs with `shots/branch/home.png`.
+`import` turns a directory of PNGs into a shot directory, which `compare` can read. A file's name is its shot's name, so `shots/main/home.png` pairs with `shots/branch/home.png`.
 
 `--viewport` is the size the shots were taken at. `--renderer` names what made them, here a Cypress suite, and goes into the fingerprint:
 

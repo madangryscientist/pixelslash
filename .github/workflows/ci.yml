@@ -272,7 +272,7 @@ jobs:
         run: bunx moon run site:test-e2e -- --project desktop
 
   # The review app reviews itself: `bun run dogfood:upload` (apps/web) captures its project, build and
-  # snapshot pages, light and dark, from a local build over the fixed synthetic seed, and uploads them to
+  # shot pages, light and dark, from a local build over the fixed synthetic seed, and uploads them to
   # the hosted app, through its old host app.pixelslash.dev, which keeps serving the API after the app moved
   # to pixelslash.dev (so this job works on both sides of that move). The PixelSlash check on a pull request
   # is posted by that server's GitHub App from this build; main's builds are the baseline every pull request is compared with. Not a required check,

@@ -42,7 +42,7 @@ To make CI wait for a person, end the job on `pixelslash status --wait` (or `upl
 
 ## Can I use my own Playwright tests?
 
-Yes. `@hackcove/pixelslash-playwright` gives your test a `snapshot(page, name, { ignore, redact })` call that settles the page, writes the PNG and records the ignore boxes. The directory it writes is a snapshot directory, so `pixelslash upload` takes it unchanged.
+Yes. `@hackcove/pixelslash-playwright` gives your test a `snapshot(page, name, { ignore, redact })` call that settles the page, writes the PNG and records the ignore boxes. The directory it writes is a shot directory, so `pixelslash upload` takes it unchanged.
 
 It runs under plain `npx playwright test` on Node. [Snapshots from your own Playwright tests](../cli.md#snapshots-from-your-own-playwright-tests) has the import and the flags.
 
@@ -66,9 +66,9 @@ If you want the real clock, set `clock: false` and `timers: false` together. A p
 
 ## Can I compare two PNGs without a browser?
 
-Yes. `--live-png` and `--local-png` take two files, and `compare` takes two snapshot directories; neither launches a browser or needs `install-browser`.
+Yes. `--live-png` and `--local-png` take two files, and `compare` takes two shot directories; neither launches a browser or needs `install-browser`.
 
-That is also the path for shots from another tool. [PNGs you already have](../tutorials/pngs.md) has the flags, and `import` is what turns a directory of them into a snapshot directory.
+That is also the path for shots from another tool. [PNGs you already have](../tutorials/pngs.md) has the flags, and `import` is what turns a directory of them into a shot directory.
 
 ## How do I shoot only one page?
 

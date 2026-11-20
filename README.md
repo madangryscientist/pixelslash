@@ -10,7 +10,7 @@ to a review server where a person accepts or rejects them.
 ## Quickstart
 
 You need [Bun](https://bun.sh) (the CLI runs on it, not on Node; `npx` and `bunx` both start it)
-and two screenshots of the same page: Main (the version you ship today) and Branch (your change).
+and two shots of the same page: Main (the version you ship today) and Branch (your change).
 PixelSlash is early (0.7.x). It is published on npm as `@hackcove/pixelslash`:
 `npm i -D @hackcove/pixelslash` installs it, and the command is `pixelslash`.
 
@@ -50,15 +50,15 @@ the rest.
 Everything below is in the [CLI reference](docs/cli.md), which lists every command, flag and exit
 code.
 
-- **Many pages:** `--routes FILE` compares a list of paths, and `compare` diffs two snapshot
+- **Many pages:** `--routes FILE` compares a list of paths, and `compare` diffs two shot
   directories.
 - **A design-system judge:** `--ds DIR` checks each shot against your component rasters with a
   local vision model (mlx on a Mac, or ollama). With no judge installed the run prints
   `skip: no judge` and invents no violations.
-- **Snapshots in CI:** [`pixelslash capture`](docs/cli.md#snapshot-capture-the-pinned-image) shoots
+- **Shots in CI:** [`pixelslash capture`](docs/cli.md#snapshot-capture-the-pinned-image) shoots
   every route in a config inside a pinned image and records what rendered each shot, so a shot from
   a different setup is named as one. A `v*` tag publishes it to `ghcr.io/slashsuite/pixelslash-capture`.
-- **Your own Playwright tests:** [snapshots from the tests you already
+- **Your own Playwright tests:** [shots from the tests you already
   have](docs/cli.md#snapshots-from-your-own-playwright-tests).
 - **A review server:** [`pixelslash upload`](docs/cli.md#uploading-to-a-server) sends shots to a
   PixelSlash server, which diffs them against the default branch, holds the build for review and
@@ -67,7 +67,7 @@ code.
 - **While you build:** [`pixelslash dev`](docs/cli.md#feature-mode-pixelslash-dev) re-captures a
   page or component on every save and diffs it with the previous iteration, uploading nothing.
 - **Your coding agent:** [`pixelslash mcp`](docs/cli.md#your-coding-agent-pixelslash-mcp) is a
-  stdio MCP server, so the agent you already run can read builds, changed shots and flakes, and
+  stdio MCP server, so the agent you already run can read builds, changed shots and flaky shots, and
   accept or reject a change for you.
 - **Start a repo:** [`pixelslash init`](docs/cli.md#start-a-repo-pixelslash-init) writes a
   `pixelslash.config.ts` from a few questions.
