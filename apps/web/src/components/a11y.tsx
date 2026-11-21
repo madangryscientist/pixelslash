@@ -3,7 +3,7 @@ import {
   MAX_VIOLATIONS,
   type A11yDiff,
   type A11yViolation,
-} from "@hackcove/pixelslash-engine/a11y-entry";
+} from "@slashsuite/pixelslash-engine/a11y-entry";
 
 /**
  * A shot's accessibility scan against its baseline's (PS-238): the violations new on Branch first,

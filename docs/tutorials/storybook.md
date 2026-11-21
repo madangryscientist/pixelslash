@@ -9,7 +9,7 @@ You need Bun on your `PATH`, and Storybook 7 or later. With an older one, captur
 If you have a Storybook, start it, install PixelSlash, and skip this section:
 
 ```
-npm i -D @hackcove/pixelslash
+npm i -D @slashsuite/pixelslash
 npx pixelslash install-browser
 ```
 
@@ -19,7 +19,7 @@ Otherwise, make a small one. `npm init -y` writes a CommonJS package and Storybo
 mkdir my-storybook && cd my-storybook
 npm init -y
 npm pkg set type=module
-npm i -D storybook @storybook/html-vite vite @hackcove/pixelslash
+npm i -D storybook @storybook/html-vite vite @slashsuite/pixelslash
 npx pixelslash install-browser
 mkdir .storybook src
 ```

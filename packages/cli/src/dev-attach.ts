@@ -3,7 +3,7 @@ import {
   type DevIteration,
   type DevLock,
   UsageError,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { type DevArgs, type DevDeps, jsonOf, lineOf } from "./dev.ts";
 import { onKeys, onceInProgress } from "./dev-loop.ts";
 import type { Io } from "./run.ts";

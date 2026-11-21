@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { BaselinePick } from "@hackcove/pixelslash-engine/ci-diff";
+import type { BaselinePick } from "@slashsuite/pixelslash-engine/ci-diff";
 import { describe, expect, test } from "vitest";
 import { createProject, diffLocationOf } from "#/db/orgs";
 import { builds } from "#/db/schema";

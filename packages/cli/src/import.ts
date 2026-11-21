@@ -4,7 +4,7 @@ import {
   UsageError,
   importPngs,
   type NativePlatform,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import type { Io } from "./run.ts";
 import { readFlagPairs } from "./args.ts";
 

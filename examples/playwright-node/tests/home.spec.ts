@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { expect, test } from "@playwright/test";
-import { snapshot } from "@hackcove/pixelslash-playwright";
+import { snapshot } from "@slashsuite/pixelslash-playwright";
 
 const PAGE = `<!doctype html>
 <html><head><style>

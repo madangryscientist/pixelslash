@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
-import { scrubEvent } from "@hackcove/pixelslash-engine/sentry-scrub";
+import { scrubEvent } from "@slashsuite/pixelslash-engine/sentry-scrub";
 import { type SentryEnv, sentryConfigOf } from "./sentry-config";
 
 /**

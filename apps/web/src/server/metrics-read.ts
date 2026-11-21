@@ -1,4 +1,4 @@
-import { parseMetricsText, type Metrics } from "@hackcove/pixelslash-engine/metrics-entry";
+import { parseMetricsText, type Metrics } from "@slashsuite/pixelslash-engine/metrics-entry";
 import { orgBlobs, type BlobStore } from "#/storage/blobs";
 
 /**

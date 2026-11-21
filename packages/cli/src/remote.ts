@@ -6,7 +6,7 @@ import {
   loadConfig,
   resolveToken,
   type CaptureConfig,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { apiClient, objects, str, type ApiClient, type FetchLike } from "./api.ts";
 import { storedToken } from "./credentials.ts";
 

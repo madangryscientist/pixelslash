@@ -5,14 +5,14 @@ a team that has never heard of Bun would: `npx playwright test` on Node, then `p
 
 It uses the two published packages, not the workspace:
 
-- `@hackcove/pixelslash-playwright`, the helper (`snapshot(page, name, opts)`), which runs under Node;
-- `@hackcove/pixelslash`, the CLI, which uploads the dir and needs Bun (`bun` on the machine that
+- `@slashsuite/pixelslash-playwright`, the helper (`snapshot(page, name, opts)`), which runs under Node;
+- `@slashsuite/pixelslash`, the CLI, which uploads the dir and needs Bun (`bun` on the machine that
   uploads, not on the one that runs the tests).
 
 Both are on npm:
 
 ```bash
-npm install -D @hackcove/pixelslash @hackcove/pixelslash-playwright
+npm install -D @slashsuite/pixelslash @slashsuite/pixelslash-playwright
 ```
 
 To try a change from a checkout, build and install the tarballs instead:
@@ -20,7 +20,7 @@ To try a change from a checkout, build and install the tarballs instead:
 ```bash
 bun scripts/pack-npm.ts packs        # from the repo root: prints the two tarball paths
 cd examples/playwright-node
-npm install ../../packs/hackcove-pixelslash-playwright-*.tgz ../../packs/hackcove-pixelslash-0.*.tgz
+npm install ../../packs/slashsuite-pixelslash-playwright-*.tgz ../../packs/slashsuite-pixelslash-0.*.tgz
 npx playwright install chromium-headless-shell
 npx playwright test                  # writes pixelslash-snapshots/ (manifest.json + PNGs)
 pixelslash upload pixelslash-snapshots --server https://your-server

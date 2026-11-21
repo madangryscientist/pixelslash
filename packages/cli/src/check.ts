@@ -14,7 +14,7 @@ import {
   onlyRoutes,
   openCaptureSession,
   timingLine,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { RemoteError } from "./api.ts";
 import {
   concurrencyFlag,

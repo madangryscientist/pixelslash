@@ -9,8 +9,8 @@ import {
   identicalResult,
   readPngSize,
   summarizeDiff,
-} from "@hackcove/pixelslash-engine/diff";
-import { release } from "@hackcove/pixelslash-engine/release";
+} from "@slashsuite/pixelslash-engine/diff";
+import { release } from "@slashsuite/pixelslash-engine/release";
 import type { BaselineSnapshot } from "#/db/baselines";
 import type { DiffLocation, DiffResult, IgnoreRect, ResolvedDiff, snapshots } from "#/db/schema";
 import { msBetween } from "#/db/server-timings";

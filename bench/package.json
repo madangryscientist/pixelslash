@@ -4,7 +4,7 @@
   "license": "Elastic-2.0",
   "type": "module",
   "dependencies": {
-    "@hackcove/pixelslash-engine": "workspace:*",
+    "@slashsuite/pixelslash-engine": "workspace:*",
     "playwright": "1.65.1",
     "pngjs": "^7.0.0"
   },

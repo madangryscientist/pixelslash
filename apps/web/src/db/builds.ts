@@ -1,6 +1,6 @@
-import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
-import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
-import { readPngSize } from "@hackcove/pixelslash-engine/diff";
+import type { A11y } from "@slashsuite/pixelslash-engine/a11y-entry";
+import type { Composition } from "@slashsuite/pixelslash-engine/composition-entry";
+import { readPngSize } from "@slashsuite/pixelslash-engine/diff";
 import { Param, SQL, and, count, eq, getTableColumns, is, sql } from "drizzle-orm";
 import type { CiUpload } from "#/diff/ci-result";
 import { sha256Bytes } from "#/lib/crypto";

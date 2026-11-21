@@ -126,7 +126,7 @@ Move the baseline first: upload the default branch from the new environment, reb
 
 The project is set to diff in CI, and this CLI is older than the version that can do it. The server answers HTTP 426 rather than measuring a build the project asked it not to measure.
 
-Upgrade `@hackcove/pixelslash` and run the job again. If you pin the version in CI, raise the pin in the same change.
+Upgrade `@slashsuite/pixelslash` and run the job again. If you pin the version in CI, raise the pin in the same change.
 
 ## --threshold must be a number from 0 to 1
 

@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { BRIEF_LIMIT, UsageError, briefTooLong, trimBrief } from "@hackcove/pixelslash-engine";
+import { BRIEF_LIMIT, UsageError, briefTooLong, trimBrief } from "@slashsuite/pixelslash-engine";
 
 /**
  * `--brief FILE` or `--brief-text TEXT`, trimmed: the author's words, refused here when over the

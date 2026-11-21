@@ -15,7 +15,7 @@ import {
   type Composition,
   type Gap,
   type SpecialCase,
-} from "@hackcove/pixelslash-engine/composition-entry";
+} from "@slashsuite/pixelslash-engine/composition-entry";
 
 export type { Composition };
 

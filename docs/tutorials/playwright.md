@@ -2,7 +2,7 @@
 
 Your tests already log in, click through and reach the states you care about. Take the shots there, with one call, on plain Node.
 
-The helper is `@hackcove/pixelslash-playwright` on npm. It runs in your tests with no Bun. Comparing the results later uses the CLI, which does need [Bun](https://bun.sh) on your `PATH`.
+The helper is `@slashsuite/pixelslash-playwright` on npm. It runs in your tests with no Bun. Comparing the results later uses the CLI, which does need [Bun](https://bun.sh) on your `PATH`.
 
 Before you start: if Getting started left its two servers running on ports 4101 and 4102, stop them first (`kill %1 %2` in the shell that started them, or close it): this page serves its own pair on the same ports.
 
@@ -14,7 +14,7 @@ In a project with Playwright, or in a new one:
 mkdir my-tests && cd my-tests
 npm init -y
 npm pkg set type=module
-npm install -D @playwright/test @hackcove/pixelslash-playwright @hackcove/pixelslash
+npm install -D @playwright/test @slashsuite/pixelslash-playwright @slashsuite/pixelslash
 npx playwright install chromium-headless-shell
 ```
 
@@ -91,7 +91,7 @@ export default defineConfig({
 
 ```ts
 import { test } from "@playwright/test";
-import { snapshot } from "@hackcove/pixelslash-playwright";
+import { snapshot } from "@slashsuite/pixelslash-playwright";
 
 test("the account page", async ({ page }) => {
   await page.goto("/");

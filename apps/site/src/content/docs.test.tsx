@@ -185,7 +185,7 @@ describe("the docs pages", () => {
     const md = readFileSync(join(ROOT, "docs/getting-started.md"), "utf8");
     const doc = DOC_PAGE_DOCS.get("getting-started");
     expect(doc?.title).toBe("Getting started");
-    expect(md).toContain("npm i -D @hackcove/pixelslash");
+    expect(md).toContain("npm i -D @slashsuite/pixelslash");
     expect(md).toContain("pixelslash install-browser");
     const html = pageHtml.get("getting-started") ?? "";
     expect(html).not.toContain('href="cli.md');

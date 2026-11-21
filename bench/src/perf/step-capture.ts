@@ -1,4 +1,4 @@
-import * as engine from "@hackcove/pixelslash-engine";
+import * as engine from "@slashsuite/pixelslash-engine";
 import { chromium } from "playwright";
 
 const WARMUP = 1;

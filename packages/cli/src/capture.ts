@@ -18,7 +18,7 @@ import {
   type Timings,
   type UploadDeps,
   type DevJudgeDeps,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import type { Io } from "./run.ts";
 import { concurrencyFlag, readFlagPairs, takeJson, takeOnly, withConcurrency } from "./args.ts";
 import { UPLOAD_FLAGS, type UploadFlags, uploadDir } from "./upload.ts";

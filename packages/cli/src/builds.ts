@@ -1,4 +1,4 @@
-import { UsageError } from "@hackcove/pixelslash-engine";
+import { UsageError } from "@slashsuite/pixelslash-engine";
 import { RemoteError, isObj, objects, str } from "./api.ts";
 import { readFlagPairs, takeJson } from "./args.ts";
 import {

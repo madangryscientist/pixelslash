@@ -1,7 +1,7 @@
 import {
   parseParityManifest,
   type ParityManifest,
-} from "@hackcove/pixelslash-engine/parity-manifest";
+} from "@slashsuite/pixelslash-engine/parity-manifest";
 import { describe, expect, test } from "vitest";
 import { parityShotsOf } from "#/db/parity-columns";
 import { RED, shot } from "#/diff/test-shots";

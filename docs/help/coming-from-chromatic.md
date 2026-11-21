@@ -23,7 +23,7 @@ The rest of the capability comparison, including the tools either side does not 
 
 ## A first day
 
-1. **Install and get a browser.** `npm i -D @hackcove/pixelslash`, then `npx pixelslash install-browser`. A PNG-only comparison needs no browser.
+1. **Install and get a browser.** `npm i -D @slashsuite/pixelslash`, then `npx pixelslash install-browser`. A PNG-only comparison needs no browser.
 2. **Write a config.** `npx pixelslash init --storybook http://localhost:6006` reads the index and writes a `pixelslash.config.ts`; `init --url` does the same for a page. Edit names, viewports and themes there.
 3. **Measure locally.** `npx pixelslash capture` shoots the routes, and `npx pixelslash compare DIR_A DIR_B` diffs two shot directories. For a pair of URLs, `--live` and `--local` are the two sides. Nothing is uploaded.
 4. **Read the report.** Open `report.html` from `--out`. [Reading a report](../concepts/reading-a-report.md) labels it.

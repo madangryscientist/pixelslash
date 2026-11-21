@@ -1,11 +1,22 @@
 name: Release
 
-# Publishes the `@hackcove/pixelslash` npm package (packages/cli) when a `v*` tag is pushed: the CI gate first
-# (ci.yml, called as it is), then `npm publish --provenance`. There is no NPM_TOKEN anywhere: npm trusted
-# publishing (OIDC) lets this workflow publish with a short-lived token that npm checks against the
-# trusted publisher set on the package's npm settings page (repository, workflow file `release.yml`,
-# environment `npm`). That page, the `npm` environment and the tag are the maintainer's steps; nothing
-# here runs until a tag is pushed. Actions are pinned to a commit; the tag is in the comment.
+# Publishes `@slashsuite/pixelslash` (`packages/cli`) and `@slashsuite/pixelslash-playwright`
+# (`packages/playwright`) when a `v*` tag is pushed: the CI gate first (ci.yml, called as it is), then
+# build, pack, smoke-install the CLI tarball, and publish each package.
+#
+# Two publish paths, chosen per package from what npm already has:
+# - Steady state (package name already exists on npm with an approved version): npm trusted publishing
+#   (OIDC), with no NPM_TOKEN in the step's environment, via `npm publish --provenance --access public`.
+#   npm checks the short-lived OIDC token against the trusted publisher set on the package's npm settings
+#   page (repository `slashsuite/pixelslash`, workflow file `release.yml`, environment `npm`).
+# - First publish (package name does not exist on npm yet, or only holds npm's `0.0.0-stage` placeholder):
+#   `npm stage publish --provenance --access public` with `secrets.NPM_TOKEN` from the `npm` environment,
+#   written to a private userconfig under `$RUNNER_TEMP` that is removed on exit. The maintainer approves
+#   the staged package with 2FA under Staged Packages on npmjs.com and sets its trusted publisher; later
+#   releases then take the OIDC path.
+#
+# Already-published versions and already-staged non-rejected versions are skipped so a rerun is safe.
+# Nothing here runs until a `v*` tag is pushed. Actions are pinned to a commit; the tag is in the comment.
 
 on:
   push:
@@ -41,7 +52,10 @@ jobs:
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
-      - name: The tag is the package's version
+      # Staging needs npm 11.15.0 or newer; Node 24 may ship an older 11.x. Pinned, so the release runs a known npm.
+      - name: npm for staged publishing
+        run: npm install --global npm@11.15.0
+      - name: The tag is the CLI package's version
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -51,19 +65,101 @@ jobs:
             exit 1
           fi
       - run: bun install --frozen-lockfile
-      - run: bun scripts/build-cli.ts
-      - name: The tarball installs and writes a report
+      - name: Build, pack and smoke-check
         run: |
           set -euo pipefail
+          bun scripts/build-cli.ts
+          bun scripts/build-playwright.ts
           work="$RUNNER_TEMP/pack"
           mkdir -p "$work/try"
           npm pack ./packages/cli --pack-destination "$work"
+          npm pack ./packages/playwright --pack-destination "$work"
           cd "$work/try"
           npm init -y > /dev/null
-          npm i "$work"/hackcove-pixelslash-*.tgz
+          npm i "$work"/slashsuite-pixelslash-[0-9]*.tgz
           npx pixelslash --version
           npx pixelslash --live-png "$GITHUB_WORKSPACE/fixtures/ds/button.png" \
             --local-png "$GITHUB_WORKSPACE/fixtures/ds/card.png" --out out
           test -s out/report.html
-      - name: Publish
-        run: npm publish ./packages/cli --provenance --access public
+      # Classify each package from what npm already has. A package with only npm's `0.0.0-stage`
+      # placeholder (staged and awaiting first approval) has no trusted publisher yet and takes the
+      # staged path alongside brand-new names.
+      - name: Which packages npm has
+        id: packages
+        run: |
+          set -euo pipefail
+          published=""
+          staged=""
+          for dir in cli playwright; do
+            pkg="$(node -p "require('./packages/$dir/package.json').name")"
+            if out="$(npm view "$pkg" versions --json 2>"$RUNNER_TEMP/npm-view.err")"; then
+              kind="$(node -e 'const v = [].concat(JSON.parse(process.argv[1])); console.log(v.some((x) => x !== "0.0.0-stage") ? "on-npm" : "placeholder")' "$out")" || {
+                echo "::error::Could not read npm's versions of $pkg: $out"
+                exit 1
+              }
+            elif grep -q E404 <<<"$out$(cat "$RUNNER_TEMP/npm-view.err")"; then
+              kind="new"
+            else
+              echo "::error::Could not ask npm whether $pkg exists: $out $(cat "$RUNNER_TEMP/npm-view.err")"
+              exit 1
+            fi
+            if [ "$kind" = "on-npm" ]; then
+              published="$published $dir"
+            else
+              staged="$staged $dir"
+              echo "$pkg is staged: $kind"
+            fi
+          done
+          echo "published=${published# }" >> "$GITHUB_OUTPUT"
+          echo "staged=${staged# }" >> "$GITHUB_OUTPUT"
+          echo "through OIDC:${published:- none}; staged:${staged:- none}"
+      # Packages npm already has, published through OIDC. No token is in this step's environment.
+      - name: Publish (trusted publishing)
+        if: steps.packages.outputs.published != ''
+        env:
+          PUBLISHED: ${{ steps.packages.outputs.published }}
+        run: |
+          set -euo pipefail
+          for dir in $PUBLISHED; do
+            pkg="$(node -p "require('./packages/$dir/package.json').name")"
+            ver="$(node -p "require('./packages/$dir/package.json').version")"
+            tarball="$RUNNER_TEMP/pack/slashsuite-${pkg#@slashsuite/}-$ver.tgz"
+            if [ "$(npm view "$pkg@$ver" version 2>/dev/null || true)" = "$ver" ]; then
+              echo "$pkg@$ver is already on npm; skipped"
+              continue
+            fi
+            npm publish "$tarball" --provenance --access public
+          done
+      # First publish of a package name npm does not have yet, staged for 2FA approval. This is the
+      # only step that sees NPM_TOKEN; it is written to a private userconfig under $RUNNER_TEMP and
+      # removed on exit.
+      - name: Stage (NPM_TOKEN)
+        if: steps.packages.outputs.staged != ''
+        env:
+          STAGED: ${{ steps.packages.outputs.staged }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::Packages ($STAGED) are to be staged, which needs the NPM_TOKEN secret on the npm environment."
+            exit 1
+          fi
+          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/stage.npmrc"
+          trap 'rm -f "$NPM_CONFIG_USERCONFIG"' EXIT
+          (umask 077 && printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$NPM_CONFIG_USERCONFIG")
+          for dir in $STAGED; do
+            pkg="$(node -p "require('./packages/$dir/package.json').name")"
+            ver="$(node -p "require('./packages/$dir/package.json').version")"
+            tarball="$RUNNER_TEMP/pack/slashsuite-${pkg#@slashsuite/}-$ver.tgz"
+            waiting="$(npm stage list "$pkg" --json)"
+            already="$(node -e 'const v = process.argv[2]; console.log(JSON.parse(process.argv[1]).some((i) => i.version === v && !/reject/i.test(String(i.status))))' "$waiting" "$ver")" || {
+              echo "::error::Could not read the staged versions of $pkg: $waiting"
+              exit 1
+            }
+            if [ "$already" = "true" ]; then
+              echo "$pkg@$ver is already staged and waits for approval on npmjs.com; skipped"
+              continue
+            fi
+            npm stage publish "$tarball" --provenance --access public
+          done
+          echo "Staged versions wait for the maintainer's 2FA approval under Staged Packages on npmjs.com."

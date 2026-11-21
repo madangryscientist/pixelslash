@@ -16,7 +16,7 @@ export function startBrowserSentry(config: SentryConfig | null): void {
   if (!config || loaded) return;
   loaded = Promise.all([
     import("@sentry/react"),
-    import("@hackcove/pixelslash-engine/sentry-scrub"),
+    import("@slashsuite/pixelslash-engine/sentry-scrub"),
   ])
     .then(([Sentry, { scrubEvent }]) => {
       Sentry.init({

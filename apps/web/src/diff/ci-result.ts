@@ -1,4 +1,4 @@
-import { changedOf } from "@hackcove/pixelslash-engine/diff";
+import { changedOf } from "@slashsuite/pixelslash-engine/diff";
 import type { DiffOptions, DiffRegion, DiffResult, IgnoreRect } from "#/db/schema";
 
 /**

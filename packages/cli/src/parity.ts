@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
-import { UsageError } from "@hackcove/pixelslash-engine";
-import type { StaleDeclaration } from "@hackcove/pixelslash-engine/parity";
+import { UsageError } from "@slashsuite/pixelslash-engine";
+import type { StaleDeclaration } from "@slashsuite/pixelslash-engine/parity";
 import {
   EMPTY_MANIFEST,
   parseParityManifest,
   type ParityManifest,
-} from "@hackcove/pixelslash-engine/parity-manifest";
+} from "@slashsuite/pixelslash-engine/parity-manifest";
 import { REMOTE_EXIT, RemoteError, isObj, type FetchLike } from "./api.ts";
 import { readFlagPairs, takeJson } from "./args.ts";
 import {

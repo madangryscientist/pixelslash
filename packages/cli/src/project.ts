@@ -1,4 +1,4 @@
-import { UploadError, UsageError } from "@hackcove/pixelslash-engine";
+import { UploadError, UsageError } from "@slashsuite/pixelslash-engine";
 import { RemoteError, isObj, str } from "./api.ts";
 import { readFlagPairs, takeJson } from "./args.ts";
 import { REMOTE_FLAGS, connect, listProjects, type RemoteDeps } from "./remote.ts";

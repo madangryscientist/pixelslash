@@ -116,7 +116,7 @@ The job exits 1. With nothing different, the counts line is `pixelslash: 0 chang
 The pinned image is what makes two runs comparable across machines. If you cannot run it, install the CLI and capture with the machine's own browser, with both sides on one machine:
 
 ```
-npm i -D @hackcove/pixelslash
+npm i -D @slashsuite/pixelslash
 npx pixelslash install-browser
 BASE_URL=http://localhost:4101 npx pixelslash capture --out snapshots/main
 BASE_URL=http://localhost:4102 npx pixelslash capture --out snapshots/branch

@@ -1,5 +1,5 @@
 import { Caption, Disclosure, Stack, Text } from "@hackcove/ui-react";
-import type { Metrics, MetricsPart } from "@hackcove/pixelslash-engine/metrics-entry";
+import type { Metrics, MetricsPart } from "@slashsuite/pixelslash-engine/metrics-entry";
 
 /**
  * A shot's layout metrics (PS-294, `docs/metrics.md`) as a compact per-part list in the side panel (a table's columns do not fit the panel's width):

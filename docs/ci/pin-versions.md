@@ -9,15 +9,15 @@ A diff is only worth reading when the change came from your code. Pin what rende
 If the job runs the CLI from npm, pin the exact version:
 
 ```
-npm i -D -E @hackcove/pixelslash@0.7.0
+npm i -D -E @slashsuite/pixelslash@0.8.0
 ```
 
-`-E` writes `"@hackcove/pixelslash": "0.7.0"` to `package.json`, with no `^`. Check what you got with `npm ls`:
+`-E` writes `"@slashsuite/pixelslash": "0.8.0"` to `package.json`, with no `^`. Check what you got with `npm ls`:
 
 ```
-$ npm ls @hackcove/pixelslash
+$ npm ls @slashsuite/pixelslash
 my-site@1.0.0 …
-└── @hackcove/pixelslash@0.7.0
+└── @slashsuite/pixelslash@0.8.0
 ```
 
 Read the version from there. `npx pixelslash --version` prints the engine's version, `pixelslash 0.1.0`, not the package's.

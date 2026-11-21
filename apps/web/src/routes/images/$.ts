@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { METRICS_SUFFIX } from "@hackcove/pixelslash-engine/metrics-entry";
+import { METRICS_SUFFIX } from "@slashsuite/pixelslash-engine/metrics-entry";
 import { blobStore, imageSigningSecret } from "#/server/env";
 import { verifySignedImagePath } from "#/storage/signed";
 

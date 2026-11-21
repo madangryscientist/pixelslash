@@ -1,6 +1,6 @@
 import { afterAll, afterEach, describe, expect, test, vi } from "vitest";
 import { gunzipSync } from "node:zlib";
-import { CLIENT_VERSION } from "@hackcove/pixelslash-engine";
+import { CLIENT_VERSION } from "@slashsuite/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { capture, cleanup, faintPair, tmp } from "./support.ts";
 import { fakeUploadApi, gitRepo, snapshotDir as uploadDir } from "./upload-support.ts";

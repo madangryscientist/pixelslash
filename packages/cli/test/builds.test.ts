@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "vitest";
-import { CLIENT_VERSION, type ProcLike } from "@hackcove/pixelslash-engine";
+import { CLIENT_VERSION, type ProcLike } from "@slashsuite/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { capture, cleanup, tmp } from "./support.ts";
 import { SERVER, USER_TOKEN, fakeApi } from "./remote-support.ts";

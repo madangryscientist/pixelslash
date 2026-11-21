@@ -13,11 +13,11 @@ Every feature, with where it lives in the source: [FEATURES.md](FEATURES.md).
 
 You need [Bun](https://bun.sh) (the CLI runs on it, not on Node; `npx` and `bunx` both start it)
 and two shots of the same page: Main (the version you ship today) and Branch (your change).
-PixelSlash is early (0.7.x). It is published on npm as `@hackcove/pixelslash`:
-`npm i -D @hackcove/pixelslash` installs it, and the command is `pixelslash`.
+PixelSlash is early (0.8.x). It is published on npm as `@slashsuite/pixelslash`:
+`npm i -D @slashsuite/pixelslash` installs it, and the command is `pixelslash`.
 
 ```bash
-npx @hackcove/pixelslash --live-png a.png --local-png b.png --out out
+npx @slashsuite/pixelslash --live-png a.png --local-png b.png --out out
 ```
 
 Open `out/report.html`. A run with changes prints how many pixels changed and where the report is:
@@ -36,8 +36,8 @@ To shoot two URLs that are already up, install the browser once, then name them.
 server.
 
 ```bash
-npx @hackcove/pixelslash install-browser   # once per machine: Playwright's chromium-headless-shell
-npx @hackcove/pixelslash --live https://example.com --local http://localhost:3000 --out out
+npx @slashsuite/pixelslash install-browser   # once per machine: Playwright's chromium-headless-shell
+npx @slashsuite/pixelslash --live https://example.com --local http://localhost:3000 --out out
 ```
 
 Each capture waits for the page to settle (fonts, images, the network, two animation frames, an
