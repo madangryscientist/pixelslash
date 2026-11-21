@@ -7,7 +7,7 @@ PixelSlash compares two versions of a page, Main and Branch, pixel by pixel, and
 PixelSlash is one npm package with one command, `pixelslash`. Install it, fetch a browser once, and check that it runs:
 
 ```sh
-npm i -D @hackcove/pixelslash
+npm i -D @slashsuite/pixelslash
 npx pixelslash install-browser
 npx pixelslash --version
 ```
@@ -20,7 +20,7 @@ pixelslash install-browser [chromium|firefox|webkit|all]
 
 ### From npm
 
-As an npm package (`@hackcove/pixelslash`, installed with `npm i -D @hackcove/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`).
+As an npm package (`@slashsuite/pixelslash`, installed with `npm i -D @slashsuite/pixelslash`; its command is `pixelslash`, from `packages/cli`; `bun run build:cli` builds it, `npm pack` packs it), it needs Bun on `PATH` and takes `playwright` as a **peer dependency**: npm installs it beside the package, and `pixelslash install-browser` fetches Playwright's `chromium-headless-shell` once, for URL capture (`install-browser firefox`, `webkit` or `all` fetch the others, for `--browser`).
 
 PNG mode (`--live-png` / `--local-png`) needs no browser.
 
@@ -398,7 +398,7 @@ A variant is one way to shoot every route: a browser, a viewport and a theme. Tw
 { "setup": "./e2e/sign-in.ts" }
 ```
 
-- `setup` is the way in to pages behind sign-in: the path to a JS/TS module (relative to the config file) whose default export is an async function. It runs once, after `start` is ready and before the first shot, with `{ page, context, baseUrl }` (Playwright, in a fresh context whose `baseURL` is `baseUrl`, at the first variant's viewport and on the real clock). It runs in the first variant's browser; whatever it leaves in that context, cookies and local storage, is given to every shot, in whichever browser. The session is held in memory only: it is never written to the shot dir, the manifest or an upload. A setup that throws fails the capture with exit 1 and names the file; one that cannot be loaded or does not export a function is exit 2. Type it with `CaptureSetup` from `@hackcove/pixelslash-engine`.
+- `setup` is the way in to pages behind sign-in: the path to a JS/TS module (relative to the config file) whose default export is an async function. It runs once, after `start` is ready and before the first shot, with `{ page, context, baseUrl }` (Playwright, in a fresh context whose `baseURL` is `baseUrl`, at the first variant's viewport and on the real clock). It runs in the first variant's browser; whatever it leaves in that context, cookies and local storage, is given to every shot, in whichever browser. The session is held in memory only: it is never written to the shot dir, the manifest or an upload. A setup that throws fails the capture with exit 1 and names the file; one that cannot be loaded or does not export a function is exit 2. Type it with `CaptureSetup` from `@slashsuite/pixelslash-engine`.
 
   ```ts
   // Sign in through the form. The password comes from env, never the config.
@@ -442,7 +442,7 @@ A Storybook needs no route list: give `storybook` its URL and every story is sho
   - `include` (default `["**"]`) and `exclude` (default `[]`) are globs matched against the story id or its title; a story is shot when it matches `include` and not `exclude`. Nothing left after the filter is a config error, so a run that shoots nothing cannot pass.
   - Top-level `masks`, `tags` and `diff` apply to every story. `start.url` is not read; use `readyUrl` (it defaults to `baseUrl`, so to the Storybook's `url`).
   - Besides the usual settle, a story waits for Storybook's own signal (the preview shows `#storybook-root` with content), inside the same `timeoutMs`. A story that throws (Storybook's error display) or names no story fails the capture by name, and so does one that never renders.
-  - A story shot is cropped to the story, not the variant's viewport (PS-286). After the settle, capture takes the union of the boxes of everything visible under `#storybook-root` and of every visible element portalled into `<body>` beside it (popovers, menus, dialogs, toasts), grows it by 8 CSS px, rounds it out to whole CSS px, clips it to the page and cuts the PNG to that, so a 50 px button is about 66 px square. A story with `parameters.layout: "fullscreen"` (Storybook marks `<body>` `sb-main-fullscreen`) keeps the full page, as does one whose content box fills it. Ignore and mask rectangles and selectors, media warnings and composition boxes are measured on the same page and shifted by the crop origin, so they sit on the same pixels in the cropped image. Routes (every URL that is not a story) and `@hackcove/pixelslash-playwright` shots are never cropped. A crop is part of the PNG, so a baseline taken before it is a different size: the server diffs the overlap and states both sizes.
+  - A story shot is cropped to the story, not the variant's viewport (PS-286). After the settle, capture takes the union of the boxes of everything visible under `#storybook-root` and of every visible element portalled into `<body>` beside it (popovers, menus, dialogs, toasts), grows it by 8 CSS px, rounds it out to whole CSS px, clips it to the page and cuts the PNG to that, so a 50 px button is about 66 px square. A story with `parameters.layout: "fullscreen"` (Storybook marks `<body>` `sb-main-fullscreen`) keeps the full page, as does one whose content box fills it. Ignore and mask rectangles and selectors, media warnings and composition boxes are measured on the same page and shifted by the crop origin, so they sit on the same pixels in the cropped image. Routes (every URL that is not a story) and `@slashsuite/pixelslash-playwright` shots are never cropped. A crop is part of the PNG, so a baseline taken before it is a different size: the server diffs the overlap and states both sizes.
   - Storybook routes and hand-written `routes` can be mixed; two that land on the same name are a config error naming both. It reads `index.json` over HTTP and never imports Storybook, so the project needs no Storybook dependency from us.
 
 ### Masks and ignore areas
@@ -517,16 +517,16 @@ A project that builds its pages only from one design-system library's components
 
 - The read happens after the shot, so it cannot change the PNG. It reads the boxes in CSS px from the first `[data-part]` element's corner, never device pixels. A page with no `[data-part]` element writes no file and the shot has no `metrics`.
 - The file is carried as the manifest entry's optional `metrics` (its path under the shot dir). `upload` sends it with the shot, and the server keeps it with the shot; a shot without one is as it was. A manifest whose `metrics` file is missing or malformed is a usage error naming it.
-- The same applies to Storybook stories (they are routes), and `snapshot(page, name, { metrics: true })` in `@hackcove/pixelslash-playwright` writes the file for one shot.
+- The same applies to Storybook stories (they are routes), and `snapshot(page, name, { metrics: true })` in `@slashsuite/pixelslash-playwright` writes the file for one shot.
 - It never changes an exit code or a diff: the file is stored and shown, and compared only by [`pixelslash parity`](#parity-between-twins), which has its own exit code.
 
 ## Snapshots from your own Playwright tests
 
-`@hackcove/pixelslash-playwright` (`packages/playwright`; on npm, `npm install -D @hackcove/pixelslash-playwright`) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a shot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
+`@slashsuite/pixelslash-playwright` (`packages/playwright`; on npm, `npm install -D @slashsuite/pixelslash-playwright`) is for a team that already takes screenshots in its own Playwright suite and wants them reviewed without our capture image. `snapshot(page, name, opts)` shoots the page into a shot dir that `pixelslash upload` takes as it is, and measures the boxes to ignore at the moment of the shot: a PNG has no DOM, so "ignore this element" has to travel with it.
 
 ```ts
 import { test } from "@playwright/test";
-import { snapshot } from "@hackcove/pixelslash-playwright";
+import { snapshot } from "@slashsuite/pixelslash-playwright";
 
 test("watch page", async ({ page }) => {
   await page.goto("/watch/42");
@@ -548,7 +548,7 @@ pixelslash upload pixelslash-snapshots --server URL
 - What it cannot do from inside your test, and `capture` does: launch chromium with `--force-color-profile=srgb --font-render-hinting=none`, pin the clock and stop page timers, and fix the fonts. The flags go in your config's `launchOptions.args`; the fonts are the image's job. To pin the clock as `capture` does, before `goto`:
 
   ```ts
-  import { keepNativeRaf } from "@hackcove/pixelslash-playwright";
+  import { keepNativeRaf } from "@slashsuite/pixelslash-playwright";
 
   await page.addInitScript(keepNativeRaf); // the settle waits on real frames; a paused clock has none
   await page.clock.install({ time });

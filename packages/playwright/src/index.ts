@@ -20,11 +20,11 @@ import {
   type Metrics,
   type SnapshotEntry,
   type SnapshotManifest,
-} from "@hackcove/pixelslash-engine/playwright";
+} from "@slashsuite/pixelslash-engine/playwright";
 import type { Browser, Page } from "playwright";
 
 /** Add as an init script before pausing the page clock, so the settle keeps real frames. */
-export { keepNativeRaf } from "@hackcove/pixelslash-engine/playwright";
+export { keepNativeRaf } from "@slashsuite/pixelslash-engine/playwright";
 
 export type SnapshotOptions = {
   /** Selectors the diff skips. Measured at the screenshot as boxes in image px; the pixels stay. */

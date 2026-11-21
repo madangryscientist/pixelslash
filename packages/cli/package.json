@@ -1,6 +1,6 @@
 {
-  "name": "@hackcove/pixelslash",
-  "version": "0.7.0",
+  "name": "@slashsuite/pixelslash",
+  "version": "0.8.0",
   "description": "Visual review from the command line: capture Main and Branch, pixel-diff them, write a report.",
   "keywords": [
     "cli",
@@ -35,7 +35,7 @@
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
-    "@hackcove/pixelslash-engine": "workspace:*",
+    "@slashsuite/pixelslash-engine": "workspace:*",
     "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
     "vitest": "5.1.0"

@@ -1,9 +1,9 @@
 # PixelSlash facts
 
-Checked against main at 52e13ea on 2026-11-19.
+Checked against main at 4e3843d on 2026-11-21.
 
 ## What it is
-PixelSlash shows what changed on a web page between two versions of it, Main and Branch, as a report you open in a browser, and can send those shots to a review app where a person accepts or rejects each change. It is in alpha, and the command line tool is at version 0.7.
+PixelSlash shows what changed on a web page between two versions of it, Main and Branch, as a report you open in a browser, and can send those shots to a review app where a person accepts or rejects each change. It is in alpha, and the command line tool is at version 0.8.
 
 ## Today
 - `compare-two-pngs`: compares two PNG shots, Main and Branch, and writes a `report.html` that shows what changed; this needs no browser.
@@ -16,7 +16,7 @@ PixelSlash shows what changed on a web page between two versions of it, Main and
 - `pinned-capture-image`: `pixelslash capture` shoots every route in a config inside a pinned container image and records what rendered each shot.
 - `storybook-stories`: shoots every story of a running Storybook 7 or later from its index, with no route list.
 - `browser-choice`: a capture config can name Chromium, Firefox or WebKit; only Chromium is tested in a real browser.
-- `playwright-helper`: `@hackcove/pixelslash-playwright` takes shots from your own Playwright tests, in Chromium only.
+- `playwright-helper`: `@slashsuite/pixelslash-playwright` takes shots from your own Playwright tests, in Chromium only.
 - `native-screenshots`: takes Android and iOS shots (from Maestro or any tool that writes PNGs) and pairs them with web shots of the same name and theme.
 - `ignore-and-redact`: an area can be left out of the diff and still shown, or painted over before the PNG is written.
 - `design-system-judge`: optionally checks each shot against your design system's component images with a local vision model (mlx or ollama); with no judge installed it prints `skip: no judge` and reports no violations.
@@ -42,8 +42,8 @@ PixelSlash shows what changed on a web page between two versions of it, Main and
 - `licence`: Elastic-2.0, source available under the Elastic License 2.0 (not open source).
 
 ## Where it runs
-- `npm-cli`: the command line tool installs from npm as `@hackcove/pixelslash` and runs on Bun, not Node.
-- `npm-playwright-helper`: the Playwright helper installs from npm as `@hackcove/pixelslash-playwright` and runs on Node.
+- `npm-cli`: the command line tool installs from npm as `@slashsuite/pixelslash` and runs on Bun, not Node.
+- `npm-playwright-helper`: the Playwright helper installs from npm as `@slashsuite/pixelslash-playwright` and runs on Node.
 - `capture-image`: the capture image is published as `ghcr.io/slashsuite/pixelslash-capture`, one tag per release.
 - `from-source`: from a clone of the repository with Bun: `bun install`, then `bun run pixelslash`.
 - `hosted-review-app`: the review app is hosted at pixelslash.dev, with sign-in by GitHub or Google.

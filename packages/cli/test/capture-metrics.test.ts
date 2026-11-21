@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { join } from "node:path";
-import { readManifest } from "@hackcove/pixelslash-engine";
+import { readManifest } from "@slashsuite/pixelslash-engine";
 import { run } from "../src/run.ts";
 import { capture, cleanup, tmp } from "./support.ts";
 

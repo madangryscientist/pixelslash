@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
-import { MAX_METRICS_BYTES } from "@hackcove/pixelslash-engine/metrics-entry";
+import { MAX_METRICS_BYTES } from "@slashsuite/pixelslash-engine/metrics-entry";
 import { snapshots } from "#/db/schema";
 import { loadMetrics } from "#/server/metrics-read";
 import { orgBlobs } from "#/storage/blobs";

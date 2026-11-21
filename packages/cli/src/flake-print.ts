@@ -6,7 +6,7 @@ import {
   type Suggestion,
   UsageError,
   parseConfig,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { pathToFileURL } from "node:url";
 import { firstLine } from "./account.ts";
 import { isObj } from "./api.ts";

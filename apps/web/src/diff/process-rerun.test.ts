@@ -1,4 +1,4 @@
-import { diffPngs } from "@hackcove/pixelslash-engine/diff";
+import { diffPngs } from "@slashsuite/pixelslash-engine/diff";
 import { eq } from "drizzle-orm";
 import { describe, expect, test } from "vitest";
 import { ABANDONED_REASON } from "#/db/abandoned";

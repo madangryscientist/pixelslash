@@ -1,4 +1,4 @@
-import { UsageError } from "@hackcove/pixelslash-engine";
+import { UsageError } from "@slashsuite/pixelslash-engine";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { arg, text } from "./mcp-dev.ts";
 import type { Remote } from "./remote.ts";

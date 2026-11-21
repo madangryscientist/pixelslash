@@ -1,5 +1,5 @@
-import type { A11yDiff } from "@hackcove/pixelslash-engine/a11y-entry";
-import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
+import type { A11yDiff } from "@slashsuite/pixelslash-engine/a11y-entry";
+import type { Composition } from "@slashsuite/pixelslash-engine/composition-entry";
 import { and, eq, ne } from "drizzle-orm";
 import { nextToReviewId } from "#/lib/build-tabs";
 import { SNAPSHOT_GROUPS, reviewGroupOf } from "#/lib/snapshot-groups";

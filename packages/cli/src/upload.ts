@@ -24,7 +24,7 @@ import {
   type UploadDeps,
   type DevJudgeDeps,
   changeNoter,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { RemoteError } from "./api.ts";
 import { concurrencyFlag, flakeRetries, prNumber, readFlagPairs } from "./args.ts";
 import { ESCALATE, enterStage, uploadLine, uploadProgress } from "./failure.ts";

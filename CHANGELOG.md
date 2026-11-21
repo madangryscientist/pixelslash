@@ -1,11 +1,21 @@
 # Changelog
 
-All notable changes to the `@hackcove/pixelslash` npm package (`packages/cli`) are listed here. The format
+All notable changes to the `@slashsuite/pixelslash` npm package (`packages/cli`) are listed here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). The version is `packages/cli/package.json`'s, and a
 release is the tag `v<version>` (see `.github/workflows/release.yml`).
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-11-21
+
+### Changed
+
+- Moved the npm packages from the `@hackcove` scope to `@slashsuite`: `@hackcove/pixelslash` is now
+  `@slashsuite/pixelslash` (`0.8.0`), `@hackcove/pixelslash-playwright` is now
+  `@slashsuite/pixelslash-playwright` (`0.1.0`), and the internal bundled engine
+  `@hackcove/pixelslash-engine` is now `@slashsuite/pixelslash-engine`. Existing versions under
+  `@hackcove` stay on npm.
 
 ## [0.7.0] - 2026-11-03
 

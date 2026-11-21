@@ -11,7 +11,7 @@ import {
   loadDevConfig,
   loadFeature,
   resolveToken,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { readFlagPairs, takeJson } from "./args.ts";
 import type { DevArgs, DevDeps } from "./dev.ts";
 import type { Io } from "./run.ts";

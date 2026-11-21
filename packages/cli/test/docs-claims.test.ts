@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { UsageError } from "@hackcove/pixelslash-engine";
+import { UsageError } from "@slashsuite/pixelslash-engine";
 import { parseDevArgs } from "../src/dev.ts";
 
 /*

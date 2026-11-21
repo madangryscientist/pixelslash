@@ -4,7 +4,7 @@ import { run } from "../src/run.ts";
 import { capture, cleanup, solidPng, tmp } from "./support.ts";
 import { metaApi, pngDir } from "./import-support.ts";
 import { gitRepo } from "./upload-support.ts";
-import { readManifest } from "@hackcove/pixelslash-engine";
+import { readManifest } from "@slashsuite/pixelslash-engine";
 
 afterAll(cleanup);
 

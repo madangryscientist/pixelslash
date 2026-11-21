@@ -7,7 +7,7 @@ export const MASK_COLOR = "#FF00FF";
 
 /**
  * Areas of a live page, measured at screenshot time: what the diff ignores and what is masked.
- * `capture` and `@hackcove/pixelslash-playwright` both measure through here, so the two read a page alike.
+ * `capture` and `@slashsuite/pixelslash-playwright` both measure through here, so the two read a page alike.
  */
 
 /** The attribute that marks an element as an ignore area without a config entry. */

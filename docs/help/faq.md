@@ -42,7 +42,7 @@ To make CI wait for a person, end the job on `pixelslash status --wait` (or `upl
 
 ## Can I use my own Playwright tests?
 
-Yes. `@hackcove/pixelslash-playwright` gives your test a `snapshot(page, name, { ignore, redact })` call that settles the page, writes the PNG and records the ignore boxes. The directory it writes is a shot directory, so `pixelslash upload` takes it unchanged.
+Yes. `@slashsuite/pixelslash-playwright` gives your test a `snapshot(page, name, { ignore, redact })` call that settles the page, writes the PNG and records the ignore boxes. The directory it writes is a shot directory, so `pixelslash upload` takes it unchanged.
 
 It runs under plain `npx playwright test` on Node. [Snapshots from your own Playwright tests](../cli.md#snapshots-from-your-own-playwright-tests) has the import and the flags.
 

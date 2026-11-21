@@ -1,5 +1,5 @@
 {
-  "name": "@hackcove/pixelslash-playwright",
+  "name": "@slashsuite/pixelslash-playwright",
   "version": "0.1.0",
   "description": "Take PixelSlash snapshots from your own Playwright tests: snapshot(page, name) writes a dir `pixelslash upload` takes.",
   "keywords": [
@@ -30,9 +30,9 @@
     "access": "public"
   },
   "devDependencies": {
-    "@hackcove/pixelslash": "workspace:*",
-    "@hackcove/pixelslash-engine": "workspace:*",
     "@playwright/test": "1.65.1",
+    "@slashsuite/pixelslash": "workspace:*",
+    "@slashsuite/pixelslash-engine": "workspace:*",
     "@types/bun": "1.4.4",
     "@types/pngjs": "^6.0.5",
     "playwright": "1.65.1",

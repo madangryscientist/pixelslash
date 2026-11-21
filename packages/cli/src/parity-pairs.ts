@@ -1,16 +1,16 @@
-import { parseMetricsText, type Metrics } from "@hackcove/pixelslash-engine/metrics-entry";
+import { parseMetricsText, type Metrics } from "@slashsuite/pixelslash-engine/metrics-entry";
 import {
   compareParity,
   staleDeclarations,
   type Mismatch,
   type ParityPair,
   type StaleDeclaration,
-} from "@hackcove/pixelslash-engine/parity";
+} from "@slashsuite/pixelslash-engine/parity";
 import {
   PARITY_PLATFORMS,
   type ParityManifest,
   type ParityPlatform,
-} from "@hackcove/pixelslash-engine/parity-manifest";
+} from "@slashsuite/pixelslash-engine/parity-manifest";
 import { RemoteError, fetchBlob, isObj, objects, str, type FetchLike } from "./api.ts";
 import type { Remote } from "./remote.ts";
 

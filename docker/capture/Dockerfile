@@ -48,9 +48,9 @@ COPY packages/engine/package.json packages/engine/
 COPY packages/cli/package.json packages/cli/
 RUN bun install --frozen-lockfile --production
 # The CLI lists the engine under devDependencies (it is bundled for npm), which --production
-# skips, so link the workspace package by hand: src/run.ts imports `@hackcove/pixelslash-engine`.
-RUN mkdir -p packages/cli/node_modules/@hackcove \
- && ln -s ../../../engine packages/cli/node_modules/@hackcove/pixelslash-engine
+# skips, so link the workspace package by hand: src/run.ts imports `@slashsuite/pixelslash-engine`.
+RUN mkdir -p packages/cli/node_modules/@slashsuite \
+ && ln -s ../../../engine packages/cli/node_modules/@slashsuite/pixelslash-engine
 
 # Chromium, Firefox and WebKit at the versions this Playwright pins (PS-236), with their system
 # libraries. A variant names one of the three (`browser:`, Chromium by default). The distro fonts

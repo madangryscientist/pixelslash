@@ -2,7 +2,7 @@ import {
   MAX_METRICS_BYTES,
   parseMetricsText,
   type Metrics,
-} from "@hackcove/pixelslash-engine/metrics-entry";
+} from "@slashsuite/pixelslash-engine/metrics-entry";
 import { bad } from "./errors";
 
 /**

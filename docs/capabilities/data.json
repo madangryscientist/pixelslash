@@ -113,7 +113,7 @@
       "label": "Component SDK for your own test run",
       "ps": {
         "v": "p",
-        "note": "Playwright only: @hackcove/pixelslash-playwright snapshot() runs on plain Node and writes a dir `pixelslash upload` takes (the upload runs on Bun); on npm",
+        "note": "Playwright only: @slashsuite/pixelslash-playwright snapshot() runs on plain Node and writes a dir `pixelslash upload` takes (the upload runs on Bun); on npm",
         "commit": "cad8b76"
       },
       "t": {

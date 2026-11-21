@@ -66,7 +66,7 @@ try {
   const stub = uploadStub();
   const server = await stub.ready();
   try {
-    const cli = join(app, "node_modules/@hackcove/pixelslash/dist/index.js");
+    const cli = join(app, "node_modules/@slashsuite/pixelslash/dist/index.js");
     const flags = ["--server", server, "--branch", "ci", "--flake-retries", "0"];
     const env = { ...process.env, PIXELSLASH_TOKEN: "psci_test", HOME: scratch };
     console.log(

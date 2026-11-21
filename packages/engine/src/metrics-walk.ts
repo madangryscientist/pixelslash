@@ -12,7 +12,7 @@ import {
 /**
  * The web emitter of the layout metrics file (PS-294, `docs/metrics.md`): every `[data-part]`
  * element's box and computed style on the settled page, at the moment of the shot. `capture` and
- * `@hackcove/pixelslash-playwright` both read through here. The page read is dumb (strings as the
+ * `@slashsuite/pixelslash-playwright` both read through here. The page read is dumb (strings as the
  * browser reports them) and the conversion is plain code, so it runs under Node and Bun alike.
  */
 

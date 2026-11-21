@@ -140,13 +140,13 @@ $EDITOR ~/.config/pixelslash/token
 
 ### 9. Upload with the CLI
 
-The CLI is on npm as `@hackcove/pixelslash` (it runs on Bun, which must be on your PATH). In the repo you are
+The CLI is on npm as `@slashsuite/pixelslash` (it runs on Bun, which must be on your PATH). In the repo you are
 reviewing (it reads the commit and branch from the directory it runs in), with a `pixelslash.config.*` there and
-Playwright's browser installed (`npx @hackcove/pixelslash install-browser`):
+Playwright's browser installed (`npx @slashsuite/pixelslash install-browser`):
 
 ```bash
-npm i -D @hackcove/pixelslash
-npx @hackcove/pixelslash capture --upload \
+npm i -D @slashsuite/pixelslash
+npx @slashsuite/pixelslash capture --upload \
   --server https://<host> --token-path ~/.config/pixelslash/token
 ```
 

@@ -1,6 +1,6 @@
 /**
- * Pack the two npm packages, built and not published (PS-237): `@hackcove/pixelslash` (the CLI) and
- * `@hackcove/pixelslash-playwright` (the Playwright helper), as `npm pack` tarballs in one directory.
+ * Pack the two npm packages, built and not published (PS-237): `@slashsuite/pixelslash` (the CLI) and
+ * `@slashsuite/pixelslash-playwright` (the Playwright helper), as `npm pack` tarballs in one directory.
  * `bun scripts/pack-npm.ts [dir]` (default `packs/`) prints the two tarball paths, one per line.
  * `examples/playwright-node` installs them; publishing is a separate, deliberate step.
  */

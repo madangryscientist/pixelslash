@@ -2,7 +2,7 @@
 
 If something else already makes your shots, PixelSlash can diff them with no browser. Nothing here needs `install-browser`.
 
-You need the package from [Getting started](../getting-started.md): `npm i -D @hackcove/pixelslash`. Bun has to be on your `PATH`. The examples run in `~/my-pngs`.
+You need the package from [Getting started](../getting-started.md): `npm i -D @slashsuite/pixelslash`. Bun has to be on your `PATH`. The examples run in `~/my-pngs`.
 
 ## Two PNGs
 

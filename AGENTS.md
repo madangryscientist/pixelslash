@@ -28,7 +28,7 @@ holds what they inherit:
 | Project | Path | What it is |
 | --- | --- | --- |
 | `engine` | `packages/engine` | capture, diff, the DS judge, Figma rasters, the run store, the report |
-| `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@hackcove/pixelslash-engine` |
+| `cli` | `packages/cli` | the `pixelslash` bin: argv, stdout and exit codes, over `@slashsuite/pixelslash-engine` |
 | `web` | `apps/web` | the hosted review app: TanStack Start on Cloudflare Workers, D1 via Drizzle, R2, GitHub sign-in |
 | `site` | `apps/site` | the old docs site, TanStack Start on a Worker, each page prerendered from the repo's own docs (`docs/`, `SECURITY.md`, `apps/web/SELF-HOST.md`); no D1, R2 or sign-in. It has no domain: `apps/site/wrangler.jsonc` has `"routes": []`, so no public address reaches it. Its pages are on slashslash.build/pixelslash. pixelslash.dev is the review app (`apps/web`), which 301s every old path of this site to slashslash.build, except `/`, its own home (`apps/web/src/server/moved.ts`). The gate still builds, prerenders and tests the site (`apps/site/README.md`) |
 | `scripts` | `scripts` | `check-slop.ts`, `check-dashes.ts` and `write-fixtures.ts`; typecheck, lint and the test of `check-dashes.ts` |
@@ -238,7 +238,7 @@ when the PR title is not already in this form.
   changelog; `docs`, `test`, `chore`, `refactor`, `build`, `ci` and `style` do not. A `!` after the
   type (`feat(cli)!: …`), or a `BREAKING CHANGE:` footer, marks a break in the CLI contract
   (`docs/cli.md`: flags, stdout, exit codes) or in the upload API.
-- A release is `chore(release): @hackcove/pixelslash <version>`.
+- A release is `chore(release): @slashsuite/pixelslash <version>`.
 - No commit, PR title or PR body carries a `Co-Authored-By` or any other AI attribution line.
 
 Older subjects on `main` carry a private ticket, as the scope (`feat(PS-289): …`, `feat(ob 1421): …`)

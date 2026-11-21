@@ -1,6 +1,6 @@
-import { UsageError } from "@hackcove/pixelslash-engine";
-import type { Mismatch, StaleDeclaration } from "@hackcove/pixelslash-engine/parity";
-import type { ParityManifest, ParityPlatform } from "@hackcove/pixelslash-engine/parity-manifest";
+import { UsageError } from "@slashsuite/pixelslash-engine";
+import type { Mismatch, StaleDeclaration } from "@slashsuite/pixelslash-engine/parity";
+import type { ParityManifest, ParityPlatform } from "@slashsuite/pixelslash-engine/parity-manifest";
 import { RemoteError, isObj, objects, str, type FetchLike } from "./api.ts";
 import { DRIFT_EXIT, comparePairs, driftLines, pairsOf, type PairResult } from "./parity-pairs.ts";
 import type { Remote } from "./remote.ts";

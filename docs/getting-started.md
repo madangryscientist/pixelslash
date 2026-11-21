@@ -15,7 +15,7 @@ Then start in an empty directory:
 ```
 mkdir my-site && cd my-site
 npm init -y
-npm i -D @hackcove/pixelslash
+npm i -D @slashsuite/pixelslash
 npx pixelslash install-browser
 ```
 
@@ -28,7 +28,7 @@ $ npx pixelslash --version
 pixelslash 0.1.0
 ```
 
-That number is the engine inside the package, not the package itself. `npm ls @hackcove/pixelslash` prints the version you installed.
+That number is the engine inside the package, not the package itself. `npm ls @slashsuite/pixelslash` prints the version you installed.
 
 ## Serve two versions of a page
 

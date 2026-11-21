@@ -1,4 +1,4 @@
-import { UsageError } from "@hackcove/pixelslash-engine";
+import { UsageError } from "@slashsuite/pixelslash-engine";
 import { apiClient, isObj, str, type Reply } from "./api.ts";
 import { forgetToken, storeToken } from "./credentials.ts";
 import {

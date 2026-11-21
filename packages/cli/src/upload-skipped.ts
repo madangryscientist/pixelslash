@@ -1,4 +1,4 @@
-import { type UploadDeps, uploadSkipped } from "@hackcove/pixelslash-engine";
+import { type UploadDeps, uploadSkipped } from "@slashsuite/pixelslash-engine";
 import { prNumber, readFlagPairs } from "./args.ts";
 import { uploadProgress } from "./failure.ts";
 import type { Io } from "./run.ts";

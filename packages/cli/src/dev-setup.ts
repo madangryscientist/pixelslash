@@ -12,7 +12,7 @@ import {
   probeTarget,
   targetName,
   targetUrl,
-} from "@hackcove/pixelslash-engine";
+} from "@slashsuite/pixelslash-engine";
 import { RemoteError } from "./api.ts";
 import type { DevArgs, DevDeps } from "./dev.ts";
 import { connect, namesProject, resolveProject } from "./remote.ts";

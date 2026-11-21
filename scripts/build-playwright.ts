@@ -1,5 +1,5 @@
 /**
- * Build the `@hackcove/pixelslash-playwright` npm package (PS-237) into `packages/playwright`:
+ * Build the `@slashsuite/pixelslash-playwright` npm package (PS-237) into `packages/playwright`:
  * `dist/index.js`, one bundle for plain Node with the engine pieces `snapshot()` uses inlined, and
  * `dist/index.d.ts` beside it. It has no run-time dependencies: `@playwright/test` is a peer and only
  * its types are imported. `bun run build:playwright`.

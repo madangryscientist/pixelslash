@@ -1,12 +1,12 @@
-import type { Metrics } from "@hackcove/pixelslash-engine/metrics-entry";
-import { compareParity } from "@hackcove/pixelslash-engine/parity";
-import { LABELS, read } from "@hackcove/pixelslash-engine/parity-fields";
+import type { Metrics } from "@slashsuite/pixelslash-engine/metrics-entry";
+import { compareParity } from "@slashsuite/pixelslash-engine/parity";
+import { LABELS, read } from "@slashsuite/pixelslash-engine/parity-fields";
 import {
   EMPTY_MANIFEST,
   PARITY_FIELDS,
   type ParityManifest,
-} from "@hackcove/pixelslash-engine/parity-manifest";
-import { similarityOfPngs } from "@hackcove/pixelslash-engine/similarity-png";
+} from "@slashsuite/pixelslash-engine/parity-manifest";
+import { similarityOfPngs } from "@slashsuite/pixelslash-engine/similarity-png";
 import type { ParityColumns, ParityShot } from "#/db/parity-columns";
 import {
   MANIFEST_NOTICE,

@@ -12,8 +12,8 @@ import type {
   IgnoreRect,
   ResolvedDiff,
 } from "./diff-json";
-import type { A11y } from "@hackcove/pixelslash-engine/a11y-entry";
-import type { Composition } from "@hackcove/pixelslash-engine/composition-entry";
+import type { A11y } from "@slashsuite/pixelslash-engine/a11y-entry";
+import type { Composition } from "@slashsuite/pixelslash-engine/composition-entry";
 import { createdAt } from "./schema-columns";
 import { serverTimingColumns, snapshotTimingColumns } from "./schema-timings";
 import { isSmoke } from "./synthetic";
